@@ -1,0 +1,151 @@
+#dentalaiosguide.md
+
+You are building **Dental Empire OS Clinic**, a Cloudflare-only MVP for a dental clinic clinical workflow.
+
+## Product Goal
+
+Build a focused chairside clinical system that captures patient visits, dental findings, treatment plans, proposal PDFs, and Lark handover tasks.
+
+Do not build a full dental PMS.
+
+## Tech Stack
+
+Use:
+
+* TypeScript
+* React
+* Tailwind CSS
+* shadcn/ui
+* Cloudflare Workers
+* Hono
+* Cloudflare D1
+* Cloudflare R2
+* Cloudflare Queues
+* Wrangler
+
+Do not use:
+
+* Node.js server
+* Express server
+* PostgreSQL in V1
+* Firebase
+* Supabase
+* S3
+* external database
+* public file URLs
+* AI diagnosis in V1
+
+## Architecture Rules
+
+1. Frontend talks only to Worker API.
+2. Worker API talks to D1 and R2 through bindings.
+3. Every clinical table includes `tenant_id`.
+4. Every clinical action writes an audit log.
+5. R2 buckets are private.
+6. File access is always checked by Worker.
+7. Lark receives only operational fields.
+8. Do not place patient data in logs.
+9. Do not trust frontend role checks.
+10. Keep repository interfaces so D1 can migrate later.
+
+## First Feature to Build
+
+Build the workflow:
+
+```txt
+Today dashboard
+    ↓
+Open patient
+    ↓
+Create visit
+    ↓
+Add clinical finding by tooth
+    ↓
+Generate treatment plan
+    ↓
+Approve treatment plan
+    ↓
+Generate proposal PDF
+    ↓
+Create Lark handover task
+```
+
+## Suggested App Structure
+
+```txt
+src/
+├── app/
+│   ├── routes/
+│   ├── components/
+│   └── pages/
+├── worker/
+│   ├── index.ts
+│   ├── routes/
+│   ├── middleware/
+│   ├── repositories/
+│   ├── services/
+│   └── jobs/
+├── shared/
+│   ├── types/
+│   ├── constants/
+│   └── validation/
+└── db/
+    ├── migrations/
+    └── seeds/
+```
+
+## UI Pages
+
+Create these pages first:
+
+```txt
+/login
+/today
+/patients
+/patients/:id
+/visits/:id
+/treatment-plans/:id
+/settings/users
+/settings/roles
+```
+
+## Required Entities
+
+Create TypeScript types for:
+
+```txt
+Tenant
+Branch
+User
+Role
+Patient
+MedicalAlert
+Visit
+ClinicalFinding
+TreatmentPlan
+TreatmentPlanItem
+FileObject
+AuditLog
+LarkSyncLog
+```
+
+## Security Requirements
+
+* implement RBAC middleware
+* implement tenant isolation
+* implement audit logging
+* use private R2 buckets
+* never expose permanent clinical file links
+* do not log patient-sensitive values
+
+## Output Style
+
+When generating code:
+
+* prefer small files
+* use clear names
+* include error handling
+* include validation
+* include migration files
+* include minimal seed data
+* add comments only where useful
