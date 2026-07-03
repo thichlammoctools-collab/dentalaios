@@ -1,0 +1,11 @@
+# Reserved for Queue consumer jobs (Phase 5).
+#
+# Each job handler processes messages from the dentalaios-jobs queue.
+# Workers export a `queue` handler with shape:
+#   { queue: (batch, env, ctx) => Promise<void> }
+#
+# Suggested jobs (Phase 5):
+# - sync-lark.task.ts      → retry failed Lark task creation
+# - sync-lark.calendar.ts  → retry failed Lark calendar event creation
+# - generate-pdf.ts        → async PDF generation for large plans
+# - notify-overdue.ts      → cron-style reminder for unpaid treatments

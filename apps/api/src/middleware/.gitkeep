@@ -1,0 +1,7 @@
+# Reserved for cross-cutting middleware (Phase 2+)
+# Suggested modules:
+# - auth.ts       → JWT verification, populates c.get('user')
+# - tenant.ts     → extract tenant_id from JWT, attaches to c.get('tenant')
+# - rbac.ts       → role-based access checks
+# - audit.ts      → write audit log entry on every clinical mutation
+# - error.ts      → centralized error responses

@@ -1,0 +1,21 @@
+# Reserved for repository pattern (data access layer).
+#
+# Architecture rule #10: "Keep repository interfaces so D1 can migrate later."
+# Each repository should:
+#   - Export an interface (e.g., PatientRepository)
+#   - Export a D1 implementation (e.g., createPatientRepository(db))
+#   - Return plain entity types from src/shared/types
+#   - Never accept or return D1-specific types like D1Result outside this layer
+#
+# Suggested modules (Phase 2+):
+# - tenants.ts
+# - branches.ts
+# - users.ts
+# - patients.ts
+# - visits.ts
+# - findings.ts
+# - treatment-plans.ts
+# - payments.ts
+# - files.ts
+# - audit-logs.ts
+# - lark-sync-logs.ts

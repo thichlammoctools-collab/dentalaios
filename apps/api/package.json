@@ -1,0 +1,26 @@
+{
+  "name": "@dentalaios/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "d1:create": "wrangler d1 create dentalaios-db",
+    "d1:migrations:local": "wrangler d1 migrations apply dentalaios-db --local",
+    "d1:migrations:remote": "wrangler d1 migrations apply dentalaios-db --remote",
+    "d1:seed:local": "wrangler d1 execute dentalaios-db --local --file=../../src/db/seeds/0001_roles.sql",
+    "d1:seed:remote": "wrangler d1 execute dentalaios-db --remote --file=../../src/db/seeds/0001_roles.sql",
+    "r2:create": "wrangler r2 bucket create dentalaios-files",
+    "queue:create": "wrangler queues create dentalaios-jobs"
+  },
+  "dependencies": {
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240712.0",
+    "typescript": "^5.5.4",
+    "wrangler": "^4.103.0"
+  }
+}

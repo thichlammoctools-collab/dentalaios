@@ -1,0 +1,16 @@
+# Reserved for business-logic services (orchestration layer).
+#
+# Services coordinate repositories and external systems (R2, Queues, Lark).
+# Routes call services; services call repositories.
+#
+# Suggested modules (Phase 2+):
+# - auth.service.ts        → login, register, password hashing
+# - patient.service.ts     → patient CRUD, medical alerts
+# - visit.service.ts       → visit lifecycle, status transitions
+# - finding.service.ts     → clinical findings by tooth (FDI validation)
+# - plan.service.ts        → treatment plan creation, approval, total recalc
+# - payment.service.ts     → payment recording, outstanding balance
+# - pdf.service.ts         → generate proposal PDF via pdf-lib
+# - lark.service.ts        → create Lark task / calendar event from clinical data
+#   (Architecture rule #7: Lark receives ONLY operational fields —
+#    patient name OK, but no diagnosis details.)

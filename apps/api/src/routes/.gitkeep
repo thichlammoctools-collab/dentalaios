@@ -1,0 +1,3 @@
+# Reserved for route handlers (Phase 2+)
+# Each route file should export a Hono sub-app or list of route definitions.
+# Pattern: src/worker/routes/patients.ts → mounted at /api/patients
