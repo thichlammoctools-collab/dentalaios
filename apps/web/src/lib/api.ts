@@ -5,17 +5,22 @@
  * so the browser sees same-origin. In prod: VITE_API_URL points at deployed Worker.
  *
  * Architecture rule: frontend never talks to D1/R2 directly — only this client.
+ * Auth: bearer token attached automatically when present in localStorage.
  */
+
+import { getToken } from "./auth";
 
 const BASE_URL =
   (import.meta.env.VITE_API_URL as string | undefined) ?? "";
 
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -24,24 +29,29 @@ export async function api<T = unknown>(
   init?: RequestInit,
 ): Promise<T> {
   const url = `${BASE_URL}${path}`;
+  const token = getToken();
+
   const res = await fetch(url, {
     ...init,
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers ?? {}),
     },
   });
 
   if (!res.ok) {
     let message = `HTTP ${res.status} ${res.statusText}`;
+    let code: string | undefined;
     try {
-      const body = (await res.json()) as { error?: string };
+      const body = (await res.json()) as { error?: string; code?: string };
       if (body?.error) message = body.error;
+      if (body?.code) code = body.code;
     } catch {
       // body wasn't JSON; keep default message
     }
-    throw new ApiError(message, res.status);
+    throw new ApiError(message, res.status, code);
   }
 
   // 204 No Content

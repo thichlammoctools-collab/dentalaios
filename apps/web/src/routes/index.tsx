@@ -9,8 +9,8 @@ import { TreatmentPlanDetailPage } from "@/pages/TreatmentPlanDetailPage";
 import { UsersSettingsPage } from "@/pages/UsersSettingsPage";
 import { RolesSettingsPage } from "@/pages/RolesSettingsPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
+import { RequireAuth } from "@/components/RequireAuth";
 
-// Replace :id placeholders with real patterns
 const PATTERNS = {
   PATIENT_DETAIL: "/patients/:id",
   VISIT_DETAIL: "/visits/:id",
@@ -20,16 +20,69 @@ const PATTERNS = {
 export function AppRoutes() {
   return (
     <Routes>
-      {/* Root redirects to login until auth is wired in Phase 2 */}
+      {/* Public */}
       <Route path="/" element={<Navigate to={ROUTES.LOGIN} replace />} />
       <Route path={ROUTES.LOGIN} element={<LoginPage />} />
-      <Route path={ROUTES.TODAY} element={<TodayPage />} />
-      <Route path={ROUTES.PATIENTS} element={<PatientsPage />} />
-      <Route path={PATTERNS.PATIENT_DETAIL} element={<PatientDetailPage />} />
-      <Route path={PATTERNS.VISIT_DETAIL} element={<VisitDetailPage />} />
-      <Route path={PATTERNS.TREATMENT_PLAN} element={<TreatmentPlanDetailPage />} />
-      <Route path={ROUTES.SETTINGS_USERS} element={<UsersSettingsPage />} />
-      <Route path={ROUTES.SETTINGS_ROLES} element={<RolesSettingsPage />} />
+
+      {/* Protected */}
+      <Route
+        path={ROUTES.TODAY}
+        element={
+          <RequireAuth>
+            <TodayPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path={ROUTES.PATIENTS}
+        element={
+          <RequireAuth>
+            <PatientsPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path={PATTERNS.PATIENT_DETAIL}
+        element={
+          <RequireAuth>
+            <PatientDetailPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path={PATTERNS.VISIT_DETAIL}
+        element={
+          <RequireAuth>
+            <VisitDetailPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path={PATTERNS.TREATMENT_PLAN}
+        element={
+          <RequireAuth>
+            <TreatmentPlanDetailPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path={ROUTES.SETTINGS_USERS}
+        element={
+          <RequireAuth>
+            <UsersSettingsPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path={ROUTES.SETTINGS_ROLES}
+        element={
+          <RequireAuth>
+            <RolesSettingsPage />
+          </RequireAuth>
+        }
+      />
+
+      {/* 404 */}
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

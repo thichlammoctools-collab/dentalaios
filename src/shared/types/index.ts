@@ -204,3 +204,44 @@ export interface AuthSession {
   token: string; // JWT
   expires_at: string;
 }
+
+// ───────────────────────── API DTOs (request/response) ─────────────────────────
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  session: AuthSession;
+}
+
+export interface MeResponse {
+  user: User;
+  role: Role;
+  tenant: Tenant;
+  branch: Branch;
+}
+
+export interface ListResponse<T> {
+  items: T[];
+  total: number;
+}
+
+export interface ErrorResponse {
+  error: string;
+  code: string;
+  details?: unknown;
+}
+
+/** Payload inside JWT — minimal, never includes sensitive data. */
+export interface JwtPayload {
+  sub: string; // user id
+  tenant_id: string;
+  branch_id: string;
+  role_id: string;
+  // Roles rarely change; include name + permissions to skip DB lookup per request
+  permissions: string[];
+  exp: number; // unix timestamp
+  iat: number;
+}

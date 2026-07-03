@@ -16,11 +16,14 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "baseUrl": ".",
+    "baseUrl": "../../",
     "paths": {
       "@/*": ["./src/*"],
-      "@shared/*": ["../../src/shared/*"],
-      "@db/*": ["../../src/db/*"]
+      "@shared/*": ["src/shared/*"],
+      "@shared/types": ["src/shared/types/index.ts"],
+      "@shared/constants": ["src/shared/constants/index.ts"],
+      "@shared/validation": ["src/shared/validation/index.ts"],
+      "@db/*": ["src/db/*"]
     }
   },
   "include": [

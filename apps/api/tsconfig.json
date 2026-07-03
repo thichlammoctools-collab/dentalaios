@@ -5,14 +5,17 @@
     "types": ["@cloudflare/workers-types"],
     "noEmit": true,
     "paths": {
-      "@shared/*": ["../../src/shared/*"],
-      "@db/*": ["../../src/db/*"]
+      "@shared/*": ["src/shared/*"],
+      "@shared/types": ["src/shared/types/index.ts"],
+      "@shared/constants": ["src/shared/constants/index.ts"],
+      "@shared/validation": ["src/shared/validation/index.ts"],
+      "@db/*": ["src/db/*"]
     }
   },
   "include": [
     "src/**/*.ts",
-    "../../src/shared/**/*.ts",
-    "../../src/db/**/*.ts"
+    "src/shared/**/*.ts",
+    "src/db/**/*.ts"
   ],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist", "scripts"]
 }

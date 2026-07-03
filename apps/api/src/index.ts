@@ -17,6 +17,13 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { AppError } from "./lib/errors";
+
+import authRoutes from "./routes/auth";
+import patientsRoutes from "./routes/patients";
+import visitsRoutes from "./routes/visits";
+import treatmentPlansRoutes from "./routes/treatment-plans";
+import paymentsRoutes from "./routes/payments";
 
 export type Env = {
   DB: D1Database;
@@ -31,8 +38,8 @@ export type Env = {
 
 const app = new Hono<{ Bindings: Env }>();
 
-// Logger middleware — Hono's logger() must NEVER be passed to clinical values.
-// It logs method/path/status only, never bodies. Safe per architecture rule #8.
+// Logger middleware — Hono's logger() logs method/path/status only,
+// never bodies. Safe per architecture rule #8.
 app.use("*", logger());
 
 // CORS — open in dev; tighten via FRONTEND_ORIGIN in production via env override.
@@ -41,7 +48,6 @@ app.use(
   cors({
     origin: (origin, c) => {
       const allowed = c.env.FRONTEND_ORIGIN || "*";
-      // In dev allow any origin (vite may use random ports); prod uses FRONTEND_ORIGIN.
       return allowed === "*" ? origin || "*" : allowed;
     },
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -60,13 +66,32 @@ app.get("/api/health", (c) =>
   }),
 );
 
-// 404 fallback
-app.notFound((c) => c.json({ error: "Not found" }, 404));
+// Mount feature routes
+app.route("/api/auth", authRoutes);
+app.route("/api/patients", patientsRoutes);
+app.route("/api/visits", visitsRoutes);
+app.route("/api/treatment-plans", treatmentPlansRoutes);
+app.route("/api/payments", paymentsRoutes);
 
-// Error handler — never leak stack traces or DB errors to clients.
+// 404 fallback
+app.notFound((c) => c.json({ error: "Not found", code: "not_found" }, 404));
+
+// Error handler — map AppError to typed JSON responses.
+// Never leak stack traces or DB errors.
 app.onError((err, c) => {
+  if (err instanceof AppError) {
+    return c.json(
+      {
+        error: err.message,
+        code: err.code,
+        ...(err.details !== undefined ? { details: err.details } : {}),
+      },
+      err.status as 400 | 401 | 403 | 404 | 409 | 422 | 500,
+    );
+  }
+  // Unknown error — log message only, never clinical data
   console.error("Unhandled error:", err.message);
-  return c.json({ error: "Internal server error" }, 500);
+  return c.json({ error: "Internal server error", code: "internal_error" }, 500);
 });
 
 export default {
