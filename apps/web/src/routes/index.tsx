@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { ROUTES } from "@shared/constants";
 import { LoginPage } from "@/pages/LoginPage";
 import { TodayPage } from "@/pages/TodayPage";
@@ -20,6 +20,8 @@ const PATTERNS = {
 export function AppRoutes() {
   return (
     <Routes>
+      {/* Root redirects to login until auth is wired in Phase 2 */}
+      <Route path="/" element={<Navigate to={ROUTES.LOGIN} replace />} />
       <Route path={ROUTES.LOGIN} element={<LoginPage />} />
       <Route path={ROUTES.TODAY} element={<TodayPage />} />
       <Route path={ROUTES.PATIENTS} element={<PatientsPage />} />
