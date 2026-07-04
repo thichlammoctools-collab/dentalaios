@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import type { ReactNode } from "react";
 import { ROUTES } from "@shared/constants";
 import { LoginPage } from "@/pages/LoginPage";
 import { TodayPage } from "@/pages/TodayPage";
@@ -8,14 +9,24 @@ import { VisitDetailPage } from "@/pages/VisitDetailPage";
 import { TreatmentPlanDetailPage } from "@/pages/TreatmentPlanDetailPage";
 import { UsersSettingsPage } from "@/pages/UsersSettingsPage";
 import { RolesSettingsPage } from "@/pages/RolesSettingsPage";
+import { AuditLogsPage } from "@/pages/AuditLogsPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { RequireAuth } from "@/components/RequireAuth";
+import { AppShell } from "@/components/AppShell";
 
 const PATTERNS = {
   PATIENT_DETAIL: "/patients/:id",
   VISIT_DETAIL: "/visits/:id",
   TREATMENT_PLAN: "/treatment-plans/:id",
 } as const;
+
+function Protected({ children }: { children: ReactNode }) {
+  return (
+    <RequireAuth>
+      <AppShell>{children}</AppShell>
+    </RequireAuth>
+  );
+}
 
 export function AppRoutes() {
   return (
@@ -28,57 +39,65 @@ export function AppRoutes() {
       <Route
         path={ROUTES.TODAY}
         element={
-          <RequireAuth>
+          <Protected>
             <TodayPage />
-          </RequireAuth>
+          </Protected>
         }
       />
       <Route
         path={ROUTES.PATIENTS}
         element={
-          <RequireAuth>
+          <Protected>
             <PatientsPage />
-          </RequireAuth>
+          </Protected>
         }
       />
       <Route
         path={PATTERNS.PATIENT_DETAIL}
         element={
-          <RequireAuth>
+          <Protected>
             <PatientDetailPage />
-          </RequireAuth>
+          </Protected>
         }
       />
       <Route
         path={PATTERNS.VISIT_DETAIL}
         element={
-          <RequireAuth>
+          <Protected>
             <VisitDetailPage />
-          </RequireAuth>
+          </Protected>
         }
       />
       <Route
         path={PATTERNS.TREATMENT_PLAN}
         element={
-          <RequireAuth>
+          <Protected>
             <TreatmentPlanDetailPage />
-          </RequireAuth>
+          </Protected>
         }
       />
       <Route
         path={ROUTES.SETTINGS_USERS}
         element={
-          <RequireAuth>
+          <Protected>
             <UsersSettingsPage />
-          </RequireAuth>
+          </Protected>
         }
       />
       <Route
         path={ROUTES.SETTINGS_ROLES}
         element={
-          <RequireAuth>
+          <Protected>
             <RolesSettingsPage />
-          </RequireAuth>
+          </Protected>
+        }
+      />
+      <Route
+        path="/settings/audit-logs"
+        element={
+          <Protected>
+            <AuditLogsPage />
+          </Protected>
         }
       />
 
