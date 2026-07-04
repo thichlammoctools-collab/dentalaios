@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
 import { requireAuth, getJwt } from "../../src/middleware/auth";
 import { requirePermission, requireAnyPermission } from "../../src/middleware/rbac";
@@ -8,6 +8,7 @@ import { signJwt } from "../../src/lib/jwt";
 import { TEST_SECRET, buildEnv } from "../helpers/jwt";
 import { PERMISSIONS } from "@shared/constants";
 import { createTestApp } from "../helpers/app";
+import { createMockD1 } from "../helpers/mock-db";
 
 async function makeToken(permissions: string[]): Promise<string> {
   return (
@@ -45,14 +46,15 @@ function makeApp() {
   return app;
 }
 
-describe("requirePermission middleware", () => {
-  let env: Env;
-  beforeEach(() => {
-    env = buildEnv({} as any);
-  });
+function makeEnv() {
+  const db = createMockD1();
+  return buildEnv(db, { JWT_SECRET: TEST_SECRET });
+}
 
+describe("requirePermission middleware", () => {
   it("grants access when permission present", async () => {
     const app = makeApp();
+    const env = makeEnv();
     const token = await makeToken(["write_plans"]);
     const res = await app.request(
       "/write-plans",
@@ -64,6 +66,7 @@ describe("requirePermission middleware", () => {
 
   it("denies access when permission missing", async () => {
     const app = makeApp();
+    const env = makeEnv();
     const token = await makeToken(["read_patients"]);
     const res = await app.request(
       "/write-plans",
@@ -78,6 +81,7 @@ describe("requirePermission middleware", () => {
 
   it("PERMISSIONS.ALL bypasses all checks (admin)", async () => {
     const app = makeApp();
+    const env = makeEnv();
     const token = await makeToken(["all"]);
     const res = await app.request(
       "/approve",
@@ -89,7 +93,7 @@ describe("requirePermission middleware", () => {
 
   it("receptionist cannot approve plans", async () => {
     const app = makeApp();
-    // receptionist permissions from seed
+    const env = makeEnv();
     const token = await makeToken(["read_patients", "write_payments", "write_appointments"]);
     const res = await app.request(
       "/approve",
@@ -101,40 +105,38 @@ describe("requirePermission middleware", () => {
 
   it("assistant can read but not write_plans", async () => {
     const app = makeApp();
+    const env = makeEnv();
     const token = await makeToken(["read_patients", "write_visits"]);
-    const resWrite = await app.request(
+    const res = await app.request(
       "/write-plans",
       { headers: { Authorization: `Bearer ${token}` } },
       env,
     );
-    expect(resWrite.status).toBe(403);
+    expect(res.status).toBe(403);
   });
 
   it("doctor can write_plans but not manage_users", async () => {
     const app = makeApp();
+    const env = makeEnv();
     const token = await makeToken([
       "read_patients",
       "write_findings",
       "write_plans",
       "approve_plans",
     ]);
-    const resPlans = await app.request(
+    const res = await app.request(
       "/write-plans",
       { headers: { Authorization: `Bearer ${token}` } },
       env,
     );
-    expect(resPlans.status).toBe(200);
+    expect(res.status).toBe(200);
   });
 });
 
 describe("requireAnyPermission middleware", () => {
-  let env: Env;
-  beforeEach(() => {
-    env = buildEnv({} as any);
-  });
-
   it("grants when ANY required permission present", async () => {
     const app = makeApp();
+    const env = makeEnv();
     const token = await makeToken(["write_payments"]);
     const res = await app.request(
       "/any-payment",
@@ -146,6 +148,7 @@ describe("requireAnyPermission middleware", () => {
 
   it("grants when alternative permission present", async () => {
     const app = makeApp();
+    const env = makeEnv();
     const token = await makeToken(["write_appointments"]);
     const res = await app.request(
       "/any-payment",
@@ -157,6 +160,7 @@ describe("requireAnyPermission middleware", () => {
 
   it("denies when none of the required permissions present", async () => {
     const app = makeApp();
+    const env = makeEnv();
     const token = await makeToken(["read_patients"]);
     const res = await app.request(
       "/any-payment",

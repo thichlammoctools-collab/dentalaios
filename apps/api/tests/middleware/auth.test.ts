@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
 import { requireAuth, getJwt } from "../../src/middleware/auth";
 import type { Env } from "../../src/index";
@@ -18,28 +18,30 @@ function makeApp() {
   return app;
 }
 
+function makeEnv() {
+  const db = createMockD1();
+  return buildEnv(db, { JWT_SECRET: TEST_SECRET });
+}
+
+async function makeValidToken(): Promise<string> {
+  return (
+    await signJwt(
+      {
+        sub: USER_A,
+        tenant_id: TENANT_A,
+        branch_id: "branch-1",
+        role_id: "role-1",
+        permissions: ["read_patients"],
+      },
+      TEST_SECRET,
+    )
+  ).token;
+}
+
 describe("requireAuth middleware", () => {
-  let env: Env;
-  let validToken: string;
-
-  beforeEach(async () => {
-    env = buildEnv(createMockD1());
-    validToken = (
-      await signJwt(
-        {
-          sub: USER_A,
-          tenant_id: TENANT_A,
-          branch_id: "branch-1",
-          role_id: "role-1",
-          permissions: ["read_patients"],
-        },
-        TEST_SECRET,
-      )
-    ).token;
-  });
-
   it("rejects request without Authorization header", async () => {
-    const { app } = makeApp();
+    const app = makeApp();
+    const env = makeEnv();
     const res = await app.request("/protected", {}, env);
     expect(res.status).toBe(401);
     const body = (await res.json()) as { error: string; code: string };
@@ -47,7 +49,8 @@ describe("requireAuth middleware", () => {
   });
 
   it("rejects malformed Authorization header (no Bearer prefix)", async () => {
-    const { app } = makeApp();
+    const app = makeApp();
+    const env = makeEnv();
     const res = await app.request(
       "/protected",
       { headers: { Authorization: "Token abc" } },
@@ -57,7 +60,8 @@ describe("requireAuth middleware", () => {
   });
 
   it("rejects empty Bearer token", async () => {
-    const { app } = makeApp();
+    const app = makeApp();
+    const env = makeEnv();
     const res = await app.request(
       "/protected",
       { headers: { Authorization: "Bearer " } },
@@ -67,7 +71,9 @@ describe("requireAuth middleware", () => {
   });
 
   it("rejects token with invalid signature", async () => {
-    const { app } = makeApp();
+    const app = makeApp();
+    const env = makeEnv();
+    const validToken = await makeValidToken();
     const res = await app.request(
       "/protected",
       { headers: { Authorization: `Bearer ${validToken.slice(0, -5)}XXXXX` } },
@@ -90,7 +96,8 @@ describe("requireAuth middleware", () => {
       .setExpirationTime(Math.floor(Date.now() / 1000) - 3600)
       .sign(new TextEncoder().encode(TEST_SECRET));
 
-    const { app } = makeApp();
+    const app = makeApp();
+    const env = makeEnv();
     const res = await app.request(
       "/protected",
       { headers: { Authorization: `Bearer ${expired}` } },
@@ -113,7 +120,8 @@ describe("requireAuth middleware", () => {
       )
     ).token;
 
-    const { app } = makeApp();
+    const app = makeApp();
+    const env = makeEnv();
     const res = await app.request(
       "/protected",
       { headers: { Authorization: `Bearer ${wrongToken}` } },
@@ -123,7 +131,9 @@ describe("requireAuth middleware", () => {
   });
 
   it("accepts valid token and attaches JWT to context", async () => {
-    const { app } = makeApp();
+    const validToken = await makeValidToken();
+    const app = makeApp();
+    const env = makeEnv();
     const res = await app.request(
       "/protected",
       { headers: { Authorization: `Bearer ${validToken}` } },
@@ -136,12 +146,12 @@ describe("requireAuth middleware", () => {
     expect(body.tenant).toBe(TENANT_A);
   });
 
-  it("getJwt throws when middleware not registered", async () => {
+  it("getJwt throws when middleware not registered", () => {
     const app = new Hono<{ Bindings: Env; Variables: AuthContext }>();
     app.get("/no-auth", (c) => {
-      getJwt(c); // should throw
-      return c.json({ ok: true });
+      throw new Error("JWT not set");
     });
-    await expect(app.request("/no-auth", {}, env)).rejects.toThrow("JWT not set");
+    // Verify the error message matches
+    expect(() => getJwt({ get: () => undefined } as any)).toThrow("JWT not set");
   });
 });
