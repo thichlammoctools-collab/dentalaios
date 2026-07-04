@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { visitCreateSchema, visitUpdateSchema, findingCreateSchema } from "@shared/validation";
+import { visitCreateSchema, visitUpdateSchema, findingCreateSchema, findingUpdateSchema } from "@shared/validation";
 import { PERMISSIONS } from "@shared/constants";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
@@ -90,6 +90,26 @@ router.post(
     const data = c.req.valid("json");
     const created = await visitService.addFinding(c.env.DB, jwt.tenant_id, c.req.param("id"), data);
     return c.json(created, 201);
+  },
+);
+
+// PATCH /api/visits/:visitId/findings/:findingId
+router.patch(
+  "/:visitId/findings/:findingId",
+  requirePermission(PERMISSIONS.WRITE_FINDINGS),
+  auditLog("update", "clinical_finding"),
+  zValidator("json", findingUpdateSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const data = c.req.valid("json");
+    const updated = await visitService.updateFinding(
+      c.env.DB,
+      jwt.tenant_id,
+      c.req.param("visitId"),
+      c.req.param("findingId"),
+      data,
+    );
+    return c.json(updated, 200);
   },
 );
 

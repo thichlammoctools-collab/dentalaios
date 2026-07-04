@@ -110,6 +110,13 @@ export const findingCreateSchema = z.object({
 
 export type FindingCreateInput = z.infer<typeof findingCreateSchema>;
 
+export const findingUpdateSchema = z.object({
+  condition: nonEmpty(100),
+  notes: optionalText(2000),
+});
+
+export type FindingUpdateInput = z.infer<typeof findingUpdateSchema>;
+
 // ──────────────── Treatment plan ────────────────
 
 export const planCreateSchema = z.object({

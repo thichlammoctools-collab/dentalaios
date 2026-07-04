@@ -102,7 +102,13 @@ export function VisitDetailPage() {
           <CardTitle>Findings ({findings.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          <FindingsList findings={findings} />
+          <FindingsList
+            visitId={visit.id}
+            findings={findings}
+            onUpdate={(updated) =>
+              setFindings((prev) => prev.map((f) => (f.id === updated.id ? updated : f)))
+            }
+          />
         </CardContent>
       </Card>
 

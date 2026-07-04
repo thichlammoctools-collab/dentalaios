@@ -9,6 +9,11 @@ export interface FindingsRepository {
     visitId: string,
     data: Omit<ClinicalFinding, "id" | "tenant_id" | "visit_id" | "tooth_system" | "created_at">,
   ): Promise<ClinicalFinding>;
+  update(
+    tenantId: string,
+    id: string,
+    data: { condition: string; notes: string | null },
+  ): Promise<ClinicalFinding>;
   delete(tenantId: string, id: string): Promise<boolean>;
 }
 
@@ -41,6 +46,23 @@ export function createFindingsRepository(db: D1Database): FindingsRepository {
         .bind(tenantId, id)
         .first()) as D1Row | null;
       if (!row) throw new Error("Insert succeeded but read failed");
+      return mapFinding(row);
+    },
+
+    async update(tenantId, id, data) {
+      await db
+        .prepare(
+          `UPDATE clinical_findings
+             SET condition = ?, notes = ?
+           WHERE tenant_id = ? AND id = ?`,
+        )
+        .bind(data.condition, data.notes, tenantId, id)
+        .run();
+      const row = (await db
+        .prepare("SELECT * FROM clinical_findings WHERE tenant_id = ? AND id = ? LIMIT 1")
+        .bind(tenantId, id)
+        .first()) as D1Row | null;
+      if (!row) throw new Error("Update succeeded but read failed");
       return mapFinding(row);
     },
 

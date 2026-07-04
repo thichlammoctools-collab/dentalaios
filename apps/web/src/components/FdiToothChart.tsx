@@ -52,7 +52,7 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
         title={tooltip ?? `#${n}`}
         onClick={() => setSelected(n)}
         className={cn(
-          "flex h-10 w-10 flex-col items-center justify-center rounded border text-xs transition-colors",
+          "flex h-8 w-8 flex-col items-center justify-center rounded border text-xs transition-colors sm:h-10 sm:w-10",
           hasFinding
             ? "border-red-400 bg-red-50 text-red-900"
             : "border-border bg-background hover:border-primary hover:bg-accent",
@@ -92,15 +92,17 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
     <div className="space-y-4">
       <div className="rounded-lg border border-border bg-card p-4">
         <p className="mb-3 text-center text-xs text-muted-foreground">↑ Hàm trên (Patient's right | left)</p>
-        <div className="mx-auto flex max-w-md justify-center gap-0">
-          <div className="flex">{UPPER_RIGHT.map((n) => renderTooth(n, "right"))}</div>
-          <div className="mx-1 w-px bg-border" />
-          <div className="flex">{UPPER_LEFT.map((n) => renderTooth(n, "left"))}</div>
-        </div>
-        <div className="mx-auto mt-3 flex max-w-md justify-center gap-0">
-          <div className="flex">{LOWER_RIGHT.map((n) => renderTooth(n, "right"))}</div>
-          <div className="mx-1 w-px bg-border" />
-          <div className="flex">{LOWER_LEFT.map((n) => renderTooth(n, "left"))}</div>
+        <div className="overflow-x-auto">
+          <div className="flex min-w-max justify-center gap-0">
+            <div className="flex">{UPPER_RIGHT.map((n) => renderTooth(n, "right"))}</div>
+            <div className="mx-1 w-px flex-shrink-0 bg-border" />
+            <div className="flex">{UPPER_LEFT.map((n) => renderTooth(n, "left"))}</div>
+          </div>
+          <div className="mt-3 flex min-w-max justify-center gap-0">
+            <div className="flex">{LOWER_RIGHT.map((n) => renderTooth(n, "right"))}</div>
+            <div className="mx-1 w-px flex-shrink-0 bg-border" />
+            <div className="flex">{LOWER_LEFT.map((n) => renderTooth(n, "left"))}</div>
+          </div>
         </div>
         <p className="mt-3 text-center text-xs text-muted-foreground">↓ Hàm dưới</p>
       </div>

@@ -1,6 +1,6 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import type { Visit, ClinicalFinding } from "@shared/types";
-import type { VisitCreateInput, VisitUpdateInput, FindingCreateInput } from "@shared/validation";
+import type { VisitCreateInput, VisitUpdateInput, FindingCreateInput, FindingUpdateInput } from "@shared/validation";
 import { createVisitsRepository } from "../repositories/visits.repo";
 import { createFindingsRepository } from "../repositories/findings.repo";
 import { NotFoundError } from "../lib/errors";
@@ -46,13 +46,27 @@ export const visitService = {
     visitId: string,
     data: FindingCreateInput,
   ): Promise<ClinicalFinding> {
-    // Ensure visit exists in this tenant
     const visit = await createVisitsRepository(db).getById(tenantId, visitId);
     if (!visit) throw new NotFoundError("Visit not found");
     return createFindingsRepository(db).create(tenantId, visitId, {
       tooth_number: data.tooth_number,
       condition: data.condition,
       notes: data.notes,
+    });
+  },
+
+  async updateFinding(
+    db: D1Database,
+    tenantId: string,
+    visitId: string,
+    findingId: string,
+    data: FindingUpdateInput,
+  ): Promise<ClinicalFinding> {
+    const visit = await createVisitsRepository(db).getById(tenantId, visitId);
+    if (!visit) throw new NotFoundError("Visit not found");
+    return createFindingsRepository(db).update(tenantId, findingId, {
+      condition: data.condition,
+      notes: data.notes ?? null,
     });
   },
 };
