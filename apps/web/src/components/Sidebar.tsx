@@ -35,7 +35,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
 
   return (
     <div className="flex h-full w-60 flex-col">
-      <div className="flex h-16 items-center gap-2 border-b border-border px-5 dark:border-slate-800">
+      <div className="flex h-16 items-center gap-2 border-b border-border px-5">
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 text-lg font-bold text-white shadow-sm">
           D
         </div>
@@ -67,7 +67,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         })}
 
         {pathname.startsWith("/settings") && (
-          <div className="mt-3 space-y-0.5 border-t border-border pt-3 dark:border-slate-800">
+          <div className="mt-3 space-y-0.5 border-t border-border pt-3">
             <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
               Quản trị
             </p>
@@ -94,7 +94,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         )}
       </nav>
 
-      <div className="border-t border-border p-3 text-xs text-muted-foreground dark:border-slate-800">
+      <div className="border-t border-border p-3 text-xs text-muted-foreground">
         <p>v0.1.0 · MVP</p>
       </div>
     </div>

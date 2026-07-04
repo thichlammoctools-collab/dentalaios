@@ -35,7 +35,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   };
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-border bg-white px-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:px-6">
+    <header className="flex h-16 items-center justify-between border-b border-border bg-card px-4 shadow-sm sm:px-6">
       <div className="flex items-center gap-3">
         {/* Mobile menu button */}
         {onMenuClick && (

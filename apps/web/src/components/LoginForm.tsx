@@ -77,7 +77,7 @@ export function LoginForm() {
       </button>
 
       <p className="text-xs text-muted-foreground">
-        Demo: <code>admin@demo.clinic</code> / <code>password123</code>
+        Demo: <code>admin@demo.clinic</code> / <code>demo123</code>
       </p>
     </form>
   );
