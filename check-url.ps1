@@ -26,9 +26,9 @@ foreach ($url in $urls) {
     } catch {
         $statusCode = $_.Exception.Response.StatusCode.value__
         if ($statusCode) {
-            Write-Host "  $url — HTTP $statusCode (may need auth)" -ForegroundColor Yellow
+            Write-Host "  $url - HTTP $statusCode (may need auth)" -ForegroundColor Yellow
         } else {
-            Write-Host "  $url — $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "  $url - $($_.Exception.Message)" -ForegroundColor Red
         }
     }
 }

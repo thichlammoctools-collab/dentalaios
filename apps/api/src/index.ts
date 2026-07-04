@@ -56,14 +56,18 @@ app.use(
       const allowed = c.env.FRONTEND_ORIGIN || "";
       const isProd = c.env.ENVIRONMENT === "production";
 
-      // Helper: match origin against allowed pattern (with optional wildcard subdomain)
+      // Helper: match origin against allowed pattern.
+      // Wildcard `*` matches a SINGLE subdomain segment (e.g. "abc").
+      // Empty subdomain is also allowed (canonical URL).
       const matches = (origin: string, pattern: string): boolean => {
         if (origin === pattern) return true;
-        // Support wildcard: "https://*.example.com" matches "https://abc.example.com"
         if (pattern.includes("*")) {
-          const regex = new RegExp(
-            "^" + pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[a-z0-9-]+") + "$",
-          );
+          // Escape regex special chars except * which we replace with optional
+          // single-subdomain pattern: ([a-z0-9-]+\.)?
+          const escaped = pattern
+            .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+            .replace(/\\\*/g, "([a-z0-9-]+\\.)?");
+          const regex = new RegExp("^" + escaped + "$");
           return regex.test(origin);
         }
         return false;
