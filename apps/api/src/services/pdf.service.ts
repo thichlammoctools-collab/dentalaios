@@ -2,12 +2,13 @@
  * Treatment plan proposal PDF generator.
  *
  * Uses pdf-lib to compose a simple A4 PDF with patient info,
- * treatment items table, and total. Vietnamese text uses
- * StandardFonts.Helvetica (Latin only) — for full Vietnamese
- * support, embed a TTF later.
+ * treatment items table, and total. Uses Noto Sans Vietnamese
+ * (TTF) to ensure full Vietnamese diacritic support.
  */
 
-import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
+import { PDFDocument, rgb, type PDFFont } from "pdf-lib";
+import RegularFont from "../fonts/NotoSansVietnamese-Regular.ttf";
+import BoldFont from "../fonts/NotoSansVietnamese-Bold.ttf";
 import type {
   Patient,
   TreatmentPlan,
@@ -39,8 +40,8 @@ export async function buildProposalPdf(input: BuildPdfInput): Promise<Uint8Array
 
   const pdf = await PDFDocument.create();
   const page = pdf.addPage([595.28, 841.89]); // A4
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const font = await pdf.embedFont(RegularFont as any);
+  const bold = await pdf.embedFont(BoldFont as any);
 
   let y = 800;
   const left = 50;

@@ -59,11 +59,11 @@ export function TodayPage() {
   const totalRevenue = approvedPlans.reduce((sum, p) => sum + p.total_cost, 0);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-6">
+    <div className="mx-auto max-w-6xl space-y-4 p-4 sm:space-y-6 sm:p-6">
       {/* Hero */}
-      <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-8 text-white shadow-lg">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard hôm nay</h1>
-        <p className="mt-1 text-blue-100">
+      <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-5 text-white shadow-lg sm:p-8">
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Dashboard hôm nay</h1>
+        <p className="mt-1 text-sm text-blue-100 sm:text-base">
           {new Date().toLocaleDateString("vi-VN", {
             weekday: "long",
             day: "2-digit",
@@ -71,12 +71,12 @@ export function TodayPage() {
             year: "numeric",
           })}
         </p>
-        <div className="mt-6 flex flex-wrap gap-3">
+        <div className="mt-4 flex flex-wrap gap-2 sm:mt-6 sm:gap-3">
           <Button asChild className="bg-white text-blue-700 hover:bg-blue-50">
             <Link to="/patients">+ Bệnh nhân mới</Link>
           </Button>
           <Button asChild variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20">
-            <Link to="/patients">Xem danh sách bệnh nhân</Link>
+            <Link to="/patients">Xem danh sách</Link>
           </Button>
         </div>
       </div>
@@ -218,20 +218,22 @@ function StatCard({
   color: "blue" | "amber" | "emerald" | "purple";
 }) {
   const colors = {
-    blue: "from-blue-50 to-blue-100/50 text-blue-700",
-    amber: "from-amber-50 to-amber-100/50 text-amber-700",
-    emerald: "from-emerald-50 to-emerald-100/50 text-emerald-700",
-    purple: "from-purple-50 to-purple-100/50 text-purple-700",
+    blue: "from-blue-50 to-blue-100/50 text-blue-700 dark:from-blue-950/40 dark:to-blue-900/30 dark:text-blue-300",
+    amber: "from-amber-50 to-amber-100/50 text-amber-700 dark:from-amber-950/40 dark:to-amber-900/30 dark:text-amber-300",
+    emerald: "from-emerald-50 to-emerald-100/50 text-emerald-700 dark:from-emerald-950/40 dark:to-emerald-900/30 dark:text-emerald-300",
+    purple: "from-purple-50 to-purple-100/50 text-purple-700 dark:from-purple-950/40 dark:to-purple-900/30 dark:text-purple-300",
   };
   return (
     <Card className={`border-0 bg-gradient-to-br ${colors[color]} shadow-sm`}>
-      <CardContent className="p-5">
+      <CardContent className="p-4 sm:p-5">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wider opacity-70">{label}</p>
-            <p className="mt-2 text-3xl font-bold">{value}</p>
+            <p className="text-[10px] font-medium uppercase tracking-wider opacity-70 sm:text-xs">
+              {label}
+            </p>
+            <p className="mt-1.5 text-2xl font-bold sm:mt-2 sm:text-3xl">{value}</p>
           </div>
-          <span className="text-3xl opacity-50">{icon}</span>
+          <span className="text-2xl opacity-50 sm:text-3xl">{icon}</span>
         </div>
       </CardContent>
     </Card>

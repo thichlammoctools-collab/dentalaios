@@ -1,7 +1,9 @@
 /**
  * Auth React Context.
  *
- * - Hydrates session from localStorage on mount
+ * - Hydrates session from localStorage SYNCHRONOUSLY in initial useState
+ *   (otherwise there's a race where the first render has session=null
+ *    and RequireAuth redirects to /login before useEffect can hydrate)
  * - Provides login(email, password) / logout()
  * - Exposes session, loading, error via useAuth()
  */
@@ -10,7 +12,6 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -30,15 +31,11 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSessionState] = useState<AuthSession | null>(null);
+  // Sync initial state from localStorage so the first render already has the session
+  // and RequireAuth doesn't redirect to /login on a hard refresh.
+  const [session, setSessionState] = useState<AuthSession | null>(() => getSession());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Hydrate from localStorage on mount
-  useEffect(() => {
-    const existing = getSession();
-    if (existing) setSessionState(existing);
-  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     setLoading(true);

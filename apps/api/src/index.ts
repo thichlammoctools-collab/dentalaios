@@ -57,20 +57,18 @@ app.use(
       const isProd = c.env.ENVIRONMENT === "production";
 
       // Helper: match origin against allowed pattern.
-      // Wildcard `*` matches a SINGLE subdomain segment (e.g. "abc").
-      // Empty subdomain is also allowed (canonical URL).
+      // Wildcard `*` matches an OPTIONAL single subdomain segment (e.g. "abc." or empty).
+      // Examples:
+      //   "https://*.example.com" matches "https://example.com" AND "https://abc.example.com"
       const matches = (origin: string, pattern: string): boolean => {
         if (origin === pattern) return true;
-        if (pattern.includes("*")) {
-          // Escape regex special chars except * which we replace with optional
-          // single-subdomain pattern: ([a-z0-9-]+\.)?
-          const escaped = pattern
-            .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
-            .replace(/\\\*/g, "([a-z0-9-]+\\.)?");
-          const regex = new RegExp("^" + escaped + "$");
-          return regex.test(origin);
-        }
-        return false;
+        if (!pattern.includes("*")) return false;
+        // Escape ALL regex metachars including * itself, then unescape * -> optional subdomain
+        const escaped = pattern.replace(/[.+?^${}()|[\]\\*]/g, "\\$&");
+        // Replace each `\*` with `([a-z0-9-]+\.)?` (optional single subdomain)
+        const final = escaped.replace(/\\\*/g, "([a-z0-9-]+\\.)?");
+        const regex = new RegExp("^" + final + "$");
+        return regex.test(origin);
       };
 
       // Production: must have a valid FRONTEND_ORIGIN
