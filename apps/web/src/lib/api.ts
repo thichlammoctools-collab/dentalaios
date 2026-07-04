@@ -6,9 +6,16 @@
  *
  * Architecture rule: frontend never talks to D1/R2 directly — only this client.
  * Auth: bearer token attached automatically when present in localStorage.
+ *
+ * 401 handling: any 401 response (except on login itself) clears the session and
+ * redirects to /login. This prevents users from being stuck in a broken authenticated
+ * state when their JWT expires mid-session.
  */
 
-import { getToken } from "./auth";
+import { clearSession, getToken } from "./auth";
+
+// Re-export so pages can grab token directly for non-JSON requests (PDF download, etc.)
+export { getToken };
 
 const BASE_URL =
   (import.meta.env.VITE_API_URL as string | undefined) ?? "";
@@ -21,6 +28,18 @@ export class ApiError extends Error {
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+  }
+}
+
+// Auth-related paths where 401 is expected (login itself returns 401 on bad creds)
+const AUTH_PATHS = new Set<string>(["/api/auth/login", "/api/auth/logout"]);
+
+function handle401(path: string): void {
+  // Don't auto-clear session for login attempts (we WANT to show the error)
+  if (AUTH_PATHS.has(path)) return;
+  clearSession();
+  if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+    window.location.href = "/login";
   }
 }
 
@@ -40,6 +59,18 @@ export async function api<T = unknown>(
       ...(init?.headers ?? {}),
     },
   });
+
+  if (res.status === 401) {
+    handle401(path);
+    let message = "Phiên đăng nhập đã hết hạn";
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (body?.error) message = body.error;
+    } catch {
+      // ignore
+    }
+    throw new ApiError(message, 401, "unauthorized");
+  }
 
   if (!res.ok) {
     let message = `HTTP ${res.status} ${res.statusText}`;

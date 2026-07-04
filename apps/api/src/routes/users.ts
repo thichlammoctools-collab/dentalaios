@@ -1,0 +1,82 @@
+import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import { userCreateSchema, userUpdateSchema } from "@shared/validation";
+import { PERMISSIONS } from "@shared/constants";
+import type { Env } from "../index";
+import { requireAuth, getJwt } from "../middleware/auth";
+import { requirePermission } from "../middleware/rbac";
+import { auditLog } from "../middleware/audit";
+import type { AuthContext } from "../middleware/auth";
+import { usersService } from "../services/users.service";
+import { createUsersRepository } from "../repositories/users.repo";
+
+const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
+
+router.use("*", requireAuth());
+
+// GET /api/users
+router.get(
+  "/",
+  requirePermission(PERMISSIONS.MANAGE_USERS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const items = await usersService.list(c.env.DB, jwt.tenant_id);
+    return c.json({ items, total: items.length });
+  },
+);
+
+// POST /api/users
+router.post(
+  "/",
+  requirePermission(PERMISSIONS.MANAGE_USERS),
+  auditLog("create", "user"),
+  zValidator("json", userCreateSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const data = c.req.valid("json");
+    const created = await usersService.create(c.env.DB, jwt.tenant_id, data);
+    return c.json(created, 201);
+  },
+);
+
+// GET /api/users/:id
+router.get(
+  "/:id",
+  requirePermission(PERMISSIONS.MANAGE_USERS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const user = await createUsersRepository(c.env.DB).getById(jwt.tenant_id, c.req.param("id"));
+    if (!user) return c.json({ error: "User not found", code: "not_found" }, 404);
+    return c.json(user);
+  },
+);
+
+// PUT /api/users/:id
+router.put(
+  "/:id",
+  requirePermission(PERMISSIONS.MANAGE_USERS),
+  auditLog("update", "user"),
+  zValidator("json", userUpdateSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const data = c.req.valid("json");
+    const updated = await usersService.update(c.env.DB, jwt.tenant_id, c.req.param("id"), data);
+    if (!updated) return c.json({ error: "User not found", code: "not_found" }, 404);
+    return c.json(updated);
+  },
+);
+
+// DELETE /api/users/:id
+router.delete(
+  "/:id",
+  requirePermission(PERMISSIONS.MANAGE_USERS),
+  auditLog("delete", "user"),
+  async (c) => {
+    const jwt = getJwt(c);
+    const ok = await usersService.remove(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    if (!ok) return c.json({ error: "User not found", code: "not_found" }, 404);
+    return c.json({ ok: true });
+  },
+);
+
+export default router;

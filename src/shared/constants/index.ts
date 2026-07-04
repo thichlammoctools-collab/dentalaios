@@ -12,6 +12,7 @@ export const ROUTES = {
   TREATMENT_PLAN: "/treatment-plans/:id",
   SETTINGS_USERS: "/settings/users",
   SETTINGS_ROLES: "/settings/roles",
+  SETTINGS_AUDIT_LOGS: "/settings/audit-logs",
 } as const;
 
 /** Role name constants. The actual IDs are stored in D1 (seeded in 0001_roles.sql). */
@@ -60,6 +61,7 @@ export const ERROR_CODES = {
   NOT_FOUND: "not_found",
   VALIDATION_ERROR: "validation_error",
   CONFLICT: "conflict",
+  RATE_LIMITED: "rate_limited",
   INTERNAL_ERROR: "internal_error",
 } as const;
 

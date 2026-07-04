@@ -1,15 +1,228 @@
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { PlaceholderPage } from "@/components/PlaceholderPage";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TreatmentPlanItemForm } from "@/components/TreatmentPlanItemForm";
+import { apiDelete, apiGet, apiPost, getToken, ApiError } from "@/lib/api";
+import { toast } from "@/lib/toast";
+import { formatCurrency, formatDateTime } from "@/lib/utils";
+import type { TreatmentPlan, TreatmentPlanItem } from "@shared/types";
 
 export function TreatmentPlanDetailPage() {
   const { id } = useParams();
+  const [plan, setPlan] = useState<TreatmentPlan | null>(null);
+  const [items, setItems] = useState<TreatmentPlanItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [openForm, setOpenForm] = useState(false);
+
+  async function load() {
+    if (!id) return;
+    setLoading(true);
+    try {
+      const p = await apiGet<TreatmentPlan>(`/api/treatment-plans/${id}`);
+      const its = await apiGet<{ items: TreatmentPlanItem[] }>(
+        `/api/treatment-plans/${id}/items`,
+      );
+      setPlan(p);
+      setItems(its.items);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi tải plan");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  async function onApprove() {
+    if (!plan) return;
+    try {
+      const updated = await apiPost<TreatmentPlan>(
+        `/api/treatment-plans/${plan.id}/approve`,
+        {},
+      );
+      toast.success("Đã duyệt kế hoạch");
+      setPlan(updated);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi duyệt");
+    }
+  }
+
+  async function onDeleteItem(item: TreatmentPlanItem) {
+    if (!plan) return;
+    if (!confirm(`Xóa hạng mục #${item.tooth_number} - ${item.procedure}?`)) return;
+    try {
+      await apiDelete(`/api/treatment-plans/${plan.id}/items/${item.id}`);
+      toast.success("Đã xóa");
+      load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi xóa");
+    }
+  }
+
+  async function onDownloadPdf() {
+    if (!plan) return;
+    try {
+      const token = getToken();
+      const res = await fetch(`/api/treatment-plans/${plan.id}/pdf`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new ApiError("PDF generation failed", res.status);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `proposal-${plan.id}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Đã tải PDF");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi PDF");
+    }
+  }
+
+  async function onLarkHandover() {
+    if (!plan) return;
+    try {
+      const res = await apiPost<{
+        mocked: boolean;
+        taskId: string;
+        taskUrl?: string;
+        warning?: string;
+      }>(`/api/treatment-plans/${plan.id}/lark-handover`, {});
+      if (res.mocked) {
+        toast.info(`Lark task đã được tạo (mock): ${res.taskId}`);
+      } else {
+        toast.success(`Lark task đã tạo: ${res.taskId}`);
+      }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi Lark");
+    }
+  }
+
+  if (loading || !plan) {
+    return <p className="px-6 py-6 text-sm text-muted-foreground">Đang tải…</p>;
+  }
+
+  const canEdit = plan.status === "draft";
+  const canApprove = plan.status === "draft" && items.length > 0;
+  const canHandOver = plan.status === "approved";
+
   return (
-    <PlaceholderPage
-      title="Kế hoạch điều trị"
-      breadcrumb={`Kế hoạch / ${id}`}
-      description="Danh sách thủ thuật theo răng, tổng chi phí, thanh toán, trạng thái duyệt, generate proposal PDF, tạo Lark handover task."
-    >
-      Workflow duyệt + PDF + Lark sẽ được triển khai ở Phase 4.
-    </PlaceholderPage>
+    <div className="mx-auto max-w-5xl space-y-6 px-6 py-6">
+      <div>
+        <p className="text-sm text-muted-foreground">
+          <a href={`/patients/${plan.patient_id}`} className="hover:underline">
+            ← Quay lại bệnh nhân
+          </a>
+        </p>
+        <div className="mt-1 flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Kế hoạch điều trị</h1>
+            <p className="text-sm text-muted-foreground">
+              Tạo {formatDateTime(plan.created_at)}
+              {plan.approved_at && ` · Duyệt ${formatDateTime(plan.approved_at)}`}
+            </p>
+          </div>
+          <Badge
+            variant={
+              plan.status === "approved" || plan.status === "completed"
+                ? "success"
+                : plan.status === "cancelled"
+                  ? "destructive"
+                  : "warning"
+            }
+          >
+            {plan.status}
+          </Badge>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Hạng mục ({items.length})</CardTitle>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Tổng:</span>
+              <span className="text-lg font-semibold">
+                {formatCurrency(plan.total_cost, plan.currency)}
+              </span>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {items.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Chưa có hạng mục nào.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Răng</TableHead>
+                  <TableHead>Thủ thuật</TableHead>
+                  <TableHead>Mô tả</TableHead>
+                  <TableHead className="text-right">Đơn giá</TableHead>
+                  {canEdit && <TableHead></TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-mono">#{item.tooth_number}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{item.procedure}</Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{item.description}</TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(item.unit_cost, plan.currency)}
+                    </TableCell>
+                    {canEdit && (
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => onDeleteItem(item)}
+                        >
+                          Xóa
+                        </Button>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Thao tác</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          {canEdit && <Button onClick={() => setOpenForm(true)}>+ Thêm hạng mục</Button>}
+          {canApprove && <Button onClick={onApprove}>Duyệt kế hoạch</Button>}
+          <Button variant="outline" onClick={onDownloadPdf} disabled={items.length === 0}>
+            📄 Tải PDF báo giá
+          </Button>
+          {canHandOver && (
+            <Button variant="outline" onClick={onLarkHandover}>
+              📨 Tạo Lark handover
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      <TreatmentPlanItemForm
+        open={openForm}
+        onOpenChange={setOpenForm}
+        planId={plan.id}
+        onCreated={() => load()}
+      />
+    </div>
   );
 }

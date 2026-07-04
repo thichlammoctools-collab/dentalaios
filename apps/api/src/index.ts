@@ -23,7 +23,13 @@ import authRoutes from "./routes/auth";
 import patientsRoutes from "./routes/patients";
 import visitsRoutes from "./routes/visits";
 import treatmentPlansRoutes from "./routes/treatment-plans";
+import treatmentPlansExtras from "./routes/treatment-plans-extras";
 import paymentsRoutes from "./routes/payments";
+import medicalAlertsRoutes from "./routes/medical-alerts";
+import auditRoutes from "./routes/audit";
+import usersRoutes from "./routes/users";
+import rolesRoutes from "./routes/roles";
+import filesRoutes from "./routes/files";
 
 export type Env = {
   DB: D1Database;
@@ -34,21 +40,36 @@ export type Env = {
   LARK_APP_ID?: string;
   LARK_APP_SECRET?: string;
   JWT_SECRET?: string;
+  R2_ACCOUNT_ID?: string;
+  R2_ACCESS_KEY_ID?: string;
+  R2_SECRET_ACCESS_KEY?: string;
 };
 
 const app = new Hono<{ Bindings: Env }>();
 
-// Logger middleware — Hono's logger() logs method/path/status only,
-// never bodies. Safe per architecture rule #8.
 app.use("*", logger());
 
-// CORS — open in dev; tighten via FRONTEND_ORIGIN in production via env override.
 app.use(
   "*",
   cors({
     origin: (origin, c) => {
-      const allowed = c.env.FRONTEND_ORIGIN || "*";
-      return allowed === "*" ? origin || "*" : allowed;
+      const allowed = c.env.FRONTEND_ORIGIN || "";
+      const isProd = c.env.ENVIRONMENT === "production";
+
+      // Production: FRONTEND_ORIGIN must be a specific URL. Reject wildcard
+      // because combining "*" with credentials: true is a security misconfiguration.
+      if (isProd && (allowed === "" || allowed === "*")) {
+        console.error(
+          "[cors] FRONTEND_ORIGIN must be a specific URL in production",
+        );
+        return ""; // hono/cors treats empty origin as no-CORS
+      }
+
+      if (allowed === "" || allowed === "*") {
+        // Dev: allow any origin (Vite may use random ports)
+        return origin || "*";
+      }
+      return allowed;
     },
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
@@ -57,7 +78,7 @@ app.use(
   }),
 );
 
-// Health endpoint — used by verification step in Phase 1.
+// Health
 app.get("/api/health", (c) =>
   c.json({
     ok: true,
@@ -66,18 +87,33 @@ app.get("/api/health", (c) =>
   }),
 );
 
-// Mount feature routes
+// Auth
 app.route("/api/auth", authRoutes);
+
+// Clinical — patients (also handles /:id/alerts via sub-router)
 app.route("/api/patients", patientsRoutes);
+app.route("/api/patients", medicalAlertsRoutes);
+
+// Visits
 app.route("/api/visits", visitsRoutes);
+
+// Treatment plans (CRUD + /items + /approve via plans router; /pdf + /lark-handover via extras)
 app.route("/api/treatment-plans", treatmentPlansRoutes);
+app.route("/api/treatment-plans", treatmentPlansExtras);
+
+// Payments
 app.route("/api/payments", paymentsRoutes);
 
-// 404 fallback
+// Operations
+app.route("/api/audit-logs", auditRoutes);
+app.route("/api/users", usersRoutes);
+app.route("/api/roles", rolesRoutes);
+app.route("/api/files", filesRoutes);
+
+// 404
 app.notFound((c) => c.json({ error: "Not found", code: "not_found" }, 404));
 
-// Error handler — map AppError to typed JSON responses.
-// Never leak stack traces or DB errors.
+// Error handler
 app.onError((err, c) => {
   if (err instanceof AppError) {
     return c.json(
@@ -89,12 +125,25 @@ app.onError((err, c) => {
       err.status as 400 | 401 | 403 | 404 | 409 | 422 | 500,
     );
   }
-  // Unknown error — log message only, never clinical data
   console.error("Unhandled error:", err.message);
   return c.json({ error: "Internal server error", code: "internal_error" }, 500);
 });
 
+// Queue consumer handler (Phase 5)
+import { larkRetryConsumer } from "./jobs/lark-retry";
+import type { MessageBatch } from "@cloudflare/workers-types";
+import type { LarkRetryMessage } from "./jobs/lark-retry";
+
+async function queueHandler(
+  batch: MessageBatch<LarkRetryMessage>,
+  env: Env,
+): Promise<void> {
+  await larkRetryConsumer(batch, env);
+}
+
+// Default export: fetch + queue
 export default {
   fetch: (request: Request, env: Env, ctx: ExecutionContext) =>
     app.fetch(request, env, ctx),
+  queue: queueHandler,
 };
