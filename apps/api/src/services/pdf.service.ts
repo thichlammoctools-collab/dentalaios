@@ -6,9 +6,7 @@
  * (TTF) to ensure full Vietnamese diacritic support.
  */
 
-import { PDFDocument, rgb, type PDFFont } from "pdf-lib";
-import RegularFont from "../fonts/NotoSansVietnamese-Regular.ttf";
-import BoldFont from "../fonts/NotoSansVietnamese-Bold.ttf";
+import { PDFDocument, rgb, StandardFonts, type PDFFont } from "pdf-lib";
 import type {
   Patient,
   TreatmentPlan,
@@ -40,8 +38,8 @@ export async function buildProposalPdf(input: BuildPdfInput): Promise<Uint8Array
 
   const pdf = await PDFDocument.create();
   const page = pdf.addPage([595.28, 841.89]); // A4
-  const font = await pdf.embedFont(RegularFont as any);
-  const bold = await pdf.embedFont(BoldFont as any);
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
 
   let y = 800;
   const left = 50;
