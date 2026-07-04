@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { TreatmentPlanItemForm } from "@/components/TreatmentPlanItemForm";
 import { apiDelete, apiGet, apiPost, getToken, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
@@ -12,14 +13,17 @@ import type { TreatmentPlan, TreatmentPlanItem } from "@shared/types";
 
 export function TreatmentPlanDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [plan, setPlan] = useState<TreatmentPlan | null>(null);
   const [items, setItems] = useState<TreatmentPlanItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [openForm, setOpenForm] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
     if (!id) return;
     setLoading(true);
+    setError(null);
     try {
       const p = await apiGet<TreatmentPlan>(`/api/treatment-plans/${id}`);
       const its = await apiGet<{ items: TreatmentPlanItem[] }>(
@@ -28,7 +32,13 @@ export function TreatmentPlanDetailPage() {
       setPlan(p);
       setItems(its.items);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Lỗi tải plan");
+      const msg = err instanceof ApiError ? err.message : "Lỗi tải plan";
+      setError(msg);
+      toast.error(msg);
+      if (err instanceof ApiError && err.status === 401) {
+        // Token expired — prompt re-login
+        setTimeout(() => navigate("/login"), 500);
+      }
     } finally {
       setLoading(false);
     }
@@ -72,7 +82,10 @@ export function TreatmentPlanDetailPage() {
       const res = await fetch(`/api/treatment-plans/${plan.id}/pdf`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      if (!res.ok) throw new ApiError("PDF generation failed", res.status);
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new ApiError(body.error ?? `HTTP ${res.status}`, res.status);
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -106,7 +119,22 @@ export function TreatmentPlanDetailPage() {
   }
 
   if (loading || !plan) {
-    return <p className="px-6 py-6 text-sm text-muted-foreground">Đang tải…</p>;
+    return (
+      <div className="mx-auto max-w-5xl p-6">
+        {error ? (
+          <Card>
+            <CardContent className="p-6">
+              <p className="text-sm text-destructive">Lỗi: {error}</p>
+              <Button onClick={load} variant="outline" className="mt-3">
+                Thử lại
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <p className="text-sm text-muted-foreground">Đang tải…</p>
+        )}
+      </div>
+    );
   }
 
   const canEdit = plan.status === "draft";
@@ -115,6 +143,12 @@ export function TreatmentPlanDetailPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-6 py-6">
+      <Breadcrumbs
+        items={[
+          { label: "Bệnh nhân", href: `/patients/${plan.patient_id}` },
+          { label: `Kế hoạch` },
+        ]}
+      />
       <div>
         <p className="text-sm text-muted-foreground">
           <a href={`/patients/${plan.patient_id}`} className="hover:underline">

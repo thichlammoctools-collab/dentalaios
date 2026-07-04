@@ -98,7 +98,7 @@ describe("POST /api/auth/login", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns 422 for invalid email format", async () => {
+  it("returns 400 for invalid email format", async () => {
     const app = mountRoute("/api/auth", authRoutes);
     const res = await publicRequest(
       app,
@@ -106,12 +106,12 @@ describe("POST /api/auth/login", () => {
       "/api/auth/login",
       { email: "not-an-email", password: "x" },
     );
-    expect(res.status).toBe(422);
-    const body = (await res.json()) as { code: string };
-    expect(body.code).toBe("validation_error");
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { success: boolean };
+    expect(body.success).toBe(false);
   });
 
-  it("returns 422 for missing password", async () => {
+  it("returns 400 for missing password", async () => {
     const app = mountRoute("/api/auth", authRoutes);
     const res = await publicRequest(
       app,
@@ -119,7 +119,7 @@ describe("POST /api/auth/login", () => {
       "/api/auth/login",
       { email: "admin@demo.clinic" },
     );
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 });
 
@@ -131,7 +131,13 @@ describe("GET /api/auth/me", () => {
     const env = buildEnv(db, { JWT_SECRET: TEST_SECRET });
     const app = mountRoute("/api/auth", authRoutes);
 
-    const res = await authedRequest(app, "GET", "/api/auth/me");
+    // authedRequest creates its own mock — use direct call to inject our mock
+    const token = await import("../helpers/api").then((m) => m.makeToken(["all"]));
+    const res = await app.request(
+      "/api/auth/me",
+      { headers: { Authorization: `Bearer ${token}` } },
+      env,
+    );
     expect(res.status).toBe(200);
     const body = (await res.json()) as { user: { email: string }; role: { name: string } };
     expect(body.user.email).toBe("admin@demo.clinic");

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { PatientForm } from "@/components/PatientForm";
 import { VisitForm } from "@/components/VisitForm";
 import { MedicalAlertsList } from "@/components/MedicalAlertsList";
@@ -83,26 +84,25 @@ export function PatientDetailPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-6 py-6">
-      <div>
-        <p className="text-sm text-muted-foreground">
-          <a href="/patients" className="hover:underline">
-            ← Danh sách bệnh nhân
-          </a>
-        </p>
-        <div className="mt-1 flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{patient.name}</h1>
-            <p className="text-sm text-muted-foreground">
-              {formatDate(patient.date_of_birth)} ·{" "}
-              {patient.gender === "M" ? "Nam" : patient.gender === "F" ? "Nữ" : "Khác"} ·{" "}
-              {patient.phone}
-              {patient.email && ` · ${patient.email}`}
-            </p>
-          </div>
-          <Button variant="outline" onClick={() => setOpenEdit(true)}>
-            Sửa
-          </Button>
+      <Breadcrumbs
+        items={[
+          { label: "Bệnh nhân", href: "/patients" },
+          { label: patient.name },
+        ]}
+      />
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">{patient.name}</h1>
+          <p className="text-sm text-muted-foreground">
+            {formatDate(patient.date_of_birth)} ·{" "}
+            {patient.gender === "M" ? "Nam" : patient.gender === "F" ? "Nữ" : "Khác"} ·{" "}
+            {patient.phone}
+            {patient.email && ` · ${patient.email}`}
+          </p>
         </div>
+        <Button variant="outline" onClick={() => setOpenEdit(true)}>
+          Sửa
+        </Button>
       </div>
 
       <Tabs defaultValue="info">

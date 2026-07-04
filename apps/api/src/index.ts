@@ -56,8 +56,20 @@ app.use(
       const allowed = c.env.FRONTEND_ORIGIN || "";
       const isProd = c.env.ENVIRONMENT === "production";
 
-      // Production: FRONTEND_ORIGIN must be a specific URL. Reject wildcard
-      // because combining "*" with credentials: true is a security misconfiguration.
+      // Helper: match origin against allowed pattern (with optional wildcard subdomain)
+      const matches = (origin: string, pattern: string): boolean => {
+        if (origin === pattern) return true;
+        // Support wildcard: "https://*.example.com" matches "https://abc.example.com"
+        if (pattern.includes("*")) {
+          const regex = new RegExp(
+            "^" + pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[a-z0-9-]+") + "$",
+          );
+          return regex.test(origin);
+        }
+        return false;
+      };
+
+      // Production: must have a valid FRONTEND_ORIGIN
       if (isProd && (allowed === "" || allowed === "*")) {
         console.error(
           "[cors] FRONTEND_ORIGIN must be a specific URL in production",
@@ -66,10 +78,17 @@ app.use(
       }
 
       if (allowed === "" || allowed === "*") {
-        // Dev: allow any origin (Vite may use random ports)
+        // Dev: allow any origin
         return origin || "*";
       }
-      return allowed;
+
+      // Production: check if origin matches allowed (or allowed pattern)
+      if (origin && matches(origin, allowed)) {
+        return origin; // reflect the matched origin
+      }
+
+      // Reject
+      return "";
     },
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],

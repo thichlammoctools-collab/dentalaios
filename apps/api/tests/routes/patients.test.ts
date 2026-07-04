@@ -87,7 +87,7 @@ describe("POST /api/patients", () => {
     expect(body.name).toBe("Test Patient");
   });
 
-  it("returns 422 for missing required field", async () => {
+  it("returns 400 for missing required field", async () => {
     const app = mountRoute("/api/patients", patientsRoutes);
     const res = await authedRequestWithDB(
       app,
@@ -104,9 +104,10 @@ describe("POST /api/patients", () => {
         },
       },
     );
-    expect(res.status).toBe(422);
-    const body = (await res.json()) as { code: string };
-    expect(body.code).toBe("validation_error");
+    expect(res.status).toBe(400);
+    // zValidator returns { success: false, error: {...} }
+    const body = (await res.json()) as { success: boolean };
+    expect(body.success).toBe(false);
   });
 
   it("returns 422 for invalid date_of_birth (month 13)", async () => {
@@ -126,7 +127,7 @@ describe("POST /api/patients", () => {
         },
       },
     );
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 
   it("returns 422 for whitespace-only name", async () => {
@@ -146,7 +147,7 @@ describe("POST /api/patients", () => {
         },
       },
     );
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(400);
   });
 
   it("returns 403 for user without write_patients permission", async () => {

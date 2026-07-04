@@ -8,12 +8,12 @@
  *
  * Two modes:
  *  - "spy"  (default): captures all (sql, binds) tuples for assertion. Returns null / empty.
- *  - "seed" (seedRows): returns pre-configured rows keyed by SQL fragment.
+ *  - "seed" (rowsByFragment): returns pre-configured rows keyed by SQL fragment.
  *
- * Tests can assert that:
- *  - Every SQL query contains "tenant_id" (tenant isolation)
- *  - tenantId was passed as a bind param
- *  - The right SQL is issued for each operation
+ * rowsByFragment Map values can be either:
+ *  - `unknown[]`: returned as-is for first() / all()
+ *  - `(sql, callIndex) => unknown[]`: function matcher called per query,
+ *    useful when the same SQL is issued multiple times with different expected results.
  */
 
 export interface CapturedCall {
@@ -34,22 +34,36 @@ export interface MockD1 {
   __calls: CapturedCall[];
   __sqlContaining(fragment: string): CapturedCall[];
   __reset(): void;
+  __callCounts: Map<string, number>;
 }
 
+export type FragmentMatcher =
+  | unknown[]
+  | ((sql: string, callIndex: number) => unknown[]);
+
 export interface MockD1Options {
-  /** Map of SQL fragment → rows to return for first() / all() */
-  rowsByFragment?: Map<string, unknown[]>;
+  /** Map of SQL fragment → rows or matcher function */
+  rowsByFragment?: Map<string, FragmentMatcher>;
   /** Default row for first() when no fragment matches */
   defaultFirst?: unknown;
 }
 
 export function createMockD1(options: MockD1Options = {}): MockD1 {
   const calls: CapturedCall[] = [];
-  const rowsByFragment = options.rowsByFragment ?? new Map<string, unknown[]>();
+  const rowsByFragment =
+    options.rowsByFragment ?? new Map<string, FragmentMatcher>();
+  const callCounts = new Map<string, number>();
 
   function findRows(sql: string): unknown[] | undefined {
-    for (const [fragment, rows] of rowsByFragment) {
-      if (sql.includes(fragment)) return rows;
+    for (const [fragment, matcher] of rowsByFragment) {
+      if (sql.includes(fragment)) {
+        if (typeof matcher === "function") {
+          const idx = callCounts.get(fragment) ?? 0;
+          callCounts.set(fragment, idx + 1);
+          return matcher(sql, idx);
+        }
+        return matcher;
+      }
     }
     return undefined;
   }
@@ -57,7 +71,7 @@ export function createMockD1(options: MockD1Options = {}): MockD1 {
   const db: MockD1 = {
     prepare(sql) {
       if (typeof sql !== "string") {
-        throw new Error(`prepare called with non-string: ${typeof sql} (db=${typeof db})`);
+        throw new Error(`prepare called with non-string: ${typeof sql}`);
       }
       return {
         bind(...binds: unknown[]) {
@@ -94,7 +108,9 @@ export function createMockD1(options: MockD1Options = {}): MockD1 {
     },
     __reset() {
       calls.length = 0;
+      callCounts.clear();
     },
+    __callCounts: callCounts,
   };
   return db;
 }

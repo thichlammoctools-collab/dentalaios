@@ -31,18 +31,6 @@ export class ApiError extends Error {
   }
 }
 
-// Auth-related paths where 401 is expected (login itself returns 401 on bad creds)
-const AUTH_PATHS = new Set<string>(["/api/auth/login", "/api/auth/logout"]);
-
-function handle401(path: string): void {
-  // Don't auto-clear session for login attempts (we WANT to show the error)
-  if (AUTH_PATHS.has(path)) return;
-  clearSession();
-  if (typeof window !== "undefined" && window.location.pathname !== "/login") {
-    window.location.href = "/login";
-  }
-}
-
 export async function api<T = unknown>(
   path: string,
   init?: RequestInit,
@@ -61,8 +49,11 @@ export async function api<T = unknown>(
   });
 
   if (res.status === 401) {
-    handle401(path);
-    let message = "Phiên đăng nhập đã hết hạn";
+    // Clear session but DON'T force-redirect — let the page handle the error
+    // and let the user re-login manually. Forcing redirect on every 401
+    // (including transient ones) is hostile UX.
+    clearSession();
+    let message = "Phiên đăng nhập đã hết hạn — vui lòng đăng nhập lại";
     try {
       const body = (await res.json()) as { error?: string };
       if (body?.error) message = body.error;
