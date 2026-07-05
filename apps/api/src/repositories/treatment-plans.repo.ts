@@ -4,7 +4,7 @@ import type { D1Row } from "./base";
 
 export interface TreatmentPlansRepository {
   getById(tenantId: string, id: string): Promise<TreatmentPlan | null>;
-  list(tenantId: string, opts?: { patientId?: string; status?: TreatmentPlan["status"] }): Promise<TreatmentPlan[]>;
+  list(tenantId: string, opts?: { patientId?: string; visitId?: string; status?: TreatmentPlan["status"] }): Promise<TreatmentPlan[]>;
   create(
     tenantId: string,
     data: Omit<TreatmentPlan, "id" | "tenant_id" | "created_at" | "total_cost" | "status" | "approved_at">,
@@ -33,6 +33,10 @@ export function createTreatmentPlansRepository(db: D1Database): TreatmentPlansRe
       if (opts.status) {
         conditions.push("status = ?");
         binds.push(opts.status);
+      }
+      if (opts.visitId) {
+        conditions.push("visit_id = ?");
+        binds.push(opts.visitId);
       }
       const result = await db
         .prepare(`SELECT * FROM treatment_plans WHERE ${conditions.join(" AND ")} ORDER BY created_at DESC`)

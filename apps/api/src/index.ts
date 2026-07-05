@@ -22,6 +22,8 @@ import { AppError } from "./lib/errors";
 import authRoutes from "./routes/auth";
 import registerRoutes from "./routes/register";
 import inviteRoutes from "./routes/invite";
+import dashboardRoutes from "./routes/dashboard";
+import aiRoutes from "./routes/ai";
 import patientsRoutes from "./routes/patients";
 import visitsRoutes from "./routes/visits";
 import treatmentPlansRoutes from "./routes/treatment-plans";
@@ -32,6 +34,7 @@ import auditRoutes from "./routes/audit";
 import usersRoutes from "./routes/users";
 import rolesRoutes from "./routes/roles";
 import filesRoutes from "./routes/files";
+import clinicRoutes from "./routes/clinic";
 
 export type Env = {
   DB: D1Database;
@@ -117,6 +120,12 @@ app.route("/api/auth", authRoutes);
 app.route("/api/register", registerRoutes);
 app.route("/api/invite", inviteRoutes);
 
+// Dashboard
+app.route("/api/dashboard", dashboardRoutes);
+
+// AI
+app.route("/api/ai", aiRoutes);
+
 // Clinical — patients (also handles /:id/alerts via sub-router)
 app.route("/api/patients", patientsRoutes);
 app.route("/api/patients", medicalAlertsRoutes);
@@ -136,6 +145,7 @@ app.route("/api/audit-logs", auditRoutes);
 app.route("/api/users", usersRoutes);
 app.route("/api/roles", rolesRoutes);
 app.route("/api/files", filesRoutes);
+app.route("/api/clinic", clinicRoutes);
 
 // 404
 app.notFound((c) => c.json({ error: "Not found", code: "not_found" }, 404));

@@ -12,6 +12,7 @@ import { VisitDetailPage } from "@/pages/VisitDetailPage";
 import { TreatmentPlanDetailPage } from "@/pages/TreatmentPlanDetailPage";
 import { UsersSettingsPage } from "@/pages/UsersSettingsPage";
 import { MembersSettingsPage } from "@/pages/MembersSettingsPage";
+import { ClinicSettingsPage } from "@/pages/ClinicSettingsPage";
 import { RolesSettingsPage } from "@/pages/RolesSettingsPage";
 import { AuditLogsPage } from "@/pages/AuditLogsPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
@@ -96,6 +97,14 @@ export function AppRoutes() {
         element={
           <Protected>
             <MembersSettingsPage />
+          </Protected>
+        }
+      />
+      <Route
+        path={ROUTES.SETTINGS_CLINIC}
+        element={
+          <Protected>
+            <ClinicSettingsPage />
           </Protected>
         }
       />

@@ -14,6 +14,7 @@ export const ROUTES = {
   SETTINGS_MEMBERS: "/settings/members",
   SETTINGS_ROLES: "/settings/roles",
   SETTINGS_AUDIT_LOGS: "/settings/audit-logs",
+  SETTINGS_CLINIC: "/settings/clinic",
 } as const;
 
 /** Role name constants. The actual IDs are stored in D1 (seeded in 0001_roles.sql). */
