@@ -28,6 +28,7 @@ export const usersService = {
         name: data.name,
         role_id: data.role_id,
         branch_id: data.branch_id,
+        is_active: true,
         password_hash,
       });
     } catch (err) {

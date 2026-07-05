@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/lib/auth-context";
 import { ROUTES } from "@shared/constants";
 import { ApiError } from "@/lib/api";
@@ -76,8 +76,15 @@ export function LoginForm() {
         {loading ? "Đang đăng nhập..." : "Đăng nhập"}
       </button>
 
+      <p className="text-center text-sm text-muted-foreground">
+        Chưa có tài khoản?{" "}
+        <Link to="/register" className="text-primary hover:underline font-medium">
+          Đăng ký miễn phí
+        </Link>
+      </p>
+
       <p className="text-xs text-muted-foreground">
-        Demo: <code>admin@demo.clinic</code> / <code>demo123</code>
+        Demo: <code>admin@demo.clinic</code> / <code>password123</code>
       </p>
     </form>
   );

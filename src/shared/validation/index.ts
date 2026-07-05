@@ -59,6 +59,42 @@ export const loginSchema = z.object({
 
 export type LoginInput = z.infer<typeof loginSchema>;
 
+// ──────────────── SaaS Registration ────────────────
+
+export const registerSchema = z.object({
+  name: nonEmpty(200),
+  email: z.string().email("Email không hợp lệ"),
+  password: z
+    .string()
+    .min(8, "Mật khẩu phải có ít nhất 8 ký tự")
+    .regex(/[A-Z]/, "Mật khẩu phải có ít nhất 1 chữ hoa")
+    .regex(/[a-z]/, "Mật khẩu phải có ít nhất 1 chữ thường")
+    .regex(/[0-9]/, "Mật khẩu phải có ít nhất 1 số"),
+  clinic_name: nonEmpty(200),
+  branch_name: optionalText(200),
+});
+
+export type RegisterInput = z.infer<typeof registerSchema>;
+
+export const emailVerifySchema = z.object({
+  token: z.string().min(1),
+});
+
+export type EmailVerifyInput = z.infer<typeof emailVerifySchema>;
+
+export const inviteAcceptSchema = z.object({
+  token: z.string().min(1),
+  name: nonEmpty(200),
+  password: z
+    .string()
+    .min(8, "Mật khẩu phải có ít nhất 8 ký tự")
+    .regex(/[A-Z]/, "Mật khẩu phải có ít nhất 1 chữ hoa")
+    .regex(/[a-z]/, "Mật khẩu phải có ít nhất 1 chữ thường")
+    .regex(/[0-9]/, "Mật khẩu phải có ít nhất 1 số"),
+});
+
+export type InviteAcceptInput = z.infer<typeof inviteAcceptSchema>;
+
 // ──────────────── Patient ────────────────
 
 export const patientCreateSchema = z.object({

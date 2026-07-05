@@ -26,6 +26,7 @@ export interface UsersRepository {
   create(
     tenantId: string,
     data: Omit<User, "id" | "tenant_id" | "created_at"> & { password_hash: string },
+    isActive?: boolean,
   ): Promise<User>;
   update(tenantId: string, id: string, data: Partial<Pick<User, "name" | "role_id" | "branch_id">> & { password_hash?: string }): Promise<User | null>;
   delete(tenantId: string, id: string): Promise<boolean>;
@@ -42,10 +43,10 @@ export function createUsersRepository(db: D1Database): UsersRepository {
           `SELECT
              u.id AS u_id, u.tenant_id AS u_tenant_id, u.branch_id AS u_branch_id,
              u.role_id AS u_role_id, u.email AS u_email, u.name AS u_name,
-             u.password_hash AS u_password_hash, u.created_at AS u_created_at,
+             u.is_active AS u_is_active, u.password_hash AS u_password_hash, u.created_at AS u_created_at,
              r.id AS r_id, r.tenant_id AS r_tenant_id, r.name AS r_name,
              r.permissions AS r_permissions, r.created_at AS r_created_at,
-             t.id AS t_id, t.name AS t_name, t.created_at AS t_created_at,
+             t.id AS t_id, t.name AS t_name, t.slug AS t_slug, t.is_active AS t_is_active, t.created_at AS t_created_at,
              b.id AS b_id, b.tenant_id AS b_tenant_id, b.name AS b_name,
              b.address AS b_address, b.created_at AS b_created_at
            FROM users u
@@ -68,10 +69,10 @@ export function createUsersRepository(db: D1Database): UsersRepository {
           `SELECT
              u.id AS u_id, u.tenant_id AS u_tenant_id, u.branch_id AS u_branch_id,
              u.role_id AS u_role_id, u.email AS u_email, u.name AS u_name,
-             u.password_hash AS u_password_hash, u.created_at AS u_created_at,
+             u.is_active AS u_is_active, u.password_hash AS u_password_hash, u.created_at AS u_created_at,
              r.id AS r_id, r.tenant_id AS r_tenant_id, r.name AS r_name,
              r.permissions AS r_permissions, r.created_at AS r_created_at,
-             t.id AS t_id, t.name AS t_name, t.created_at AS t_created_at,
+             t.id AS t_id, t.name AS t_name, t.slug AS t_slug, t.is_active AS t_is_active, t.created_at AS t_created_at,
              b.id AS b_id, b.tenant_id AS b_tenant_id, b.name AS b_name,
              b.address AS b_address, b.created_at AS b_created_at
            FROM users u
@@ -106,13 +107,13 @@ export function createUsersRepository(db: D1Database): UsersRepository {
       return row ? mapUser(row) : null;
     },
 
-    async create(tenantId, data) {
+    async create(tenantId, data, isActive = true) {
       const id = crypto.randomUUID();
       await db
         .prepare(
           `INSERT INTO users
-             (id, tenant_id, branch_id, role_id, email, name, password_hash)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+             (id, tenant_id, branch_id, role_id, email, name, password_hash, is_active)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
@@ -122,6 +123,7 @@ export function createUsersRepository(db: D1Database): UsersRepository {
           data.email,
           data.name,
           data.password_hash,
+          isActive ? 1 : 0,
         )
         .run();
       const row = (await db
@@ -178,6 +180,7 @@ function mapUser(row: D1Row): User {
     role_id: row.role_id as string,
     email: row.email as string,
     name: row.name as string,
+    is_active: (row.is_active as number) === 1,
     created_at: row.created_at as string,
   };
 }
@@ -190,6 +193,7 @@ function mapUserWithContext(row: D1Row): UserWithContext {
     role_id: row.u_role_id as string,
     email: row.u_email as string,
     name: row.u_name as string,
+    is_active: (row.u_is_active as number) === 1,
     created_at: row.u_created_at as string,
   };
   const role: Role = {
@@ -202,6 +206,8 @@ function mapUserWithContext(row: D1Row): UserWithContext {
   const tenant: Tenant = {
     id: row.t_id as string,
     name: row.t_name as string,
+    slug: (row as Record<string, unknown>).t_slug as string | undefined,
+    is_active: ((row as Record<string, unknown>).t_is_active as number) === 1,
     created_at: row.t_created_at as string,
   };
   const branch: Branch = {

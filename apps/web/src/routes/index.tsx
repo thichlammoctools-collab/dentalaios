@@ -2,12 +2,16 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import type { ReactNode } from "react";
 import { ROUTES } from "@shared/constants";
 import { LoginPage } from "@/pages/LoginPage";
+import { RegisterPage } from "@/pages/RegisterPage";
+import { VerifyEmailPage } from "@/pages/VerifyEmailPage";
+import { InviteAcceptPage } from "@/pages/InviteAcceptPage";
 import { TodayPage } from "@/pages/TodayPage";
 import { PatientsPage } from "@/pages/PatientsPage";
 import { PatientDetailPage } from "@/pages/PatientDetailPage";
 import { VisitDetailPage } from "@/pages/VisitDetailPage";
 import { TreatmentPlanDetailPage } from "@/pages/TreatmentPlanDetailPage";
 import { UsersSettingsPage } from "@/pages/UsersSettingsPage";
+import { MembersSettingsPage } from "@/pages/MembersSettingsPage";
 import { RolesSettingsPage } from "@/pages/RolesSettingsPage";
 import { AuditLogsPage } from "@/pages/AuditLogsPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
@@ -34,6 +38,9 @@ export function AppRoutes() {
       {/* Public */}
       <Route path="/" element={<Navigate to={ROUTES.LOGIN} replace />} />
       <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/invite/:token" element={<InviteAcceptPage />} />
 
       {/* Protected */}
       <Route
@@ -81,6 +88,14 @@ export function AppRoutes() {
         element={
           <Protected>
             <UsersSettingsPage />
+          </Protected>
+        }
+      />
+      <Route
+        path={ROUTES.SETTINGS_MEMBERS}
+        element={
+          <Protected>
+            <MembersSettingsPage />
           </Protected>
         }
       />

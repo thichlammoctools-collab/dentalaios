@@ -16,6 +16,10 @@ export const authService = {
     const ctx = await users.findByEmail(email);
     if (!ctx) throw new UnauthorizedError("Email hoặc mật khẩu không đúng");
 
+    if (!ctx.user.is_active) {
+      throw new UnauthorizedError("Tài khoản chưa được kích hoạt. Vui lòng xác thực email.");
+    }
+
     const valid = await verifyPassword(password, ctx.password_hash);
     if (!valid) throw new UnauthorizedError("Email hoặc mật khẩu không đúng");
 

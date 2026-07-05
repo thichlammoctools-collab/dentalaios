@@ -20,6 +20,8 @@ import { logger } from "hono/logger";
 import { AppError } from "./lib/errors";
 
 import authRoutes from "./routes/auth";
+import registerRoutes from "./routes/register";
+import inviteRoutes from "./routes/invite";
 import patientsRoutes from "./routes/patients";
 import visitsRoutes from "./routes/visits";
 import treatmentPlansRoutes from "./routes/treatment-plans";
@@ -110,6 +112,10 @@ app.get("/api/health", (c) =>
 
 // Auth
 app.route("/api/auth", authRoutes);
+
+// Registration (public)
+app.route("/api/register", registerRoutes);
+app.route("/api/invite", inviteRoutes);
 
 // Clinical — patients (also handles /:id/alerts via sub-router)
 app.route("/api/patients", patientsRoutes);

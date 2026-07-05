@@ -11,6 +11,7 @@ export const ROUTES = {
   VISIT_DETAIL: "/visits/:id",
   TREATMENT_PLAN: "/treatment-plans/:id",
   SETTINGS_USERS: "/settings/users",
+  SETTINGS_MEMBERS: "/settings/members",
   SETTINGS_ROLES: "/settings/roles",
   SETTINGS_AUDIT_LOGS: "/settings/audit-logs",
 } as const;

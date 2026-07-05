@@ -15,6 +15,8 @@
 export interface Tenant {
   id: string;
   name: string;
+  slug?: string;
+  is_active: boolean;
   created_at: string;
 }
 
@@ -41,6 +43,7 @@ export interface User {
   role_id: string;
   email: string;
   name: string;
+  is_active: boolean;
   // password_hash lives in DB but is NEVER returned to clients — repos strip it.
   created_at: string;
 }
@@ -244,4 +247,40 @@ export interface JwtPayload {
   permissions: string[];
   exp: number; // unix timestamp
   iat: number;
+}
+
+// ───────────────────────── SaaS Registration ─────────────────────────
+
+export interface RegisterRequest {
+  name: string;
+  email: string;
+  password: string;
+  clinic_name: string;
+  branch_name?: string;
+}
+
+export interface RegisterResponse {
+  message: string;
+  pending_email_verification: boolean;
+}
+
+export interface EmailVerifyRequest {
+  token: string;
+}
+
+export interface EmailVerifyResponse {
+  message: string;
+  session: AuthSession;
+}
+
+export interface InviteRequest {
+  email: string;
+  role_id: string;
+  branch_id: string;
+}
+
+export interface InviteAcceptRequest {
+  token: string;
+  name: string;
+  password: string;
 }
