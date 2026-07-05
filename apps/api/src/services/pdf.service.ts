@@ -136,11 +136,8 @@ export async function buildProposalPdf(input: BuildPdfInput): Promise<Uint8Array
   drawText(page, bold, tenant.name.toUpperCase(), left, y, 18, { color: COLORS.primary });
   y -= lineH;
   drawText(page, font, `${branch.name} | ${branch.address}`, left, y, 10, { color: COLORS.textLight });
-  if (branch.phone) {
-    drawText(page, font, `Tel: ${branch.phone}`, left, y - smallLineH, 9, { color: COLORS.textLight });
-  }
-  if (tenant.phone) {
-    drawText(page, font, `Email: ${tenant.email || ""}`, left, y - smallLineH * 2, 9, { color: COLORS.textLight });
+  if (tenant.email) {
+    drawText(page, font, `Email: ${tenant.email}`, left, y - smallLineH, 9, { color: COLORS.textLight });
   }
 
   // Horizontal divider
@@ -196,11 +193,6 @@ export async function buildProposalPdf(input: BuildPdfInput): Promise<Uint8Array
 
   drawText(page, bold, "Dien thoai:", col2, infoY - rowH, 9, { color: COLORS.textLight });
   drawText(page, font, patient.phone, col2 + 70, infoY - rowH, 10, { color: COLORS.text });
-
-  if (patient.address) {
-    drawText(page, bold, "Dia chi:", col1, infoY - rowH * 2, 9, { color: COLORS.textLight });
-    drawText(page, font, patient.address, col1 + 70, infoY - rowH * 2, 10, { color: COLORS.text });
-  }
 
   y = y - 108 - lineH * 2;
 
