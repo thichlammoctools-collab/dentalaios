@@ -19,6 +19,7 @@ export function TreatmentPlanDetailPage() {
   const [loading, setLoading] = useState(true);
   const [openForm, setOpenForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   async function load() {
     if (!id) return;
@@ -65,7 +66,7 @@ export function TreatmentPlanDetailPage() {
 
   async function onDeleteItem(item: TreatmentPlanItem) {
     if (!plan) return;
-    if (!confirm(`Xóa hạng mục #${item.tooth_number} - ${item.procedure}?`)) return;
+    if (!confirm(`Xóa hạng mục ${item.tooth_number != null ? `#${item.tooth_number}` : "toàn hàm"} - ${item.procedure}?`)) return;
     try {
       await apiDelete(`/api/treatment-plans/${plan.id}/items/${item.id}`);
       toast.success("Đã xóa");
@@ -77,6 +78,7 @@ export function TreatmentPlanDetailPage() {
 
   async function onDownloadPdf() {
     if (!plan) return;
+    setPdfLoading(true);
     try {
       const token = getToken();
       const res = await fetch(`/api/treatment-plans/${plan.id}/pdf`, {
@@ -90,12 +92,14 @@ export function TreatmentPlanDetailPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `proposal-${plan.id}.pdf`;
+      a.download = `Ke-hoach-dieu-tri-${plan.id}.pdf`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success("Đã tải PDF");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi PDF");
+    } finally {
+      setPdfLoading(false);
     }
   }
 
@@ -206,7 +210,9 @@ export function TreatmentPlanDetailPage() {
               <TableBody>
                 {items.map((item) => (
                   <TableRow key={item.id}>
-                    <TableCell className="font-mono">#{item.tooth_number}</TableCell>
+                    <TableCell className="font-mono">
+                      {item.tooth_number != null ? `#${item.tooth_number}` : <span className="text-xs font-normal text-orange-700">Toàn hàm</span>}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline">{item.procedure}</Badge>
                     </TableCell>
@@ -240,8 +246,22 @@ export function TreatmentPlanDetailPage() {
         <CardContent className="flex flex-wrap gap-2">
           {canEdit && <Button onClick={() => setOpenForm(true)}>+ Thêm hạng mục</Button>}
           {canApprove && <Button onClick={onApprove}>Duyệt kế hoạch</Button>}
-          <Button variant="outline" onClick={onDownloadPdf} disabled={items.length === 0}>
-            📄 Tải PDF báo giá
+          <Button variant="outline" onClick={onDownloadPdf} disabled={pdfLoading || items.length === 0}>
+            {pdfLoading ? (
+              <>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                Đang tạo PDF…
+              </>
+            ) : (
+              <>
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v6a2 2 0 002 2h6" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 13h6M9 17h4" />
+                </svg>
+                Xuất PDF báo giá
+              </>
+            )}
           </Button>
           {canHandOver && (
             <Button variant="outline" onClick={onLarkHandover}>

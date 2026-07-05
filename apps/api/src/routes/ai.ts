@@ -1,6 +1,7 @@
 /**
  * AI routes:
  *   POST /api/ai/summarize — generate visit summary using AI
+ *   POST /api/ai/generate-plan — generate treatment plan from clinical findings
  */
 
 import { Hono } from "hono";
@@ -25,8 +26,23 @@ router.post(
   async (c) => {
     const jwt = getJwt(c);
     const { visit_id } = c.req.valid("json");
-    // AI is a global binding on Cloudflare Workers — cast as any since Env type doesn't list it
     const result = await aiService.summarizeVisit(
+      { db: c.env.DB, AI: (c.env as Record<string, unknown>).AI },
+      jwt.tenant_id,
+      visit_id,
+    );
+    return c.json(result);
+  },
+);
+
+// POST /api/ai/generate-plan
+router.post(
+  "/generate-plan",
+  zValidator("json", z.object({ visit_id: z.string().min(1) })),
+  async (c) => {
+    const jwt = getJwt(c);
+    const { visit_id } = c.req.valid("json");
+    const result = await aiService.generateTreatmentPlan(
       { db: c.env.DB, AI: (c.env as Record<string, unknown>).AI },
       jwt.tenant_id,
       visit_id,

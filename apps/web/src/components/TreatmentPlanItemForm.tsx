@@ -27,9 +27,10 @@ export function TreatmentPlanItemForm({
   const [description, setDescription] = useState("");
   const [unitCost, setUnitCost] = useState<number | "">("");
   const [saving, setSaving] = useState(false);
+  const [fullMouth, setFullMouth] = useState(false);
 
   const validTooth =
-    typeof toothNumber === "number" ? isValidFdiTooth(toothNumber) : false;
+    fullMouth || (typeof toothNumber === "number" ? isValidFdiTooth(toothNumber) : false);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -46,7 +47,7 @@ export function TreatmentPlanItemForm({
       const created = await apiPost<TreatmentPlanItem>(
         `/api/treatment-plans/${planId}/items`,
         {
-          tooth_number: toothNumber,
+          tooth_number: fullMouth ? null : toothNumber,
           procedure,
           description,
           unit_cost: unitCost,
@@ -58,6 +59,7 @@ export function TreatmentPlanItemForm({
       setToothNumber("");
       setDescription("");
       setUnitCost("");
+      setFullMouth(false);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi thêm item");
     } finally {
@@ -72,24 +74,45 @@ export function TreatmentPlanItemForm({
           <DialogTitle>Thêm hạng mục điều trị</DialogTitle>
         </DialogHeader>
         <div className="grid gap-3">
+          <div className="grid gap-1.5">
+            <div className="flex items-center gap-2">
+              <input
+                id="full-mouth"
+                type="checkbox"
+                checked={fullMouth}
+                onChange={(e) => {
+                  setFullMouth(e.target.checked);
+                  if (e.target.checked) setToothNumber("");
+                }}
+                className="h-4 w-4 rounded border-input"
+              />
+              <Label htmlFor="full-mouth" className="text-sm font-normal">
+                Thủ thuật toàn hàm (cạo vôi răng, tẩy trắng toàn hàm…)
+              </Label>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="tooth">Răng (FDI) *</Label>
+              <Label htmlFor="tooth">Răng (FDI)</Label>
               <Input
                 id="tooth"
                 type="number"
                 min="11"
                 max="85"
-                required
-                value={toothNumber}
+                disabled={fullMouth}
+                value={fullMouth ? "" : toothNumber}
                 onChange={(e) => {
                   const v = e.target.value;
                   setToothNumber(v ? Number(v) : "");
                 }}
                 placeholder="VD: 11, 16, 28, 36…"
               />
-              {toothNumber !== "" && !validTooth && (
+              {!fullMouth && toothNumber !== "" && !isValidFdiTooth(toothNumber) && (
                 <p className="text-xs text-destructive">Không hợp lệ</p>
+              )}
+              {fullMouth && (
+                <p className="text-xs text-muted-foreground">Áp dụng toàn hàm</p>
               )}
             </div>
             <div className="grid gap-1.5">
@@ -105,7 +128,8 @@ export function TreatmentPlanItemForm({
                 <option value="crown">Bọc răng sứ</option>
                 <option value="implant">Cấy ghép implant</option>
                 <option value="extraction">Nhổ răng</option>
-                <option value="cleaning">Lấy cao răng</option>
+                <option value="scaling">Cạo vôi răng</option>
+                <option value="fluoride">Tẩy trắng fluoride</option>
                 <option value="other">Khác</option>
               </select>
             </div>

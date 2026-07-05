@@ -16,6 +16,7 @@ export interface Tenant {
   id: string;
   name: string;
   slug?: string;
+  email?: string;
   is_active: boolean;
   created_at: string;
 }
@@ -96,13 +97,36 @@ export interface Visit {
 /** Tooth numbering system — only FDI supported in V1 per user decision. */
 export type ToothSystem = "FDI";
 
+/**
+ * Scope of a clinical finding:
+ *  - "tooth"         — specific FDI tooth
+ *  - "full_mouth"    — entire dentition (e.g. scaling)
+ *  - "soft_tissue"   — oral soft tissue (gums, tongue, etc.)
+ */
+export type FindingScope = "tooth" | "full_mouth" | "soft_tissue";
+
+/** Valid soft-tissue areas when scope = "soft_tissue" */
+export type SoftTissueArea =
+  | "gum"           // nướu
+  | "tongue"        // lưỡi
+  | "buccal"        // niêm mạc má
+  | "palate"        // vòm miệng
+  | "floor_mouth"   // đáy miệng
+  | "lip"           // môi
+  | "pharynx"       // họng
+  | "jaw"           // xương hàm
+  | "tmj"           // khớp thái dương hàm
+  | "salivary_gland"; // tuyến nước bọt
+
 export interface ClinicalFinding {
   id: string;
   tenant_id: string;
   visit_id: string;
-  tooth_number: number; // 11–48 (permanent), 51–85 (primary) in FDI
-  tooth_system: ToothSystem;
-  condition: string; // e.g. "caries", "fracture", "missing", "periapical"
+  tooth_number?: number; // present when scope = "tooth"; absent for full_mouth / soft_tissue
+  tooth_system?: ToothSystem; // always present when tooth_number is present
+  scope: FindingScope;
+  area?: SoftTissueArea; // required when scope = "soft_tissue"
+  condition: string; // e.g. "caries", "fracture", "gingivitis", "ulcer"
   notes?: string;
   created_at: string;
 }
@@ -130,7 +154,7 @@ export interface TreatmentPlanItem {
   id: string;
   tenant_id: string;
   treatment_plan_id: string;
-  tooth_number: number;
+  tooth_number?: number; // present for per-tooth items; absent for full-mouth procedures
   procedure: string; // e.g. "root_canal", "crown", "implant", "filling"
   description: string;
   unit_cost: number;
@@ -195,6 +219,22 @@ export interface LarkSyncLog {
   status: LarkSyncStatus;
   error?: string;
   created_at: string;
+}
+
+// ───────────────────────── AI ─────────────────────────
+
+export interface GeneratePlanItemDraft {
+  tooth: number | null; // null = full-mouth procedure
+  procedure: string;
+  description: string;
+  cost: number;
+}
+
+export interface GeneratePlanResult {
+  items: GeneratePlanItemDraft[];
+  notes: string;
+  ai_model: string;
+  generated_at: string;
 }
 
 // ───────────────────────── Auth response shape ─────────────────────────

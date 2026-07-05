@@ -135,13 +135,24 @@ export type VisitUpdateInput = z.infer<typeof visitUpdateSchema>;
 
 // ──────────────── Clinical finding ────────────────
 
+const SOFT_TISSUE_AREAS = [
+  "gum", "tongue", "buccal", "palate",
+  "floor_mouth", "lip", "pharynx", "jaw", "tmj", "salivary_gland",
+] as const;
+
 export const findingCreateSchema = z.object({
-  tooth_number: z
-    .number()
-    .int()
-    .refine(isValidFdiTooth, { message: "Số răng FDI không hợp lệ" }),
+  tooth_number: z.number().int().nullable(),
+  scope: z.enum(["tooth", "full_mouth", "soft_tissue"]).default("tooth"),
+  area: z.enum(SOFT_TISSUE_AREAS).optional(),
   condition: nonEmpty(100),
   notes: optionalText(2000),
+}).superRefine((data, ctx) => {
+  if (data.scope === "tooth" && (data.tooth_number == null || !isValidFdiTooth(data.tooth_number))) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Số răng FDI không hợp lệ" });
+  }
+  if (data.scope === "soft_tissue" && !data.area) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Vùng mô mềm là bắt buộc khi scope = soft_tissue" });
+  }
 });
 
 export type FindingCreateInput = z.infer<typeof findingCreateSchema>;
@@ -163,13 +174,14 @@ export const planCreateSchema = z.object({
 });
 
 export const planItemCreateSchema = z.object({
-  tooth_number: z
-    .number()
-    .int()
-    .refine(isValidFdiTooth, { message: "Số răng FDI không hợp lệ" }),
+  tooth_number: z.number().int().nullable(),
   procedure: nonEmpty(100),
   description: nonEmpty(500),
   unit_cost: z.number().nonnegative(),
+}).superRefine((data, ctx) => {
+  if (data.tooth_number != null && !isValidFdiTooth(data.tooth_number)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Số răng FDI không hợp lệ" });
+  }
 });
 
 export type PlanCreateInput = z.infer<typeof planCreateSchema>;

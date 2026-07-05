@@ -1,5 +1,5 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import type { ClinicalFinding } from "@shared/types";
+import type { ClinicalFinding, SoftTissueArea } from "@shared/types";
 import type { D1Row } from "./base";
 
 export interface FindingsRepository {
@@ -7,7 +7,7 @@ export interface FindingsRepository {
   create(
     tenantId: string,
     visitId: string,
-    data: Omit<ClinicalFinding, "id" | "tenant_id" | "visit_id" | "tooth_system" | "created_at">,
+    data: Omit<ClinicalFinding, "id" | "tenant_id" | "visit_id" | "created_at">,
   ): Promise<ClinicalFinding>;
   update(
     tenantId: string,
@@ -24,7 +24,7 @@ export function createFindingsRepository(db: D1Database): FindingsRepository {
         .prepare(
           `SELECT * FROM clinical_findings
            WHERE tenant_id = ? AND visit_id = ?
-           ORDER BY tooth_number ASC`,
+           ORDER BY scope ASC, tooth_number ASC`,
         )
         .bind(tenantId, visitId)
         .all();
@@ -36,10 +36,20 @@ export function createFindingsRepository(db: D1Database): FindingsRepository {
       await db
         .prepare(
           `INSERT INTO clinical_findings
-             (id, tenant_id, visit_id, tooth_number, tooth_system, condition, notes)
-           VALUES (?, ?, ?, ?, 'FDI', ?, ?)`,
+             (id, tenant_id, visit_id, tooth_number, tooth_system, scope, area, condition, notes)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .bind(id, tenantId, visitId, data.tooth_number, data.condition, data.notes ?? null)
+        .bind(
+          id,
+          tenantId,
+          visitId,
+          data.tooth_number ?? null,
+          data.tooth_system ?? null,
+          data.scope,
+          data.area ?? null,
+          data.condition,
+          data.notes ?? null,
+        )
         .run();
       const row = (await db
         .prepare("SELECT * FROM clinical_findings WHERE tenant_id = ? AND id = ? LIMIT 1")
@@ -77,12 +87,15 @@ export function createFindingsRepository(db: D1Database): FindingsRepository {
 }
 
 function mapFinding(row: D1Row): ClinicalFinding {
+  const scope = (row.scope as ClinicalFinding["scope"]) || "tooth";
   return {
     id: row.id as string,
     tenant_id: row.tenant_id as string,
     visit_id: row.visit_id as string,
-    tooth_number: row.tooth_number as number,
-    tooth_system: row.tooth_system as ClinicalFinding["tooth_system"],
+    tooth_number: row.tooth_number as number | undefined,
+    tooth_system: (row.tooth_system as ClinicalFinding["tooth_system"]) || undefined,
+    scope,
+    area: (row.area as SoftTissueArea | undefined) ?? undefined,
     condition: row.condition as string,
     notes: (row.notes as string | null) ?? undefined,
     created_at: row.created_at as string,

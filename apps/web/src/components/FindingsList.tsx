@@ -8,15 +8,87 @@ import { apiPatch, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import type { ClinicalFinding } from "@shared/types";
 
-const CONDITIONS = [
+const TOOTH_CONDITIONS = [
   { value: "caries", label: "Sâu răng" },
   { value: "fracture", label: "Gãy/vỡ" },
   { value: "missing", label: "Mất răng" },
   { value: "periapical", label: "Viêm quanh chóp" },
   { value: "calculus", label: "Cao răng" },
   { value: "pulpitis", label: "Viêm tủy" },
+  { value: "discoloration", label: "Đổi màu" },
+  { value: "wear", label: "Mòn răng" },
   { value: "other", label: "Khác" },
 ];
+
+const FULLMOUTH_CONDITIONS = [
+  { value: "calculus", label: "Cao răng (cạo vôi toàn hàm)" },
+  { value: "staining", label: "Nhuộm màu toàn hàm" },
+  { value: "halitosis", label: "Hôi miệng" },
+  { value: "dry_mouth", label: "Khô miệng" },
+  { value: "bruxism", label: "Nghiến răng" },
+  { value: "other", label: "Khác" },
+];
+
+const SOFT_TISSUE_AREAS = [
+  { value: "gum", label: "Nướu" },
+  { value: "tongue", label: "Lưỡi" },
+  { value: "buccal", label: "Niêm mạc má" },
+  { value: "palate", label: "Vòm miệng" },
+  { value: "floor_mouth", label: "Đáy miệng" },
+  { value: "lip", label: "Môi" },
+  { value: "pharynx", label: "Họng" },
+  { value: "jaw", label: "Xương hàm" },
+  { value: "tmj", label: "Khớp TMJ" },
+  { value: "salivary_gland", label: "Tuyến nước bọt" },
+];
+
+const SOFT_TISSUE_CONDITIONS = [
+  { value: "gingivitis", label: "Viêm lợi" },
+  { value: "periodontitis", label: "Viêm quanh răng" },
+  { value: "ulcer", label: "Loét miệng" },
+  { value: "aphtha", label: "Aft miệng" },
+  { value: "leukoplakia", label: "Bạch sản" },
+  { value: "erythroplakia", label: "Hồng sản" },
+  { value: "herpes", label: "Mụn rộp herpes" },
+  { value: "candidiasis", label: "Nấm miệng" },
+  { value: "fissure", label: "Nứt khóe miệng" },
+  { value: "abscess", label: "Áp xe nướu" },
+  { value: "fistula", label: "Rò quanh răng" },
+  { value: "recession", label: "Tụt lợi" },
+  { value: "hypertrophy", label: "Phì đại nướu" },
+  { value: "tongue_coating", label: "B tong lưỡi" },
+  { value: "geographic_tongue", label: "Lưỡi địa lý" },
+  { value: "fissured_tongue", label: "Lưỡi nứt" },
+  { value: "macroglossia", label: "Lưỡi to" },
+  { value: "torus", label: "Gai xương hàm" },
+  { value: "tmd_pain", label: "Đau khớp TMJ" },
+  { value: "clicking", label: "Khớp kêu click" },
+  { value: "limitation", label: "Hạn chế há miệng" },
+  { value: "sialolith", label: "Sialolith" },
+  { value: "swelling", label: "Sưng tuyến nước bọt" },
+  { value: "other", label: "Khác" },
+];
+
+function conditionLabel(scope: string, condition: string): string {
+  if (scope === "soft_tissue") {
+    return SOFT_TISSUE_CONDITIONS.find((c) => c.value === condition)?.label ?? condition;
+  }
+  if (scope === "full_mouth") {
+    return FULLMOUTH_CONDITIONS.find((c) => c.value === condition)?.label ?? condition;
+  }
+  return TOOTH_CONDITIONS.find((c) => c.value === condition)?.label ?? condition;
+}
+
+function areaLabel(area?: string): string {
+  if (!area) return "";
+  return SOFT_TISSUE_AREAS.find((a) => a.value === area)?.label ?? area;
+}
+
+function scopeBadgeVariant(scope: string): "outline" | "secondary" | "default" {
+  if (scope === "full_mouth") return "secondary";
+  if (scope === "soft_tissue") return "default";
+  return "outline";
+}
 
 interface FindingsListProps {
   visitId: string;
@@ -64,82 +136,133 @@ export function FindingsList({ visitId, findings, onUpdate }: FindingsListProps)
     return <p className="text-sm text-muted-foreground">Chưa có finding nào.</p>;
   }
 
+  // Group: tooth, full_mouth, soft_tissue
+  const toothFindings = findings.filter((f) => f.scope === "tooth");
+  const fmFindings = findings.filter((f) => f.scope === "full_mouth");
+  const stFindings = findings.filter((f) => f.scope === "soft_tissue");
+
+  function renderRow(f: ClinicalFinding) {
+    const isEditing = editing?.finding.id === f.id;
+    const scope = f.scope || "tooth";
+
+    return (
+      <TableRow key={f.id}>
+        <TableCell className="w-32">
+          {scope === "tooth" ? (
+            <span className="font-mono font-medium">#{f.tooth_number}</span>
+          ) : scope === "full_mouth" ? (
+            <span className="text-xs font-medium text-orange-700">Toàn hàm</span>
+          ) : (
+            <span className="text-xs font-medium text-blue-700">{areaLabel(f.area)}</span>
+          )}
+        </TableCell>
+        <TableCell>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge variant={scopeBadgeVariant(scope)}>{scope === "tooth" ? "Răng" : scope === "full_mouth" ? "Toàn hàm" : "Mô mềm"}</Badge>
+            {isEditing ? (
+              <Select
+                value={editing.condition}
+                onChange={(e) => setEditing((prev) => prev ? { ...prev, condition: e.target.value } : null)}
+              >
+                {(scope === "soft_tissue" ? SOFT_TISSUE_CONDITIONS : scope === "full_mouth" ? FULLMOUTH_CONDITIONS : TOOTH_CONDITIONS).map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </Select>
+            ) : (
+              <Badge variant="outline">{conditionLabel(scope, f.condition)}</Badge>
+            )}
+          </div>
+        </TableCell>
+        <TableCell className="text-muted-foreground max-w-xs">
+          {isEditing ? (
+            <Textarea
+              rows={2}
+              value={editing.notes}
+              onChange={(e) => setEditing((prev) => prev ? { ...prev, notes: e.target.value } : null)}
+              placeholder="Ghi chú…"
+            />
+          ) : (
+            f.notes ?? "—"
+          )}
+        </TableCell>
+        <TableCell className="w-32 text-right">
+          {isEditing ? (
+            <>
+              <Button variant="ghost" size="sm" onClick={saveEdit} disabled={editing.saving} className="text-xs">
+                {editing.saving ? "…" : "Lưu"}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={cancelEdit} disabled={editing.saving} className="text-xs">
+                Hủy
+              </Button>
+            </>
+          ) : (
+            <Button variant="ghost" size="sm" onClick={() => startEdit(f)} className="text-xs">
+              Sửa
+            </Button>
+          )}
+        </TableCell>
+      </TableRow>
+    );
+  }
+
   return (
-    <>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Răng</TableHead>
-            <TableHead>Tình trạng</TableHead>
-            <TableHead>Ghi chú</TableHead>
-            <TableHead />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {findings.map((f) => {
-            const isEditing = editing?.finding.id === f.id;
-            return (
-              <TableRow key={f.id}>
-                <TableCell className="font-mono font-medium">#{f.tooth_number}</TableCell>
-                <TableCell>
-                  {isEditing ? (
-                    <Select
-                      value={editing.condition}
-                      onChange={(e) => setEditing((prev) => prev ? { ...prev, condition: e.target.value } : null)}
-                    >
-                      {CONDITIONS.map((c) => (
-                        <option key={c.value} value={c.value}>{c.label}</option>
-                      ))}
-                    </Select>
-                  ) : (
-                    <Badge variant="outline">{f.condition}</Badge>
-                  )}
-                </TableCell>
-                <TableCell className="text-muted-foreground max-w-xs">
-                  {isEditing ? (
-                    <Textarea
-                      rows={2}
-                      value={editing.notes}
-                      onChange={(e) => setEditing((prev) => prev ? { ...prev, notes: e.target.value } : null)}
-                      placeholder="Ghi chú…"
-                    />
-                  ) : (
-                    f.notes ?? "—"
-                  )}
-                </TableCell>
-                <TableCell className="w-32 text-right">
-                  {isEditing ? (
-                    <>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={saveEdit}
-                        disabled={editing.saving}
-                        className="text-xs"
-                      >
-                        {editing.saving ? "…" : "Lưu"}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={cancelEdit}
-                        disabled={editing.saving}
-                        className="text-xs"
-                      >
-                        Hủy
-                      </Button>
-                    </>
-                  ) : (
-                    <Button variant="ghost" size="sm" onClick={() => startEdit(f)} className="text-xs">
-                      Sửa
-                    </Button>
-                  )}
-                </TableCell>
+    <div className="space-y-4">
+      {toothFindings.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Theo răng</p>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Răng</TableHead>
+                <TableHead>Tình trạng</TableHead>
+                <TableHead>Ghi chú</TableHead>
+                <TableHead />
               </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </>
+            </TableHeader>
+            <TableBody>
+              {toothFindings.map(renderRow)}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {fmFindings.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-orange-600">Toàn hàm</p>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Vùng</TableHead>
+                <TableHead>Tình trạng</TableHead>
+                <TableHead>Ghi chú</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {fmFindings.map(renderRow)}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {stFindings.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-blue-600">Mô mềm miệng</p>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Vùng</TableHead>
+                <TableHead>Tình trạng</TableHead>
+                <TableHead>Ghi chú</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {stFindings.map(renderRow)}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
   );
 }

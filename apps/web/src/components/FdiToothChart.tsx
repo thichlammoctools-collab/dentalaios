@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
-import type { ClinicalFinding } from "@shared/types";
+import type { ClinicalFinding, SoftTissueArea } from "@shared/types";
 import { cn } from "@/lib/utils";
 
 interface FdiToothChartProps {
@@ -15,27 +14,107 @@ interface FdiToothChartProps {
   onCreated: (finding: ClinicalFinding) => void;
 }
 
-/**
- * FDI tooth chart — 32 permanent teeth.
- * Layout: Upper (Q1+Q2) and Lower (Q3+Q4) rows, each split into right (patient's right) | left.
- *
- *   Q1: 18 17 16 15 14 13 12 11 | 21 22 23 24 25 26 27 28 :Q2
- *   Q4: 48 47 46 45 44 43 42 41 | 31 32 33 34 35 36 37 38 :Q3
- */
 const UPPER_RIGHT = [18, 17, 16, 15, 14, 13, 12, 11];
 const UPPER_LEFT = [21, 22, 23, 24, 25, 26, 27, 28];
 const LOWER_RIGHT = [48, 47, 46, 45, 44, 43, 42, 41];
 const LOWER_LEFT = [31, 32, 33, 34, 35, 36, 37, 38];
 
+const ALL_TEETH = [...UPPER_RIGHT, ...UPPER_LEFT, ...LOWER_RIGHT, ...LOWER_LEFT];
+
+type Tab = "tooth" | "full_mouth" | "soft_tissue";
+
+const TOOTH_CONDITIONS = [
+  { value: "caries", label: "Sâu răng" },
+  { value: "fracture", label: "Gãy/vỡ" },
+  { value: "missing", label: "Mất răng" },
+  { value: "periapical", label: "Viêm quanh chóp" },
+  { value: "calculus", label: "Cao răng" },
+  { value: "pulpitis", label: "Viêm tủy" },
+  { value: "discoloration", label: "Đổi màu" },
+  { value: "wear", label: "Mòn răng" },
+  { value: "other", label: "Khác" },
+];
+
+const FULLMOUTH_CONDITIONS = [
+  { value: "calculus", label: "Cao răng (cạo vôi toàn hàm)" },
+  { value: "staining", label: "Nhuộm màu toàn hàm" },
+  { value: "halitosis", label: "Hôi miệng" },
+  { value: "dry_mouth", label: "Khô miệng" },
+  { value: "bruxism", label: "Nghiến răng" },
+  { value: "other", label: "Khác" },
+];
+
+const SOFT_TISSUE_AREAS: { value: SoftTissueArea; label: string }[] = [
+  { value: "gum", label: "Nướu (lợi)" },
+  { value: "tongue", label: "Lưỡi" },
+  { value: "buccal", label: "Niêm mạc má" },
+  { value: "palate", label: "Vòm miệng" },
+  { value: "floor_mouth", label: "Đáy miệng" },
+  { value: "lip", label: "Môi" },
+  { value: "pharynx", label: "Họng" },
+  { value: "jaw", label: "Xương hàm" },
+  { value: "tmj", label: "Khớp thái dương hàm (TMJ)" },
+  { value: "salivary_gland", label: "Tuyến nước bọt" },
+];
+
+const SOFT_TISSUE_CONDITIONS = [
+  { value: "gingivitis", label: "Viêm lợi (Gingivitis)" },
+  { value: "periodontitis", label: "Viêm quanh răng (Periodontitis)" },
+  { value: "ulcer", label: "Loét miệng" },
+  { value: "aphtha", label: "Aft miệng" },
+  { value: "leukoplakia", label: "Bạch sản" },
+  { value: "erythroplakia", label: "Hồng sản" },
+  { value: "herpes", label: "Mụn rộp herpes" },
+  { value: "candidiasis", label: "Nấm miệng (Candidiasis)" },
+  { value: "fissure", label: "Nứt khóe miệng" },
+  { value: "abscess", label: "Áp xe nướu" },
+  { value: "fistula", label: "Rò quanh răng" },
+  { value: "recession", label: "Tụt lợi (Recession)" },
+  { value: "hypertrophy", label: "Phì đại nướu" },
+  { value: "tongue_coating", label: "B tong lưỡi" },
+  { value: "geographic_tongue", label: "Lưỡi địa lý" },
+  { value: "fissured_tongue", label: "Lưỡi nứt" },
+  { value: "macroglossia", label: "Lưỡi to" },
+  { value: "torus", label: "Gai xương hàm" },
+  { value: "tmd_pain", label: "Đau khớp TMJ" },
+  { value: "clicking", label: "Khớp kêu click" },
+  { value: "limitation", label: "Hạn chế há miệng" },
+  { value: "sialolith", label: "Sialolith (đá tuyến nước bọt)" },
+  { value: "swelling", label: "Sưng tuyến nước bọt" },
+  { value: "other", label: "Khác" },
+];
+
+function toothLabel(n: number) {
+  return `#${n}`;
+}
+
 export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartProps) {
+  const [tab, setTab] = useState<Tab>("tooth");
   const [selected, setSelected] = useState<number | null>(null);
   const [condition, setCondition] = useState("caries");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Map tooth number → set of findings
+  // Full-mouth dialog state
+  const [fmCondition, setFmCondition] = useState("calculus");
+  const [fmNotes, setFmNotes] = useState("");
+  const [fmOpen, setFmOpen] = useState(false);
+  const [fmSaving, setFmSaving] = useState(false);
+
+  // Soft-tissue dialog state
+  const [stArea, setStArea] = useState<SoftTissueArea>("gum");
+  const [stCondition, setStCondition] = useState("gingivitis");
+  const [stNotes, setStNotes] = useState("");
+  const [stOpen, setStOpen] = useState(false);
+  const [stSaving, setStSaving] = useState(false);
+
+  const toothFindings = findings.filter((f) => f.scope === "tooth");
+  const fullMouthFindings = findings.filter((f) => f.scope === "full_mouth");
+  const softTissueFindings = findings.filter((f) => f.scope === "soft_tissue");
+
   const findingsByTooth = new Map<number, ClinicalFinding[]>();
-  for (const f of findings) {
+  for (const f of toothFindings) {
+    if (f.tooth_number == null) continue;
     const list = findingsByTooth.get(f.tooth_number) ?? [];
     list.push(f);
     findingsByTooth.set(f.tooth_number, list);
@@ -65,7 +144,7 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
     );
   }
 
-  async function onSubmit() {
+  async function onToothSubmit() {
     if (selected == null) return;
     setSaving(true);
     try {
@@ -73,6 +152,7 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
         `/api/visits/${visitId}/findings`,
         {
           tooth_number: selected,
+          scope: "tooth",
           condition,
           notes: notes || undefined,
         },
@@ -80,6 +160,7 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
       toast.success(`Đã thêm finding cho răng #${selected}`);
       onCreated(created);
       setSelected(null);
+      setCondition("caries");
       setNotes("");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi thêm finding");
@@ -88,30 +169,172 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
     }
   }
 
+  async function onFullMouthSubmit() {
+    setFmSaving(true);
+    try {
+      const created = await apiPost<ClinicalFinding>(
+        `/api/visits/${visitId}/findings`,
+        {
+          tooth_number: null,
+          scope: "full_mouth",
+          condition: fmCondition,
+          notes: fmNotes || undefined,
+        },
+      );
+      toast.success("Đã thêm finding toàn hàm");
+      onCreated(created);
+      setFmOpen(false);
+      setFmCondition("calculus");
+      setFmNotes("");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi thêm finding");
+    } finally {
+      setFmSaving(false);
+    }
+  }
+
+  async function onSoftTissueSubmit() {
+    setStSaving(true);
+    try {
+      const created = await apiPost<ClinicalFinding>(
+        `/api/visits/${visitId}/findings`,
+        {
+          tooth_number: null,
+          scope: "soft_tissue",
+          area: stArea,
+          condition: stCondition,
+          notes: stNotes || undefined,
+        },
+      );
+      toast.success("Đã thêm finding mô mềm");
+      onCreated(created);
+      setStOpen(false);
+      setStCondition("gingivitis");
+      setStNotes("");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi thêm finding");
+    } finally {
+      setStSaving(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-border bg-card p-4">
-        <p className="mb-3 text-center text-xs text-muted-foreground">↑ Hàm trên (Patient's right | left)</p>
-        <div className="overflow-x-auto">
-          <div className="flex min-w-max justify-center gap-0">
-            <div className="flex">{UPPER_RIGHT.map((n) => renderTooth(n, "right"))}</div>
-            <div className="mx-1 w-px flex-shrink-0 bg-border" />
-            <div className="flex">{UPPER_LEFT.map((n) => renderTooth(n, "left"))}</div>
-          </div>
-          <div className="mt-3 flex min-w-max justify-center gap-0">
-            <div className="flex">{LOWER_RIGHT.map((n) => renderTooth(n, "right"))}</div>
-            <div className="mx-1 w-px flex-shrink-0 bg-border" />
-            <div className="flex">{LOWER_LEFT.map((n) => renderTooth(n, "left"))}</div>
-          </div>
-        </div>
-        <p className="mt-3 text-center text-xs text-muted-foreground">↓ Hàm dưới</p>
+      {/* Tab navigation */}
+      <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1">
+        {([
+          { key: "tooth", label: "Theo răng", count: toothFindings.length },
+          { key: "full_mouth", label: "Toàn hàm", count: fullMouthFindings.length },
+          { key: "soft_tissue", label: "Mô mềm", count: softTissueFindings.length },
+        ] as { key: Tab; label: string; count: number }[]).map(({ key, label, count }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setTab(key)}
+            className={cn(
+              "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+              tab === key
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {label}
+            {count > 0 && (
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/10 px-1 text-xs text-primary">
+                {count}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
+      {/* Tab: Tooth */}
+      {tab === "tooth" && (
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="mb-3 text-center text-xs text-muted-foreground">↑ Hàm trên (Patient's right | left)</p>
+          <div className="overflow-x-auto">
+            <div className="flex min-w-max justify-center gap-0">
+              <div className="flex">{UPPER_RIGHT.map((n) => renderTooth(n, "right"))}</div>
+              <div className="mx-1 w-px flex-shrink-0 bg-border" />
+              <div className="flex">{UPPER_LEFT.map((n) => renderTooth(n, "left"))}</div>
+            </div>
+            <div className="mt-3 flex min-w-max justify-center gap-0">
+              <div className="flex">{LOWER_RIGHT.map((n) => renderTooth(n, "right"))}</div>
+              <div className="mx-1 w-px flex-shrink-0 bg-border" />
+              <div className="flex">{LOWER_LEFT.map((n) => renderTooth(n, "left"))}</div>
+            </div>
+          </div>
+          <p className="mt-3 text-center text-xs text-muted-foreground">↓ Hàm dưới</p>
+          <p className="mt-2 text-center text-xs text-muted-foreground">
+            Nhấn răng để thêm tình trạng. Răng đỏ = đã có findings.
+          </p>
+        </div>
+      )}
+
+      {/* Tab: Full mouth */}
+      {tab === "full_mouth" && (
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="mb-2 text-sm font-medium">Thêm finding cho toàn hàm</p>
+          <p className="mb-4 text-xs text-muted-foreground">
+            Dùng cho các thủ thuật áp dụng toàn bộ hàm như cạo vôi răng, tẩy trắng toàn hàm…
+          </p>
+          <Button variant="outline" size="sm" onClick={() => setFmOpen(true)}>
+            + Thêm finding toàn hàm
+          </Button>
+          {fullMouthFindings.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {fullMouthFindings.map((f) => (
+                <span key={f.id} className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800">
+                  {FULLMOUTH_CONDITIONS.find((c) => c.value === f.condition)?.label ?? f.condition}
+                  {f.notes && <span className="ml-1 text-orange-600">— {f.notes}</span>}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab: Soft tissue */}
+      {tab === "soft_tissue" && (
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="mb-2 text-sm font-medium">Thêm finding mô mềm miệng</p>
+          <p className="mb-4 text-xs text-muted-foreground">
+            Nướu, lưỡi, niêm mạc, xương hàm, khớp TMJ, tuyến nước bọt…
+          </p>
+          <Button variant="outline" size="sm" onClick={() => setStOpen(true)}>
+            + Thêm finding mô mềm
+          </Button>
+          {softTissueFindings.length > 0 && (
+            <div className="mt-3 flex flex-col gap-1.5">
+              {softTissueFindings.map((f) => (
+                <div key={f.id} className="flex items-center gap-2 text-xs">
+                  <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+                    {SOFT_TISSUE_AREAS.find((a) => a.value === f.area)?.label ?? f.area}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {SOFT_TISSUE_CONDITIONS.find((c) => c.value === f.condition)?.label ?? f.condition}
+                  </span>
+                  {f.notes && <span className="text-muted-foreground italic">— {f.notes}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Dialog: Tooth condition */}
       <Dialog open={selected != null} onOpenChange={(o) => !o && setSelected(null)}>
         {selected != null && (
           <div>
             <DialogHeader>
-              <DialogTitle>Thêm finding — Răng #{selected}</DialogTitle>
+              <DialogTitle>
+                Thêm finding — Răng #{selected}{" "}
+                <span className="font-normal text-muted-foreground">
+                  ({ALL_TEETH.includes(selected)
+                    ? selected >= 30 ? "Hàm dưới" : "Hàm trên"
+                    : "?"})
+                </span>
+              </DialogTitle>
             </DialogHeader>
             <div className="grid gap-3">
               <div className="grid gap-1.5">
@@ -122,13 +345,9 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
                   onChange={(e) => setCondition(e.target.value)}
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
                 >
-                  <option value="caries">Sâu răng</option>
-                  <option value="fracture">Gãy/vỡ</option>
-                  <option value="missing">Mất răng</option>
-                  <option value="periapical">Viêm quanh chóp</option>
-                  <option value="calculus">Cao răng</option>
-                  <option value="pulpitis">Viêm tủy</option>
-                  <option value="other">Khác</option>
+                  {TOOTH_CONDITIONS.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
                 </select>
               </div>
               <div className="grid gap-1.5">
@@ -148,12 +367,109 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
               <Button variant="outline" onClick={() => setSelected(null)}>
                 Hủy
               </Button>
-              <Button onClick={onSubmit} disabled={saving}>
+              <Button onClick={onToothSubmit} disabled={saving}>
                 {saving ? "Đang lưu…" : "Lưu"}
               </Button>
             </DialogFooter>
           </div>
         )}
+      </Dialog>
+
+      {/* Dialog: Full-mouth finding */}
+      <Dialog open={fmOpen} onOpenChange={setFmOpen}>
+        <div>
+          <DialogHeader>
+            <DialogTitle>Thêm finding toàn hàm</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div className="grid gap-1.5">
+              <Label htmlFor="fm-cond">Tình trạng</Label>
+              <select
+                id="fm-cond"
+                value={fmCondition}
+                onChange={(e) => setFmCondition(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+              >
+                {FULLMOUTH_CONDITIONS.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="fm-notes">Ghi chú</Label>
+              <Textarea
+                id="fm-notes"
+                rows={3}
+                value={fmNotes}
+                onChange={(e) => setFmNotes(e.target.value)}
+                placeholder="Ví dụ: cạo vôi 2 hàm, khuyên bệnh nhân tẩy trắng…"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFmOpen(false)}>
+              Hủy
+            </Button>
+            <Button onClick={onFullMouthSubmit} disabled={fmSaving}>
+              {fmSaving ? "Đang lưu…" : "Lưu"}
+            </Button>
+          </DialogFooter>
+        </div>
+      </Dialog>
+
+      {/* Dialog: Soft-tissue finding */}
+      <Dialog open={stOpen} onOpenChange={setStOpen}>
+        <div>
+          <DialogHeader>
+            <DialogTitle>Thêm finding mô mềm</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div className="grid gap-1.5">
+              <Label htmlFor="st-area">Vùng</Label>
+              <select
+                id="st-area"
+                value={stArea}
+                onChange={(e) => setStArea(e.target.value as SoftTissueArea)}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+              >
+                {SOFT_TISSUE_AREAS.map((a) => (
+                  <option key={a.value} value={a.value}>{a.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="st-cond">Tình trạng</Label>
+              <select
+                id="st-cond"
+                value={stCondition}
+                onChange={(e) => setStCondition(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+              >
+                {SOFT_TISSUE_CONDITIONS.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="st-notes">Ghi chú</Label>
+              <Textarea
+                id="st-notes"
+                rows={3}
+                value={stNotes}
+                onChange={(e) => setStNotes(e.target.value)}
+                placeholder="Mô tả thêm về tình trạng…"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStOpen(false)}>
+              Hủy
+            </Button>
+            <Button onClick={onSoftTissueSubmit} disabled={stSaving}>
+              {stSaving ? "Đang lưu…" : "Lưu"}
+            </Button>
+          </DialogFooter>
+        </div>
       </Dialog>
     </div>
   );

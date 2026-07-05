@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { VisitForm } from "@/components/VisitForm";
 import { FdiToothChart } from "@/components/FdiToothChart";
 import { FindingsList } from "@/components/FindingsList";
@@ -10,12 +11,20 @@ import { Dialog, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui
 import { apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatDateTime } from "@/lib/utils";
-import type { Visit, ClinicalFinding, TreatmentPlan } from "@shared/types";
+import type { Visit, ClinicalFinding, TreatmentPlan, GeneratePlanResult, GeneratePlanItemDraft } from "@shared/types";
 
 interface SummarizeResult {
   summary: string;
   ai_model: string;
   generated_at: string;
+}
+
+interface EditableItem {
+  id: string; // local temp id
+  tooth: number | null; // null = full-mouth procedure
+  procedure: string;
+  description: string;
+  cost: number;
 }
 
 function parseSummary(text: string): { type: "h2" | "p" | "li"; content: string }[] {
@@ -71,6 +80,24 @@ function SummaryBlock({ blocks }: { blocks: { type: "h2" | "p" | "li"; content: 
   );
 }
 
+const PROCEDURE_OPTIONS = [
+  { value: "examination", label: "Khám và chẩn đoán" },
+  { value: "filling", label: "Trám răng" },
+  { value: "root_canal", label: "Điều trị tủy" },
+  { value: "extraction", label: "Nhổ răng" },
+  { value: "crown", label: "Bọc mão răng" },
+  { value: "scaling", label: "Cạo vôi răng" },
+  { value: "implant", label: "Cấy ghép implant" },
+  { value: "bridge", label: "Cầu răng sứ" },
+  { value: "veneer", label: "Dán sứ veneer" },
+  { value: "fluoride", label: "Tẩy trắng fluoride" },
+  { value: "other", label: "Khác" },
+];
+
+function procedureLabel(v: string) {
+  return PROCEDURE_OPTIONS.find((o) => o.value === v)?.label ?? v;
+}
+
 export function VisitDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -82,6 +109,14 @@ export function VisitDetailPage() {
   const [summarizing, setSummarizing] = useState(false);
   const [summaryResult, setSummaryResult] = useState<SummarizeResult | null>(null);
   const [summaryDialogOpen, setSummaryDialogOpen] = useState(false);
+
+  // AI generate plan
+  const [generatingPlan, setGeneratingPlan] = useState(false);
+  const [planResult, setPlanResult] = useState<GeneratePlanResult | null>(null);
+  const [planDialogOpen, setPlanDialogOpen] = useState(false);
+  const [editableItems, setEditableItems] = useState<EditableItem[]>([]);
+  const [planNotes, setPlanNotes] = useState("");
+  const [savingPlan, setSavingPlan] = useState(false);
 
   async function load() {
     if (!id) return;
@@ -134,6 +169,85 @@ export function VisitDetailPage() {
       setSummarizing(false);
     }
   }
+
+  async function onGeneratePlan() {
+    if (!visit) return;
+    setGeneratingPlan(true);
+    setPlanResult(null);
+    setPlanDialogOpen(true);
+    setEditableItems([]);
+    setPlanNotes("");
+    try {
+      const result = await apiPost<GeneratePlanResult>("/api/ai/generate-plan", {
+        visit_id: visit.id,
+      });
+      setPlanResult(result);
+      setEditableItems(result.items.map((item, idx) => ({
+        id: `temp-${idx}`,
+        tooth: item.tooth,
+        procedure: item.procedure,
+        description: item.description,
+        cost: item.cost,
+      })));
+      setPlanNotes(result.notes);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi tạo kế hoạch AI");
+      setPlanDialogOpen(false);
+    } finally {
+      setGeneratingPlan(false);
+    }
+  }
+
+  async function onSavePlan() {
+    if (!visit) return;
+    setSavingPlan(true);
+    try {
+      const plan = await apiPost<TreatmentPlan>("/api/treatment-plans", {
+        visit_id: visit.id,
+        patient_id: visit.patient_id,
+        currency: "VND",
+      });
+
+      for (const item of editableItems) {
+        await apiPost("/api/treatment-plans/items", {
+          plan_id: plan.id,
+          tooth_number: item.tooth,
+          procedure: item.procedure,
+          description: item.description,
+          unit_cost: item.cost,
+          currency: "VND",
+          status: "proposed",
+        });
+      }
+
+      toast.success("Đã tạo kế hoạch điều trị từ AI");
+      setPlanDialogOpen(false);
+      navigate(`/treatment-plans/${plan.id}`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi lưu kế hoạch");
+    } finally {
+      setSavingPlan(false);
+    }
+  }
+
+  function addItem() {
+    setEditableItems((prev) => [
+      ...prev,
+      { id: `temp-${Date.now()}`, tooth: 0, procedure: "examination", description: "", cost: 0 },
+    ]);
+  }
+
+  function removeItem(id: string) {
+    setEditableItems((prev) => prev.filter((i) => i.id !== id));
+  }
+
+  function updateItem(id: string, field: keyof EditableItem, value: string | number) {
+    setEditableItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+    );
+  }
+
+  const totalCost = editableItems.reduce((sum, item) => sum + (item.cost || 0), 0);
 
   if (loading || !visit) {
     return <p className="px-6 py-6 text-sm text-muted-foreground">Đang tải…</p>;
@@ -207,6 +321,9 @@ export function VisitDetailPage() {
           <Button variant="outline" onClick={onSummarize} disabled={summarizing}>
             {summarizing ? "Đang tạo tóm tắt…" : "🤖 Tóm tắt AI"}
           </Button>
+          <Button variant="secondary" onClick={onGeneratePlan} disabled={generatingPlan}>
+            {generatingPlan ? "AI đang tạo kế hoạch…" : "🤖 Tạo kế hoạch AI"}
+          </Button>
         </CardContent>
       </Card>
 
@@ -246,7 +363,7 @@ export function VisitDetailPage() {
                   Copy
                 </button>
               </div>
-              <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <div className="rounded-xl border border-border bg-white p-5 shadow-sm">
                 <SummaryBlock blocks={parseSummary(summaryResult.summary)} />
               </div>
             </div>
@@ -256,6 +373,153 @@ export function VisitDetailPage() {
         <DialogFooter>
           <Button variant="outline" onClick={() => setSummaryDialogOpen(false)}>
             Đóng
+          </Button>
+        </DialogFooter>
+      </Dialog>
+
+      {/* AI Generate Plan Dialog */}
+      <Dialog open={planDialogOpen} onOpenChange={setPlanDialogOpen}>
+        <DialogHeader>
+          <DialogTitle>Tạo kế hoạch điều trị bằng AI</DialogTitle>
+        </DialogHeader>
+
+        <div className="mt-4">
+          {generatingPlan ? (
+            <div className="flex items-center gap-3 py-10 justify-center">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-muted border-t-primary" />
+              <span className="text-sm text-muted-foreground">AI đang phân tích clinical findings…</span>
+            </div>
+          ) : planResult ? (
+            <div className="space-y-4">
+              {/* Model badge */}
+              <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
+                  {planResult.ai_model === "llama-3.1-8b-instruct" ? "AI Cloudflare" : "Gợi ý cấu trúc"}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {new Date(planResult.generated_at).toLocaleTimeString("vi-VN")}
+                </span>
+              </div>
+
+              {/* Items table */}
+              {editableItems.length > 0 ? (
+                <div className="rounded-xl border border-border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/30">
+                        <th className="px-3 py-2 text-left font-medium text-muted-foreground w-16">Răng</th>
+                        <th className="px-3 py-2 text-left font-medium text-muted-foreground">Thủ thuật</th>
+                        <th className="px-3 py-2 text-left font-medium text-muted-foreground">Mô tả</th>
+                        <th className="px-3 py-2 text-right font-medium text-muted-foreground w-32">Chi phí (VND)</th>
+                        <th className="w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {editableItems.map((item) => (
+                        <tr key={item.id} className="border-b border-border last:border-0">
+                          <td className="px-3 py-2">
+                            <Input
+                              type="number"
+                              value={item.tooth ?? ""}
+                              onChange={(e) => updateItem(item.id, "tooth", e.target.value === "" ? null : Number(e.target.value))}
+                              className="h-8 w-16 text-center"
+                              min={1} max={88}
+                              placeholder="*"
+                              title="Để trống = toàn hàm"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <select
+                              value={item.procedure}
+                              onChange={(e) => updateItem(item.id, "procedure", e.target.value)}
+                              className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                            >
+                              {PROCEDURE_OPTIONS.map((o) => (
+                                <option key={o.value} value={o.value}>{o.label}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              value={item.description}
+                              onChange={(e) => updateItem(item.id, "description", e.target.value)}
+                              className="h-8 text-xs"
+                              placeholder="Mô tả điều trị"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              type="number"
+                              value={item.cost || ""}
+                              onChange={(e) => updateItem(item.id, "cost", Number(e.target.value))}
+                              className="h-8 text-right text-xs"
+                              placeholder="0"
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <button
+                              onClick={() => removeItem(item.id)}
+                              className="text-muted-foreground hover:text-destructive"
+                            >
+                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-border bg-muted/20 p-6 text-center text-sm text-muted-foreground">
+                  Không có clinical findings để tạo kế hoạch
+                </div>
+              )}
+
+              {/* Notes */}
+              <div>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">Ghi chú</label>
+                <textarea
+                  value={planNotes}
+                  onChange={(e) => setPlanNotes(e.target.value)}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm resize-none"
+                  rows={2}
+                  placeholder="Ghi chú cho kế hoạch điều trị"
+                />
+              </div>
+
+              {/* Total */}
+              <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3">
+                <span className="text-sm font-medium text-muted-foreground">Tổng chi phí ước tính</span>
+                <span className="text-base font-semibold text-foreground">
+                  {totalCost.toLocaleString("vi-VN")} VND
+                </span>
+              </div>
+
+              {/* Add item */}
+              <button
+                onClick={addItem}
+                className="w-full rounded-lg border-2 border-dashed border-border py-2 text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+              >
+                + Thêm thủ thuật
+              </button>
+            </div>
+          ) : null}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setPlanDialogOpen(false)}>
+            Hủy
+          </Button>
+          <Button
+            onClick={onSavePlan}
+            disabled={savingPlan || editableItems.length === 0}
+          >
+            {savingPlan ? "Đang lưu…" : "Lưu kế hoạch điều trị"}
           </Button>
         </DialogFooter>
       </Dialog>

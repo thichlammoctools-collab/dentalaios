@@ -39,6 +39,7 @@ function mapTenant(row: D1Row): Tenant {
     id: row.id as string,
     name: row.name as string,
     slug: (row.slug as string | null) || undefined,
+    email: (row.email as string | null) || undefined,
     is_active: (row.is_active as number) === 1,
     created_at: row.created_at as string,
   };

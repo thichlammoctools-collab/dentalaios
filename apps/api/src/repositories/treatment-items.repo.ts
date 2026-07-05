@@ -19,7 +19,7 @@ export function createTreatmentItemsRepository(db: D1Database): TreatmentItemsRe
         .prepare(
           `SELECT * FROM treatment_plan_items
            WHERE tenant_id = ? AND treatment_plan_id = ?
-           ORDER BY tooth_number ASC`,
+           ORDER BY scope ASC, tooth_number ASC`,
         )
         .bind(tenantId, planId)
         .all();
@@ -38,7 +38,7 @@ export function createTreatmentItemsRepository(db: D1Database): TreatmentItemsRe
           id,
           tenantId,
           planId,
-          data.tooth_number,
+          data.tooth_number ?? null,
           data.procedure,
           data.description,
           data.unit_cost,
@@ -67,7 +67,7 @@ function mapItem(row: D1Row): TreatmentPlanItem {
     id: row.id as string,
     tenant_id: row.tenant_id as string,
     treatment_plan_id: row.treatment_plan_id as string,
-    tooth_number: row.tooth_number as number,
+    tooth_number: row.tooth_number as number | undefined,
     procedure: row.procedure as string,
     description: row.description as string,
     unit_cost: Number(row.unit_cost ?? 0),

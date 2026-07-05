@@ -49,7 +49,10 @@ export const visitService = {
     const visit = await createVisitsRepository(db).getById(tenantId, visitId);
     if (!visit) throw new NotFoundError("Visit not found");
     return createFindingsRepository(db).create(tenantId, visitId, {
-      tooth_number: data.tooth_number,
+      tooth_number: data.tooth_number ?? undefined,
+      tooth_system: data.scope === "tooth" ? "FDI" : undefined,
+      scope: data.scope ?? "tooth",
+      area: data.area,
       condition: data.condition,
       notes: data.notes,
     });

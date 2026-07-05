@@ -46,7 +46,7 @@ export const planService = {
       throw new ValidationError("Chỉ có thể thêm item khi plan đang ở trạng thái draft");
     }
     const item = await createTreatmentItemsRepository(db).create(tenantId, planId, {
-      tooth_number: data.tooth_number,
+      tooth_number: data.tooth_number ?? undefined,
       procedure: data.procedure,
       description: data.description,
       unit_cost: data.unit_cost,
