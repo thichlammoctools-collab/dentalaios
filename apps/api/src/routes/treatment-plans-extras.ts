@@ -26,34 +26,56 @@ router.get(
     const jwt = getJwt(c);
     const planId = c.req.param("id");
 
-    const [plan, items, me] = await Promise.all([
-      planService.get(c.env.DB, jwt.tenant_id, planId),
-      planService.listItems(c.env.DB, jwt.tenant_id, planId),
-      authService.getMe(
-        { db: c.env.DB, jwtSecret: c.env.JWT_SECRET },
-        jwt.sub,
-        jwt.tenant_id,
-      ),
-    ]);
+    let plan;
+    let items: Awaited<ReturnType<typeof planService.listItems>> = [];
+    let me;
+    let patient;
 
+    try {
+      [plan, items, me] = await Promise.all([
+        planService.get(c.env.DB, jwt.tenant_id, planId),
+        planService.listItems(c.env.DB, jwt.tenant_id, planId),
+        authService.getMe(
+          { db: c.env.DB, jwtSecret: c.env.JWT_SECRET },
+          jwt.sub,
+          jwt.tenant_id,
+        ),
+      ]);
+    } catch (err) {
+      console.error("[/pdf] fetch plan/items/me failed:", err);
+      throw err;
+    }
+
+    if (!plan) throw new ValidationError("Ke hoach khong ton tai");
     if (!me) throw new ValidationError("User not found");
-    const patient = await patientService.get(c.env.DB, jwt.tenant_id, plan.patient_id);
-    if (!patient) throw new ValidationError("Patient not found");
+    try {
+      patient = await patientService.get(c.env.DB, jwt.tenant_id, plan.patient_id);
+    } catch (err) {
+      console.error("[/pdf] fetch patient failed:", err);
+      throw err;
+    }
+    if (!patient) throw new ValidationError("Benh nhan khong ton tai");
 
-    const bytes = await buildProposalPdf({
-      tenant: me.tenant,
-      branch: me.branch,
-      patient,
-      plan,
-      items,
-      approverName: me.user.name,
-    });
+    let bytes: Uint8Array;
+    try {
+      bytes = await buildProposalPdf({
+        tenant: me.tenant,
+        branch: me.branch,
+        patient,
+        plan,
+        items,
+        approverName: me.user.name,
+      });
+    } catch (err) {
+      console.error("[/pdf] buildProposalPdf failed:", err);
+      throw err;
+    }
 
     return new Response(bytes, {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="proposal-${planId}.pdf"`,
+        "Content-Disposition": `attachment; filename="Ke-hoach-dieu-tri-${planId}.pdf"`,
         "Cache-Control": "no-store",
       },
     });

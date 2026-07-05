@@ -3,7 +3,7 @@
  *
  * - Persists choice in localStorage
  * - Default to system preference (`prefers-color-scheme`)
- * - Applies `dark` class to <html> for Tailwind v4 dark: variants
+ * - Sets `data-theme="dark"` on <html>
  */
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
@@ -24,17 +24,12 @@ function getInitialTheme(): Theme {
   if (typeof window === "undefined") return "light";
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored === "light" || stored === "dark") return stored;
-  // Default to system preference
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 function applyTheme(theme: Theme): void {
   const root = document.documentElement;
-  if (theme === "dark") {
-    root.classList.add("dark");
-  } else {
-    root.classList.remove("dark");
-  }
+  root.setAttribute("data-theme", theme);
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
@@ -47,7 +42,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(STORAGE_KEY, theme);
     } catch {
-      // ignore
+      // ignore storage errors
     }
   }, [theme]);
 

@@ -12,7 +12,7 @@
         var stored = localStorage.getItem('dentalaios.theme');
         var theme = stored === 'dark' || stored === 'light' ? stored :
           window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        if (theme === 'dark') document.documentElement.classList.add('dark');
+        document.documentElement.setAttribute('data-theme', theme);
       })();
     </script>
     <div id="root"></div>
