@@ -4,174 +4,228 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { apiGet, apiPut, ApiError } from "@/lib/api";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Dialog, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
+import { formatDate } from "@/lib/utils";
 import type { Role } from "@shared/types";
-import { PERMISSIONS, ROLES } from "@shared/constants";
 
-interface RolesResponse {
-  items: Role[];
-  total: number;
-}
-
-const ALL_PERMISSIONS = Object.values(PERMISSIONS).filter((p) => p !== PERMISSIONS.ALL);
-const PERMISSION_LABELS: Record<string, string> = {
-  all: "Tất cả",
-  read_patients: "Đọc bệnh nhân",
-  write_patients: "Ghi bệnh nhân",
-  write_visits: "Ghi lượt khám",
-  write_findings: "Ghi clinical finding",
-  write_plans: "Ghi kế hoạch điều trị",
-  approve_plans: "Duyệt kế hoạch",
-  write_payments: "Ghi thanh toán",
-  write_appointments: "Ghi lịch hẹn",
-  manage_users: "Quản lý user",
-  manage_roles: "Quản lý role",
-};
-
-export function RolesSettingsPage() {
+export default function RolesSettingsPage() {
   const [roles, setRoles] = useState<Role[]>([]);
-  const [editing, setEditing] = useState<Role | null>(null);
-  const [permissions, setPermissions] = useState<string[]>([]);
-  const [name, setName] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [openCreate, setOpenCreate] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createDesc, setCreateDesc] = useState("");
+  const [savingCreate, setSavingCreate] = useState(false);
+  const [openEdit, setOpenEdit] = useState(false);
+  const [editRole, setEditRole] = useState<Role | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
-  async function load() {
-    try {
-      const res = await apiGet<RolesResponse>("/api/roles");
-      setRoles(res.items);
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Lỗi tải");
-    }
+  async function loadRoles() {
+    const data = await apiGet<Role[]>("/api/roles");
+    setRoles(data);
   }
 
   useEffect(() => {
-    load();
+    loadRoles();
   }, []);
 
-  function openEdit(role: Role) {
-    setEditing(role);
-    setName(role.name);
-    // Nếu có "all", tự tick tất cả
-    if (role.permissions.includes(PERMISSIONS.ALL)) {
-      setPermissions([...ALL_PERMISSIONS, PERMISSIONS.ALL]);
-    } else {
-      setPermissions([...role.permissions]);
+  async function onCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingCreate(true);
+    try {
+      await apiPost("/api/roles", { name: createName, description: createDesc });
+      toast.success("Đã tạo vai trò");
+      setOpenCreate(false);
+      setCreateName("");
+      setCreateDesc("");
+      loadRoles();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi");
+    } finally {
+      setSavingCreate(false);
     }
   }
 
-  function togglePermission(p: string) {
-    setPermissions((prev) =>
-      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p],
-    );
+  function openEditDialog(r: Role) {
+    setEditRole(r);
+    setEditName(r.name);
+    setEditDesc(r.description ?? "");
+    setOpenEdit(true);
   }
 
-  async function onSave() {
-    if (!editing) return;
-    setSaving(true);
+  async function onEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editRole) return;
+    setSavingEdit(true);
     try {
-      await apiPut(`/api/roles/${editing.id}`, {
-        name,
-        permissions: permissions.filter((p) => p !== PERMISSIONS.ALL),
-      });
-      toast.success("Đã cập nhật role");
-      setEditing(null);
-      load();
+      await apiPut(`/api/roles/${editRole.id}`, { name: editName, description: editDesc });
+      toast.success("Đã cập nhật vai trò");
+      setOpenEdit(false);
+      loadRoles();
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Lỗi lưu");
+      toast.error(err instanceof ApiError ? err.message : "Lỗi");
     } finally {
-      setSaving(false);
+      setSavingEdit(false);
+    }
+  }
+
+  async function onDelete(r: Role) {
+    if (!confirm(`Xóa vai trò "${r.name}"?`)) return;
+    try {
+      await apiDelete(`/api/roles/${r.id}`);
+      toast.success("Đã xóa vai trò");
+      loadRoles();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi xóa");
     }
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 px-6 py-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Vai trò</h1>
+    <div className="p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Vai trò & Phân quyền</h1>
+          <p className="text-sm text-muted-foreground">Quản lý vai trò và quyền hạn của người dùng</p>
+        </div>
+        <Button onClick={() => setOpenCreate(true)}>+ Tạo vai trò</Button>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Danh sách ({roles.length})</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
-          {roles.map((r) => {
-            const isSystemRole = Object.values(ROLES).includes(r.name as never);
-            return (
-              <div
-                key={r.id}
-                className="flex items-center justify-between rounded-md border border-border p-3"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{r.name}</span>
-                    {isSystemRole && <Badge variant="secondary">hệ thống</Badge>}
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {r.permissions.length} quyền: {r.permissions.slice(0, 5).join(", ")}
-                    {r.permissions.length > 5 && "…"}
-                  </p>
-                </div>
-                <Button size="sm" variant="outline" onClick={() => openEdit(r)}>
-                  Sửa
-                </Button>
-              </div>
-            );
-          })}
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tên vai trò</TableHead>
+                <TableHead>Mô tả</TableHead>
+                <TableHead>Ngày tạo</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {roles.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell className="font-medium">{r.name}</TableCell>
+                  <TableCell className="text-muted-foreground">{r.description ?? "—"}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatDate(r.created_at)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="ghost" size="sm" onClick={() => openEditDialog(r)}>
+                      Sửa
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 hover:text-red-600"
+                      onClick={() => onDelete(r)}
+                    >
+                      Xóa
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {roles.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                    Chưa có vai trò nào
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
-      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
-        {editing && (
-          <div>
-            <DialogHeader>
-              <DialogTitle>Sửa role: {editing.name}</DialogTitle>
-            </DialogHeader>
-            <div className="grid gap-3">
-              <div className="grid gap-1.5">
-                <Label htmlFor="r-name">Tên role</Label>
-                <Input
-                  id="r-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </div>
-              <div className="grid gap-1.5">
-                <Label>Permissions</Label>
-                <div className="grid grid-cols-2 gap-2 rounded-md border border-border p-3">
-                  {ALL_PERMISSIONS.map((p) => (
-                    <label
-                      key={p}
-                      className="flex items-center gap-2 text-sm cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={permissions.includes(p)}
-                        onChange={() => togglePermission(p)}
-                        className="h-4 w-4"
-                      />
-                      <span>{PERMISSION_LABELS[p] ?? p}</span>
-                    </label>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Tick "Tất cả" = super admin (bypass mọi permission check).
-                </p>
-              </div>
+      {/* ─── Create Dialog ─── */}
+      <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+        <form onSubmit={onCreate}>
+          <DialogHeader>
+            <DialogTitle>Tạo vai trò mới</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 mt-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="r-name">
+                Tên vai trò <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="r-name"
+                required
+                value={createName}
+                onChange={(e) => setCreateName(e.target.value)}
+                placeholder="VD: Bác sĩ"
+              />
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setEditing(null)}>
-                Hủy
-              </Button>
-              <Button onClick={onSave} disabled={saving}>
-                {saving ? "Đang lưu…" : "Lưu"}
-              </Button>
-            </DialogFooter>
+            <div className="grid gap-1.5">
+              <Label htmlFor="r-desc">Mô tả</Label>
+              <Input
+                id="r-desc"
+                value={createDesc}
+                onChange={(e) => setCreateDesc(e.target.value)}
+                placeholder="Mô tả ngắn về vai trò này"
+              />
+            </div>
           </div>
-        )}
+          <DialogFooter className="mt-4">
+            <Button type="button" variant="outline" onClick={() => setOpenCreate(false)}>
+              Hủy
+            </Button>
+            <Button type="submit" disabled={savingCreate}>
+              {savingCreate ? "Đang tạo…" : "Tạo vai trò"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </Dialog>
+
+      {/* ─── Edit Dialog ─── */}
+      <Dialog open={openEdit} onOpenChange={setOpenEdit}>
+        <form onSubmit={onEdit}>
+          <DialogHeader>
+            <DialogTitle>Sửa vai trò</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 mt-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="re-name">
+                Tên vai trò <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="re-name"
+                required
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="VD: Bác sĩ"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="re-desc">Mô tả</Label>
+              <Input
+                id="re-desc"
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+                placeholder="Mô tả ngắn về vai trò này"
+              />
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button type="button" variant="outline" onClick={() => setOpenEdit(false)}>
+              Hủy
+            </Button>
+            <Button type="submit" disabled={savingEdit}>
+              {savingEdit ? "Đang lưu…" : "Lưu"}
+            </Button>
+          </DialogFooter>
+        </form>
       </Dialog>
     </div>
   );

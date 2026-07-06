@@ -24,6 +24,7 @@ export const patientService = {
       gender: data.gender,
       phone: data.phone,
       email: data.email || undefined,
+      address: data.address,
       notes: data.notes,
       referral_type: data.referral_type,
       referral_user_id: data.referral_user_id ?? undefined,
@@ -38,6 +39,7 @@ export const patientService = {
     data: PatientUpdateInput,
   ): Promise<Patient | null> {
     return createPatientsRepository(db).update(tenantId, id, {
+      address: data.address,
       referral_type: data.referral_type,
       referral_user_id: data.referral_user_id ?? undefined,
       referral_notes: data.referral_notes,

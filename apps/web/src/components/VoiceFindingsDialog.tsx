@@ -1,0 +1,454 @@
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { VoiceInputButton } from "@/components/VoiceInputButton";
+import { apiPost, ApiError } from "@/lib/api";
+import { toast } from "@/lib/toast";
+import type { ClinicalFinding } from "@shared/types";
+import { cn } from "@/lib/utils";
+
+interface ParsedFinding {
+  scope: "tooth" | "full_mouth" | "soft_tissue";
+  tooth_number: number | null;
+  area?: string;
+  condition: string;
+  notes: string;
+}
+
+interface VoiceFindingsResult {
+  findings: ParsedFinding[];
+  ai_model: string;
+  generated_at: string;
+}
+
+interface VoiceFindingsDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  visitId: string;
+  onSaved: (findings: ClinicalFinding[]) => void;
+}
+
+const TOOTH_CONDITIONS = [
+  { value: "caries", label: "Sâu răng" },
+  { value: "fracture", label: "Gãy/vỡ" },
+  { value: "missing", label: "Mất răng" },
+  { value: "periapical", label: "Viêm quanh chóp" },
+  { value: "calculus", label: "Cao răng" },
+  { value: "pulpitis", label: "Viêm tủy" },
+  { value: "discoloration", label: "Đổi màu" },
+  { value: "wear", label: "Mòn răng" },
+  { value: "other", label: "Khác" },
+];
+
+const FULLMOUTH_CONDITIONS = [
+  { value: "calculus", label: "Cao răng (cạo vôi toàn hàm)" },
+  { value: "staining", label: "Nhuộm màu toàn hàm" },
+  { value: "halitosis", label: "Hôi miệng" },
+  { value: "dry_mouth", label: "Khô miệng" },
+  { value: "bruxism", label: "Nghiến răng" },
+  { value: "other", label: "Khác" },
+];
+
+const SOFT_TISSUE_AREAS = [
+  { value: "gum", label: "Nướu (lợi)" },
+  { value: "tongue", label: "Lưỡi" },
+  { value: "buccal", label: "Niêm mạc má" },
+  { value: "palate", label: "Vòm miệng" },
+  { value: "floor_mouth", label: "Đáy miệng" },
+  { value: "lip", label: "Môi" },
+  { value: "pharynx", label: "Họng" },
+  { value: "jaw", label: "Xương hàm" },
+  { value: "tmj", label: "Khớp TMJ" },
+  { value: "salivary_gland", label: "Tuyến nước bọt" },
+];
+
+const SOFT_TISSUE_CONDITIONS = [
+  { value: "gingivitis", label: "Viêm lợi" },
+  { value: "periodontitis", label: "Viêm quanh răng" },
+  { value: "ulcer", label: "Loét miệng" },
+  { value: "aphtha", label: "Aft miệng" },
+  { value: "leukoplakia", label: "Bạch sản" },
+  { value: "erythroplakia", label: "Hồng sản" },
+  { value: "herpes", label: "Mụn rộp herpes" },
+  { value: "candidiasis", label: "Nấm miệng" },
+  { value: "fissure", label: "Nứt khóe miệng" },
+  { value: "abscess", label: "Áp xe nướu" },
+  { value: "fistula", label: "Rò quanh răng" },
+  { value: "recession", label: "Tụt lợi" },
+  { value: "hypertrophy", label: "Phì đại nướu" },
+  { value: "tongue_coating", label: "Bội lưỡi" },
+  { value: "geographic_tongue", label: "Lưỡi địa lý" },
+  { value: "fissured_tongue", label: "Lưỡi nứt" },
+  { value: "macroglossia", label: "Lưỡi to" },
+  { value: "torus", label: "Gai xương hàm" },
+  { value: "tmd_pain", label: "Đau khớp TMJ" },
+  { value: "clicking", label: "Khớp kêu click" },
+  { value: "limitation", label: "Hạn chế há miệng" },
+  { value: "sialolith", label: "Sialolith" },
+  { value: "swelling", label: "Sưng tuyến nước bọt" },
+  { value: "other", label: "Khác" },
+];
+
+function conditionOptions(scope: string) {
+  if (scope === "soft_tissue") return SOFT_TISSUE_CONDITIONS;
+  if (scope === "full_mouth") return FULLMOUTH_CONDITIONS;
+  return TOOTH_CONDITIONS;
+}
+
+export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: VoiceFindingsDialogProps) {
+  const [transcript, setTranscript] = useState("");
+  const [parsedFindings, setParsedFindings] = useState<ParsedFinding[]>([]);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [manualEntry, setManualEntry] = useState("");
+
+  function handleTranscription(text: string) {
+    setTranscript(text);
+    analyzeText(text);
+  }
+
+  async function analyzeText(text: string) {
+    setAnalyzing(true);
+    setParsedFindings([]);
+    try {
+      const result = await apiPost<VoiceFindingsResult>("/api/ai/voice-findings", {
+        visit_id: visitId,
+        transcript: text,
+      });
+      setParsedFindings(result.findings);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi phân tích giọng nói");
+      setParsedFindings([]);
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  async function onSave() {
+    if (parsedFindings.length === 0) return;
+    setSaving(true);
+    try {
+      const saved: ClinicalFinding[] = [];
+      for (const f of parsedFindings) {
+        const created = await apiPost<ClinicalFinding>(`/api/visits/${visitId}/findings`, {
+          tooth_number: f.tooth_number,
+          scope: f.scope,
+          area: f.area as ClinicalFinding["area"],
+          condition: f.condition,
+          notes: f.notes || undefined,
+        });
+        saved.push(created);
+      }
+      toast.success(`Đã lưu ${saved.length} findings`);
+      onSaved(saved);
+      handleClose();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi lưu findings");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleClose() {
+    setTranscript("");
+    setParsedFindings([]);
+    setAnalyzing(false);
+    setEditingIdx(null);
+    setManualEntry("");
+    onOpenChange(false);
+  }
+
+  function removeFinding(idx: number) {
+    setParsedFindings((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function updateFinding(idx: number, field: keyof ParsedFinding, value: string | number | null) {
+    setParsedFindings((prev) =>
+      prev.map((f, i) => (i === idx ? { ...f, [field]: value } : f)),
+    );
+  }
+
+  function addManualEntry() {
+    if (!manualEntry.trim()) return;
+    analyzeText(manualEntry.trim());
+    setManualEntry("");
+  }
+
+  const scopeVariant = (scope: string) => {
+    if (scope === "full_mouth") return "bg-orange-100 text-orange-700 border-orange-200";
+    if (scope === "soft_tissue") return "bg-blue-100 text-blue-700 border-blue-200";
+    return "bg-slate-100 text-slate-700 border-slate-200";
+  };
+
+  const scopeLabel = (scope: string) => {
+    if (scope === "full_mouth") return "Toàn hàm";
+    if (scope === "soft_tissue") return "Mô mềm";
+    return "Răng";
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogHeader>
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg">
+            <svg className="h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+          </div>
+          <div>
+            <DialogTitle>Nhập findings bằng giọng nói</DialogTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">AI phân tích &amp; tạo findings, bác sĩ duyệt lại</p>
+          </div>
+        </div>
+      </DialogHeader>
+
+      <div className="space-y-4 px-5 pb-5">
+        {/* Step 1: Voice input */}
+        <div className="rounded-xl border border-border bg-card p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-medium">Bước 1 — Ghi âm hoặc nhập text</p>
+            <VoiceInputButton
+              onTranscription={handleTranscription}
+              label="Ghi âm"
+            />
+          </div>
+          {transcript ? (
+            <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
+              <p className="text-xs font-medium text-blue-600 mb-1">Bản ghi:</p>
+              <p className="text-sm text-gray-800 italic">"{transcript}"</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Textarea
+                rows={2}
+                value={manualEntry}
+                onChange={(e) => setManualEntry(e.target.value)}
+                placeholder="Hoặc nhập text thủ công và nhấn Phân tích…"
+                className="text-sm"
+              />
+              {manualEntry.trim() && (
+                <Button size="sm" onClick={addManualEntry} variant="outline" className="text-xs">
+                  Phân tích text
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Step 2: Analyzing */}
+        {analyzing && (
+          <div className="rounded-xl border border-cyan-200 bg-gradient-to-r from-cyan-50 to-blue-50 p-6 flex flex-col items-center gap-3">
+            <div className="relative">
+              <div className="h-12 w-12 rounded-full border-4 border-cyan-100" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-cyan-500 border-t-transparent" />
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="font-medium text-sm text-cyan-800">AI đang phân tích…</p>
+              <p className="text-xs text-cyan-500 mt-0.5">Chuyển đổi giọng nói thành clinical findings</p>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Parsed findings */}
+        {parsedFindings.length > 0 && !analyzing && (
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-medium">
+                Bước 2 — Findings đã phân tích ({parsedFindings.length})
+              </p>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => analyzeText(transcript)}
+                className="text-xs text-muted-foreground"
+              >
+                Phân tích lại
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              Kiểm tra &amp; chỉnh sửa findings trước khi lưu. Bác sĩ chịu trách nhiệm duyệt.
+            </p>
+            <div className="space-y-2 max-h-72 overflow-y-auto">
+              {parsedFindings.map((f, idx) => {
+                const isEditing = editingIdx === idx;
+                return (
+                  <div
+                    key={idx}
+                    className={cn(
+                      "rounded-lg border p-3 transition-colors",
+                      isEditing
+                        ? "border-primary bg-primary/5"
+                        : "border-border bg-background hover:border-primary/30",
+                    )}
+                  >
+                    {/* Header row */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={cn("inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium", scopeVariant(f.scope))}>
+                        {f.scope === "tooth" ? `Răng #${f.tooth_number}` : scopeLabel(f.scope)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {f.scope === "tooth"
+                          ? TOOTH_CONDITIONS.find((c) => c.value === f.condition)?.label ?? f.condition
+                          : f.scope === "soft_tissue"
+                            ? SOFT_TISSUE_CONDITIONS.find((c) => c.value === f.condition)?.label ?? f.condition
+                            : FULLMOUTH_CONDITIONS.find((c) => c.value === f.condition)?.label ?? f.condition}
+                      </span>
+                      <div className="ml-auto flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-2 text-xs"
+                          onClick={() => setEditingIdx(isEditing ? null : idx)}
+                        >
+                          {isEditing ? "Xong" : "Sửa"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 px-2 text-xs text-red-500 hover:text-red-600"
+                          onClick={() => removeFinding(idx)}
+                        >
+                          Xóa
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Editable fields */}
+                    {isEditing && (
+                      <div className="space-y-2 pt-2 border-t border-border/50">
+                        {/* Scope */}
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="grid gap-1">
+                            <label className="text-xs text-muted-foreground">Phạm vi</label>
+                            <select
+                              value={f.scope}
+                              onChange={(e) => updateFinding(idx, "scope", e.target.value as ParsedFinding["scope"])}
+                              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                            >
+                              <option value="tooth">Răng</option>
+                              <option value="full_mouth">Toàn hàm</option>
+                              <option value="soft_tissue">Mô mềm</option>
+                            </select>
+                          </div>
+                          {f.scope === "tooth" && (
+                            <div className="grid gap-1">
+                              <label className="text-xs text-muted-foreground">Số răng FDI</label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={88}
+                                value={f.tooth_number ?? ""}
+                                onChange={(e) => updateFinding(idx, "tooth_number", e.target.value ? Number(e.target.value) : null)}
+                                className="h-8 text-xs"
+                              />
+                            </div>
+                          )}
+                          {f.scope === "soft_tissue" && (
+                            <div className="grid gap-1">
+                              <label className="text-xs text-muted-foreground">Vùng</label>
+                              <select
+                                value={f.area ?? "gum"}
+                                onChange={(e) => updateFinding(idx, "area", e.target.value)}
+                                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                              >
+                                {SOFT_TISSUE_AREAS.map((a) => (
+                                  <option key={a.value} value={a.value}>{a.label}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                        {/* Condition */}
+                        <div className="grid gap-1">
+                          <label className="text-xs text-muted-foreground">Tình trạng</label>
+                          <select
+                            value={f.condition}
+                            onChange={(e) => updateFinding(idx, "condition", e.target.value)}
+                            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+                          >
+                            {conditionOptions(f.scope).map((c) => (
+                              <option key={c.value} value={c.value}>{c.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        {/* Notes */}
+                        <div className="grid gap-1">
+                          <label className="text-xs text-muted-foreground">Ghi chú</label>
+                          <Textarea
+                            rows={2}
+                            value={f.notes}
+                            onChange={(e) => updateFinding(idx, "notes", e.target.value)}
+                            placeholder="Mô tả thêm…"
+                            className="text-xs"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {/* Notes preview */}
+                    {!isEditing && f.notes && (
+                      <p className="text-xs text-muted-foreground italic mt-1">— {f.notes}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Add manual finding */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3 w-full text-xs border-dashed"
+              onClick={() =>
+                setParsedFindings((prev) => [
+                  ...prev,
+                  { scope: "tooth", tooth_number: null, condition: "caries", notes: "" },
+                ])
+              }
+            >
+              + Thêm findings thủ công
+            </Button>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!transcript && !analyzing && parsedFindings.length === 0 && (
+          <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 py-8 flex flex-col items-center gap-2 text-center">
+            <svg className="h-8 w-8 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+            <p className="text-sm text-gray-400">Nhấn <strong>Ghi âm</strong> hoặc nhập text để bắt đầu</p>
+            <p className="text-xs text-gray-300">AI sẽ phân tích và tạo clinical findings cho bạn duyệt</p>
+          </div>
+        )}
+      </div>
+
+      <DialogFooter>
+        <Button variant="outline" onClick={handleClose}>Hủy</Button>
+        <Button
+          onClick={onSave}
+          disabled={parsedFindings.length === 0 || saving}
+          className="bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white shadow-md"
+        >
+          {saving ? (
+            <>
+              <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+              Đang lưu…
+            </>
+          ) : (
+            <>
+              <svg className="mr-1.5 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+              Lưu {parsedFindings.length > 0 ? `(${parsedFindings.length})` : ""} Findings
+            </>
+          )}
+        </Button>
+      </DialogFooter>
+    </Dialog>
+  );
+}

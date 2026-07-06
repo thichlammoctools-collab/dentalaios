@@ -2,10 +2,21 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { Dialog, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import type { Payment, TreatmentPlan } from "@shared/types";
+
+function planStatusVi(s: string) {
+  if (s === "draft") return "Bản nháp";
+  if (s === "in_progress") return "Đang điều trị";
+  if (s === "completed") return "Hoàn thành";
+  if (s === "cancelled") return "Đã hủy";
+  if (s === "approved") return "Đã duyệt";
+  if (s === "planned") return "Đã lên kế hoạch";
+  return s;
+}
 
 interface PaymentFormProps {
   open: boolean;
@@ -62,29 +73,32 @@ export function PaymentForm({ open, onOpenChange, patientId, plans, onCreated }:
         </DialogHeader>
         <div className="grid gap-3">
           <div className="grid gap-1.5">
-            <Label htmlFor="plan">Kế hoạch *</Label>
-            <select
+            <Label htmlFor="plan">
+              Kế hoạch điều trị <span className="text-red-500">*</span>
+            </Label>
+            <Select
               id="plan"
               required
               value={planId}
               onChange={(e) => setPlanId(e.target.value)}
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
             >
               {plans.length === 0 ? (
                 <option value="">— Chưa có kế hoạch nào —</option>
               ) : (
                 plans.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.id.slice(0, 8)} · {p.status} · {p.total_cost.toLocaleString("vi-VN")}{" "}
+                    {p.id.slice(0, 8)} · {planStatusVi(p.status)} · {p.total_cost.toLocaleString("vi-VN")}{" "}
                     {p.currency}
                   </option>
                 ))
               )}
-            </select>
+            </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="amt">Số tiền (VND) *</Label>
+              <Label htmlFor="amt">
+                Số tiền (VND) <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="amt"
                 type="number"
@@ -92,21 +106,23 @@ export function PaymentForm({ open, onOpenChange, patientId, plans, onCreated }:
                 required
                 value={amount}
                 onChange={(e) => setAmount(e.target.value ? Number(e.target.value) : "")}
+                placeholder="VD: 1500000"
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="meth">Phương thức *</Label>
-              <select
+              <Label htmlFor="meth">
+                Phương thức <span className="text-red-500">*</span>
+              </Label>
+              <Select
                 id="meth"
                 value={method}
                 onChange={(e) => setMethod(e.target.value as typeof method)}
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
               >
                 <option value="cash">Tiền mặt</option>
                 <option value="transfer">Chuyển khoản</option>
                 <option value="card">Thẻ</option>
                 <option value="other">Khác</option>
-              </select>
+              </Select>
             </div>
           </div>
           <div className="grid gap-1.5">

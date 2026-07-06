@@ -45,17 +45,14 @@ export function MembersSettingsPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const [invitesRes, rolesRes] = await Promise.all([
+      const [invitesRes, rolesRes, clinicRes] = await Promise.all([
         apiGet<{ items: Invite[] }>("/api/invite"),
         apiGet<{ items: Role[] }>("/api/roles"),
+        apiGet<{ branches: Branch[] }>("/api/clinic"),
       ]);
       setInvites(invitesRes.items || []);
       setRoles(rolesRes.items || []);
-      // For branches, we can get it from the session
-      const session = JSON.parse(localStorage.getItem("dental-session") || "{}");
-      if (session?.branch?.id) {
-        setBranches([{ id: session.branch.id, name: session.branch.name }]);
-      }
+      setBranches(clinicRes.branches || []);
     } catch (err) {
       console.error("Failed to load members data:", err);
     } finally {

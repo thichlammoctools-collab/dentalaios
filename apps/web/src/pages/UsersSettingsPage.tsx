@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -252,27 +253,27 @@ export function UsersSettingsPage() {
             <DialogTitle>Tạo user mới</DialogTitle>
           </DialogHeader>
           <div className="grid gap-3">
+
+            <SectionDivider icon={<UserIcon />}>Thông tin đăng nhập</SectionDivider>
+
             <div className="grid gap-1.5">
-              <Label htmlFor="u-email">Email *</Label>
+              <Label htmlFor="u-email">
+                Email <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="u-email"
                 type="email"
                 required
                 value={createForm.email}
                 onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                placeholder="VD: nguyenvana@email.com"
               />
             </div>
+
             <div className="grid gap-1.5">
-              <Label htmlFor="u-name">Họ tên *</Label>
-              <Input
-                id="u-name"
-                required
-                value={createForm.name}
-                onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="u-pwd">Mật khẩu *</Label>
+              <Label htmlFor="u-pwd">
+                Mật khẩu <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="u-pwd"
                 type="password"
@@ -280,31 +281,48 @@ export function UsersSettingsPage() {
                 minLength={6}
                 value={createForm.password}
                 onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+                placeholder="Ít nhất 6 ký tự"
               />
             </div>
+
+            <SectionDivider icon={<RoleIcon />}>Thông tin cá nhân</SectionDivider>
+
             <div className="grid gap-1.5">
-              <Label htmlFor="u-role">Vai trò *</Label>
-              <select
+              <Label htmlFor="u-name">
+                Họ tên <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="u-name"
+                required
+                value={createForm.name}
+                onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                placeholder="VD: Nguyễn Văn A"
+              />
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label htmlFor="u-role">
+                Vai trò <span className="text-red-500">*</span>
+              </Label>
+              <Select
                 id="u-role"
                 required
                 value={createForm.role_id}
                 onChange={(e) => setCreateForm({ ...createForm, role_id: e.target.value })}
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
               >
                 {roles.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
+                  <option key={r.id} value={r.id}>{r.name}</option>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="mt-4">
             <Button type="button" variant="outline" onClick={() => setOpenCreate(false)}>
               Hủy
             </Button>
             <Button type="submit" disabled={savingCreate}>
-              {savingCreate ? "Đang tạo…" : "Tạo"}
+              {savingCreate ? "Đang tạo…" : "Tạo user"}
             </Button>
           </DialogFooter>
         </form>
@@ -314,60 +332,66 @@ export function UsersSettingsPage() {
       <Dialog open={openEdit} onOpenChange={setOpenEdit}>
         <form onSubmit={onEdit}>
           <DialogHeader>
-            <DialogTitle>Sửa user: {editUser?.email}</DialogTitle>
+            <DialogTitle>Sửa user</DialogTitle>
           </DialogHeader>
           <div className="grid gap-3">
+
+            <SectionDivider icon={<UserIcon />}>Thông tin cá nhân</SectionDivider>
+
             <div className="grid gap-1.5">
-              <Label htmlFor="e-name">Họ tên *</Label>
+              <Label htmlFor="e-name">
+                Họ tên <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="e-name"
                 required
                 value={editForm.name}
                 onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                placeholder="VD: Nguyễn Văn A"
               />
             </div>
+
+            <SectionDivider icon={<RoleIcon />}>Phân quyền</SectionDivider>
+
             <div className="grid gap-1.5">
               <Label htmlFor="e-role">Vai trò</Label>
-              <select
+              <Select
                 id="e-role"
                 value={editForm.role_id}
                 onChange={(e) => setEditForm({ ...editForm, role_id: e.target.value })}
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
               >
                 {roles.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
+                  <option key={r.id} value={r.id}>{r.name}</option>
                 ))}
-              </select>
+              </Select>
             </div>
+
             <div className="grid gap-1.5">
               <Label htmlFor="e-branch">Chi nhánh</Label>
-              <select
+              <Select
                 id="e-branch"
                 value={editForm.branch_id}
                 onChange={(e) => setEditForm({ ...editForm, branch_id: e.target.value })}
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
               >
                 {branches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
+                  <option key={b.id} value={b.id}>{b.name}</option>
                 ))}
-              </select>
+              </Select>
             </div>
-            <div className="flex items-center gap-2">
+
+            <div className="flex items-center gap-2 px-1">
               <input
                 id="e-active"
                 type="checkbox"
                 checked={editForm.is_active}
                 onChange={(e) => setEditForm({ ...editForm, is_active: e.target.checked })}
-                className="h-4 w-4"
+                className="h-4 w-4 accent-primary"
               />
-              <Label htmlFor="e-active">Hoạt động</Label>
+              <Label htmlFor="e-active" className="font-normal">Hoạt động</Label>
             </div>
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="mt-4">
             <Button type="button" variant="outline" onClick={() => setOpenEdit(false)}>
               Hủy
             </Button>
@@ -378,5 +402,31 @@ export function UsersSettingsPage() {
         </form>
       </Dialog>
     </div>
+  );
+}
+
+function SectionDivider({ children, icon }: { children: React.ReactNode; icon?: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 py-1">
+      {icon && <span className="text-muted-foreground">{icon}</span>}
+      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{children}</span>
+      <div className="flex-1 h-px bg-border" />
+    </div>
+  );
+}
+
+function UserIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
+function RoleIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
   );
 }

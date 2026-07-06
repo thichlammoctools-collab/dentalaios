@@ -108,6 +108,7 @@ export const patientCreateSchema = z.object({
     { message: "Email không hợp lệ" },
   ),
   notes: optionalText(2000),
+  address: optionalText(500),
   // Family contact
   family_name: optionalText(200),
   family_phone: z.string().max(20).transform((s) => (s === "" ? undefined : s)).optional(),

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -112,58 +113,90 @@ export function MedicalAlertsList({
             <DialogTitle>Thêm cảnh báo y khoa</DialogTitle>
           </DialogHeader>
           <div className="grid gap-3">
+
+            <SectionDivider icon={<AlertIcon />}>Loại & Mức độ</SectionDivider>
+
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1.5">
                 <Label htmlFor="type">Loại</Label>
-                <select
+                <Select
                   id="type"
                   value={type}
                   onChange={(e) => setType(e.target.value)}
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
                 >
                   <option value="allergy">Dị ứng</option>
                   <option value="chronic">Bệnh mãn tính</option>
                   <option value="medication">Thuốc đang dùng</option>
                   <option value="other">Khác</option>
-                </select>
+                </Select>
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="sev">Mức độ</Label>
-                <select
+                <Select
                   id="sev"
                   value={severity}
                   onChange={(e) => setSeverity(e.target.value as typeof severity)}
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
                 >
                   <option value="low">Thấp</option>
                   <option value="medium">Trung bình</option>
                   <option value="high">Cao</option>
-                </select>
+                </Select>
               </div>
             </div>
+
+            <SectionDivider icon={<DescIcon />}>Mô tả</SectionDivider>
+
             <div className="grid gap-1.5">
-              <Label htmlFor="desc">Mô tả *</Label>
+              <Label htmlFor="desc">
+                Mô tả <span className="text-red-500">*</span>
+              </Label>
               <Textarea
                 id="desc"
                 rows={2}
                 required
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
+                placeholder="VD: Dị ứng kháng sinh Amoxicillin, hen phế quản…"
               />
             </div>
-            {/* Placeholder so spacing matches */}
-            <Input type="hidden" />
           </div>
-          <DialogFooter>
+          <DialogFooter className="mt-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Hủy
             </Button>
             <Button type="submit" disabled={saving}>
-              {saving ? "Đang lưu…" : "Thêm"}
+              {saving ? "Đang lưu…" : "Thêm cảnh báo"}
             </Button>
           </DialogFooter>
         </form>
       </Dialog>
     </div>
+  );
+}
+
+function SectionDivider({ children, icon }: { children: React.ReactNode; icon?: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 py-1">
+      {icon && <span className="text-muted-foreground">{icon}</span>}
+      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{children}</span>
+      <div className="flex-1 h-px bg-border" />
+    </div>
+  );
+}
+
+function AlertIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  );
+}
+
+function DescIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" x2="8" y1="13" y2="13" /><line x1="16" x2="8" y1="17" y2="17" />
+    </svg>
   );
 }

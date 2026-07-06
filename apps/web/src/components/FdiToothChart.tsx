@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { VoiceInputButton } from "@/components/VoiceInputButton";
+import { VoiceFindingsDialog } from "@/components/VoiceFindingsDialog";
 import { apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import type { ClinicalFinding, SoftTissueArea } from "@shared/types";
@@ -12,6 +14,7 @@ interface FdiToothChartProps {
   visitId: string;
   findings: ClinicalFinding[];
   onCreated: (finding: ClinicalFinding) => void;
+  onCreatedBatch?: (findings: ClinicalFinding[]) => void;
 }
 
 const UPPER_RIGHT = [18, 17, 16, 15, 14, 13, 12, 11];
@@ -88,8 +91,9 @@ function toothLabel(n: number) {
   return `#${n}`;
 }
 
-export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartProps) {
+export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: FdiToothChartProps) {
   const [tab, setTab] = useState<Tab>("tooth");
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   const [condition, setCondition] = useState("caries");
   const [notes, setNotes] = useState("");
@@ -246,6 +250,12 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
             )}
           </button>
         ))}
+        <VoiceInputButton
+          onTranscription={() => setVoiceOpen(true)}
+          label=""
+          size="sm"
+          variant="ghost"
+        />
       </div>
 
       {/* Tab: Tooth */}
@@ -471,6 +481,20 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
           </DialogFooter>
         </div>
       </Dialog>
+
+      <VoiceFindingsDialog
+        open={voiceOpen}
+        onOpenChange={setVoiceOpen}
+        visitId={visitId}
+        onSaved={(saved) => {
+          if (onCreatedBatch) {
+            onCreatedBatch(saved);
+          } else {
+            saved.forEach(onCreated);
+          }
+          setVoiceOpen(false);
+        }}
+      />
     </div>
   );
 }

@@ -6,17 +6,12 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { apiPost, apiPut, ApiError } from "@/lib/api";
+import { apiPost, apiPut, apiGet, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import type { Patient } from "@shared/types";
+import type { UserWithDetails } from "@shared/types";
 import type { PatientCreateInput } from "@shared/validation";
-
-interface UserWithDetails {
-  id: string;
-  name: string;
-  role: { name: string };
-}
 
 interface PatientFormProps {
   open: boolean;
@@ -36,7 +31,6 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
   const [gender, setGender] = useState<"M" | "F" | "O">(patient?.gender ?? "M");
   const [phone, setPhone] = useState(patient?.phone ?? "");
   const [email, setEmail] = useState(patient?.email ?? "");
-  const [address, setAddress] = useState(patient?.address ?? "");
   const [notes, setNotes] = useState(patient?.notes ?? "");
   const [saving, setSaving] = useState(false);
 
@@ -68,7 +62,6 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
       setGender(patient?.gender ?? "M");
       setPhone(patient?.phone ?? "");
       setEmail(patient?.email ?? "");
-      setAddress(patient?.address ?? "");
       setNotes(patient?.notes ?? "");
       setFamilyName(patient?.family_name ?? "");
       setFamilyPhone(patient?.family_phone ?? "");
@@ -420,11 +413,4 @@ function NotesIcon() {
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" x2="8" y1="13" y2="13" /><line x1="16" x2="8" y1="17" y2="17" /><polyline points="10 9 9 9 8 9" />
     </svg>
   );
-}
-
-// Simple apiGet for fetching users list
-async function apiGet<T>(url: string): Promise<T> {
-  const res = await fetch(url, { credentials: "include" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
 }

@@ -63,11 +63,11 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
       await db
         .prepare(
           `INSERT INTO patients
-             (id, tenant_id, branch_id, name, date_of_birth, gender, phone, email, notes,
+             (id, tenant_id, branch_id, name, date_of_birth, gender, phone, email, notes, address,
               family_name, family_phone, family_relation, marketing_source,
               referral_type, referral_user_id, referral_notes,
               height_cm, weight_kg)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
@@ -79,6 +79,7 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
           data.phone,
           data.email ?? null,
           data.notes ?? null,
+          data.address ?? null,
           data.family_name ?? null,
           data.family_phone ?? null,
           data.family_relation ?? null,
@@ -106,6 +107,7 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
         "phone",
         "email",
         "notes",
+        "address",
         "family_name",
         "family_phone",
         "family_relation",
@@ -152,6 +154,7 @@ function mapPatient(row: D1Row): Patient {
     phone: row.phone as string,
     email: (row.email as string | null) ?? undefined,
     notes: (row.notes as string | null) ?? undefined,
+    address: (row.address as string | null) ?? undefined,
     created_at: row.created_at as string,
     family_name: (row.family_name as string | null) ?? undefined,
     family_phone: (row.family_phone as string | null) ?? undefined,

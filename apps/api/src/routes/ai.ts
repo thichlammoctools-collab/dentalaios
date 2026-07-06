@@ -13,6 +13,7 @@ import { requireAuth, getJwt } from "../middleware/auth";
 import { requirePermission } from "../middleware/rbac";
 import type { AuthContext } from "../middleware/auth";
 import { aiService } from "../services/ai.service";
+import { voiceFindingsService } from "../services/voice-findings.service";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -30,6 +31,23 @@ router.post(
       { db: c.env.DB, AI: (c.env as Record<string, unknown>).AI },
       jwt.tenant_id,
       visit_id,
+    );
+    return c.json(result);
+  },
+);
+
+// POST /api/ai/voice-findings
+router.post(
+  "/voice-findings",
+  zValidator("json", z.object({ visit_id: z.string().min(1), transcript: z.string().min(1) })),
+  async (c) => {
+    const jwt = getJwt(c);
+    const { visit_id, transcript } = c.req.valid("json");
+    const result = await voiceFindingsService.parseTranscript(
+      { db: c.env.DB, AI: (c.env as Record<string, unknown>).AI },
+      jwt.tenant_id,
+      visit_id,
+      transcript,
     );
     return c.json(result);
   },

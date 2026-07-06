@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { VoiceFindingsDialog } from "@/components/VoiceFindingsDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -282,6 +283,7 @@ export function VisitDetailPage() {
   const [editableItems, setEditableItems] = useState<EditableItem[]>([]);
   const [planNotes, setPlanNotes] = useState("");
   const [savingPlan, setSavingPlan] = useState(false);
+  const [voiceDialogOpen, setVoiceDialogOpen] = useState(false);
 
   async function load() {
     if (!id) return;
@@ -331,6 +333,10 @@ export function VisitDetailPage() {
     } finally {
       setSummarizing(false);
     }
+  }
+
+  function onFindingsBatchCreated(saved: ClinicalFinding[]) {
+    setFindings((prev) => [...prev, ...saved]);
   }
 
   async function onGeneratePlan() {
@@ -498,6 +504,7 @@ export function VisitDetailPage() {
             visitId={visit.id}
             findings={findings}
             onCreated={(f) => setFindings((prev) => [...prev, f])}
+            onCreatedBatch={onFindingsBatchCreated}
           />
         </CardContent>
       </Card>
@@ -535,6 +542,15 @@ export function VisitDetailPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
             {summarizing ? "Đang tóm tắt…" : "Tóm tắt AI"}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => setVoiceDialogOpen(true)}
+          >
+            <svg className="mr-1.5 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            </svg>
+            Ghi âm Findings
           </Button>
           <Button variant="secondary" onClick={onGeneratePlan} disabled={generatingPlan}>
             <svg className="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -810,6 +826,16 @@ export function VisitDetailPage() {
           </Button>
         </DialogFooter>
       </Dialog>
+
+      <VoiceFindingsDialog
+        open={voiceDialogOpen}
+        onOpenChange={setVoiceDialogOpen}
+        visitId={visit.id}
+        onSaved={(saved) => {
+          setFindings((prev) => [...prev, ...saved]);
+          setVoiceDialogOpen(false);
+        }}
+      />
     </div>
   );
 }

@@ -64,6 +64,7 @@ export interface Patient {
   gender: Gender;
   phone: string;
   email?: string;
+  address?: string;
   notes?: string;
   created_at: string;
   // Family contact
@@ -245,6 +246,22 @@ export interface LarkSyncLog {
   status: LarkSyncStatus;
   error?: string;
   created_at: string;
+}
+
+// ───────────────────────── Voice ─────────────────────────
+
+export interface VoiceParsedFinding {
+  scope: "tooth" | "full_mouth" | "soft_tissue";
+  tooth_number: number | null;
+  area?: string;
+  condition: string;
+  notes: string;
+}
+
+export interface VoiceFindingsResult {
+  findings: VoiceParsedFinding[];
+  ai_model: string;
+  generated_at: string;
 }
 
 // ───────────────────────── AI ─────────────────────────
