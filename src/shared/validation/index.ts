@@ -108,6 +108,19 @@ export const patientCreateSchema = z.object({
     { message: "Email không hợp lệ" },
   ),
   notes: optionalText(2000),
+  // Family contact
+  family_name: optionalText(200),
+  family_phone: z.string().max(20).transform((s) => (s === "" ? undefined : s)).optional(),
+  family_relation: optionalText(50),
+  // Marketing source
+  marketing_source: optionalText(200),
+  // Referral tracking
+  referral_type: z.enum(["doctor", "staff", "other", "ad", "none"]).optional(),
+  referral_user_id: z.string().uuid().nullable().optional(),
+  referral_notes: optionalText(500),
+  // Body metrics
+  height_cm: z.number().positive().max(300).optional(),
+  weight_kg: z.number().positive().max(500).optional(),
 });
 
 export const patientUpdateSchema = patientCreateSchema.partial();
@@ -123,11 +136,26 @@ export const visitCreateSchema = z.object({
   clinician_id: z.string().min(1),
   date: z.string().datetime({ offset: true }).optional(),
   notes: optionalText(2000),
+  // Personnel
+  treating_clinician_id: z.string().uuid().nullable().optional(),
+  assistant_id: z.string().uuid().nullable().optional(),
+  // Vitals
+  blood_pressure_systolic:  z.number().int().min(50).max(300).optional(),
+  blood_pressure_diastolic: z.number().int().min(30).max(200).optional(),
+  blood_sugar_mgdl:        z.number().min(20).max(600).optional(),
 });
 
 export const visitUpdateSchema = z.object({
   status: z.enum(["in_progress", "completed", "cancelled"]).optional(),
   notes: optionalText(2000).optional(),
+  // Personnel
+  treating_clinician_id: z.string().uuid().nullable().optional(),
+  assistant_id: z.string().uuid().nullable().optional(),
+  // Vitals
+  blood_pressure_systolic:  z.number().int().min(50).max(300).optional(),
+  blood_pressure_diastolic: z.number().int().min(30).max(200).optional(),
+  blood_sugar_mgdl:        z.number().min(20).max(600).optional(),
+  vitals_recorded_at:       z.string().datetime({ offset: true }).transform((s) => (s === "" ? undefined : s)).optional(),
 });
 
 export type VisitCreateInput = z.infer<typeof visitCreateSchema>;
@@ -226,6 +254,7 @@ export const userUpdateSchema = z.object({
   role_id: z.string().min(1).optional(),
   branch_id: z.string().min(1).optional(),
   password: z.string().min(6).optional(),
+  is_active: z.boolean().optional(),
 });
 
 export type UserCreateInput = z.infer<typeof userCreateSchema>;

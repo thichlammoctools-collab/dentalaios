@@ -25,6 +25,17 @@ router.get(
   },
 );
 
+// GET /api/users/branch/:branchId — list users by branch for dropdowns
+router.get(
+  "/branch/:branchId",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const items = await usersService.listByBranch(c.env.DB, jwt.tenant_id, c.req.param("branchId"));
+    return c.json({ items, total: items.length });
+  },
+);
+
 // POST /api/users
 router.post(
   "/",

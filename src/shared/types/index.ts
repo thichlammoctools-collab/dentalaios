@@ -53,6 +53,8 @@ export interface User {
 
 export type Gender = "M" | "F" | "O";
 
+export type ReferralType = "doctor" | "staff" | "other" | "ad" | "none";
+
 export interface Patient {
   id: string;
   tenant_id: string;
@@ -64,6 +66,20 @@ export interface Patient {
   email?: string;
   notes?: string;
   created_at: string;
+  // Family contact
+  family_name?: string;
+  family_phone?: string;
+  family_relation?: string;
+  // Marketing
+  marketing_source?: string;
+  // Referral tracking
+  referral_type?: ReferralType;
+  referral_user_id?: string;
+  referral_user_name?: string;
+  referral_notes?: string;
+  // Body metrics
+  height_cm?: number;
+  weight_kg?: number;
 }
 
 export type AlertSeverity = "low" | "medium" | "high";
@@ -87,11 +103,21 @@ export interface Visit {
   tenant_id: string;
   patient_id: string;
   branch_id: string;
-  clinician_id: string; // FK to User
+  clinician_id: string; // FK to User — bác sĩ khám
   date: string; // ISO datetime
   status: VisitStatus;
   notes?: string;
   created_at: string;
+  // Vitals
+  blood_pressure_systolic?: number;
+  blood_pressure_diastolic?: number;
+  blood_sugar_mgdl?: number;
+  vitals_recorded_at?: string;
+  // Personnel
+  treating_clinician_id?: string; // FK to User — bác sĩ điều trị
+  treating_clinician_name?: string;
+  assistant_id?: string; // FK to User — phụ tá
+  assistant_name?: string;
 }
 
 /** Tooth numbering system — only FDI supported in V1 per user decision. */
@@ -323,4 +349,10 @@ export interface InviteAcceptRequest {
   token: string;
   name: string;
   password: string;
+}
+
+/** User enriched with role_name and branch_name — returned by listByBranch. */
+export interface UserWithDetails extends User {
+  role_name: string;
+  branch_name: string;
 }

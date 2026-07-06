@@ -25,6 +25,9 @@ export const patientService = {
       phone: data.phone,
       email: data.email || undefined,
       notes: data.notes,
+      referral_type: data.referral_type,
+      referral_user_id: data.referral_user_id ?? undefined,
+      referral_notes: data.referral_notes,
     });
   },
 
@@ -34,7 +37,11 @@ export const patientService = {
     id: string,
     data: PatientUpdateInput,
   ): Promise<Patient | null> {
-    return createPatientsRepository(db).update(tenantId, id, data);
+    return createPatientsRepository(db).update(tenantId, id, {
+      referral_type: data.referral_type,
+      referral_user_id: data.referral_user_id ?? undefined,
+      referral_notes: data.referral_notes,
+    });
   },
 
   remove(db: D1Database, tenantId: string, id: string): Promise<boolean> {

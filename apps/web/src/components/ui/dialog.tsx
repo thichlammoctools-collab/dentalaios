@@ -15,7 +15,6 @@ export function Dialog({ open, onOpenChange, children, className }: DialogProps)
       if (e.key === "Escape") onOpenChange(false);
     }
     window.addEventListener("keydown", onKey);
-    // Lock body scroll when dialog open
     const original = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -27,13 +26,14 @@ export function Dialog({ open, onOpenChange, children, className }: DialogProps)
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"
       onClick={() => onOpenChange(false)}
     >
       <div
         className={cn(
-          "relative z-[10000] w-full max-w-lg rounded-xl border border-border bg-white p-6 shadow-2xl",
-          "animate-in fade-in zoom-in-95 duration-200",
+          "relative z-[10000] w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl border border-border bg-white shadow-2xl",
+          "animate-in fade-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200",
+          "max-h-[92dvh] sm:max-h-[85dvh] flex flex-col",
           className,
         )}
         onClick={(e) => e.stopPropagation()}
@@ -50,21 +50,27 @@ interface DialogHeaderProps {
 }
 
 export function DialogHeader({ className, children }: DialogHeaderProps) {
-  return <div className={cn("mb-5 flex flex-col gap-1.5 border-b border-border pb-4", className)}>{children}</div>;
+  return (
+    <div className={cn("flex-shrink-0 border-b border-border bg-white px-5 pt-5 pb-4 sm:px-6 sm:pt-6 sm:pb-4", className)}>
+      {children}
+    </div>
+  );
 }
 
 export function DialogTitle({ children }: { children: ReactNode }) {
-  return <h2 className="text-lg font-semibold leading-none tracking-tight text-foreground">{children}</h2>;
+  return <h2 className="text-base font-semibold leading-tight tracking-tight text-foreground sm:text-lg">{children}</h2>;
 }
 
 export function DialogDescription({ children }: { children: ReactNode }) {
-  return <p className="text-sm text-muted-foreground mt-1">{children}</p>;
+  return <p className="text-xs text-muted-foreground mt-1">{children}</p>;
 }
 
 export function DialogFooter({ className, children }: DialogHeaderProps) {
   return (
-    <div className={cn("mt-6 flex justify-end gap-2 border-t border-border pt-4", className)}>
-      {children}
+    <div className={cn("flex-shrink-0 border-t border-border bg-white px-5 pb-5 pt-4 sm:px-6 sm:pb-6", className)}>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        {children}
+      </div>
     </div>
   );
 }

@@ -18,18 +18,33 @@ export interface UserWithContext {
   password_hash: string; // internal only — caller must verify then drop
 }
 
+/** User enriched with role_name and branch_name — returned by listByBranch. */
+export interface UserWithDetails {
+  id: string;
+  tenant_id: string;
+  branch_id: string;
+  role_id: string;
+  email: string;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+  role_name: string;
+  branch_name: string;
+}
+
 export interface UsersRepository {
   findByEmail(email: string): Promise<UserWithContext | null>;
   findContextById(userId: string, tenantId: string): Promise<UserWithContext | null>;
   list(tenantId: string): Promise<User[]>;
   getById(tenantId: string, id: string): Promise<User | null>;
+  listByBranch(tenantId: string, branchId: string): Promise<UserWithDetails[]>;
   create(
     tenantId: string,
     data: Omit<User, "id" | "tenant_id" | "created_at"> & { password_hash: string },
     isActive?: boolean,
   ): Promise<User>;
-  update(tenantId: string, id: string, data: Partial<Pick<User, "name" | "role_id" | "branch_id">> & { password_hash?: string }): Promise<User | null>;
-  delete(tenantId: string, id: string): Promise<boolean>;
+  update(tenantId: string, id: string, data: Partial<Pick<User, "name" | "role_id" | "branch_id" | "is_active">> & { password_hash?: string }): Promise<User | null>;
+  deactivate(tenantId: string, id: string): Promise<boolean>;
 }
 
 export function createUsersRepository(db: D1Database): UsersRepository {
@@ -107,6 +122,34 @@ export function createUsersRepository(db: D1Database): UsersRepository {
       return row ? mapUser(row) : null;
     },
 
+    async listByBranch(tenantId, branchId) {
+      const result = await db
+        .prepare(
+          `SELECT u.id, u.tenant_id, u.branch_id, u.role_id, u.email, u.name,
+                  u.is_active, u.created_at,
+                  r.name AS role_name, b.name AS branch_name
+           FROM users u
+           JOIN roles r ON r.id = u.role_id
+           JOIN branches b ON b.id = u.branch_id
+           WHERE u.tenant_id = ? AND u.branch_id = ? AND u.is_active = 1
+           ORDER BY u.name`,
+        )
+        .bind(tenantId, branchId)
+        .all();
+      return (result.results as D1Row[]).map((row) => ({
+        id: row.id as string,
+        tenant_id: row.tenant_id as string,
+        branch_id: row.branch_id as string,
+        role_id: row.role_id as string,
+        email: row.email as string,
+        name: row.name as string,
+        is_active: (row.is_active as number) === 1,
+        created_at: row.created_at as string,
+        role_name: row.role_name as string,
+        branch_name: row.branch_name as string,
+      }));
+    },
+
     async create(tenantId, data, isActive = true) {
       const id = crypto.randomUUID();
       await db
@@ -149,6 +192,10 @@ export function createUsersRepository(db: D1Database): UsersRepository {
         fields.push("branch_id = ?");
         binds.push(data.branch_id);
       }
+      if (data.is_active !== undefined) {
+        fields.push("is_active = ?");
+        binds.push(data.is_active ? 1 : 0);
+      }
       if (data.password_hash !== undefined) {
         fields.push("password_hash = ?");
         binds.push(data.password_hash);
@@ -162,9 +209,9 @@ export function createUsersRepository(db: D1Database): UsersRepository {
       return this.getById(tenantId, id);
     },
 
-    async delete(tenantId, id) {
+    async deactivate(tenantId, id) {
       const res = await db
-        .prepare("DELETE FROM users WHERE tenant_id = ? AND id = ?")
+        .prepare("UPDATE users SET is_active = 0 WHERE tenant_id = ? AND id = ?")
         .bind(tenantId, id)
         .run();
       return res.meta.changes > 0;

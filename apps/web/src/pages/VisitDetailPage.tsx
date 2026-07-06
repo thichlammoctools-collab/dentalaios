@@ -28,17 +28,17 @@ interface EditableItem {
 }
 
 const PROCEDURE_OPTIONS = [
-  { value: "examination", label: "Kham & chan doan" },
-  { value: "filling", label: "Tram rang" },
-  { value: "root_canal", label: "Dieu tri tuy" },
-  { value: "extraction", label: "Nho rang" },
-  { value: "crown", label: "Boc mao rang" },
-  { value: "scaling", label: "Cao voi rang" },
-  { value: "implant", label: "Cay ghep implant" },
-  { value: "bridge", label: "Cau rang su" },
-  { value: "veneer", label: "Dan su veneer" },
-  { value: "fluoride", label: "Tray trang fluoride" },
-  { value: "other", label: "Dieu tri khac" },
+  { value: "examination", label: "Khám & chẩn đoán" },
+  { value: "filling", label: "Trám răng" },
+  { value: "root_canal", label: "Điều trị tủy" },
+  { value: "extraction", label: "Nhổ răng" },
+  { value: "crown", label: "Bọc mão răng" },
+  { value: "scaling", label: "Cạo vôi răng" },
+  { value: "implant", label: "Cấy ghép implant" },
+  { value: "bridge", label: "Cầu răng sứ" },
+  { value: "veneer", label: "Dán sứ veneer" },
+  { value: "fluoride", label: "Tráng răng fluoride" },
+  { value: "other", label: "Điều trị khác" },
 ];
 
 const PROCEDURE_COLORS: Record<string, string> = {
@@ -79,7 +79,7 @@ function parseSummary(raw: string): SummarySection[] {
 
     if (line.startsWith("## ") || line.startsWith("##")) {
       const label = line.replace(/^##\s*/, "").trim();
-      const key = label.toLowerCase();
+      const key = label.toLowerCase().normalize("NFC");
 
       if (key.includes("nhân") || key.includes("benh nhan") || key.includes("patient")) {
         // Patient block — collect next non-empty lines until blank or next ##
@@ -105,7 +105,7 @@ function parseSummary(raw: string): SummarySection[] {
           if (colonIdx !== -1) {
             const lbl = part.slice(0, colonIdx).trim();
             const val = part.slice(colonIdx + 1).trim();
-            const isStatus = lbl.toLowerCase().includes("trạng thái") || lbl.toLowerCase().includes("status");
+            const isStatus = lbl.toLowerCase().normalize("NFC").includes("trạng thái") || lbl.toLowerCase().includes("status");
             items.push({ label: lbl, value: val, accent: isStatus });
           } else {
             items.push({ label: "", value: part });
@@ -113,7 +113,7 @@ function parseSummary(raw: string): SummarySection[] {
           i++;
         }
         sections.push({ type: "visit", label, items });
-      } else if (key.includes("finding") || key.includes("clinical")) {
+      } else if (key.includes("finding") || key.includes("clinical") || key.includes("phát hiện") || key.includes("lâm sàng")) {
         const items: SummarySection["items"] = [];
         i++;
         while (i < lines.length && lines[i].trim() && !lines[i].startsWith("##")) {
@@ -127,7 +127,7 @@ function parseSummary(raw: string): SummarySection[] {
           i++;
         }
         sections.push({ type: "findings", label, items });
-      } else if (key.includes("ke hoach") || key.includes("plan") || key.includes("điều trị") || key.includes("dieu tri")) {
+      } else if (key.includes("kế hoạch") || key.includes("plan") || key.includes("điều trị")) {
         const items: SummarySection["items"] = [];
         i++;
         while (i < lines.length && lines[i].trim() && !lines[i].startsWith("##")) {
@@ -160,7 +160,7 @@ function SummaryPatientCard({ items }: { items: SummarySection["items"] }) {
   return (
     <div className="overflow-hidden rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white shadow-sm">
       <div className="bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-2.5">
-        <p className="text-xs font-semibold uppercase tracking-wider text-blue-100">Thong tin benh nhan</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-blue-100">Thông tin bệnh nhân</p>
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 p-4">
         {items?.map((item, idx) => (
@@ -178,7 +178,7 @@ function SummaryVisitCard({ items }: { items: SummarySection["items"] }) {
   return (
     <div className="overflow-hidden rounded-xl border border-violet-200 bg-white shadow-sm">
       <div className="bg-gradient-to-r from-violet-600 to-violet-500 px-4 py-2.5">
-        <p className="text-xs font-semibold uppercase tracking-wider text-violet-100">Luot kham</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-violet-100">Lượt khám</p>
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 p-4">
         {items?.map((item, idx) => (
@@ -202,25 +202,27 @@ function SummaryFindingsCard({ items, label }: { items: SummarySection["items"];
       </div>
       <div className="divide-y divide-teal-100">
         {items?.map((item, idx) => {
-          const [tooth, ...rest] = item.value.split(":");
-          const restStr = rest.join(":").trim();
+          const colonIdx = item.value.indexOf(":");
+          const hasColon = colonIdx !== -1;
+          const tooth = hasColon ? item.value.slice(0, colonIdx).trim() : item.value.trim();
+          const restStr = hasColon ? item.value.slice(colonIdx + 1).trim() : "";
           return (
             <div key={idx} className="flex items-center gap-3 px-4 py-3 hover:bg-teal-50 transition-colors">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-100 text-sm font-bold text-teal-700">
-                {tooth.trim()}
+                {tooth}
               </span>
               <div className="flex-1 min-w-0">
                 {restStr ? (
                   <p className="text-sm font-medium text-gray-800 truncate">{restStr}</p>
                 ) : (
-                  <p className="text-sm text-gray-600 italic">Khong co mo ta</p>
+                  <p className="text-sm font-medium text-gray-800 truncate">{tooth}</p>
                 )}
               </div>
             </div>
           );
         })}
         {!items?.length && (
-          <p className="px-4 py-3 text-sm text-gray-400 italic">Khong co du lieu</p>
+          <p className="px-4 py-3 text-sm text-gray-400 italic">Không có dữ liệu</p>
         )}
       </div>
     </div>
@@ -243,7 +245,7 @@ function SummaryPlanCard({ items, label }: { items: SummarySection["items"]; lab
           </div>
         ))}
         {!items?.length && (
-          <p className="px-4 py-3 text-sm text-gray-400 italic">Khong co ke hoach</p>
+          <p className="px-4 py-3 text-sm text-gray-400 italic">Không có kế hoạch</p>
         )}
       </div>
     </div>
@@ -253,7 +255,7 @@ function SummaryPlanCard({ items, label }: { items: SummarySection["items"]; lab
 function SummaryNotesCard({ items }: { items: SummarySection["items"] }) {
   return (
     <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-indigo-500">Ghi chu</p>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-indigo-500">Ghi chú</p>
       {items?.map((item, idx) => (
         <p key={idx} className="text-sm text-gray-700 leading-relaxed">{item.value}</p>
       ))}
@@ -292,7 +294,7 @@ export function VisitDetailPage() {
       setVisit(v);
       setFindings(f.items);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Loi tai visit");
+      toast.error(err instanceof ApiError ? err.message : "Lỗi tải visit");
     } finally {
       setLoading(false);
     }
@@ -308,7 +310,7 @@ export function VisitDetailPage() {
         patient_id: visit.patient_id,
         currency: "VND",
       });
-      toast.success("Da tao ke hoach dieu tri");
+      toast.success("Đã tạo kế hoạch điều trị");
       navigate(`/treatment-plans/${created.id}`);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Loi tao plan");
@@ -324,7 +326,7 @@ export function VisitDetailPage() {
       const result = await apiPost<SummarizeResult>("/api/ai/summarize", { visit_id: visit.id });
       setSummaryResult(result);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Loi tao tom tat AI");
+      toast.error(err instanceof ApiError ? err.message : "Ọi tạo tóm tắt AI");
       setSummaryDialogOpen(false);
     } finally {
       setSummarizing(false);
@@ -350,7 +352,7 @@ export function VisitDetailPage() {
       })));
       setPlanNotes(result.notes);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Loi tao ke hoach AI");
+      toast.error(err instanceof ApiError ? err.message : "Loi tao kế hoạch AI");
       setPlanDialogOpen(false);
     } finally {
       setGeneratingPlan(false);
@@ -377,11 +379,11 @@ export function VisitDetailPage() {
           status: "proposed",
         });
       }
-      toast.success("Da tao ke hoach dieu tri tu AI");
+      toast.success("Da tao kế hoạch điều trị tu AI");
       setPlanDialogOpen(false);
       navigate(`/treatment-plans/${plan.id}`);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Loi luu ke hoach");
+      toast.error(err instanceof ApiError ? err.message : "Loi luu kế hoạch");
     } finally {
       setSavingPlan(false);
     }
@@ -408,7 +410,7 @@ export function VisitDetailPage() {
   const sections = summaryResult ? parseSummary(summaryResult.summary) : [];
 
   if (loading || !visit) {
-    return <p className="px-6 py-6 text-sm text-muted-foreground">Dang tai…</p>;
+    return <p className="px-6 py-6 text-sm text-muted-foreground">Đang tải…</p>;
   }
 
   return (
@@ -417,12 +419,12 @@ export function VisitDetailPage() {
       <div>
         <p className="text-sm text-muted-foreground">
           <a href={`/patients/${visit.patient_id}`} className="hover:underline">
-            ← Quay lai benh nhan
+            ← Quay lại bệnh nhân
           </a>
         </p>
         <div className="mt-1 flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Luot khám</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Lượt khám</h1>
             <p className="text-sm text-muted-foreground">{formatDateTime(visit.date)}</p>
           </div>
           <Badge
@@ -433,12 +435,63 @@ export function VisitDetailPage() {
             {visit.status}
           </Badge>
         </div>
+        {(visit.treating_clinician_name || visit.assistant_name) && (
+          <div className="mt-2 flex flex-wrap gap-4 text-sm">
+            {visit.treating_clinician_name && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">Bs điều trị:</span>
+                <span className="font-medium">{visit.treating_clinician_name}</span>
+              </div>
+            )}
+            {visit.assistant_name && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">Phụ tá:</span>
+                <span className="font-medium">{visit.assistant_name}</span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Vitals */}
+      {(visit.blood_pressure_systolic || visit.blood_pressure_diastolic || visit.blood_sugar_mgdl) && (
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+              Chỉ số khám
+            </p>
+            <div className="flex flex-wrap gap-6">
+              {(visit.blood_pressure_systolic || visit.blood_pressure_diastolic) && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">💉</span>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Huyết áp</p>
+                    <p className="font-semibold text-sm">
+                      {visit.blood_pressure_systolic}/{visit.blood_pressure_diastolic} mmHg
+                    </p>
+                  </div>
+                </div>
+              )}
+              {visit.blood_sugar_mgdl && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🩸</span>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Đường huyết</p>
+                    <p className="font-semibold text-sm">
+                      {visit.blood_sugar_mgdl} mg/dL
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* FDI Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>So do rang FDI</CardTitle>
+          <CardTitle>So đồ răng FDI</CardTitle>
         </CardHeader>
         <CardContent>
           <FdiToothChart
@@ -468,26 +521,26 @@ export function VisitDetailPage() {
       {/* Actions */}
       <Card>
         <CardHeader>
-          <CardTitle>Thao tac</CardTitle>
+          <CardTitle>Thao tác</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
           <Button onClick={onCreatePlan}>
             <svg className="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            Tao ke hoach dieu tri
+            Tạo kế hoạch điều trị
           </Button>
           <Button variant="outline" onClick={onSummarize} disabled={summarizing}>
             <svg className="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
-            {summarizing ? "Dang tom tat…" : "Tom tat AI"}
+            {summarizing ? "Đang tóm tắt…" : "Tóm tắt AI"}
           </Button>
           <Button variant="secondary" onClick={onGeneratePlan} disabled={generatingPlan}>
             <svg className="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
-            {generatingPlan ? "AI dang tao ke hoach…" : "Tao ke hoach AI"}
+            {generatingPlan ? "AI dang tao kế hoạch…" : "Tạo kế hoạch AI"}
           </Button>
         </CardContent>
       </Card>
@@ -502,13 +555,13 @@ export function VisitDetailPage() {
               </svg>
             </div>
             <div>
-              <DialogTitle>Tom tat benh an</DialogTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">Phan tich AI tu clinical findings</p>
+              <DialogTitle>Tóm tắt bệnh án</DialogTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">Phân tích AI từ clinical findings</p>
             </div>
           </div>
         </DialogHeader>
 
-        <div className="mt-4 space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+        <div className="flex-1 overflow-y-auto px-5 pb-5 sm:px-6">
           {summarizing ? (
             <div className="flex flex-col items-center gap-4 py-14">
               <div className="relative">
@@ -518,8 +571,8 @@ export function VisitDetailPage() {
                 </div>
               </div>
               <div className="text-center">
-                <p className="font-medium text-foreground">AI dang phan tich…</p>
-                <p className="text-sm text-muted-foreground mt-1">Dang xu ly clinical findings</p>
+                <p className="font-medium text-foreground">AI đang phân tích…</p>
+                <p className="text-sm text-muted-foreground mt-1">Đang xử lý clinical findings</p>
               </div>
             </div>
           ) : summaryResult ? (
@@ -531,7 +584,7 @@ export function VisitDetailPage() {
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                     </svg>
-                    {summaryResult.ai_model === "llama-3.1-8b-instruct" ? "AI Cloudflare" : "Tom tat cau truc"}
+                    {summaryResult.ai_model === "llama-3.1-8b-instruct" ? "AI Cloudflare" : "Tóm tắt cau truc"}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -541,7 +594,7 @@ export function VisitDetailPage() {
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(summaryResult.summary);
-                      toast.success("Da copy vao bo nho tam");
+                      toast.success("Đã copy vào bộ nhớ tạm");
                     }}
                     className="flex items-center gap-1.5 rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-medium text-violet-700 shadow-sm transition-all hover:bg-violet-50 hover:shadow-md"
                   >
@@ -554,15 +607,15 @@ export function VisitDetailPage() {
               </div>
 
               {/* Parsed sections */}
-              {sections.length > 0 ? sections.map((section, idx) => {
+              {sections.length > 0 ? <div className="mt-4 space-y-4">{sections.map((section, idx) => {
                 if (section.type === "patient" && section.items) return <SummaryPatientCard key={idx} items={section.items} />;
                 if (section.type === "visit" && section.items) return <SummaryVisitCard key={idx} items={section.items} />;
                 if (section.type === "findings" && section.items) return <SummaryFindingsCard key={idx} items={section.items} label={section.label} />;
                 if (section.type === "plan" && section.items) return <SummaryPlanCard key={idx} items={section.items} label={section.label} />;
                 if (section.type === "notes" && section.items) return <SummaryNotesCard key={idx} items={section.items} />;
                 return null;
-              }) : (
-                <div className="rounded-xl border border-border bg-muted/20 p-6">
+              })}</div> : (
+                <div className="mt-4 rounded-xl border border-border bg-muted/20 p-6">
                   <pre className="text-sm whitespace-pre-wrap text-foreground leading-relaxed font-mono">{summaryResult.summary}</pre>
                 </div>
               )}
@@ -571,7 +624,7 @@ export function VisitDetailPage() {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => setSummaryDialogOpen(false)}>Dong</Button>
+          <Button variant="outline" onClick={() => setSummaryDialogOpen(false)}>Đóng</Button>
         </DialogFooter>
       </Dialog>
 
@@ -585,13 +638,13 @@ export function VisitDetailPage() {
               </svg>
             </div>
             <div>
-              <DialogTitle>Tao ke hoach dieu tri bang AI</DialogTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">AI de xuat dua tren clinical findings</p>
+              <DialogTitle>Tạo kế hoạch điều trị bằng AI</DialogTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">AI đề xuất dựa trên clinical findings</p>
             </div>
           </div>
         </DialogHeader>
 
-        <div className="mt-4 space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+        <div className="flex-1 overflow-y-auto px-5 pb-5 sm:px-6">
           {generatingPlan ? (
             <div className="flex flex-col items-center gap-4 py-14">
               <div className="relative">
@@ -601,8 +654,8 @@ export function VisitDetailPage() {
                 </div>
               </div>
               <div className="text-center">
-                <p className="font-medium text-foreground">AI dang phan tich…</p>
-                <p className="text-sm text-muted-foreground mt-1">Dang xu ly clinical findings & de xuat ke hoach</p>
+                <p className="font-medium text-foreground">AI đang phân tích…</p>
+                <p className="text-sm text-muted-foreground mt-1">Đang xử lý clinical findings & kế hoạch kế hoạch</p>
               </div>
             </div>
           ) : planResult ? (
@@ -614,7 +667,7 @@ export function VisitDetailPage() {
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                     </svg>
-                    {planResult.ai_model === "llama-3.1-8b-instruct" ? "AI Cloudflare" : "Go y cau truc"}
+                    {planResult.ai_model === "llama-3.1-8b-instruct" ? "AI Cloudflare" : "Gợi ý cấu trúc"}
                   </div>
                 </div>
                 <span className="text-xs text-muted-foreground">
@@ -624,14 +677,14 @@ export function VisitDetailPage() {
 
               {/* Items table */}
               {editableItems.length > 0 ? (
-                <div className="overflow-hidden rounded-xl border border-border shadow-sm">
-                  <table className="w-full text-sm">
+                <div className="overflow-x-auto rounded-xl border border-border shadow-sm">
+                  <table className="w-full min-w-[500px] text-sm">
                     <thead>
                       <tr className="bg-gradient-to-r from-slate-700 to-slate-600">
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-white/80 w-14">Rang</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-white/80 w-36">Thu thuat</th>
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-white/80">Mo ta</th>
-                        <th className="px-3 py-2.5 text-right text-xs font-semibold text-white/80 w-32">Chi phi (VND)</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-white/80 w-36">Thủ thuật</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-white/80">Mô tả</th>
+                        <th className="px-3 py-2.5 text-right text-xs font-semibold text-white/80 w-32">Chi phí</th>
                         <th className="w-10"></th>
                       </tr>
                     </thead>
@@ -664,8 +717,8 @@ export function VisitDetailPage() {
                               <Input
                                 value={item.description}
                                 onChange={(e) => updateItem(item.id, "description", e.target.value)}
-                                className="h-8 text-xs border-slate-200"
-                                placeholder="Mo ta dieu tri"
+                                className="h-8 text-xs border-slate-200 min-w-0"
+                                placeholder="Mô tả điều trị"
                               />
                             </td>
                             <td className="px-3 py-2">
@@ -695,27 +748,27 @@ export function VisitDetailPage() {
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 py-10 text-center text-sm text-gray-400">
-                  Khong co clinical findings de tao ke hoach
+                  Không có clinical findings để tạo kế hoạch
                 </div>
               )}
 
               {/* Notes */}
               <div>
-                <label className="mb-1.5 block text-xs font-semibold text-gray-500 uppercase tracking-wider">Ghi chu</label>
+                <label className="mb-1.5 block text-xs font-semibold text-gray-500 uppercase tracking-wider">Ghi chú</label>
                 <textarea
                   value={planNotes}
                   onChange={(e) => setPlanNotes(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   rows={2}
-                  placeholder="Ghi chu cho ke hoach dieu tri"
+                  placeholder="Ghi chú cho kế hoạch điều trị"
                 />
               </div>
 
               {/* Total */}
               <div className="flex items-center justify-between rounded-xl border-2 border-teal-300 bg-gradient-to-r from-teal-50 to-emerald-50 px-5 py-4 shadow-sm">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-teal-600">Tong chi phi uoc tinh</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{editableItems.length} hang muc | {new Set(editableItems.map((i) => i.procedure)).size} thu thuat</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-teal-600">Tổng chi phí ước tính</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{editableItems.length} hạng mục | {new Set(editableItems.map((i) => i.procedure)).size} thu thuat</p>
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-bold text-teal-700">{totalCost.toLocaleString("vi-VN")}</p>
@@ -728,14 +781,14 @@ export function VisitDetailPage() {
                 onClick={addItem}
                 className="w-full rounded-xl border-2 border-dashed border-slate-300 py-2.5 text-sm font-medium text-slate-500 transition-all hover:border-teal-400 hover:text-teal-600 hover:bg-teal-50/30"
               >
-                + Them thu thuat
+                + Thêm thủ thuật
               </button>
             </>
           ) : null}
         </div>
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => setPlanDialogOpen(false)}>Huy</Button>
+          <Button variant="outline" onClick={() => setPlanDialogOpen(false)}>Hủy</Button>
           <Button
             onClick={onSavePlan}
             disabled={savingPlan || editableItems.length === 0}
@@ -744,14 +797,14 @@ export function VisitDetailPage() {
             {savingPlan ? (
               <>
                 <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
-                Dang luu…
+                Đang lưu…
               </>
             ) : (
               <>
                 <svg className="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
-                Luu ke hoach dieu tri
+                Luu kế hoạch điều trị
               </>
             )}
           </Button>

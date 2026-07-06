@@ -206,32 +206,111 @@ function buildSummaryData(opts: {
 }
 
 function buildPrompt(data: SummaryData): string {
+  const translated = translateFindings(data.findings);
   const patient = data.patient
     ? `Bệnh nhân: ${data.patient.name}, ${data.patient.gender === "M" ? "Nam" : data.patient.gender === "F" ? "Nữ" : "Khác"}, sinh ${data.patient.dob}, ĐT: ${data.patient.phone}`
     : "Bệnh nhân: không xác định";
-  const visit = `Lượt khám: ${new Date(data.visit.date).toLocaleDateString("vi-VN")}, trạng thái: ${data.visit.status}${data.visit.notes ? `, Ghi chú: ${data.visit.notes}` : ""}`;
-  const findings = data.findings.length
-    ? `Clinical findings:\n${data.findings.map((f) => {
+  const visit = `Lượt khám: ${new Date(data.visit.date).toLocaleDateString("vi-VN")}, trạng thái: ${visitStatusVi(data.visit.status)}${data.visit.notes ? `, Ghi chú: ${data.visit.notes}` : ""}`;
+  const findings = translated.length
+    ? `Phát hiện lâm sàng:\n${translated.map((f) => {
         const loc = f.scope === "tooth" ? `Răng ${f.tooth}` : f.scope === "full_mouth" ? "Toàn hàm" : `Mô mềm (${f.area ?? f.scope})`;
         return `  - ${loc}: ${f.condition}${f.notes ? ` (${f.notes})` : ""}`;
       }).join("\n")}`
-    : "Clinical findings: không có";
+    : "Phát hiện lâm sàng: không có";
   const plans = data.planItems.length
-    ? `Kế hoạch điều trị:\n${data.planItems.map(({ plan, items }) => `  [${plan?.status}] Tổng: ${(plan?.total_cost ?? 0).toLocaleString("vi-VN")} ${plan?.currency || "VND"}\n${items.map((i) => `    - ${i.tooth_number ? `Răng ${i.tooth_number}` : "Toàn hàm"}: ${i.procedure} — ${i.description} (${i.unit_cost.toLocaleString("vi-VN")} ${plan?.currency || "VND"}) [${i.status}]`).join("\n")}`).join("\n")}`
+    ? `Kế hoạch điều trị:\n${data.planItems.map(({ plan, items }) => `  [${visitStatusVi(plan?.status ?? "planned")}] Tổng: ${(plan?.total_cost ?? 0).toLocaleString("vi-VN")} ${plan?.currency || "VND"}\n${items.map((i) => `    - ${i.tooth_number ? `Răng ${i.tooth_number}` : "Toàn hàm"}: ${procedureVi(i.procedure)} — ${i.description} (${i.unit_cost.toLocaleString("vi-VN")} ${plan?.currency || "VND"}) [${procedureVi(i.status)}]`).join("\n")}`).join("\n")}`
     : "Kế hoạch: không có";
   return `${patient}\n${visit}\n\n${findings}\n\n${plans}\n\nHãy viết tóm tắt bệnh án ngắn gọn bằng tiếng Việt cho bác sĩ.`;
 }
 
+function visitStatusVi(status: string): string {
+  if (status === "in_progress") return "Đang khám";
+  if (status === "completed") return "Hoàn thành";
+  if (status === "cancelled") return "Đã hủy";
+  if (status === "draft") return "Bản nháp";
+  if (status === "approved") return "Đã duyệt";
+  if (status === "planned") return "Đã lên kế hoạch";
+  return status;
+}
+
+function procedureVi(proc: string): string {
+  const map: Record<string, string> = {
+    examination: "Khám & chẩn đoán",
+    filling: "Trám răng",
+    root_canal: "Điều trị tủy",
+    extraction: "Nhổ răng",
+    crown: "Bọc mão răng",
+    scaling: "Cạo vôi răng",
+    implant: "Cấy ghép implant",
+    bridge: "Cầu răng sứ",
+    veneer: "Dán sứ veneer",
+    fluoride: "Tráng răng fluoride",
+    other: "Điều trị khác",
+    planned: "Đã lên kế hoạch",
+    in_progress: "Đang điều trị",
+    completed: "Hoàn thành",
+    proposed: "Đề xuất",
+  };
+  return map[proc] ?? proc;
+}
+
+function conditionVi(cond: string): string {
+  const map: Record<string, string> = {
+    "caries": "Sâu răng",
+    "caries_other": "Sâu răng khác",
+    "caries other": "Sâu răng khác",
+    "caries_o": "Sâu răng khác",
+    "caries_occlusal": "Sâu răng mặt nhai",
+    "caries_mesial": "Sâu răng mặt trung tâm",
+    "caries_distal": "Sâu răng mặt xa",
+    "caries_lingual": "Sâu răng mặt lưỡi",
+    "caries_buccal": "Sâu răng mặt má",
+    "caries_interproximal": "Sâu kẽ răng",
+    "pulpitis": "Viêm tủy",
+    "viêm tủy": "Viêm tủy",
+    "viêm cuống răng": "Viêm cuống răng",
+    "apical_periodontitis": "Viêm cuống răng",
+    "pulpal_necrosis": "Hoại tử tủy",
+    "gingivitis": "Viêm lợi",
+    "viêm lợi": "Viêm lợi",
+    "periodontitis": "Viêm nha chu",
+    "viêm nha chu": "Viêm nha chu",
+    "halitosis": "Hôi miệng",
+    "hôi miệng": "Hôi miệng",
+    "fracture": "Gãy răng",
+    "fissure": "Răng nứt",
+    "abscess": "Áp xe răng",
+    "á p xe": "Áp xe răng",
+    "missing_tooth": "Thiếu răng",
+    "discoloration": "Đổi màu răng",
+    "malocclusion": "Răng lệch khớp cắn",
+    "sensitivity": "Nhạy cảm răng",
+    "calculus": "Cao răng",
+    "stain": "Đốm răng",
+    "pericoronitis": "Viêm quanh răng khôn",
+    "fistula": "Rò quanh răng",
+    "lesion": "Tổn thương",
+    "other": "Khác",
+  };
+  const lower = cond.toLowerCase();
+  return map[lower] ?? cond;
+}
+
+function translateFindings(findings: SummaryData["findings"]): SummaryData["findings"] {
+  return findings.map((f) => ({ ...f, condition: conditionVi(f.condition) }));
+}
+
 function buildStructuredSummary(data: SummaryData): string {
+  const translated = translateFindings(data.findings);
   const lines: string[] = [];
   if (data.patient) {
     lines.push(`## Bệnh nhân\n${data.patient.name}, ${data.patient.gender === "M" ? "Nam" : "Nữ"}, sinh ${data.patient.dob}, ĐT: ${data.patient.phone}`);
   }
-  lines.push(`## Lượt khám ngày ${new Date(data.visit.date).toLocaleDateString("vi-VN")} (${data.visit.status})`);
+  lines.push(`## Lượt khám ngày ${new Date(data.visit.date).toLocaleDateString("vi-VN")} (${visitStatusVi(data.visit.status)})`);
   if (data.visit.notes) lines.push(`Ghi chú: ${data.visit.notes}`);
-  if (data.findings.length) {
-    lines.push(`## Clinical Findings (${data.findings.length})`);
-    data.findings.forEach((f) => {
+  if (translated.length) {
+    lines.push(`## Phát hiện lâm sàng (${translated.length})`);
+    translated.forEach((f) => {
       const loc = f.scope === "tooth" ? `Răng ${f.tooth}` : f.scope === "full_mouth" ? "Toàn hàm" : `Mô mềm (${f.area ?? f.scope})`;
       lines.push(`- ${loc}: ${f.condition}${f.notes ? ` — ${f.notes}` : ""}`);
     });
@@ -240,10 +319,10 @@ function buildStructuredSummary(data: SummaryData): string {
     lines.push("## Kế hoạch điều trị");
     data.planItems.forEach(({ plan, items }) => {
       if (!items.length) return;
-      lines.push(`[${plan?.status}] ${(plan?.total_cost ?? 0).toLocaleString("vi-VN")} ${plan?.currency || "VND"}`);
+      lines.push(`[${visitStatusVi(plan?.status ?? "planned")}] Tổng: ${(plan?.total_cost ?? 0).toLocaleString("vi-VN")} ${plan?.currency || "VND"}`);
       items.forEach((i) => {
         const loc = i.tooth_number ? `Răng ${i.tooth_number}` : "Toàn hàm";
-        lines.push(`  - ${loc}: ${i.procedure} — ${i.description} (${i.unit_cost.toLocaleString("vi-VN")} VND)`);
+        lines.push(`  - ${loc}: ${procedureVi(i.procedure)} — ${i.description} (${i.unit_cost.toLocaleString("vi-VN")} VND) [${procedureVi(i.status)}]`);
       });
     });
   }

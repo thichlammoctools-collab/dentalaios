@@ -13,11 +13,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Dialog, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { apiDelete, apiGet, apiPost, ApiError } from "@/lib/api";
+import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import { formatDate } from "@/lib/utils";
-import type { User, Role } from "@shared/types";
+import type { User, Role, Branch } from "@shared/types";
 
 interface UsersResponse {
   items: User[];
@@ -27,31 +27,61 @@ interface RolesResponse {
   items: Role[];
   total: number;
 }
+interface ClinicResponse {
+  tenant: { id: string; name: string };
+  branches: Branch[];
+}
+interface EditForm {
+  name: string;
+  email: string;
+  role_id: string;
+  branch_id: string;
+  is_active: boolean;
+}
 
 export function UsersSettingsPage() {
   const { session } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
+
+  // Create dialog
+  const [openCreate, setOpenCreate] = useState(false);
+  const [createForm, setCreateForm] = useState({
     email: "",
     name: "",
     password: "password123",
     role_id: "",
   });
-  const [saving, setSaving] = useState(false);
+  const [savingCreate, setSavingCreate] = useState(false);
+
+  // Edit dialog
+  const [openEdit, setOpenEdit] = useState(false);
+  const [editUser, setEditUser] = useState<User | null>(null);
+  const [editForm, setEditForm] = useState<EditForm>({
+    name: "",
+    email: "",
+    role_id: "",
+    branch_id: "",
+    is_active: true,
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   async function load() {
     setLoading(true);
     try {
-      const [u, r] = await Promise.all([
+      const [u, r, c] = await Promise.all([
         apiGet<UsersResponse>("/api/users"),
         apiGet<RolesResponse>("/api/roles"),
+        apiGet<ClinicResponse>("/api/clinic"),
       ]);
       setUsers(u.items);
       setRoles(r.items);
-      if (!form.role_id && r.items[0]) setForm((f) => ({ ...f, role_id: r.items[0].id }));
+      setBranches(c.branches);
+      if (!createForm.role_id && r.items[0]) {
+        setCreateForm((f) => ({ ...f, role_id: r.items[0].id }));
+      }
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi tải");
     } finally {
@@ -64,30 +94,64 @@ export function UsersSettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function onSubmit(e: FormEvent) {
+  async function onCreate(e: FormEvent) {
     e.preventDefault();
     if (!session) return;
-    if (!form.role_id) {
+    if (!createForm.role_id) {
       toast.error("Chọn role");
       return;
     }
-    setSaving(true);
+    setSavingCreate(true);
     try {
       await apiPost("/api/users", {
-        email: form.email,
-        name: form.name,
-        password: form.password,
-        role_id: form.role_id,
+        email: createForm.email,
+        name: createForm.name,
+        password: createForm.password,
+        role_id: createForm.role_id,
         branch_id: session.branch.id,
       });
       toast.success("Đã tạo user");
-      setOpen(false);
-      setForm({ email: "", name: "", password: "password123", role_id: roles[0]?.id ?? "" });
+      setOpenCreate(false);
+      setCreateForm({ email: "", name: "", password: "password123", role_id: roles[0]?.id ?? "" });
       load();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi tạo user");
     } finally {
-      setSaving(false);
+      setSavingCreate(false);
+    }
+  }
+
+  function openEditDialog(u: User) {
+    setEditUser(u);
+    setEditForm({
+      name: u.name,
+      email: u.email,
+      role_id: u.role_id,
+      branch_id: u.branch_id,
+      is_active: u.is_active,
+    });
+    setOpenEdit(true);
+  }
+
+  async function onEdit(e: FormEvent) {
+    e.preventDefault();
+    if (!editUser) return;
+    setSavingEdit(true);
+    try {
+      await apiPut(`/api/users/${editUser.id}`, {
+        name: editForm.name,
+        role_id: editForm.role_id,
+        branch_id: editForm.branch_id,
+        is_active: editForm.is_active,
+      });
+      toast.success("Đã cập nhật");
+      setOpenEdit(false);
+      setEditUser(null);
+      load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi cập nhật");
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -96,7 +160,7 @@ export function UsersSettingsPage() {
       toast.error("Không thể xóa chính mình");
       return;
     }
-    if (!confirm(`Xóa user ${u.email}?`)) return;
+    if (!confirm(`Xóa user ${u.email}? Họ sẽ không thể đăng nhập.`)) return;
     try {
       await apiDelete(`/api/users/${u.id}`);
       toast.success("Đã xóa");
@@ -110,7 +174,7 @@ export function UsersSettingsPage() {
     <div className="mx-auto max-w-5xl space-y-4 px-6 py-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold tracking-tight">Người dùng</h1>
-        <Button onClick={() => setOpen(true)}>+ Tạo user</Button>
+        <Button onClick={() => setOpenCreate(true)}>+ Tạo user</Button>
       </div>
       <Card>
         <CardHeader>
@@ -125,7 +189,9 @@ export function UsersSettingsPage() {
                 <TableRow>
                   <TableHead>Email</TableHead>
                   <TableHead>Họ tên</TableHead>
-                  <TableHead>Role</TableHead>
+                  <TableHead>Vai trò</TableHead>
+                  <TableHead>Chi nhánh</TableHead>
+                  <TableHead>Trạng thái</TableHead>
                   <TableHead>Ngày tạo</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -133,6 +199,7 @@ export function UsersSettingsPage() {
               <TableBody>
                 {users.map((u) => {
                   const role = roles.find((r) => r.id === u.role_id);
+                  const branch = branches.find((b) => b.id === u.branch_id);
                   return (
                     <TableRow key={u.id}>
                       <TableCell className="font-mono">{u.email}</TableCell>
@@ -141,12 +208,33 @@ export function UsersSettingsPage() {
                         <Badge variant="outline">{role?.name ?? "—"}</Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
+                        {branch?.name ?? "—"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={u.is_active ? "success" : "destructive"}>
+                          {u.is_active ? "Hoạt động" : "Đã khóa"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
                         {formatDate(u.created_at)}
                       </TableCell>
                       <TableCell>
-                        <Button size="sm" variant="destructive" onClick={() => onDelete(u)}>
-                          Xóa
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openEditDialog(u)}
+                          >
+                            Sửa
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => onDelete(u)}
+                          >
+                            Xóa
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -157,8 +245,9 @@ export function UsersSettingsPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <form onSubmit={onSubmit}>
+      {/* ─── Create Dialog ─── */}
+      <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+        <form onSubmit={onCreate}>
           <DialogHeader>
             <DialogTitle>Tạo user mới</DialogTitle>
           </DialogHeader>
@@ -169,8 +258,8 @@ export function UsersSettingsPage() {
                 id="u-email"
                 type="email"
                 required
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                value={createForm.email}
+                onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
               />
             </div>
             <div className="grid gap-1.5">
@@ -178,8 +267,8 @@ export function UsersSettingsPage() {
               <Input
                 id="u-name"
                 required
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                value={createForm.name}
+                onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
               />
             </div>
             <div className="grid gap-1.5">
@@ -189,17 +278,17 @@ export function UsersSettingsPage() {
                 type="password"
                 required
                 minLength={6}
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                value={createForm.password}
+                onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="u-role">Role *</Label>
+              <Label htmlFor="u-role">Vai trò *</Label>
               <select
                 id="u-role"
                 required
-                value={form.role_id}
-                onChange={(e) => setForm({ ...form, role_id: e.target.value })}
+                value={createForm.role_id}
+                onChange={(e) => setCreateForm({ ...createForm, role_id: e.target.value })}
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
               >
                 {roles.map((r) => (
@@ -211,11 +300,79 @@ export function UsersSettingsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setOpenCreate(false)}>
               Hủy
             </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? "Đang tạo…" : "Tạo"}
+            <Button type="submit" disabled={savingCreate}>
+              {savingCreate ? "Đang tạo…" : "Tạo"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </Dialog>
+
+      {/* ─── Edit Dialog ─── */}
+      <Dialog open={openEdit} onOpenChange={setOpenEdit}>
+        <form onSubmit={onEdit}>
+          <DialogHeader>
+            <DialogTitle>Sửa user: {editUser?.email}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div className="grid gap-1.5">
+              <Label htmlFor="e-name">Họ tên *</Label>
+              <Input
+                id="e-name"
+                required
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="e-role">Vai trò</Label>
+              <select
+                id="e-role"
+                value={editForm.role_id}
+                onChange={(e) => setEditForm({ ...editForm, role_id: e.target.value })}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+              >
+                {roles.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="e-branch">Chi nhánh</Label>
+              <select
+                id="e-branch"
+                value={editForm.branch_id}
+                onChange={(e) => setEditForm({ ...editForm, branch_id: e.target.value })}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+              >
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                id="e-active"
+                type="checkbox"
+                checked={editForm.is_active}
+                onChange={(e) => setEditForm({ ...editForm, is_active: e.target.checked })}
+                className="h-4 w-4"
+              />
+              <Label htmlFor="e-active">Hoạt động</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpenEdit(false)}>
+              Hủy
+            </Button>
+            <Button type="submit" disabled={savingEdit}>
+              {savingEdit ? "Đang lưu…" : "Lưu"}
             </Button>
           </DialogFooter>
         </form>

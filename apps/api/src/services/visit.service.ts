@@ -27,11 +27,17 @@ export const visitService = {
       clinician_id: data.clinician_id,
       date: data.date ?? new Date().toISOString(),
       notes: data.notes,
+      treating_clinician_id: data.treating_clinician_id ?? undefined,
+      assistant_id: data.assistant_id ?? undefined,
     });
   },
 
   async update(db: D1Database, tenantId: string, id: string, data: VisitUpdateInput): Promise<Visit> {
-    const updated = await createVisitsRepository(db).update(tenantId, id, data);
+    const updated = await createVisitsRepository(db).update(tenantId, id, {
+      ...data,
+      treating_clinician_id: data.treating_clinician_id ?? undefined,
+      assistant_id: data.assistant_id ?? undefined,
+    });
     if (!updated) throw new NotFoundError("Visit not found");
     return updated;
   },

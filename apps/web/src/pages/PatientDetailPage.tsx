@@ -136,6 +136,100 @@ export function PatientDetailPage() {
                 <p className="text-muted-foreground">Email</p>
                 <p className="font-medium">{patient.email ?? "—"}</p>
               </div>
+              {(patient.family_name || patient.family_phone || patient.family_relation) && (
+                <div className="col-span-2 rounded-lg border bg-muted/30 p-3">
+                  <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-2">
+                    Người nhà
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <p className="text-muted-foreground text-xs">Họ tên</p>
+                      <p className="font-medium">{patient.family_name ?? "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Mối quan hệ</p>
+                      <p className="font-medium">{patient.family_relation ?? "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">SĐT</p>
+                      <p className="font-medium">{patient.family_phone ?? "—"}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {patient.marketing_source && (
+                <div>
+                  <p className="text-muted-foreground">Nguồn bệnh nhân</p>
+                  <p className="font-medium">{patient.marketing_source}</p>
+                </div>
+              )}
+              {(patient.referral_type || patient.referral_user_name) && (
+                <div className="col-span-2 rounded-lg border bg-muted/30 p-3">
+                  <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-2">
+                    Nguồn giới thiệu
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <p className="text-muted-foreground text-xs">Loại</p>
+                      <p className="font-medium">
+                        {patient.referral_type === "doctor" ? "Bác sĩ giới thiệu"
+                          : patient.referral_type === "staff" ? "Nhân viên giới thiệu"
+                          : patient.referral_type === "ad" ? "Quảng cáo"
+                          : patient.referral_type === "other" ? "Khác"
+                          : "—"}
+                      </p>
+                    </div>
+                    {patient.referral_user_name && (
+                      <div>
+                        <p className="text-muted-foreground text-xs">Người giới thiệu</p>
+                        <p className="font-medium">{patient.referral_user_name}</p>
+                      </div>
+                    )}
+                    {patient.referral_notes && (
+                      <div className="col-span-2">
+                        <p className="text-muted-foreground text-xs">Ghi chú</p>
+                        <p className="font-medium">{patient.referral_notes}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {(patient.height_cm || patient.weight_kg) && (
+                <div className="col-span-2 rounded-lg border bg-muted/30 p-3">
+                  <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-2">
+                    Chỉ số cơ thể
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <p className="text-muted-foreground text-xs">Chiều cao</p>
+                      <p className="font-medium">
+                        {patient.height_cm ? `${patient.height_cm} cm` : "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Cân nặng</p>
+                      <p className="font-medium">
+                        {patient.weight_kg ? `${patient.weight_kg} kg` : "—"}
+                      </p>
+                    </div>
+                    {patient.height_cm && patient.weight_kg && (
+                      <div>
+                        <p className="text-muted-foreground text-xs">BMI</p>
+                        {(() => {
+                          const bmi = (patient.weight_kg! / ((patient.height_cm! / 100) ** 2));
+                          const b = parseFloat(bmi.toFixed(1));
+                          let label = "";
+                          if (b < 18.5) label = "Gầy";
+                          else if (b < 23) label = "Bình thường";
+                          else if (b < 25) label = "Thừa cân";
+                          else label = "Béo phì";
+                          return <p className="font-medium">{b} — {label}</p>;
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="col-span-2">
                 <p className="text-muted-foreground">Ghi chú</p>
                 <p className="font-medium">{patient.notes ?? "—"}</p>

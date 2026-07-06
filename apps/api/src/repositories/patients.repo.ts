@@ -21,31 +21,38 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
     async list(tenantId, opts = {}) {
       const limit = Math.min(opts.limit ?? 100, 500);
       const offset = opts.offset ?? 0;
-      const conditions = ["tenant_id = ?"];
+      const conditions = ["p.tenant_id = ?"];
       const binds: unknown[] = [tenantId];
 
       if (opts.branchId) {
-        conditions.push("branch_id = ?");
+        conditions.push("p.branch_id = ?");
         binds.push(opts.branchId);
       }
       if (opts.search) {
-        conditions.push("(name LIKE ? OR phone LIKE ?)");
+        conditions.push("(p.name LIKE ? OR p.phone LIKE ?)");
         const like = `%${opts.search}%`;
         binds.push(like, like);
       }
 
-      const sql = `SELECT * FROM patients
-                   WHERE ${conditions.join(" AND ")}
-                   ORDER BY created_at DESC
-                   LIMIT ? OFFSET ?`;
       binds.push(limit, offset);
+      const sql = `SELECT p.*,
+                    ref.name AS referral_user_name
+                   FROM patients p
+                   LEFT JOIN users ref ON ref.id = p.referral_user_id
+                   WHERE ${conditions.join(" AND ")}
+                   ORDER BY p.created_at DESC
+                   LIMIT ? OFFSET ?`;
       const result = await db.prepare(sql).bind(...binds).all();
       return (result.results as D1Row[]).map(mapPatient);
     },
 
     async getById(tenantId, id) {
       const row = (await db
-        .prepare("SELECT * FROM patients WHERE tenant_id = ? AND id = ? LIMIT 1")
+        .prepare(`SELECT p.*,
+                    ref.name AS referral_user_name
+                   FROM patients p
+                   LEFT JOIN users ref ON ref.id = p.referral_user_id
+                   WHERE p.tenant_id = ? AND p.id = ? LIMIT 1`)
         .bind(tenantId, id)
         .first()) as D1Row | null;
       return row ? mapPatient(row) : null;
@@ -56,8 +63,11 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
       await db
         .prepare(
           `INSERT INTO patients
-             (id, tenant_id, branch_id, name, date_of_birth, gender, phone, email, notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             (id, tenant_id, branch_id, name, date_of_birth, gender, phone, email, notes,
+              family_name, family_phone, family_relation, marketing_source,
+              referral_type, referral_user_id, referral_notes,
+              height_cm, weight_kg)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
@@ -69,6 +79,15 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
           data.phone,
           data.email ?? null,
           data.notes ?? null,
+          data.family_name ?? null,
+          data.family_phone ?? null,
+          data.family_relation ?? null,
+          data.marketing_source ?? null,
+          data.referral_type ?? null,
+          data.referral_user_id ?? null,
+          data.referral_notes ?? null,
+          data.height_cm ?? null,
+          data.weight_kg ?? null,
         )
         .run();
       const created = await this.getById(tenantId, id);
@@ -77,7 +96,6 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
     },
 
     async update(tenantId, id, data) {
-      // Build dynamic UPDATE
       const fields: string[] = [];
       const binds: unknown[] = [];
       const allowed: (keyof Patient)[] = [
@@ -88,6 +106,15 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
         "phone",
         "email",
         "notes",
+        "family_name",
+        "family_phone",
+        "family_relation",
+        "marketing_source",
+        "referral_type",
+        "referral_user_id",
+        "referral_notes",
+        "height_cm",
+        "weight_kg",
       ];
       for (const key of allowed) {
         if (data[key] !== undefined) {
@@ -126,5 +153,15 @@ function mapPatient(row: D1Row): Patient {
     email: (row.email as string | null) ?? undefined,
     notes: (row.notes as string | null) ?? undefined,
     created_at: row.created_at as string,
+    family_name: (row.family_name as string | null) ?? undefined,
+    family_phone: (row.family_phone as string | null) ?? undefined,
+    family_relation: (row.family_relation as string | null) ?? undefined,
+    marketing_source: (row.marketing_source as string | null) ?? undefined,
+    referral_type: (row.referral_type as Patient["referral_type"]) ?? undefined,
+    referral_user_id: (row.referral_user_id as string | null) ?? undefined,
+    referral_user_name: (row.referral_user_name as string | null) ?? undefined,
+    referral_notes: (row.referral_notes as string | null) ?? undefined,
+    height_cm: (row.height_cm as number | null) ?? undefined,
+    weight_kg: (row.weight_kg as number | null) ?? undefined,
   };
 }

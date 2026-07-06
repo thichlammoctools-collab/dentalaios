@@ -1,5 +1,6 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import type { User } from "@shared/types";
+import type { UserWithDetails } from "../repositories/users.repo";
 import { createUsersRepository } from "../repositories/users.repo";
 import { hashPassword } from "../lib/password";
 import { ConflictError } from "../lib/errors";
@@ -43,13 +44,14 @@ export const usersService = {
     db: D1Database,
     tenantId: string,
     id: string,
-    data: { name?: string; role_id?: string; branch_id?: string; password?: string },
+    data: { name?: string; role_id?: string; branch_id?: string; password?: string; is_active?: boolean },
   ): Promise<User | null> {
     const repo = createUsersRepository(db);
     const patch: Parameters<typeof repo.update>[2] = {};
     if (data.name !== undefined) patch.name = data.name;
     if (data.role_id !== undefined) patch.role_id = data.role_id;
     if (data.branch_id !== undefined) patch.branch_id = data.branch_id;
+    if (data.is_active !== undefined) patch.is_active = data.is_active;
     if (data.password !== undefined) patch.password_hash = await hashPassword(data.password);
     try {
       return await repo.update(tenantId, id, patch);
@@ -62,6 +64,10 @@ export const usersService = {
   },
 
   remove(db: D1Database, tenantId: string, id: string): Promise<boolean> {
-    return createUsersRepository(db).delete(tenantId, id);
+    return createUsersRepository(db).deactivate(tenantId, id);
+  },
+
+  listByBranch(db: D1Database, tenantId: string, branchId: string): Promise<UserWithDetails[]> {
+    return createUsersRepository(db).listByBranch(tenantId, branchId);
   },
 };
