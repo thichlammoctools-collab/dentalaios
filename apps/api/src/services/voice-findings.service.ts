@@ -146,7 +146,7 @@ function parseVoiceResponse(raw: string): { findings: ParsedFinding[] } | null {
         if (SOFT_TISSUE_AREAS.includes(a as typeof SOFT_TISSUE_AREAS[number])) return a;
         // fuzzy match
         const areaMap: Record<string, string> = {
-          "nướu": "gum", "lợi": "gum", "lợi": "gum",
+          "nướu": "gum", "lợi": "gum",
           "lưỡi": "tongue",
           "niêm mạc": "buccal", "má": "buccal",
           "vòm": "palate",
@@ -227,18 +227,18 @@ function extractFindFromText(text: string): ParsedFinding[] {
   }
 
   // Soft tissue patterns
-  const stPatterns: Array<{ regex: RegExp; area: string; condition: string }> = [
-    [/nước|lợi|nướu|gingiv/i, "gum", "gingivitis"],
-    [/lưỡi|tongue/i, "tongue", "other"],
-    [/niêm mạc|má|buccal/i, "buccal", "other"],
-    [/vòm|palat/i, "palate", "other"],
-    [/môi|lip/i, "lip", "other"],
-    [/xương hàm|jaw/i, "jaw", "other"],
-    [/khớp\s*(?:tmj|thái dương)|tmd/i, "tmj", "tmd_pain"],
-    [/tuyến nước bọt|salivary/i, "salivary_gland", "other"],
-    [/đáy miếng|floor/i, "floor_mouth", "other"],
-    [/họng|pharynx|pharin/i, "pharynx", "other"],
-  ];
+  const stPatterns = [
+    { regex: /nước|lợi|nướu|gingiv/i, area: "gum", condition: "gingivitis" },
+    { regex: /lưỡi|tongue/i, area: "tongue", condition: "other" },
+    { regex: /niêm mạc|má|buccal/i, area: "buccal", condition: "other" },
+    { regex: /vòm|palat/i, area: "palate", condition: "other" },
+    { regex: /môi|lip/i, area: "lip", condition: "other" },
+    { regex: /xương hàm|jaw/i, area: "jaw", condition: "other" },
+    { regex: /khớp\s*(?:tmj|thái dương)|tmd/i, area: "tmj", condition: "tmd_pain" },
+    { regex: /tuyến nước bọt|salivary/i, area: "salivary_gland", condition: "other" },
+    { regex: /đáy miếng|floor/i, area: "floor_mouth", condition: "other" },
+    { regex: /họng|pharynx|pharin/i, area: "pharynx", condition: "other" },
+  ] satisfies Array<{ regex: RegExp; area: string; condition: string }>;
 
   for (const { regex, area, condition } of stPatterns) {
     if (regex.test(text)) {
