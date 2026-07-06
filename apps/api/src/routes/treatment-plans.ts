@@ -108,4 +108,17 @@ router.post(
   },
 );
 
+// DELETE /api/treatment-plans/:id
+router.delete(
+  "/:id",
+  requirePermission(PERMISSIONS.WRITE_PLANS),
+  auditLog("delete", "treatment_plan"),
+  async (c) => {
+    const jwt = getJwt(c);
+    const ok = await planService.deletePlan(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    if (!ok) return c.json({ error: "Plan not found", code: "not_found" }, 404);
+    return c.json({ ok: true }, 200);
+  },
+);
+
 export default router;

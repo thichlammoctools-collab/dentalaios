@@ -19,7 +19,7 @@ export function createTreatmentItemsRepository(db: D1Database): TreatmentItemsRe
         .prepare(
           `SELECT * FROM treatment_plan_items
            WHERE tenant_id = ? AND treatment_plan_id = ?
-           ORDER BY scope ASC, tooth_number ASC`,
+           ORDER BY tooth_number ASC`,
         )
         .bind(tenantId, planId)
         .all();

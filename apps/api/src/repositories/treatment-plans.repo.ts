@@ -11,6 +11,7 @@ export interface TreatmentPlansRepository {
   ): Promise<TreatmentPlan>;
   approve(tenantId: string, id: string): Promise<TreatmentPlan | null>;
   recomputeTotal(tenantId: string, id: string): Promise<number>;
+  delete(tenantId: string, id: string): Promise<boolean>;
 }
 
 export function createTreatmentPlansRepository(db: D1Database): TreatmentPlansRepository {
@@ -88,6 +89,14 @@ export function createTreatmentPlansRepository(db: D1Database): TreatmentPlansRe
         .bind(total, tenantId, id)
         .run();
       return total;
+    },
+
+    async delete(tenantId, id) {
+      const res = await db
+        .prepare("DELETE FROM treatment_plans WHERE tenant_id = ? AND id = ?")
+        .bind(tenantId, id)
+        .run();
+      return res.meta.changes > 0;
     },
   };
 }

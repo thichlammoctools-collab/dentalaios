@@ -103,6 +103,18 @@ export function TreatmentPlanDetailPage() {
     }
   }
 
+  async function onDeletePlan() {
+    if (!plan) return;
+    if (!confirm("Xóa kế hoạch điều trị này? Hành động này không thể hoàn tác.")) return;
+    try {
+      await apiDelete(`/api/treatment-plans/${plan.id}`);
+      toast.success("Đã xóa kế hoạch");
+      navigate(`/patients/${plan.patient_id}`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi xóa");
+    }
+  }
+
   async function onLarkHandover() {
     if (!plan) return;
     try {
@@ -142,6 +154,7 @@ export function TreatmentPlanDetailPage() {
   }
 
   const canEdit = plan.status === "draft";
+  const canDelete = plan.status !== "completed";
   const canApprove = plan.status === "draft" && items.length > 0;
   const canHandOver = plan.status === "approved";
 
@@ -246,6 +259,9 @@ export function TreatmentPlanDetailPage() {
         <CardContent className="flex flex-wrap gap-2">
           {canEdit && <Button onClick={() => setOpenForm(true)}>+ Thêm hạng mục</Button>}
           {canApprove && <Button onClick={onApprove}>Duyệt kế hoạch</Button>}
+          {canDelete && (
+            <Button variant="destructive" onClick={onDeletePlan}>Xóa kế hoạch</Button>
+          )}
           <Button variant="outline" onClick={onDownloadPdf} disabled={pdfLoading || items.length === 0}>
             {pdfLoading ? (
               <>

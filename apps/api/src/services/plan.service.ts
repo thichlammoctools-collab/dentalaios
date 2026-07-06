@@ -78,4 +78,12 @@ export const planService = {
     if (!approved) throw new NotFoundError("Treatment plan not found");
     return approved;
   },
+
+  async deletePlan(db: D1Database, tenantId: string, planId: string): Promise<boolean> {
+    const plan = await this.get(db, tenantId, planId);
+    if (plan.status === "completed") {
+      throw new ValidationError("Không thể xóa kế hoạch đã hoàn thành");
+    }
+    return createTreatmentPlansRepository(db).delete(tenantId, planId);
+  },
 };

@@ -1,81 +1,45 @@
 /**
- * Treatment plan proposal PDF generator — professional A4 layout.
+ * Treatment plan proposal PDF generator — clean A4 layout.
  *
- * Uses pdf-lib with Noto Sans Vietnamese (fetched from CDN) for
- * full Vietnamese diacritic support. Falls back to Helvetica if
- * font fetch fails.
+ * Uses pdf-lib with built-in Helvetica (no external font fetching needed).
+ * Vietnamese diacritics will render as best-effort ASCII fallback.
  */
 
-import { PDFDocument, rgb, StandardFonts, type PDFFont } from "pdf-lib";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
-function formatCurrency(amount: number, currency = "VND"): string {
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(amount);
+function formatVnd(amount: number): string {
+  return new Intl.NumberFormat("vi-VN").format(amount) + " VND";
 }
 
-interface BuildPdfInput {
-  tenant: { name: string; phone?: string; email?: string };
-  branch: { name: string; address: string; phone?: string };
-  patient: {
-    name: string;
-    date_of_birth: string;
-    gender: string;
-    phone: string;
-    address?: string;
-  };
-  plan: {
-    id: string;
-    status: string;
-    total_cost: number;
-    currency: string;
-    notes?: string;
-    approved_at?: string | null;
-    created_at: string;
-  };
-  items: {
-    tooth_number?: number;
-    procedure: string;
-    description: string;
-    unit_cost: number;
-    status: string;
-  }[];
-  approverName: string;
-}
-
-// Color palette
-const COLORS = {
-  primary: rgb(0.11, 0.36, 0.65),     // #1C5CA6 — professional blue
-  primaryLight: rgb(0.93, 0.96, 1),    // light blue bg
-  accent: rgb(0.16, 0.67, 0.57),       // #29AA91 — teal accent
-  accentLight: rgb(0.94, 0.98, 0.97),  // teal bg
-  warning: rgb(0.84, 0.55, 0.1),        // #D68C1A — amber
-  warningLight: rgb(1, 0.97, 0.91),
-  success: rgb(0.13, 0.59, 0.33),       // #219754
-  successLight: rgb(0.93, 0.98, 0.94),
-  destructive: rgb(0.74, 0.12, 0.12),   // #BD1E1E
-  destructiveLight: rgb(1, 0.94, 0.94),
-  proposed: rgb(0.35, 0.38, 0.42),
-  proposedLight: rgb(0.96, 0.96, 0.97),
-  text: rgb(0.13, 0.14, 0.16),         // dark text
-  textLight: rgb(0.45, 0.49, 0.55),    // muted text
-  border: rgb(0.86, 0.87, 0.89),        // light gray border
-  headerBg: rgb(0.97, 0.98, 0.99),
+const C = {
+  blue: rgb(0.11, 0.36, 0.65),
+  blueLight: rgb(0.93, 0.96, 1.0),
+  teal: rgb(0.16, 0.67, 0.57),
+  tealLight: rgb(0.94, 0.98, 0.97),
+  amber: rgb(0.84, 0.55, 0.1),
+  amberLight: rgb(1.0, 0.97, 0.91),
+  green: rgb(0.13, 0.59, 0.33),
+  greenLight: rgb(0.93, 0.98, 0.94),
+  red: rgb(0.74, 0.12, 0.12),
+  redLight: rgb(1.0, 0.94, 0.94),
+  gray: rgb(0.45, 0.49, 0.55),
+  grayLight: rgb(0.96, 0.96, 0.97),
+  dark: rgb(0.13, 0.14, 0.16),
+  border: rgb(0.86, 0.87, 0.89),
   white: rgb(1, 1, 1),
+  headerBg: rgb(0.97, 0.98, 0.99),
 };
 
-const STATUS_COLORS: Record<string, { fg: ReturnType<typeof rgb>; bg: ReturnType<typeof rgb>; label: string }> = {
-  proposed: { fg: COLORS.proposed, bg: COLORS.proposedLight, label: "De xuat" },
-  approved: { fg: COLORS.success, bg: COLORS.successLight, label: "Da duyet" },
-  completed: { fg: COLORS.accent, bg: COLORS.accentLight, label: "Hoan thanh" },
-  cancelled: { fg: COLORS.destructive, bg: COLORS.destructiveLight, label: "Da huy" },
-  in_progress: { fg: COLORS.warning, bg: COLORS.warningLight, label: "Dang thuc hien" },
+const STATUS_STYLE: Record<string, { color: ReturnType<typeof rgb>; bg: ReturnType<typeof rgb>; label: string }> = {
+  proposed: { color: C.gray, bg: C.grayLight, label: "De xuat" },
+  approved: { color: C.green, bg: C.greenLight, label: "Da duyet" },
+  completed: { color: C.teal, bg: C.tealLight, label: "Hoan thanh" },
+  cancelled: { color: C.red, bg: C.redLight, label: "Da huy" },
+  in_progress: { color: C.amber, bg: C.amberLight, label: "Dang thuc hien" },
 };
 
-const PROCEDURE_LABELS: Record<string, string> = {
-  examination: "Kham va chan doan",
+const PROC_LABELS: Record<string, string> = {
+  examination: "Kham chan doan",
   filling: "Tram rang",
   root_canal: "Dieu tri tuy",
   extraction: "Nho rang",
@@ -88,275 +52,206 @@ const PROCEDURE_LABELS: Record<string, string> = {
   other: "Dieu tri khac",
 };
 
-async function loadVietnameseFont(pdf: PDFDocument): Promise<{ font: PDFFont; bold: PDFFont }> {
-  try {
-    // Try to fetch Noto Sans Vietnamese from jsDelivr CDN
-    const fontUrl = "https://cdn.jsdelivr.net/npm/@fontsource-variable/noto-sans-vietnamese@latest/files/noto-sans-vietnamese-wght-normal.woff2";
-    const res = await fetch(fontUrl);
-    if (res.ok) {
-      const fontBytes = await res.arrayBuffer();
-      const font = await pdf.embedFont(fontBytes);
-      return { font, bold: font };
-    }
-  } catch {
-    // fall through to fallback
-  }
-  // Fallback: Helvetica (won't render Vietnamese diacritics, but layout works)
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  return { font, bold };
-}
-
-export async function buildProposalPdf(input: BuildPdfInput): Promise<Uint8Array> {
+export async function buildProposalPdf(input: {
+  tenant: { name: string; email?: string };
+  branch: { name: string; address: string };
+  patient: { name: string; date_of_birth: string; gender: string; phone: string };
+  plan: {
+    id: string;
+    status: string;
+    total_cost: number;
+    currency: string;
+    notes?: string;
+    approved_at?: string | null;
+    created_at: string;
+  };
+  items: { tooth_number: number; procedure: string; description: string; unit_cost: number; status: string }[];
+  approverName: string;
+}): Promise<Uint8Array> {
   const { tenant, branch, patient, plan, items, approverName } = input;
   const pdf = await PDFDocument.create();
 
-  const { font, bold } = await loadVietnameseFont(pdf);
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
 
-  let page = pdf.addPage([595.28, 841.89]); // A4
-  const pageW = 595.28;
-  const left = 40;
-  const right = pageW - 40;
-  const contentW = right - left;
+  let page = pdf.addPage([595.28, 841.89]);
+  const PAGE_W = 595.28;
+  const L = 45;
+  const R = PAGE_W - 45;
+  const CW = R - L;
 
-  let y = 810;
-  const lineH = 16;
-  const smallLineH = 13;
+  let y = 800;
+  const lh = 14;
 
-  // ── Page 1: Cover layout ──────────────────────────────────────
-
-  // Top accent bar
-  page.drawRectangle({
-    x: 0, y: y - 4, width: pageW, height: 6,
-    color: COLORS.primary,
-  });
-
-  // Clinic name + address
-  y -= lineH * 2.5;
-  drawText(page, bold, tenant.name.toUpperCase(), left, y, 18, { color: COLORS.primary });
-  y -= lineH;
-  drawText(page, font, `${branch.name} | ${branch.address}`, left, y, 10, { color: COLORS.textLight });
-  if (tenant.email) {
-    drawText(page, font, `Email: ${tenant.email}`, left, y - smallLineH, 9, { color: COLORS.textLight });
+  function txt(f: typeof font, s: string, x: number, sy: number, size: number, color = C.dark, align: "left" | "right" = "left") {
+    let dx = x;
+    if (align === "right") {
+      dx = x - f.widthOfTextAtSize(s, size);
+    }
+    page.drawText(s, { x: dx, y: sy, size, font: f, color });
   }
 
-  // Horizontal divider
-  y -= lineH * 2.2;
-  page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 1.5, color: COLORS.primary });
-  y -= lineH * 0.8;
+  function line(x1: number, y1: number, x2: number, y2: number, thick = 0.5, color = C.border) {
+    page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: thick, color });
+  }
 
-  // Document title
-  drawText(page, bold, "PHIEU DE XUAT DIEU TRI", left, y, 20, { color: COLORS.text });
-  y -= lineH * 0.6;
-  drawText(page, font, "Treatment Plan Proposal", left, y, 9, { color: COLORS.textLight });
-  y -= lineH * 1.5;
+  function rect(x: number, y: number, w: number, h: number, fill = C.white, stroke?: ReturnType<typeof rgb>, thick = 0.5) {
+    page.drawRectangle({ x, y: y - h, height: h, width: w, color: fill, borderColor: stroke, borderWidth: thick });
+  }
 
-  // Status badge
-  const status = STATUS_COLORS[plan.status] || STATUS_COLORS.proposed;
-  const badgeLabel = `${status.label} | ${plan.id}`;
-  const badgeW = bold.widthOfTextAtSize(badgeLabel, 9) + 16;
-  page.drawRectangle({ x: left, y: y - 10, width: badgeW, height: 20, color: status.bg, borderColor: status.fg, borderWidth: 1 });
-  drawText(page, bold, badgeLabel, left + 8, y - 1, 9, { color: status.fg });
+  function checkPage(need: number) {
+    if (y - need < 70) {
+      page = pdf.addPage([595.28, 841.89]);
+      y = 800;
+      return true;
+    }
+    return false;
+  }
 
-  // Plan date on right
-  const dateLabel = `Ngay: ${new Date(plan.created_at).toLocaleDateString("vi-VN")}`;
-  drawText(page, font, dateLabel, right, y - 1, 10, { color: COLORS.textLight, align: "right" });
-  y -= lineH * 2;
+  // ── Top bar ──────────────────────────────────────────────────
+  page.drawRectangle({ x: 0, y: 815, width: PAGE_W, height: 26, color: C.blue });
+  txt(bold, tenant.name.toUpperCase(), L, 822, 13, C.white);
 
-  // ── Patient info card ─────────────────────────────────────────
-  const cardR = right;
-  const cardLeft = left;
-  page.drawRectangle({
-    x: cardLeft, y: y - 108, width: contentW, height: 100,
-    color: COLORS.headerBg, borderColor: COLORS.border, borderWidth: 1,
-  });
+  // ── Clinic info ───────────────────────────────────────────────
+  y = 790;
+  txt(bold, "PHIEU DE XUAT DIEU TRI / TREATMENT PLAN", L, y, 15, C.blue);
+  y -= lh * 0.8;
+  txt(font, `${branch.name}  |  ${branch.address}`, L, y, 9, C.gray);
+  y -= lh * 0.8;
+  if (tenant.email) txt(font, `Email: ${tenant.email}`, L, y, 9, C.gray);
+  y -= lh;
 
-  page.drawRectangle({
-    x: cardLeft, y: y - 24, width: contentW, height: 24,
-    color: COLORS.primary,
-  });
-  drawText(page, bold, "THONG TIN BENH NHAN", cardLeft + 10, y - 18, 10, { color: COLORS.white });
+  line(L, y, R, y, 1.5, C.blue);
+  y -= lh * 1.2;
 
-  const infoY = y - 38;
-  const col1 = cardLeft + 12;
-  const col2 = cardLeft + contentW / 2 + 8;
-  const rowH = smallLineH + 2;
+  // ── Plan meta ────────────────────────────────────────────────
+  const statusStyle = STATUS_STYLE[plan.status] || STATUS_STYLE.proposed;
+  const statusLabel = `${statusStyle.label}  |  ${plan.id}`;
+  const badgeW = bold.widthOfTextAtSize(statusLabel, 9) + 16;
+  page.drawRectangle({ x: L, y: y - 16, width: badgeW, height: 20, color: statusStyle.bg, borderColor: statusStyle.color, borderWidth: 1 });
+  txt(bold, statusLabel, L + 8, y - 5, 9, statusStyle.color);
+  const dateLabel = `Ngay tao: ${new Date(plan.created_at).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })}`;
+  txt(font, dateLabel, R, y - 5, 9, C.gray, "right");
+  y -= lh * 2;
 
-  drawText(page, bold, "Ho va ten:", col1, infoY, 9, { color: COLORS.textLight });
-  drawText(page, bold, patient.name, col1 + 80, infoY, 10, { color: COLORS.text });
+  // ── Patient info card ────────────────────────────────────────
+  page.drawRectangle({ x: L, y: y - 80, width: CW, height: 72, color: C.headerBg, borderColor: C.border, borderWidth: 1 });
+  page.drawRectangle({ x: L, y: y - 22, width: CW, height: 22, color: C.blue });
+  txt(bold, "THONG TIN BENH NHAN", L + 10, y - 15, 10, C.white);
 
-  drawText(page, bold, "Ngay sinh:", col2, infoY, 9, { color: COLORS.textLight });
-  drawText(page, font, patient.date_of_birth, col2 + 70, infoY, 10, { color: COLORS.text });
+  const py = y - 36;
+  const mid = L + CW / 2;
+  const row = lh + 3;
 
-  drawText(page, bold, "Gioi tinh:", col1, infoY - rowH, 9, { color: COLORS.textLight });
-  drawText(page, font, patient.gender === "M" ? "Nam" : patient.gender === "F" ? "Nu" : "Khac", col1 + 70, infoY - rowH, 10, { color: COLORS.text });
+  txt(bold, "Ho va ten:", L + 10, py, 9, C.gray);
+  txt(bold, patient.name, L + 75, py, 10, C.dark);
 
-  drawText(page, bold, "Dien thoai:", col2, infoY - rowH, 9, { color: COLORS.textLight });
-  drawText(page, font, patient.phone, col2 + 70, infoY - rowH, 10, { color: COLORS.text });
+  txt(bold, "Ngay sinh:", mid, py, 9, C.gray);
+  txt(font, patient.date_of_birth, mid + 70, py, 10, C.dark);
 
-  y = y - 108 - lineH * 2;
+  txt(bold, "Gioi tinh:", L + 10, py - row, 9, C.gray);
+  txt(font, patient.gender === "M" ? "Nam" : patient.gender === "F" ? "Nu" : "Khac", L + 75, py - row, 10, C.dark);
 
-  // ── Treatment items table ─────────────────────────────────────
-  drawText(page, bold, "CHI TIET DIEU TRI", left, y, 11, { color: COLORS.text });
-  y -= lineH * 1.5;
+  txt(bold, "Dien thoai:", mid, py - row, 9, C.gray);
+  txt(font, patient.phone, mid + 70, py - row, 10, C.dark);
 
-  // Table header
-  const colTooth = left;
-  const colProc = left + 44;
-  const colDesc = left + 140;
-  const colUnit = right - 100;
-  const colTotal = right;
+  y -= 80 + lh;
 
-  page.drawRectangle({ x: left, y: y - 22, width: contentW, height: 22, color: COLORS.primary });
-  drawText(page, bold, "Rang", colTooth + 4, y - 15, 9, { color: COLORS.white });
-  drawText(page, bold, "Thu thuat", colProc, y - 15, 9, { color: COLORS.white });
-  drawText(page, bold, "Mo ta", colDesc, y - 15, 9, { color: COLORS.white });
-  drawText(page, bold, "Don gia", colUnit, y - 15, 9, { color: COLORS.white, align: "right", width: 90 });
-  drawText(page, bold, "Thanh tien", colTotal, y - 15, 9, { color: COLORS.white, align: "right", width: 90 });
+  // ── Treatment table ──────────────────────────────────────────
+  txt(bold, "CHI TIET DIEU TRI", L, y, 11, C.dark);
+  y -= lh * 1.4;
 
-  y -= 22;
+  const COL_TOOTH = L;
+  const COL_PROC = L + 45;
+  const COL_DESC = L + 140;
+  const COL_UNIT = R - 100;
+  const COL_TOTAL = R;
 
-  const rowH_t = 28;
-  let pageNum = 1;
+  const TH = 22;
+  page.drawRectangle({ x: L, y: y - TH, width: CW, height: TH, color: C.blue });
+  txt(bold, "#", COL_TOOTH + 4, y - 15, 9, C.white);
+  txt(bold, "Thu thuat", COL_PROC, y - 15, 9, C.white);
+  txt(bold, "Mo ta", COL_DESC, y - 15, 9, C.white);
+  txt(bold, "Don gia", COL_UNIT, y - 15, 8, C.white, "right");
+  txt(bold, "Thanh tien", COL_TOTAL, y - 15, 8, C.white, "right");
+
+  y -= TH;
+  const ROW_H = 28;
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    const isEven = i % 2 === 0;
+    checkPage(ROW_H);
 
-    if (y - rowH_t < 80) {
-      // Add new page
-      page = pdf.addPage([595.28, 841.89]);
-      y = 810;
-      pageNum++;
-      drawFooter(page, pdf, bold, font, pageNum, tenant.name, plan.id, pageW, right);
-      y -= lineH * 2;
-    }
+    const even = i % 2 === 0;
+    page.drawRectangle({ x: L, y: y - ROW_H, width: CW, height: ROW_H, color: even ? C.white : C.headerBg });
+    line(L, y - ROW_H, R, y - ROW_H, 0.5, C.border);
 
-    const rowY = y - rowH_t;
-    page.drawRectangle({ x: left, y: rowY, width: contentW, height: rowH_t, color: isEven ? COLORS.white : COLORS.headerBg });
-    page.drawLine({ start: { x: left, y: rowY }, end: { x: right, y: rowY }, thickness: 0.5, color: COLORS.border });
-    page.drawLine({ start: { x: right, y: rowY }, end: { x: right, y: rowY + rowH_t }, thickness: 0.5, color: COLORS.border });
-
-    const cellY = rowY + rowH_t / 2 + 3;
-
-    // Tooth number badge
-    const toothStr = item.tooth_number != null ? `#${item.tooth_number}` : "Toàn hàm";
+    const cy = y - ROW_H / 2 + 4;
+    const toothStr = `#${item.tooth_number}`;
     const toothW = bold.widthOfTextAtSize(toothStr, 9) + 8;
-    page.drawRectangle({ x: colTooth + 2, y: cellY - 8, width: toothW, height: 16, color: COLORS.primaryLight });
-    drawText(page, bold, toothStr, colTooth + 5, cellY - 2, 9, { color: COLORS.primary });
+    page.drawRectangle({ x: COL_TOOTH + 2, y: cy - 8, width: toothW, height: 16, color: C.blueLight });
+    txt(bold, toothStr, COL_TOOTH + 5, cy - 2, 9, C.blue);
 
-    // Procedure
-    const procLabel = PROCEDURE_LABELS[item.procedure] || item.procedure;
-    drawText(page, font, procLabel, colProc, cellY - 2, 9, { color: COLORS.text });
+    const procLabel = PROC_LABELS[item.procedure] || item.procedure;
+    txt(font, procLabel, COL_PROC, cy - 2, 9, C.dark);
+    txt(font, item.description, COL_DESC, cy + 3, 8, C.gray);
 
-    // Description
-    drawText(page, font, item.description, colDesc, cellY + 2, 8, { color: COLORS.textLight });
+    txt(font, formatVnd(item.unit_cost), COL_UNIT, cy - 2, 9, C.dark, "right");
+    txt(bold, formatVnd(item.unit_cost), COL_TOTAL, cy - 2, 9, C.dark, "right");
 
-    // Unit cost
-    drawText(page, font, formatCurrency(item.unit_cost, plan.currency), colUnit, cellY - 2, 9, { color: COLORS.text, align: "right", width: 90 });
-
-    // Total (same as unit cost for single item)
-    drawText(page, bold, formatCurrency(item.unit_cost, plan.currency), colTotal, cellY - 2, 9, { color: COLORS.text, align: "right", width: 90 });
-
-    y -= rowH_t;
+    y -= ROW_H;
   }
 
-  // Bottom table border
-  page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 1, color: COLORS.border });
+  line(L, y, R, y, 1, C.border);
+  y -= lh * 0.6;
 
-  y -= lineH * 0.5;
+  // ── Total ───────────────────────────────────────────────────
+  checkPage(60);
+  page.drawRectangle({ x: L, y: y - 44, width: CW, height: 44, color: C.blueLight });
+  txt(bold, "TONG CONG (VAT CHUA) / SUBTOTAL", L + 12, y - 16, 10, C.blue);
+  txt(bold, formatVnd(plan.total_cost), R, y - 16, 14, C.blue, "right");
+  const count = items.length;
+  const uniqProc = new Set(items.map((i) => i.procedure)).size;
+  txt(font, `${count} hang muc  |  ${uniqProc} thu thuat`, L + 12, y - 32, 9, C.gray);
+  y -= 44 + lh;
 
-  // ── Total section ──────────────────────────────────────────────
-  const totalY = y;
-
-  page.drawRectangle({ x: left, y: totalY - 48, width: contentW, height: 48, color: COLORS.primaryLight });
-
-  const totalLabel = "TONG CONG (VAT CHUA) / SUBTOTAL";
-  drawText(page, bold, totalLabel, left + 12, totalY - 18, 10, { color: COLORS.primary });
-  drawText(page, bold, formatCurrency(plan.total_cost, plan.currency), right, totalY - 18, 14, { color: COLORS.primary, align: "right", width: 120 });
-
-  const itemCount = items.length;
-  const treatmentCount = new Set(items.map((i) => i.procedure)).size;
-  drawText(page, font, `${itemCount} hang muc | ${treatmentCount} thu thuat`, left + 12, totalY - 36, 9, { color: COLORS.textLight });
-
-  y -= 48 + lineH;
-
-  // ── Notes ──────────────────────────────────────────────────────
+  // ── Notes ────────────────────────────────────────────────────
   if (plan.notes) {
-    page.drawRectangle({ x: left, y: y - 52, width: contentW, height: 52, color: COLORS.accentLight, borderColor: COLORS.accent, borderWidth: 1 });
-    drawText(page, bold, "Ghi chu / Notes", left + 10, y - 14, 9, { color: COLORS.accent });
-    drawText(page, font, plan.notes, left + 10, y - 28, 9, { color: COLORS.text });
-    y -= 52 + lineH;
+    checkPage(56);
+    page.drawRectangle({ x: L, y: y - 48, width: CW, height: 48, color: C.tealLight, borderColor: C.teal, borderWidth: 1 });
+    txt(bold, "Ghi chu / Notes", L + 10, y - 14, 9, C.teal);
+    txt(font, plan.notes, L + 10, y - 28, 9, C.dark);
+    y -= 48 + lh;
   }
 
-  y -= lineH;
+  // ── Signature ────────────────────────────────────────────────
+  checkPage(100);
+  y -= 10;
+  const sigW = (CW - 20) / 2;
 
-  // ── Signature section ──────────────────────────────────────────
-  const sigY = y - 10;
-  const sigW = (contentW - 20) / 2;
-
-  // Left: Approver
-  page.drawRectangle({ x: left, y: sigY - 80, width: sigW, height: 80, color: COLORS.white, borderColor: COLORS.border, borderWidth: 1 });
-  page.drawLine({ start: { x: left, y: sigY - 30 }, end: { x: left + sigW, y: sigY - 30 }, thickness: 0.5, color: COLORS.border });
-  drawText(page, bold, "XAC NHAN CUA PHONG KHAM", left + 10, sigY - 20, 8, { color: COLORS.textLight });
-  drawText(page, font, `Nguoi duyet: ${approverName}`, left + 10, sigY - 42, 9, { color: COLORS.text });
+  page.drawRectangle({ x: L, y: y - 80, width: sigW, height: 80, color: C.white, borderColor: C.border, borderWidth: 1 });
+  line(L, y - 30, L + sigW, y - 30, 0.5, C.border);
+  txt(bold, "XAC NHAN CUA PHONG KHAM", L + 10, y - 20, 8, C.gray);
+  txt(font, `Nguoi duyet: ${approverName}`, L + 10, y - 42, 9, C.dark);
   if (plan.approved_at) {
-    drawText(page, font, `Ngay: ${new Date(plan.approved_at).toLocaleDateString("vi-VN")}`, left + 10, sigY - 56, 9, { color: COLORS.textLight });
+    txt(font, `Ngay: ${new Date(plan.approved_at).toLocaleDateString("vi-VN")}`, L + 10, y - 56, 9, C.gray);
   }
-  drawText(page, font, "(Ky va dong dau)", left + 10, sigY - 72, 8, { color: COLORS.textLight });
+  txt(font, "(Ky va dong dau)", L + 10, y - 72, 8, C.gray);
 
-  // Right: Terms
-  page.drawRectangle({ x: left + sigW + 20, y: sigY - 80, width: sigW, height: 80, color: COLORS.white, borderColor: COLORS.border, borderWidth: 1 });
-  page.drawLine({ start: { x: left + sigW + 20, y: sigY - 30 }, end: { x: left + sigW + 20 + sigW, y: sigY - 30 }, thickness: 0.5, color: COLORS.border });
-  drawText(page, bold, "XAC NHAN CUA KHACH HANG", left + sigW + 30, sigY - 20, 8, { color: COLORS.textLight });
-  drawText(page, font, "Ten: __________________________", left + sigW + 30, sigY - 42, 9, { color: COLORS.text });
-  drawText(page, font, "Ngay: _________________________", left + sigW + 30, sigY - 56, 9, { color: COLORS.text });
-  drawText(page, font, "(Ky xac nhan dong y)", left + sigW + 30, sigY - 72, 8, { color: COLORS.textLight });
+  page.drawRectangle({ x: L + sigW + 20, y: y - 80, width: sigW, height: 80, color: C.white, borderColor: C.border, borderWidth: 1 });
+  line(L + sigW + 20, y - 30, L + sigW + 20 + sigW, y - 30, 0.5, C.border);
+  txt(bold, "XAC NHAN CUA KHACH HANG", L + sigW + 30, y - 20, 8, C.gray);
+  txt(font, "Ten: __________________________", L + sigW + 30, y - 42, 9, C.dark);
+  txt(font, "Ngay: _________________________", L + sigW + 30, y - 56, 9, C.dark);
+  txt(font, "(Ky xac nhan dong y)", L + sigW + 30, y - 72, 8, C.gray);
 
-  // ── Footer ─────────────────────────────────────────────────────
-  drawFooter(page, pdf, bold, font, pageNum, tenant.name, plan.id, pageW, right);
+  // ── Footer ───────────────────────────────────────────────────
+  const footerY = 30;
+  line(L, footerY + 12, R, footerY + 12, 0.5, C.border);
+  txt(font, `${tenant.name}  |  Ma: ${plan.id}`, L, footerY, 8, C.gray);
+  txt(font, "Trang " + pdf.getPageCount(), R, footerY, 8, C.gray, "right");
+  txt(font, "Tai lieu chi co tinh thong tin — Khong thanh lap quan he phap ly.", L, footerY - 10, 7, C.gray);
+  txt(font, "This document is for informational purposes only.", L, footerY - 18, 7, C.gray);
 
   return pdf.save();
-}
-
-function drawFooter(
-  page: ReturnType<PDFDocument["addPage"]>,
-  pdf: PDFDocument,
-  bold: PDFFont,
-  font: PDFFont,
-  pageNum: number,
-  clinicName: string,
-  planId: string,
-  pageW: number,
-  right: number,
-) {
-  const footerY = 30;
-  page.drawLine({ start: { x: 40, y: footerY + 10 }, end: { x: pageW - 40, y: footerY + 10 }, thickness: 0.5, color: COLORS.border });
-  drawText(page, font, `${clinicName} | Ma: ${planId}`, 40, footerY, 8, { color: COLORS.textLight });
-  drawText(page, font, `Trang ${pageNum}`, right, footerY, 8, { color: COLORS.textLight, align: "right" });
-  drawText(page, font, "Tai lieu chi co tinh thong tin — Khong thanh lap quan he phap ly.", 40, footerY - 10, 7, { color: COLORS.textLight });
-  drawText(page, font, "This document is for informational purposes only — does not constitute a legal contract.", 40, footerY - 18, 7, { color: COLORS.textLight });
-}
-
-function drawText(
-  page: ReturnType<PDFDocument["addPage"]>,
-  font: PDFFont,
-  text: string,
-  x: number,
-  y: number,
-  size: number,
-  opts?: { color?: ReturnType<typeof rgb>; align?: "left" | "right"; width?: number },
-) {
-  let drawX = x;
-  if (opts?.align === "right" && opts.width !== undefined) {
-    const w = font.widthOfTextAtSize(text, size);
-    drawX = x + opts.width - w;
-  }
-  page.drawText(text, {
-    x: drawX,
-    y,
-    size,
-    font,
-    color: opts?.color ?? COLORS.text,
-  });
 }
