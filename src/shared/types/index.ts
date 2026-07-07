@@ -373,3 +373,42 @@ export interface UserWithDetails extends User {
   role_name: string;
   branch_name: string;
 }
+
+// ───────────────────────── Patient Images ─────────────────────────
+
+export type PatientImageType =
+  | "cbct"
+  | "scan_3d"
+  | "dicom"
+  | "photo_before"
+  | "photo_after"
+  | "xray"
+  | "intraoral"
+  | "other";
+
+export const PATIENT_IMAGE_TYPE_LABELS: Record<PatientImageType, string> = {
+  cbct: "CBCT",
+  scan_3d: "Scan 3D",
+  dicom: "DICOM",
+  photo_before: "Hình trước",
+  photo_after: "Hình sau",
+  xray: "X-quang",
+  intraoral: "Intraoral",
+  other: "Khác",
+};
+
+export interface PatientImage {
+  id: string;
+  tenant_id: string;
+  patient_id: string;
+  visit_id?: string;
+  uploaded_by: string;
+  image_type: PatientImageType;
+  description?: string;
+  file_id: string;
+  thumb_key?: string;
+  original_name?: string;
+  original_size?: number;
+  uploader_name?: string;
+  created_at: string;
+}

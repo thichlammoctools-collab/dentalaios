@@ -258,6 +258,28 @@ export const userUpdateSchema = z.object({
   is_active: z.boolean().optional(),
 });
 
+// ──────────────── Patient Images ────────────────
+
+export const patientImageCreateSchema = z.object({
+  patient_id: z.string().min(1),
+  visit_id: z.string().min(1).optional(),
+  image_type: z.enum(["cbct","scan_3d","dicom","photo_before","photo_after","xray","intraoral","other"]),
+  description: optionalText(500),
+  file_id: z.string().min(1),
+  thumb_key: z.string().optional(),
+  original_name: z.string().min(1).max(200).optional(),
+  original_size: z.number().int().positive().optional(),
+});
+export type PatientImageCreateInput = z.infer<typeof patientImageCreateSchema>;
+
+export const aiAnalyzeImageSchema = z.object({
+  file_id: z.string().min(1),
+  visit_id: z.string().min(1).optional(),
+  image_type: z.enum(["cbct","scan_3d","dicom","photo_before","photo_after","xray","intraoral","other"]),
+  prompt: z.string().min(1).max(1000).optional(),
+});
+export type AiAnalyzeImageInput = z.infer<typeof aiAnalyzeImageSchema>;
+
 export type UserCreateInput = z.infer<typeof userCreateSchema>;
 export type UserUpdateInput = z.infer<typeof userUpdateSchema>;
 
