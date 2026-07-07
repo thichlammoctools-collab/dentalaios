@@ -35,6 +35,7 @@ export function PatientsPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [openForm, setOpenForm] = useState(false);
+  const [editPatient, setEditPatient] = useState<Patient | undefined>(undefined);
 
   const load = useCallback(async (q: string) => {
     setLoading(true);
@@ -85,7 +86,7 @@ export function PatientsPage() {
             {loading ? "Đang tải…" : `${total} bệnh nhân`}
           </p>
         </div>
-        <Button onClick={() => setOpenForm(true)} className="gap-1.5">
+        <Button onClick={() => { setEditPatient(undefined); setOpenForm(true); }} className="gap-1.5">
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
@@ -130,7 +131,7 @@ export function PatientsPage() {
                 </p>
               </div>
               {!search && (
-                <Button size="sm" variant="outline" onClick={() => setOpenForm(true)}>
+                <Button size="sm" variant="outline" onClick={() => { setEditPatient(undefined); setOpenForm(true); }}>
                   Tạo bệnh nhân đầu tiên
                 </Button>
               )}
@@ -194,7 +195,10 @@ export function PatientsPage() {
                               size="sm"
                               variant="ghost"
                               className="h-7 px-2 text-xs"
-                              onClick={() => {/* edit */}}
+                              onClick={() => {
+                                setEditPatient(p);
+                                setOpenForm(true);
+                              }}
                             >
                               <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
@@ -222,7 +226,7 @@ export function PatientsPage() {
         </CardContent>
       </Card>
 
-      <PatientForm open={openForm} onOpenChange={setOpenForm} onSaved={() => load(search)} />
+      <PatientForm open={openForm} onOpenChange={(v) => { if (!v) setEditPatient(undefined); setOpenForm(v); }} patient={editPatient} onSaved={() => load(search)} />
     </div>
   );
 }

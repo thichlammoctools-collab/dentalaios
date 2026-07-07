@@ -655,7 +655,7 @@ export function VisitDetailPage() {
           </div>
         </DialogHeader>
 
-        <DialogBody>
+        <DialogBody className="px-5 py-5">
           {generatingPlan ? (
             <div className="flex flex-col items-center gap-4 py-14">
               <div className="relative">
@@ -670,7 +670,7 @@ export function VisitDetailPage() {
               </div>
             </div>
           ) : planResult ? (
-            <>
+            <div className="space-y-4">
               {/* Model + time bar */}
               <div className="flex items-center justify-between rounded-xl border border-teal-200 dark:border-teal-800 bg-gradient-to-r from-teal-50 to-emerald-50 dark:from-teal-950/30 dark:to-emerald-950/30 px-4 py-3">
                 <div className="flex items-center gap-2">
@@ -688,7 +688,7 @@ export function VisitDetailPage() {
 
               {/* Items table */}
               {editableItems.length > 0 ? (
-                <div className="overflow-x-auto rounded-xl border border-border shadow-sm">
+                <div className="overflow-x-auto rounded-xl border border-border shadow-sm mt-4">
                   <table className="w-full min-w-[500px] text-sm">
                     <thead>
                       <tr className="bg-gradient-to-r from-slate-700 to-slate-600">
@@ -764,7 +764,7 @@ export function VisitDetailPage() {
               )}
 
               {/* Notes */}
-              <div>
+              <div className="mt-5">
                 <label className="mb-1.5 block text-xs font-semibold text-gray-500 uppercase tracking-wider">Ghi chú</label>
                 <textarea
                   value={planNotes}
@@ -790,11 +790,11 @@ export function VisitDetailPage() {
               {/* Add item */}
               <button
                 onClick={addItem}
-                className="w-full rounded-xl border-2 border-dashed border-slate-300 dark:border-zinc-700 py-2.5 text-sm font-medium text-slate-500 dark:text-zinc-400 transition-all hover:border-teal-400 hover:text-teal-600 dark:hover:border-teal-600 dark:hover:text-teal-400 hover:bg-teal-50/30 dark:hover:bg-teal-950/30"
+                className="w-full rounded-xl border-2 border-dashed border-slate-300 dark:border-zinc-700 py-3 mt-5 text-sm font-medium text-slate-500 dark:text-zinc-400 transition-all hover:border-teal-400 hover:text-teal-600 dark:hover:border-teal-600 dark:hover:text-teal-400 hover:bg-teal-50/30 dark:hover:bg-teal-950/30"
               >
                 + Thêm thủ thuật
               </button>
-            </>
+            </div>
           ) : null}
         </DialogBody>
 
