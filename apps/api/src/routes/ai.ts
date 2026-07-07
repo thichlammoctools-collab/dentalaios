@@ -70,4 +70,22 @@ router.post(
   },
 );
 
+// POST /api/ai/analyze-image
+router.post(
+  "/analyze-image",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  zValidator("json", aiAnalyzeImageSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const { file_id, visit_id, image_type, prompt } = c.req.valid("json");
+    const result = await aiService.analyzeImage(
+      { db: c.env.DB, AI: (c.env as Record<string, unknown>).AI },
+      file_id,
+      image_type,
+      prompt,
+    );
+    return c.json({ ...result, visit_id });
+  },
+);
+
 export default router;

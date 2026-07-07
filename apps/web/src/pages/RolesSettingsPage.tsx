@@ -32,8 +32,8 @@ export function RolesSettingsPage() {
   const [savingEdit, setSavingEdit] = useState(false);
 
   async function loadRoles() {
-    const data = await apiGet<Role[]>("/api/roles");
-    setRoles(data);
+    const data = await apiGet<{ items: Role[]; total: number }>("/api/roles");
+    setRoles(data.items);
   }
 
   useEffect(() => {

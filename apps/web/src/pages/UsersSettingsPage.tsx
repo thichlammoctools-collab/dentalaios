@@ -17,7 +17,7 @@ import { Dialog, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui
 import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
-import { formatDate } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import type { User, Role, Branch } from "@shared/types";
 
 interface UsersResponse {
@@ -334,64 +334,100 @@ export function UsersSettingsPage() {
           <DialogHeader>
             <DialogTitle>Sửa user</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3">
+          <div className="px-5 py-4 sm:px-6 sm:py-5 space-y-5 overflow-y-auto max-h-[60dvh]">
 
-            <SectionDivider icon={<UserIcon />}>Thông tin cá nhân</SectionDivider>
-
-            <div className="grid gap-1.5">
-              <Label htmlFor="e-name">
-                Họ tên <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="e-name"
-                required
-                value={editForm.name}
-                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                placeholder="VD: Nguyễn Văn A"
-              />
+            {/* Personal info section */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground"><UserIcon /></span>
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Thông tin cá nhân</span>
+              </div>
+              <div className="bg-muted/40 rounded-xl p-4 space-y-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="e-name" className="text-xs font-medium text-muted-foreground">
+                    Họ tên <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="e-name"
+                    required
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    placeholder="VD: Nguyễn Văn A"
+                    className="h-9"
+                  />
+                </div>
+              </div>
             </div>
 
-            <SectionDivider icon={<RoleIcon />}>Phân quyền</SectionDivider>
+            {/* Authorization section */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground"><RoleIcon /></span>
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Phân quyền</span>
+              </div>
+              <div className="bg-muted/40 rounded-xl p-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="e-role" className="text-xs font-medium text-muted-foreground">Vai trò</Label>
+                    <Select
+                      id="e-role"
+                      value={editForm.role_id}
+                      onChange={(e) => setEditForm({ ...editForm, role_id: e.target.value })}
+                      className="h-9"
+                    >
+                      {roles.map((r) => (
+                        <option key={r.id} value={r.id}>{r.name}</option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="e-branch" className="text-xs font-medium text-muted-foreground">Chi nhánh</Label>
+                    <Select
+                      id="e-branch"
+                      value={editForm.branch_id}
+                      onChange={(e) => setEditForm({ ...editForm, branch_id: e.target.value })}
+                      className="h-9"
+                    >
+                      {branches.map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </Select>
+                  </div>
+                </div>
 
-            <div className="grid gap-1.5">
-              <Label htmlFor="e-role">Vai trò</Label>
-              <Select
-                id="e-role"
-                value={editForm.role_id}
-                onChange={(e) => setEditForm({ ...editForm, role_id: e.target.value })}
-              >
-                {roles.map((r) => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
-                ))}
-              </Select>
+                <div className="flex items-center gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditForm({ ...editForm, is_active: !editForm.is_active })}
+                    className={cn(
+                      "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+                      editForm.is_active ? "bg-primary" : "bg-muted",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out",
+                        editForm.is_active ? "translate-x-4" : "translate-x-0",
+                      )}
+                    />
+                  </button>
+                  <Label
+                    htmlFor="e-active"
+                    className={cn(
+                      "text-sm font-medium cursor-pointer transition-colors",
+                      editForm.is_active ? "text-foreground" : "text-muted-foreground",
+                    )}
+                    onClick={() => setEditForm({ ...editForm, is_active: !editForm.is_active })}
+                  >
+                    Hoạt động
+                  </Label>
+                </div>
+              </div>
             </div>
 
-            <div className="grid gap-1.5">
-              <Label htmlFor="e-branch">Chi nhánh</Label>
-              <Select
-                id="e-branch"
-                value={editForm.branch_id}
-                onChange={(e) => setEditForm({ ...editForm, branch_id: e.target.value })}
-              >
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-2 px-1">
-              <input
-                id="e-active"
-                type="checkbox"
-                checked={editForm.is_active}
-                onChange={(e) => setEditForm({ ...editForm, is_active: e.target.checked })}
-                className="h-4 w-4 accent-primary"
-              />
-              <Label htmlFor="e-active" className="font-normal">Hoạt động</Label>
-            </div>
           </div>
 
-          <DialogFooter className="mt-4">
+          <DialogFooter className="gap-2">
             <Button type="button" variant="outline" onClick={() => setOpenEdit(false)}>
               Hủy
             </Button>

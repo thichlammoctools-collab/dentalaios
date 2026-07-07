@@ -35,6 +35,7 @@ import usersRoutes from "./routes/users";
 import rolesRoutes from "./routes/roles";
 import filesRoutes from "./routes/files";
 import clinicRoutes from "./routes/clinic";
+import patientImagesRoutes from "./routes/patient-images";
 
 export type Env = {
   DB: D1Database;
