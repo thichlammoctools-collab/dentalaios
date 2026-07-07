@@ -117,7 +117,7 @@ export const patientCreateSchema = z.object({
   marketing_source: optionalText(200),
   // Referral tracking
   referral_type: z.enum(["doctor", "staff", "other", "ad", "none"]).optional(),
-  referral_user_id: z.string().uuid().nullable().optional(),
+  referral_user_id: z.string().min(1).nullable().optional(),
   referral_notes: optionalText(500),
   // Body metrics
   height_cm: z.number().positive().max(300).optional(),
@@ -138,8 +138,8 @@ export const visitCreateSchema = z.object({
   date: z.string().datetime({ offset: true }).optional(),
   notes: optionalText(2000),
   // Personnel
-  treating_clinician_id: z.string().uuid().nullable().optional(),
-  assistant_id: z.string().uuid().nullable().optional(),
+  treating_clinician_id: z.string().min(1).nullable().optional(),
+  assistant_id: z.string().min(1).nullable().optional(),
   // Vitals
   blood_pressure_systolic:  z.number().int().min(50).max(300).optional(),
   blood_pressure_diastolic: z.number().int().min(30).max(200).optional(),
@@ -150,8 +150,8 @@ export const visitUpdateSchema = z.object({
   status: z.enum(["in_progress", "completed", "cancelled"]).optional(),
   notes: optionalText(2000).optional(),
   // Personnel
-  treating_clinician_id: z.string().uuid().nullable().optional(),
-  assistant_id: z.string().uuid().nullable().optional(),
+  treating_clinician_id: z.string().min(1).nullable().optional(),
+  assistant_id: z.string().min(1).nullable().optional(),
   // Vitals
   blood_pressure_systolic:  z.number().int().min(50).max(300).optional(),
   blood_pressure_diastolic: z.number().int().min(30).max(200).optional(),

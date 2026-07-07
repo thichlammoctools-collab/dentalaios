@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { VoiceInputButton } from "@/components/VoiceInputButton";
 import { VoiceFindingsDialog } from "@/components/VoiceFindingsDialog";
 import { apiPost, ApiError } from "@/lib/api";
@@ -337,7 +337,7 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
       {/* Dialog: Tooth condition */}
       <Dialog open={selected != null} onOpenChange={(o) => !o && setSelected(null)}>
         {selected != null && (
-          <div>
+          <>
             <DialogHeader>
               <DialogTitle>
                 Thêm finding — Răng #{selected}{" "}
@@ -348,7 +348,7 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
                 </span>
               </DialogTitle>
             </DialogHeader>
-            <div className="grid gap-3">
+            <DialogBody className="grid gap-3">
               <div className="grid gap-1.5">
                 <Label htmlFor="cond">Tình trạng</Label>
                 <select
@@ -374,7 +374,7 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
               <p className="text-xs text-muted-foreground">
                 Đã có {findingsByTooth.get(selected)?.length ?? 0} finding cho răng này.
               </p>
-            </div>
+            </DialogBody>
             <DialogFooter>
               <Button variant="outline" onClick={() => setSelected(null)}>
                 Hủy
@@ -383,105 +383,101 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
                 {saving ? "Đang lưu…" : "Lưu"}
               </Button>
             </DialogFooter>
-          </div>
+          </>
         )}
       </Dialog>
 
       {/* Dialog: Full-mouth finding */}
       <Dialog open={fmOpen} onOpenChange={setFmOpen}>
-        <div>
-          <DialogHeader>
-            <DialogTitle>Thêm finding toàn hàm</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-3">
-            <div className="grid gap-1.5">
-              <Label htmlFor="fm-cond">Tình trạng</Label>
-              <select
-                id="fm-cond"
-                value={fmCondition}
-                onChange={(e) => setFmCondition(e.target.value)}
-                className="flex h-9 w-full rounded-md border border-input bg-background dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-100 px-3 py-1 text-sm"
-              >
-                {FULLMOUTH_CONDITIONS.map((c) => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="fm-notes">Ghi chú</Label>
-              <Textarea
-                id="fm-notes"
-                rows={3}
-                value={fmNotes}
-                onChange={(e) => setFmNotes(e.target.value)}
-                placeholder="Ví dụ: cạo vôi 2 hàm, khuyên bệnh nhân tẩy trắng…"
-              />
-            </div>
+        <DialogHeader>
+          <DialogTitle>Thêm finding toàn hàm</DialogTitle>
+        </DialogHeader>
+        <DialogBody className="grid gap-3">
+          <div className="grid gap-1.5">
+            <Label htmlFor="fm-cond">Tình trạng</Label>
+            <select
+              id="fm-cond"
+              value={fmCondition}
+              onChange={(e) => setFmCondition(e.target.value)}
+              className="flex h-9 w-full rounded-md border border-input bg-background dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-100 px-3 py-1 text-sm"
+            >
+              {FULLMOUTH_CONDITIONS.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setFmOpen(false)}>
-              Hủy
-            </Button>
-            <Button onClick={onFullMouthSubmit} disabled={fmSaving}>
-              {fmSaving ? "Đang lưu…" : "Lưu"}
-            </Button>
-          </DialogFooter>
-        </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="fm-notes">Ghi chú</Label>
+            <Textarea
+              id="fm-notes"
+              rows={3}
+              value={fmNotes}
+              onChange={(e) => setFmNotes(e.target.value)}
+              placeholder="Ví dụ: cạo vôi 2 hàm, khuyên bệnh nhân tẩy trắng…"
+            />
+          </div>
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setFmOpen(false)}>
+            Hủy
+          </Button>
+          <Button onClick={onFullMouthSubmit} disabled={fmSaving}>
+            {fmSaving ? "Đang lưu…" : "Lưu"}
+          </Button>
+        </DialogFooter>
       </Dialog>
 
       {/* Dialog: Soft-tissue finding */}
       <Dialog open={stOpen} onOpenChange={setStOpen}>
-        <div>
-          <DialogHeader>
-            <DialogTitle>Thêm finding mô mềm</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-3">
-            <div className="grid gap-1.5">
-              <Label htmlFor="st-area">Vùng</Label>
-              <select
-                id="st-area"
-                value={stArea}
-                onChange={(e) => setStArea(e.target.value as SoftTissueArea)}
-                className="flex h-9 w-full rounded-md border border-input bg-background dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-100 px-3 py-1 text-sm"
-              >
-                {SOFT_TISSUE_AREAS.map((a) => (
-                  <option key={a.value} value={a.value}>{a.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="st-cond">Tình trạng</Label>
-              <select
-                id="st-cond"
-                value={stCondition}
-                onChange={(e) => setStCondition(e.target.value)}
-                className="flex h-9 w-full rounded-md border border-input bg-background dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-100 px-3 py-1 text-sm"
-              >
-                {SOFT_TISSUE_CONDITIONS.map((c) => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="st-notes">Ghi chú</Label>
-              <Textarea
-                id="st-notes"
-                rows={3}
-                value={stNotes}
-                onChange={(e) => setStNotes(e.target.value)}
-                placeholder="Mô tả thêm về tình trạng…"
-              />
-            </div>
+        <DialogHeader>
+          <DialogTitle>Thêm finding mô mềm</DialogTitle>
+        </DialogHeader>
+        <DialogBody className="grid gap-3">
+          <div className="grid gap-1.5">
+            <Label htmlFor="st-area">Vùng</Label>
+            <select
+              id="st-area"
+              value={stArea}
+              onChange={(e) => setStArea(e.target.value as SoftTissueArea)}
+              className="flex h-9 w-full rounded-md border border-input bg-background dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-100 px-3 py-1 text-sm"
+            >
+              {SOFT_TISSUE_AREAS.map((a) => (
+                <option key={a.value} value={a.value}>{a.label}</option>
+              ))}
+            </select>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setStOpen(false)}>
-              Hủy
-            </Button>
-            <Button onClick={onSoftTissueSubmit} disabled={stSaving}>
-              {stSaving ? "Đang lưu…" : "Lưu"}
-            </Button>
-          </DialogFooter>
-        </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="st-cond">Tình trạng</Label>
+            <select
+              id="st-cond"
+              value={stCondition}
+              onChange={(e) => setStCondition(e.target.value)}
+              className="flex h-9 w-full rounded-md border border-input bg-background dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-100 px-3 py-1 text-sm"
+            >
+              {SOFT_TISSUE_CONDITIONS.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="st-notes">Ghi chú</Label>
+            <Textarea
+              id="st-notes"
+              rows={3}
+              value={stNotes}
+              onChange={(e) => setStNotes(e.target.value)}
+              placeholder="Mô tả thêm về tình trạng…"
+            />
+          </div>
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setStOpen(false)}>
+            Hủy
+          </Button>
+          <Button onClick={onSoftTissueSubmit} disabled={stSaving}>
+            {stSaving ? "Đang lưu…" : "Lưu"}
+          </Button>
+        </DialogFooter>
       </Dialog>
 
       <VoiceFindingsDialog

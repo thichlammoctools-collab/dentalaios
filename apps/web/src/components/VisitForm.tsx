@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
@@ -35,7 +35,7 @@ export function VisitForm({ open, onOpenChange, patientId, onCreated }: VisitFor
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!open || !session) return;
+    if (!open || !session?.branch?.id) return;
     apiGet<UserWithDetailsResponse>(`/api/users/branch/${session.branch.id}`)
       .then((res) => setUsers(res.items))
       .catch(() => setUsers([]));
@@ -43,7 +43,14 @@ export function VisitForm({ open, onOpenChange, patientId, onCreated }: VisitFor
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!session) return;
+    if (!session?.branch?.id) {
+      toast.error("Không tìm thấy chi nhánh — vui lòng đăng nhập lại");
+      return;
+    }
+    if (!session?.user?.id) {
+      toast.error("Không tìm thấy người dùng — vui lòng đăng nhập lại");
+      return;
+    }
     setSaving(true);
     try {
       const created = await apiPost<Visit>("/api/visits", {
@@ -83,7 +90,7 @@ export function VisitForm({ open, onOpenChange, patientId, onCreated }: VisitFor
         <DialogHeader>
           <DialogTitle>Tạo lượt khám mới</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-3">
+        <DialogBody className="grid gap-3">
 
           <SectionDivider icon={<TeamIcon />}>Nhân sự</SectionDivider>
 
@@ -173,7 +180,7 @@ export function VisitForm({ open, onOpenChange, patientId, onCreated }: VisitFor
             Bác sĩ phụ trách: <strong className="text-foreground">{session?.user.name}</strong>
             {session?.branch.name && <> · Chi nhánh: <strong className="text-foreground">{session.branch.name}</strong></>}
           </p>
-        </div>
+        </DialogBody>
         <DialogFooter className="mt-4">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Hủy

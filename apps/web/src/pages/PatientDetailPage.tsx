@@ -129,12 +129,26 @@ export function PatientDetailPage() {
                 <p className="font-medium">{formatDate(patient.date_of_birth)}</p>
               </div>
               <div>
+                <p className="text-muted-foreground">Giới tính</p>
+                <p className="font-medium">{patient.gender === "M" ? "Nam" : patient.gender === "F" ? "Nữ" : "Khác"}</p>
+              </div>
+              <div>
                 <p className="text-muted-foreground">Số điện thoại</p>
                 <p className="font-medium">{patient.phone}</p>
               </div>
-              <div>
+              <div className="col-span-2">
                 <p className="text-muted-foreground">Email</p>
                 <p className="font-medium">{patient.email ?? "—"}</p>
+              </div>
+              {patient.address && (
+                <div className="col-span-2">
+                  <p className="text-muted-foreground">Địa chỉ</p>
+                  <p className="font-medium">{patient.address}</p>
+                </div>
+              )}
+              <div className="col-span-2">
+                <p className="text-muted-foreground">Ngày tạo</p>
+                <p className="font-medium">{new Date(patient.created_at).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })}</p>
               </div>
               {(patient.family_name || patient.family_phone || patient.family_relation) && (
                 <div className="col-span-2 rounded-lg border bg-muted/30 p-3">

@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { isValidFdiTooth } from "@shared/constants";
@@ -74,7 +74,7 @@ export function TreatmentPlanItemForm({
         <DialogHeader>
           <DialogTitle>Thêm hạng mục điều trị</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4">
+        <DialogBody className="grid gap-4">
 
           <SectionDivider icon={<ToothIcon />}>Vị trí răng</SectionDivider>
 
@@ -175,7 +175,7 @@ export function TreatmentPlanItemForm({
               />
             </div>
           </div>
-        </div>
+        </DialogBody>
         <DialogFooter className="mt-4">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Hủy

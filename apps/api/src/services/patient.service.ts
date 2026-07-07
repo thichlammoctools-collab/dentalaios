@@ -26,9 +26,15 @@ export const patientService = {
       email: data.email || undefined,
       address: data.address,
       notes: data.notes,
+      family_name: data.family_name ?? undefined,
+      family_phone: data.family_phone ?? undefined,
+      family_relation: data.family_relation ?? undefined,
+      marketing_source: data.marketing_source ?? undefined,
       referral_type: data.referral_type,
       referral_user_id: data.referral_user_id ?? undefined,
       referral_notes: data.referral_notes,
+      height_cm: data.height_cm ?? undefined,
+      weight_kg: data.weight_kg ?? undefined,
     });
   },
 
@@ -39,10 +45,22 @@ export const patientService = {
     data: PatientUpdateInput,
   ): Promise<Patient | null> {
     return createPatientsRepository(db).update(tenantId, id, {
+      name: data.name,
+      date_of_birth: data.date_of_birth,
+      gender: data.gender,
+      phone: data.phone,
+      email: data.email ?? undefined,
       address: data.address,
+      notes: data.notes,
+      family_name: data.family_name ?? undefined,
+      family_phone: data.family_phone ?? undefined,
+      family_relation: data.family_relation ?? undefined,
+      marketing_source: data.marketing_source ?? undefined,
       referral_type: data.referral_type,
       referral_user_id: data.referral_user_id ?? undefined,
       referral_notes: data.referral_notes,
+      height_cm: data.height_cm ?? undefined,
+      weight_kg: data.weight_kg ?? undefined,
     });
   },
 

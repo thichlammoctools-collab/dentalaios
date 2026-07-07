@@ -23,17 +23,23 @@ export function Dialog({ open, onOpenChange, children, className }: DialogProps)
     };
   }, [open, onOpenChange]);
 
-  if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
+      className={cn(
+        "fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4",
+        "transition-all duration-200",
+        open ? "opacity-100" : "pointer-events-none opacity-0",
+      )}
       onClick={() => onOpenChange(false)}
     >
       <div
         className={cn(
           "relative z-[10000] w-full sm:max-w-xl rounded-t-2xl sm:rounded-2xl border border-border bg-card shadow-2xl",
-          "animate-in fade-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200",
           "max-h-[92dvh] sm:max-h-[85dvh] flex flex-col",
+          "transition-all duration-200",
+          open
+            ? "opacity-100 translate-y-0 sm:scale-100"
+            : "opacity-0 translate-y-4 sm:scale-95",
           className,
         )}
         onClick={(e) => e.stopPropagation()}

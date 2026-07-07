@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { VisitForm } from "@/components/VisitForm";
 import { FdiToothChart } from "@/components/FdiToothChart";
 import { FindingsList } from "@/components/FindingsList";
-import { Dialog, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatDateTime } from "@/lib/utils";
@@ -572,7 +572,7 @@ export function VisitDetailPage() {
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto px-5 pb-5 sm:px-6">
+        <DialogBody>
           {summarizing ? (
             <div className="flex flex-col items-center gap-4 py-14">
               <div className="relative">
@@ -632,7 +632,7 @@ export function VisitDetailPage() {
               )}
             </>
           ) : null}
-        </div>
+        </DialogBody>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => setSummaryDialogOpen(false)}>Đóng</Button>
@@ -655,7 +655,7 @@ export function VisitDetailPage() {
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto px-5 pb-5 sm:px-6">
+        <DialogBody>
           {generatingPlan ? (
             <div className="flex flex-col items-center gap-4 py-14">
               <div className="relative">
@@ -796,7 +796,7 @@ export function VisitDetailPage() {
               </button>
             </>
           ) : null}
-        </div>
+        </DialogBody>
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => setPlanDialogOpen(false)}>Hủy</Button>

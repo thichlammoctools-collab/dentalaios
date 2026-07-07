@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiPost, apiPut, apiGet, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
@@ -95,8 +95,8 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
         family_phone: familyPhone || undefined,
         family_relation: familyRelation || undefined,
         marketing_source: marketingSource || undefined,
-        height_cm: heightCm ? Number(heightCm) : undefined,
-        weight_kg: weightKg ? Number(weightKg) : undefined,
+        height_cm: heightCm ? Number(heightCm) || undefined : undefined,
+        weight_kg: weightKg ? Number(weightKg) || undefined : undefined,
         referral_type: referralType || undefined,
         referral_user_id: referralUserId || undefined,
         referral_notes: referralNotes || undefined,
@@ -140,7 +140,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
           <DialogTitle>{isEdit ? "Sửa bệnh nhân" : "Tạo bệnh nhân mới"}</DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-3 max-h-[70vh] overflow-y-auto pr-1">
+        <DialogBody className="grid gap-3 max-h-[70vh] overflow-y-auto pr-1">
 
           {/* ─── 1. Thông tin cơ bản ─── */}
           <SectionDivider icon={<UserIcon />}>Thông tin cơ bản</SectionDivider>
@@ -350,7 +350,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
               placeholder="Ghi chú thêm về bệnh nhân…"
             />
           </div>
-        </div>
+        </DialogBody>
 
         <DialogFooter className="mt-4">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

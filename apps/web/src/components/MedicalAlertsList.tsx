@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { apiDelete, apiPost, ApiError } from "@/lib/api";
@@ -112,7 +112,7 @@ export function MedicalAlertsList({
           <DialogHeader>
             <DialogTitle>Thêm cảnh báo y khoa</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3">
+          <DialogBody className="grid gap-3">
 
             <SectionDivider icon={<AlertIcon />}>Loại & Mức độ</SectionDivider>
 
@@ -159,7 +159,7 @@ export function MedicalAlertsList({
                 placeholder="VD: Dị ứng kháng sinh Amoxicillin, hen phế quản…"
               />
             </div>
-          </div>
+          </DialogBody>
           <DialogFooter className="mt-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Hủy

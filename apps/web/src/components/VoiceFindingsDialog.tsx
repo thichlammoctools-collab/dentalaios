@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { VoiceInputButton } from "@/components/VoiceInputButton";
 import { apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
@@ -205,7 +205,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
         </div>
       </DialogHeader>
 
-      <div className="space-y-4 px-5 pb-5">
+      <DialogBody className="space-y-4">
         {/* Step 1: Voice input */}
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center justify-between mb-3">
@@ -425,7 +425,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
             <p className="text-xs text-zinc-400 dark:text-zinc-600">AI sẽ phân tích và tạo clinical findings cho bạn duyệt</p>
           </div>
         )}
-      </div>
+      </DialogBody>
 
       <DialogFooter>
         <Button variant="outline" onClick={handleClose}>Hủy</Button>
