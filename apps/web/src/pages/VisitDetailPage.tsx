@@ -43,17 +43,17 @@ const PROCEDURE_OPTIONS = [
 ];
 
 const PROCEDURE_COLORS: Record<string, string> = {
-  examination: "bg-slate-100 text-slate-700",
-  filling: "bg-blue-100 text-blue-700",
-  root_canal: "bg-purple-100 text-purple-700",
-  extraction: "bg-red-100 text-red-700",
-  crown: "bg-amber-100 text-amber-700",
-  scaling: "bg-teal-100 text-teal-700",
-  implant: "bg-green-100 text-green-700",
-  bridge: "bg-orange-100 text-orange-700",
-  veneer: "bg-pink-100 text-pink-700",
-  fluoride: "bg-cyan-100 text-cyan-700",
-  other: "bg-gray-100 text-gray-700",
+  examination: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300",
+  filling: "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300",
+  root_canal: "bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300",
+  extraction: "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300",
+  crown: "bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300",
+  scaling: "bg-teal-100 dark:bg-teal-900 text-teal-700 dark:text-teal-300",
+  implant: "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300",
+  bridge: "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300",
+  veneer: "bg-pink-100 dark:bg-pink-900 text-pink-700 dark:text-pink-300",
+  fluoride: "bg-cyan-100 dark:bg-cyan-900 text-cyan-700 dark:text-cyan-300",
+  other: "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300",
 };
 
 function procedureLabel(v: string) {
@@ -159,7 +159,7 @@ function parseSummary(raw: string): SummarySection[] {
 
 function SummaryPatientCard({ items }: { items: SummarySection["items"] }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50 to-white dark:from-blue-950/30 dark:to-zinc-900 shadow-sm">
       <div className="bg-gradient-to-r from-blue-600 to-blue-500 px-4 py-2.5">
         <p className="text-xs font-semibold uppercase tracking-wider text-blue-100">Thông tin bệnh nhân</p>
       </div>
@@ -167,7 +167,7 @@ function SummaryPatientCard({ items }: { items: SummarySection["items"] }) {
         {items?.map((item, idx) => (
           <div key={idx} className="flex items-start gap-2">
             {item.label && <span className="text-xs text-blue-500 font-medium shrink-0">{item.label}:</span>}
-            <span className="text-sm font-medium text-gray-800">{item.value}</span>
+            <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">{item.value}</span>
           </div>
         ))}
       </div>
@@ -177,7 +177,7 @@ function SummaryPatientCard({ items }: { items: SummarySection["items"] }) {
 
 function SummaryVisitCard({ items }: { items: SummarySection["items"] }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-violet-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-violet-200 dark:border-violet-800 bg-white dark:bg-zinc-900 shadow-sm">
       <div className="bg-gradient-to-r from-violet-600 to-violet-500 px-4 py-2.5">
         <p className="text-xs font-semibold uppercase tracking-wider text-violet-100">Lượt khám</p>
       </div>
@@ -185,7 +185,7 @@ function SummaryVisitCard({ items }: { items: SummarySection["items"] }) {
         {items?.map((item, idx) => (
           <div key={idx} className="flex items-start gap-2">
             {item.label && <span className="text-xs text-violet-500 font-medium shrink-0">{item.label}:</span>}
-            <span className={`text-sm ${item.accent ? "font-semibold text-amber-600" : "font-medium text-gray-800"}`}>{item.value}</span>
+            <span className={`text-sm ${item.accent ? "font-semibold text-amber-600 dark:text-amber-400" : "font-medium text-zinc-800 dark:text-zinc-200"}`}>{item.value}</span>
           </div>
         ))}
       </div>
@@ -196,34 +196,34 @@ function SummaryVisitCard({ items }: { items: SummarySection["items"] }) {
 function SummaryFindingsCard({ items, label }: { items: SummarySection["items"]; label: string }) {
   const count = items?.length ?? 0;
   return (
-    <div className="overflow-hidden rounded-xl border border-teal-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-teal-200 dark:border-teal-800 bg-white dark:bg-zinc-900 shadow-sm">
       <div className="bg-gradient-to-r from-teal-600 to-teal-500 px-4 py-2.5 flex items-center justify-between">
         <p className="text-xs font-semibold uppercase tracking-wider text-teal-100">{label}</p>
         <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-xs font-bold text-white">{count}</span>
       </div>
-      <div className="divide-y divide-teal-100">
+      <div className="divide-y divide-teal-100 dark:divide-teal-900">
         {items?.map((item, idx) => {
           const colonIdx = item.value.indexOf(":");
           const hasColon = colonIdx !== -1;
           const tooth = hasColon ? item.value.slice(0, colonIdx).trim() : item.value.trim();
           const restStr = hasColon ? item.value.slice(colonIdx + 1).trim() : "";
           return (
-            <div key={idx} className="flex items-center gap-3 px-4 py-3 hover:bg-teal-50 transition-colors">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-100 text-sm font-bold text-teal-700">
+            <div key={idx} className="flex items-center gap-3 px-4 py-3 hover:bg-teal-50 dark:hover:bg-teal-950/30 transition-colors">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-100 dark:bg-teal-900 text-sm font-bold text-teal-700 dark:text-teal-300">
                 {tooth}
               </span>
               <div className="flex-1 min-w-0">
                 {restStr ? (
-                  <p className="text-sm font-medium text-gray-800 truncate">{restStr}</p>
+                  <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate">{restStr}</p>
                 ) : (
-                  <p className="text-sm font-medium text-gray-800 truncate">{tooth}</p>
+                  <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 truncate">{tooth}</p>
                 )}
               </div>
             </div>
           );
         })}
         {!items?.length && (
-          <p className="px-4 py-3 text-sm text-gray-400 italic">Không có dữ liệu</p>
+          <p className="px-4 py-3 text-sm text-zinc-400 dark:text-zinc-500 italic">Không có dữ liệu</p>
         )}
       </div>
     </div>
@@ -232,21 +232,21 @@ function SummaryFindingsCard({ items, label }: { items: SummarySection["items"];
 
 function SummaryPlanCard({ items, label }: { items: SummarySection["items"]; label: string }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-amber-200 dark:border-amber-800 bg-white dark:bg-zinc-900 shadow-sm">
       <div className="bg-gradient-to-r from-amber-600 to-amber-500 px-4 py-2.5">
         <p className="text-xs font-semibold uppercase tracking-wider text-amber-100">{label}</p>
       </div>
-      <div className="divide-y divide-amber-100">
+      <div className="divide-y divide-amber-100 dark:divide-amber-900">
         {items?.map((item, idx) => (
           <div key={idx} className="flex items-start gap-3 px-4 py-3">
-            <span className="flex h-6 w-6 shrink-0 mt-0.5 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-700">
+            <span className="flex h-6 w-6 shrink-0 mt-0.5 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900 text-xs font-bold text-amber-700 dark:text-amber-300">
               {idx + 1}
             </span>
-            <p className="flex-1 text-sm text-gray-700 leading-relaxed">{item.value}</p>
+            <p className="flex-1 text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">{item.value}</p>
           </div>
         ))}
         {!items?.length && (
-          <p className="px-4 py-3 text-sm text-gray-400 italic">Không có kế hoạch</p>
+          <p className="px-4 py-3 text-sm text-zinc-400 dark:text-zinc-500 italic">Không có kế hoạch</p>
         )}
       </div>
     </div>
@@ -255,10 +255,10 @@ function SummaryPlanCard({ items, label }: { items: SummarySection["items"]; lab
 
 function SummaryNotesCard({ items }: { items: SummarySection["items"] }) {
   return (
-    <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 shadow-sm">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-indigo-500">Ghi chú</p>
+    <div className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40 p-4 shadow-sm">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-indigo-500 dark:text-indigo-400">Ghi chú</p>
       {items?.map((item, idx) => (
-        <p key={idx} className="text-sm text-gray-700 leading-relaxed">{item.value}</p>
+        <p key={idx} className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">{item.value}</p>
       ))}
     </div>
   );
@@ -555,13 +555,6 @@ export function VisitDetailPage() {
           </Button>
         </div>
       </div>
-            <svg className="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-            {generatingPlan ? "AI dang tao kế hoạch…" : "Tạo kế hoạch AI"}
-          </Button>
-        </CardContent>
-      </Card>
 
       {/* ─── AI Summary Dialog ─────────────────────────────── */}
       <Dialog open={summaryDialogOpen} onOpenChange={setSummaryDialogOpen}>
@@ -596,9 +589,9 @@ export function VisitDetailPage() {
           ) : summaryResult ? (
             <>
               {/* Model + time bar */}
-              <div className="flex items-center justify-between rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 to-purple-50 px-4 py-3">
+              <div className="flex items-center justify-between rounded-xl border border-violet-200 dark:border-violet-800 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30 px-4 py-3">
                 <div className="flex items-center gap-2">
-                  <div className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold ${summaryResult.ai_model === "llama-3.1-8b-instruct" ? "bg-violet-600 text-white" : "bg-violet-100 text-violet-700"}`}>
+                  <div className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold ${summaryResult.ai_model === "llama-3.1-8b-instruct" ? "bg-violet-600 text-white" : "bg-violet-100 dark:bg-violet-900 text-violet-700 dark:text-violet-300"}`}>
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                     </svg>
@@ -614,7 +607,7 @@ export function VisitDetailPage() {
                       navigator.clipboard.writeText(summaryResult.summary);
                       toast.success("Đã copy vào bộ nhớ tạm");
                     }}
-                    className="flex items-center gap-1.5 rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-medium text-violet-700 shadow-sm transition-all hover:bg-violet-50 hover:shadow-md"
+                    className="flex items-center gap-1.5 rounded-lg border border-violet-200 dark:border-violet-800 bg-white dark:bg-zinc-800 px-3 py-1.5 text-xs font-medium text-violet-700 dark:text-violet-300 shadow-sm transition-all hover:bg-violet-50 dark:hover:bg-violet-900/50 hover:shadow-md"
                   >
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -679,9 +672,9 @@ export function VisitDetailPage() {
           ) : planResult ? (
             <>
               {/* Model + time bar */}
-              <div className="flex items-center justify-between rounded-xl border border-teal-200 bg-gradient-to-r from-teal-50 to-emerald-50 px-4 py-3">
+              <div className="flex items-center justify-between rounded-xl border border-teal-200 dark:border-teal-800 bg-gradient-to-r from-teal-50 to-emerald-50 dark:from-teal-950/30 dark:to-emerald-950/30 px-4 py-3">
                 <div className="flex items-center gap-2">
-                  <div className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold ${planResult.ai_model === "llama-3.1-8b-instruct" ? "bg-teal-600 text-white" : "bg-teal-100 text-teal-700"}`}>
+                  <div className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold ${planResult.ai_model === "llama-3.1-8b-instruct" ? "bg-teal-600 text-white" : "bg-teal-100 dark:bg-teal-900 text-teal-700 dark:text-teal-300"}`}>
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                     </svg>
@@ -708,15 +701,15 @@ export function VisitDetailPage() {
                     </thead>
                     <tbody>
                       {editableItems.map((item, idx) => {
-                        const procColor = PROCEDURE_COLORS[item.procedure] || "bg-gray-100 text-gray-700";
+                        const procColor = PROCEDURE_COLORS[item.procedure] || "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
                         return (
-                          <tr key={item.id} className={`border-t border-border ${idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"} group`}>
+                          <tr key={item.id} className={`border-t border-border ${idx % 2 === 0 ? "bg-white dark:bg-zinc-900" : "bg-slate-50/50 dark:bg-zinc-800/50"} group`}>
                             <td className="px-3 py-2">
                               <Input
                                 type="number"
                                 value={item.tooth || ""}
                                 onChange={(e) => updateItem(item.id, "tooth", Number(e.target.value))}
-                                className="h-8 w-14 text-center border-slate-200 text-sm font-bold"
+                                className="h-8 w-14 text-center border-slate-200 dark:border-zinc-700 dark:bg-zinc-800 text-sm font-bold"
                                 min={1} max={88}
                               />
                             </td>
@@ -727,7 +720,7 @@ export function VisitDetailPage() {
                                 className={`h-8 w-full rounded-lg border-0 px-2 text-xs font-semibold ${procColor}`}
                               >
                                 {PROCEDURE_OPTIONS.map((o) => (
-                                  <option key={o.value} value={o.value} className="bg-white text-gray-800 font-normal">{o.label}</option>
+                                  <option key={o.value} value={o.value} className="bg-white dark:bg-zinc-900 text-gray-800 dark:text-zinc-200 font-normal">{o.label}</option>
                                 ))}
                               </select>
                             </td>
@@ -735,7 +728,7 @@ export function VisitDetailPage() {
                               <Input
                                 value={item.description}
                                 onChange={(e) => updateItem(item.id, "description", e.target.value)}
-                                className="h-8 text-xs border-slate-200 min-w-0"
+                                className="h-8 text-xs border-slate-200 dark:border-zinc-700 dark:bg-zinc-800 min-w-0"
                                 placeholder="Mô tả điều trị"
                               />
                             </td>
@@ -744,14 +737,14 @@ export function VisitDetailPage() {
                                 type="number"
                                 value={item.cost || ""}
                                 onChange={(e) => updateItem(item.id, "cost", Number(e.target.value))}
-                                className="h-8 text-right text-xs border-slate-200 font-mono"
+                                className="h-8 text-right text-xs border-slate-200 dark:border-zinc-700 dark:bg-zinc-800 font-mono"
                                 placeholder="0"
                               />
                             </td>
                             <td className="px-3 py-2 text-center">
                               <button
                                 onClick={() => removeItem(item.id)}
-                                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-all"
+                                className="opacity-0 group-hover:opacity-100 text-gray-400 dark:text-zinc-500 hover:text-red-500 dark:hover:text-red-400 transition-all"
                               >
                                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -765,7 +758,7 @@ export function VisitDetailPage() {
                   </table>
                 </div>
               ) : (
-                <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 py-10 text-center text-sm text-gray-400">
+                <div className="rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 py-10 text-center text-sm text-zinc-400 dark:text-zinc-500">
                   Không có clinical findings để tạo kế hoạch
                 </div>
               )}
@@ -776,28 +769,28 @@ export function VisitDetailPage() {
                 <textarea
                   value={planNotes}
                   onChange={(e) => setPlanNotes(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  className="w-full rounded-xl border border-slate-200 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500 dark:focus:ring-teal-400 focus:border-transparent"
                   rows={2}
                   placeholder="Ghi chú cho kế hoạch điều trị"
                 />
               </div>
 
               {/* Total */}
-              <div className="flex items-center justify-between rounded-xl border-2 border-teal-300 bg-gradient-to-r from-teal-50 to-emerald-50 px-5 py-4 shadow-sm">
+              <div className="flex items-center justify-between rounded-xl border-2 border-teal-300 dark:border-teal-700 bg-gradient-to-r from-teal-50 to-emerald-50 dark:from-teal-950/40 dark:to-emerald-950/40 px-5 py-4 shadow-sm">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-teal-600">Tổng chi phí ước tính</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{editableItems.length} hạng mục | {new Set(editableItems.map((i) => i.procedure)).size} thu thuat</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-teal-600 dark:text-teal-400">Tổng chi phí ước tính</p>
+                  <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">{editableItems.length} hạng mục | {new Set(editableItems.map((i) => i.procedure)).size} thu thuat</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-bold text-teal-700">{totalCost.toLocaleString("vi-VN")}</p>
-                  <p className="text-xs text-gray-400">VND</p>
+                  <p className="text-2xl font-bold text-teal-700 dark:text-teal-300">{totalCost.toLocaleString("vi-VN")}</p>
+                  <p className="text-xs text-zinc-400 dark:text-zinc-500">VND</p>
                 </div>
               </div>
 
               {/* Add item */}
               <button
                 onClick={addItem}
-                className="w-full rounded-xl border-2 border-dashed border-slate-300 py-2.5 text-sm font-medium text-slate-500 transition-all hover:border-teal-400 hover:text-teal-600 hover:bg-teal-50/30"
+                className="w-full rounded-xl border-2 border-dashed border-slate-300 dark:border-zinc-700 py-2.5 text-sm font-medium text-slate-500 dark:text-zinc-400 transition-all hover:border-teal-400 hover:text-teal-600 dark:hover:border-teal-600 dark:hover:text-teal-400 hover:bg-teal-50/30 dark:hover:bg-teal-950/30"
               >
                 + Thêm thủ thuật
               </button>

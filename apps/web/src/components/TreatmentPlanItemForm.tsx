@@ -69,12 +69,12 @@ export function TreatmentPlanItemForm({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} className="sm:max-w-2xl">
       <form onSubmit={onSubmit}>
         <DialogHeader>
           <DialogTitle>Thêm hạng mục điều trị</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-3">
+        <div className="grid gap-4">
 
           <SectionDivider icon={<ToothIcon />}>Vị trí răng</SectionDivider>
 
@@ -94,10 +94,10 @@ export function TreatmentPlanItemForm({
             </Label>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor="tooth">
-                Số răng FDI <span className="text-red-500">*</span>
+                Số răng FDI <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="tooth"
@@ -121,7 +121,7 @@ export function TreatmentPlanItemForm({
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="proc">
-                Thủ thuật <span className="text-red-500">*</span>
+                Thủ thuật <span className="text-destructive">*</span>
               </Label>
               <Select
                 id="proc"
@@ -130,7 +130,7 @@ export function TreatmentPlanItemForm({
               >
                 <option value="filling">Trám răng</option>
                 <option value="root_canal">Điều trị tủy</option>
-                <option value="crown">Bọc răng sứ</option>
+                <option value="crown">Bọc mão răng</option>
                 <option value="implant">Cấy ghép implant</option>
                 <option value="extraction">Nhổ răng</option>
                 <option value="scaling">Cạo vôi răng</option>
@@ -143,36 +143,37 @@ export function TreatmentPlanItemForm({
 
           <SectionDivider icon={<DescIcon />}>Chi tiết & Chi phí</SectionDivider>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="desc">
-              Mô tả <span className="text-red-500">*</span>
-            </Label>
-            <Textarea
-              id="desc"
-              rows={2}
-              required
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Mô tả chi tiết thủ thuật cần thực hiện…"
-            />
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="cost">
-              Đơn giá (VND) <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="cost"
-              type="number"
-              min="0"
-              required
-              value={unitCost}
-              onChange={(e) => {
-                const v = e.target.value;
-                setUnitCost(v ? Number(v) : "");
-              }}
-              placeholder="VD: 500000"
-            />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="desc">
+                Mô tả <span className="text-destructive">*</span>
+              </Label>
+              <Textarea
+                id="desc"
+                rows={2}
+                required
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Mô tả chi tiết thủ thuật cần thực hiện…"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="cost">
+                Đơn giá (VNĐ) <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="cost"
+                type="number"
+                min="0"
+                required
+                value={unitCost}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setUnitCost(v ? Number(v) : "");
+                }}
+                placeholder="VD: 500000"
+              />
+            </div>
           </div>
         </div>
         <DialogFooter className="mt-4">

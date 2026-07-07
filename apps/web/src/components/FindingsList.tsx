@@ -151,9 +151,9 @@ export function FindingsList({ visitId, findings, onUpdate }: FindingsListProps)
           {scope === "tooth" ? (
             <span className="font-mono font-medium">#{f.tooth_number}</span>
           ) : scope === "full_mouth" ? (
-            <span className="text-xs font-medium text-orange-700">Toàn hàm</span>
+            <span className="text-xs font-medium text-orange-700 dark:text-orange-400">Toàn hàm</span>
           ) : (
-            <span className="text-xs font-medium text-blue-700">{areaLabel(f.area)}</span>
+            <span className="text-xs font-medium text-blue-700 dark:text-blue-400">{areaLabel(f.area)}</span>
           )}
         </TableCell>
         <TableCell>
@@ -228,7 +228,7 @@ export function FindingsList({ visitId, findings, onUpdate }: FindingsListProps)
 
       {fmFindings.length > 0 && (
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-orange-600">Toàn hàm</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-orange-600 dark:text-orange-400">Toàn hàm</p>
           <Table>
             <TableHeader>
               <TableRow>
@@ -247,7 +247,7 @@ export function FindingsList({ visitId, findings, onUpdate }: FindingsListProps)
 
       {stFindings.length > 0 && (
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-blue-600">Mô mềm miệng</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">Mô mềm miệng</p>
           <Table>
             <TableHeader>
               <TableRow>

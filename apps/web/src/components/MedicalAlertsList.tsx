@@ -81,7 +81,7 @@ export function MedicalAlertsList({
             {alerts.map((a) => (
               <TableRow key={a.id}>
                 <TableCell>
-                  <Badge variant="outline">{a.type}</Badge>
+                  <Badge variant="outline" color="blue">{a.type}</Badge>
                 </TableCell>
                 <TableCell>{a.description}</TableCell>
                 <TableCell>

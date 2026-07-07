@@ -26,12 +26,12 @@ export function Dialog({ open, onOpenChange, children, className }: DialogProps)
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"
+      className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
       onClick={() => onOpenChange(false)}
     >
       <div
         className={cn(
-          "relative z-[10000] w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl border border-border bg-card shadow-2xl",
+          "relative z-[10000] w-full sm:max-w-xl rounded-t-2xl sm:rounded-2xl border border-border bg-card shadow-2xl",
           "animate-in fade-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200",
           "max-h-[92dvh] sm:max-h-[85dvh] flex flex-col",
           className,
@@ -42,10 +42,10 @@ export function Dialog({ open, onOpenChange, children, className }: DialogProps)
         <button
           type="button"
           onClick={() => onOpenChange(false)}
-          className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground opacity-60 transition-opacity hover:opacity-100 hover:bg-accent hover:text-accent-foreground z-10"
+          className="absolute right-3 top-3 rounded-md p-1.5 text-zinc-400 dark:text-zinc-500 opacity-50 transition-all hover:opacity-100 hover:bg-accent dark:hover:bg-zinc-800 z-10"
           aria-label="Đóng"
         >
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-4 w-4 dark:text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
@@ -62,7 +62,7 @@ interface DialogHeaderProps {
 
 export function DialogHeader({ className, children }: DialogHeaderProps) {
   return (
-    <div className={cn("flex-shrink-0 border-b border-border bg-card px-5 pt-5 pb-4 sm:px-6 sm:pt-6 sm:pb-4", className)}>
+    <div className={cn("flex-shrink-0 border-b border-border px-5 pt-5 pb-4 sm:px-6 sm:pt-6 sm:pb-4", className)}>
       {children}
     </div>
   );
@@ -78,7 +78,7 @@ export function DialogDescription({ children }: { children: ReactNode }) {
 
 export function DialogFooter({ className, children }: DialogHeaderProps) {
   return (
-    <div className={cn("flex-shrink-0 border-t border-border bg-card px-5 pb-5 pt-4 sm:px-6 sm:pb-6", className)}>
+    <div className={cn("flex-shrink-0 border-t border-border px-5 pb-5 pt-4 sm:px-6 sm:pb-6", className)}>
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         {children}
       </div>

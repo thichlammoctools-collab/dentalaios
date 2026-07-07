@@ -137,13 +137,13 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
         className={cn(
           "flex h-8 w-8 flex-col items-center justify-center rounded border text-xs transition-colors sm:h-10 sm:w-10",
           hasFinding
-            ? "border-red-400 bg-red-50 text-red-900"
-            : "border-border bg-background hover:border-primary hover:bg-accent",
+            ? "border-red-400 bg-red-50 dark:bg-red-950/50 text-red-900 dark:text-red-300"
+            : "border-border bg-background dark:bg-zinc-900 hover:border-primary hover:bg-accent dark:hover:bg-zinc-800",
           side === "right" ? "border-r-2" : "border-l-2",
         )}
       >
-        <span className="font-mono font-medium">{n}</span>
-        {hasFinding && <span className="text-[8px] text-red-700">{list.length}</span>}
+        <span className="font-mono font-medium text-foreground dark:text-zinc-200">{n}</span>
+        {hasFinding && <span className="text-[8px] text-red-700 dark:text-red-400">{list.length}</span>}
       </button>
     );
   }
@@ -259,7 +259,6 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
           />
         </div>
       </div>
-      </div>
 
       {/* Tab: Tooth */}
       {tab === "tooth" && (
@@ -297,9 +296,9 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
           {fullMouthFindings.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {fullMouthFindings.map((f) => (
-                <span key={f.id} className="inline-flex items-center rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-800">
+                <span key={f.id} className="inline-flex items-center rounded-full bg-orange-100 dark:bg-orange-950 px-2.5 py-0.5 text-xs font-medium text-orange-800 dark:text-orange-300">
                   {FULLMOUTH_CONDITIONS.find((c) => c.value === f.condition)?.label ?? f.condition}
-                  {f.notes && <span className="ml-1 text-orange-600">— {f.notes}</span>}
+                  {f.notes && <span className="ml-1 text-orange-600 dark:text-orange-400">— {f.notes}</span>}
                 </span>
               ))}
             </div>
@@ -321,7 +320,7 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
             <div className="mt-3 flex flex-col gap-1.5">
               {softTissueFindings.map((f) => (
                 <div key={f.id} className="flex items-center gap-2 text-xs">
-                  <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+                  <span className="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-950 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:text-blue-300">
                     {SOFT_TISSUE_AREAS.find((a) => a.value === f.area)?.label ?? f.area}
                   </span>
                   <span className="text-muted-foreground">
@@ -356,7 +355,7 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
                   id="cond"
                   value={condition}
                   onChange={(e) => setCondition(e.target.value)}
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                  className="flex h-9 w-full rounded-md border border-input bg-background dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-100 px-3 py-1 text-sm"
                 >
                   {TOOTH_CONDITIONS.map((c) => (
                     <option key={c.value} value={c.value}>{c.label}</option>
@@ -401,7 +400,7 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
                 id="fm-cond"
                 value={fmCondition}
                 onChange={(e) => setFmCondition(e.target.value)}
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                className="flex h-9 w-full rounded-md border border-input bg-background dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-100 px-3 py-1 text-sm"
               >
                 {FULLMOUTH_CONDITIONS.map((c) => (
                   <option key={c.value} value={c.value}>{c.label}</option>
@@ -443,7 +442,7 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
                 id="st-area"
                 value={stArea}
                 onChange={(e) => setStArea(e.target.value as SoftTissueArea)}
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                className="flex h-9 w-full rounded-md border border-input bg-background dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-100 px-3 py-1 text-sm"
               >
                 {SOFT_TISSUE_AREAS.map((a) => (
                   <option key={a.value} value={a.value}>{a.label}</option>
@@ -456,7 +455,7 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
                 id="st-cond"
                 value={stCondition}
                 onChange={(e) => setStCondition(e.target.value)}
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                className="flex h-9 w-full rounded-md border border-input bg-background dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-100 px-3 py-1 text-sm"
               >
                 {SOFT_TISSUE_CONDITIONS.map((c) => (
                   <option key={c.value} value={c.value}>{c.label}</option>

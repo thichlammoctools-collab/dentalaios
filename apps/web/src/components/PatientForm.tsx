@@ -31,6 +31,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
   const [gender, setGender] = useState<"M" | "F" | "O">(patient?.gender ?? "M");
   const [phone, setPhone] = useState(patient?.phone ?? "");
   const [email, setEmail] = useState(patient?.email ?? "");
+  const [address, setAddress] = useState(patient?.address ?? "");
   const [notes, setNotes] = useState(patient?.notes ?? "");
   const [saving, setSaving] = useState(false);
 
@@ -62,6 +63,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
       setGender(patient?.gender ?? "M");
       setPhone(patient?.phone ?? "");
       setEmail(patient?.email ?? "");
+      setAddress(patient?.address ?? "");
       setNotes(patient?.notes ?? "");
       setFamilyName(patient?.family_name ?? "");
       setFamilyPhone(patient?.family_phone ?? "");
@@ -132,7 +134,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
     : null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange} className="sm:max-w-2xl">
       <form onSubmit={onSubmit}>
         <DialogHeader>
           <DialogTitle>{isEdit ? "Sửa bệnh nhân" : "Tạo bệnh nhân mới"}</DialogTitle>

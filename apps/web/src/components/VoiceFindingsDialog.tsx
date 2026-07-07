@@ -178,9 +178,9 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
   }
 
   const scopeVariant = (scope: string) => {
-    if (scope === "full_mouth") return "bg-orange-100 text-orange-700 border-orange-200";
-    if (scope === "soft_tissue") return "bg-blue-100 text-blue-700 border-blue-200";
-    return "bg-slate-100 text-slate-700 border-slate-200";
+    if (scope === "full_mouth") return "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800";
+    if (scope === "soft_tissue") return "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800";
+    return "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700";
   };
 
   const scopeLabel = (scope: string) => {
@@ -190,7 +190,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={handleClose} className="sm:max-w-2xl">
       <DialogHeader>
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg">
@@ -216,9 +216,9 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
             />
           </div>
           {transcript ? (
-            <div className="rounded-lg bg-blue-50 border border-blue-200 p-3">
-              <p className="text-xs font-medium text-blue-600 mb-1">Bản ghi:</p>
-              <p className="text-sm text-gray-800 italic">"{transcript}"</p>
+            <div className="rounded-lg bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 p-3">
+              <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">Bản ghi:</p>
+              <p className="text-sm text-zinc-800 dark:text-zinc-200 italic">"{transcript}"</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -240,16 +240,16 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
 
         {/* Step 2: Analyzing */}
         {analyzing && (
-          <div className="rounded-xl border border-cyan-200 bg-gradient-to-r from-cyan-50 to-blue-50 p-6 flex flex-col items-center gap-3">
+          <div className="rounded-xl border border-cyan-200 dark:border-cyan-800 bg-gradient-to-r from-cyan-50 to-blue-50 dark:from-cyan-950/50 dark:to-blue-950/50 p-6 flex flex-col items-center gap-3">
             <div className="relative">
-              <div className="h-12 w-12 rounded-full border-4 border-cyan-100" />
+              <div className="h-12 w-12 rounded-full border-4 border-cyan-100 dark:border-cyan-900" />
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-cyan-500 border-t-transparent" />
               </div>
             </div>
             <div className="text-center">
-              <p className="font-medium text-sm text-cyan-800">AI đang phân tích…</p>
-              <p className="text-xs text-cyan-500 mt-0.5">Chuyển đổi giọng nói thành clinical findings</p>
+              <p className="font-medium text-sm text-cyan-800 dark:text-cyan-300">AI đang phân tích…</p>
+              <p className="text-xs text-cyan-600 dark:text-cyan-500 mt-0.5">Chuyển đổi giọng nói thành clinical findings</p>
             </div>
           </div>
         )}
@@ -417,12 +417,12 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
 
         {/* Empty state */}
         {!transcript && !analyzing && parsedFindings.length === 0 && (
-          <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 py-8 flex flex-col items-center gap-2 text-center">
-            <svg className="h-8 w-8 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+          <div className="rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 py-8 flex flex-col items-center gap-2 text-center">
+            <svg className="h-8 w-8 text-zinc-300 dark:text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
             </svg>
-            <p className="text-sm text-gray-400">Nhấn <strong>Ghi âm</strong> hoặc nhập text để bắt đầu</p>
-            <p className="text-xs text-gray-300">AI sẽ phân tích và tạo clinical findings cho bạn duyệt</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Nhấn <strong>Ghi âm</strong> hoặc nhập text để bắt đầu</p>
+            <p className="text-xs text-zinc-400 dark:text-zinc-600">AI sẽ phân tích và tạo clinical findings cho bạn duyệt</p>
           </div>
         )}
       </div>
