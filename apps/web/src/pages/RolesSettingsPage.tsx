@@ -19,7 +19,7 @@ import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
 import type { Role } from "@shared/types";
 
-export default function RolesSettingsPage() {
+export function RolesSettingsPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [openCreate, setOpenCreate] = useState(false);
   const [createName, setCreateName] = useState("");

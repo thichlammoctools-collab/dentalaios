@@ -76,6 +76,14 @@ export function DialogDescription({ children }: { children: ReactNode }) {
   return <p className="text-xs text-muted-foreground mt-1">{children}</p>;
 }
 
+export function DialogBody({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <div className={cn("flex-1 overflow-y-auto px-5 py-4 sm:px-6 sm:py-5", className)}>
+      {children}
+    </div>
+  );
+}
+
 export function DialogFooter({ className, children }: DialogHeaderProps) {
   return (
     <div className={cn("flex-shrink-0 border-t border-border px-5 pb-5 pt-4 sm:px-6 sm:pb-6", className)}>

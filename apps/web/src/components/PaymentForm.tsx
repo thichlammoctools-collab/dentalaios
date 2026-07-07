@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { Dialog, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import type { Payment, TreatmentPlan } from "@shared/types";
@@ -71,7 +71,7 @@ export function PaymentForm({ open, onOpenChange, patientId, plans, onCreated }:
         <DialogHeader>
           <DialogTitle>Ghi nhận thanh toán</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-3">
+        <DialogBody className="grid gap-3">
           <div className="grid gap-1.5">
             <Label htmlFor="plan">
               Kế hoạch điều trị <span className="text-red-500">*</span>
@@ -134,7 +134,7 @@ export function PaymentForm({ open, onOpenChange, patientId, plans, onCreated }:
               placeholder="VD: mã giao dịch, số biên nhận…"
             />
           </div>
-        </div>
+        </DialogBody>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Hủy
