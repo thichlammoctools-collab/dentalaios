@@ -31,13 +31,24 @@ export function Dialog({ open, onOpenChange, children, className }: DialogProps)
     >
       <div
         className={cn(
-          "relative z-[10000] w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl border border-border bg-white shadow-2xl",
+          "relative z-[10000] w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl border border-border bg-card shadow-2xl",
           "animate-in fade-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200",
           "max-h-[92dvh] sm:max-h-[85dvh] flex flex-col",
           className,
         )}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* X close button */}
+        <button
+          type="button"
+          onClick={() => onOpenChange(false)}
+          className="absolute right-4 top-4 rounded-md p-1 text-muted-foreground opacity-60 transition-opacity hover:opacity-100 hover:bg-accent hover:text-accent-foreground z-10"
+          aria-label="Đóng"
+        >
+          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
         {children}
       </div>
     </div>
@@ -51,7 +62,7 @@ interface DialogHeaderProps {
 
 export function DialogHeader({ className, children }: DialogHeaderProps) {
   return (
-    <div className={cn("flex-shrink-0 border-b border-border bg-white px-5 pt-5 pb-4 sm:px-6 sm:pt-6 sm:pb-4", className)}>
+    <div className={cn("flex-shrink-0 border-b border-border bg-card px-5 pt-5 pb-4 sm:px-6 sm:pt-6 sm:pb-4", className)}>
       {children}
     </div>
   );
@@ -67,7 +78,7 @@ export function DialogDescription({ children }: { children: ReactNode }) {
 
 export function DialogFooter({ className, children }: DialogHeaderProps) {
   return (
-    <div className={cn("flex-shrink-0 border-t border-border bg-white px-5 pb-5 pt-4 sm:px-6 sm:pb-6", className)}>
+    <div className={cn("flex-shrink-0 border-t border-border bg-card px-5 pb-5 pt-4 sm:px-6 sm:pb-6", className)}>
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         {children}
       </div>

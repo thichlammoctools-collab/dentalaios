@@ -225,37 +225,40 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
   return (
     <div className="space-y-4">
       {/* Tab navigation */}
-      <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-1">
+      <div className="flex gap-1 rounded-xl border border-border bg-muted/20 p-1 shadow-sm">
         {([
-          { key: "tooth", label: "Theo răng", count: toothFindings.length },
-          { key: "full_mouth", label: "Toàn hàm", count: fullMouthFindings.length },
-          { key: "soft_tissue", label: "Mô mềm", count: softTissueFindings.length },
-        ] as { key: Tab; label: string; count: number }[]).map(({ key, label, count }) => (
+          { key: "tooth" as Tab, label: "Theo răng", count: toothFindings.length },
+          { key: "full_mouth" as Tab, label: "Toàn hàm", count: fullMouthFindings.length },
+          { key: "soft_tissue" as Tab, label: "Mô mềm", count: softTissueFindings.length },
+        ]).map(({ key, label, count }) => (
           <button
             key={key}
             type="button"
             onClick={() => setTab(key)}
             className={cn(
-              "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+              "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all",
               tab === key
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
+                ? "bg-background text-foreground shadow-sm ring-1 ring-border/50 font-semibold"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
             )}
           >
             {label}
             {count > 0 && (
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/10 px-1 text-xs text-primary">
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/10 px-1.5 text-[11px] font-bold text-primary">
                 {count}
               </span>
             )}
           </button>
         ))}
-        <VoiceInputButton
-          onTranscription={() => setVoiceOpen(true)}
-          label=""
-          size="sm"
-          variant="ghost"
-        />
+        <div className="px-1">
+          <VoiceInputButton
+            onTranscription={() => setVoiceOpen(true)}
+            label="Ghi âm"
+            size="sm"
+            variant="ghost"
+          />
+        </div>
+      </div>
       </div>
 
       {/* Tab: Tooth */}

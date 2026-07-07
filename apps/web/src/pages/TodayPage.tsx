@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiGet } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -77,15 +77,15 @@ export function TodayPage() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        <StatCard label="Lượt khám hôm nay" value={stats?.today.visits ?? 0} icon="📅" color="blue" />
-        <StatCard label="Đang điều trị" value={stats?.today.inProgress ?? 0} icon="⚡" color="amber" />
-        <StatCard label="Hoàn thành hôm nay" value={stats?.today.completed ?? 0} icon="✅" color="emerald" />
-        <StatCard label="Tổng bệnh nhân" value={stats?.totals.patients ?? 0} icon="🧑‍⚕️" color="cyan" />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <StatCard label="Lượt khám hôm nay" value={stats?.today.visits ?? 0} icon="calendar" color="blue" />
+        <StatCard label="Đang điều trị" value={stats?.today.inProgress ?? 0} icon="progress" color="amber" />
+        <StatCard label="Hoàn thành hôm nay" value={stats?.today.completed ?? 0} icon="check" color="emerald" />
+        <StatCard label="Tổng bệnh nhân" value={stats?.totals.patients ?? 0} icon="patients" color="cyan" />
         <StatCard
           label="Doanh thu (VND)"
           value={stats ? formatCurrency(stats.totals.revenue, "VND") : "—"}
-          icon="💰"
+          icon="money"
           color="purple"
           small
         />
@@ -247,7 +247,8 @@ export function TodayPage() {
 function StatCard({
   label, value, icon, color, small,
 }: {
-  label: string; value: number | string; icon: string;
+  label: string; value: number | string;
+  icon: "calendar" | "progress" | "check" | "patients" | "money";
   color: "blue" | "amber" | "emerald" | "purple" | "cyan";
   small?: boolean;
 }) {
@@ -258,15 +259,22 @@ function StatCard({
     purple: "from-purple-50 to-purple-100/50 text-purple-700",
     cyan: "from-cyan-50 to-cyan-100/50 text-cyan-700",
   };
+  const icons: Record<string, React.ReactNode> = {
+    calendar: <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>,
+    progress: <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>,
+    check: <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+    patients: <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>,
+    money: <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M12 1v22M17 5H9.5a3.5 3.5 0 100 7h5a3.5 3.5 0 010 7H6"/></svg>,
+  };
   return (
     <Card className={`border-0 bg-gradient-to-br ${colors[color]} shadow-sm`}>
       <CardContent className={`${small ? "p-3 sm:p-4" : "p-4 sm:p-5"}`}>
         <div className="flex items-start justify-between">
           <div>
             <p className="text-[10px] font-medium uppercase tracking-wider opacity-70 sm:text-xs">{label}</p>
-            <p className={`font-bold mt-1 sm:mt-2 ${small ? "text-lg sm:text-xl" : "text-2xl sm:text-3xl"}`}>{value}</p>
+            <p className={`font-bold mt-1 sm:mt-2 ${small ? "text-base sm:text-lg" : "text-2xl sm:text-3xl"} truncate`}>{value}</p>
           </div>
-          <span className="text-2xl opacity-50 sm:text-3xl">{icon}</span>
+          <span className="opacity-60 shrink-0">{icons[icon]}</span>
         </div>
       </CardContent>
     </Card>
