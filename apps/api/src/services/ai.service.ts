@@ -36,6 +36,23 @@ export interface GeneratePlanResult {
 export interface AiDeps {
   db: D1Database;
   AI: unknown;
+  FILES?: R2Bucket;
+}
+
+export interface ImageAnalysisFinding {
+  tooth_number: number | null;
+  scope: "tooth" | "full_mouth" | "soft_tissue";
+  area?: string;
+  condition: string;
+  description: string;
+  recommendation: string;
+}
+
+export interface AnalyzeImageResult {
+  analysis: string;
+  findings: ImageAnalysisFinding[];
+  ai_model: string;
+  generated_at: string;
 }
 
 export const aiService = {
@@ -176,6 +193,92 @@ QUY TẮC QUAN TRỌNG:
 
     // Fallback: rule-based plan
     return buildFallbackPlan(findings, visit, patient);
+  },
+
+  // ─── Analyze Image ─────────────────────────────────────────────
+  async analyzeImage(
+    deps: AiDeps,
+    fileId: string,
+    imageType: string,
+    optionalPrompt?: string,
+  ): Promise<AnalyzeImageResult> {
+    const { AI, FILES } = deps;
+
+    const imageTypeLabels: Record<string, string> = {
+      cbct: "CBCT (Cone Beam CT)",
+      scan_3d: "Scan 3D",
+      dicom: "DICOM",
+      photo_before: "Hình chụp trước điều trị",
+      photo_after: "Hình chụp sau điều trị",
+      xray: "X-quang",
+      intraoral: "Intraoral",
+      other: "Hình ảnh y khoa",
+    };
+    const typeLabel = imageTypeLabels[imageType] ?? "Hình ảnh y khoa";
+
+    const prompt = optionalPrompt
+      ?? `Phân tích ${typeLabel} trong nha khoa và trả về JSON chính xác theo format bên dưới.
+
+YÊU CẦU:
+- Chỉ trả về JSON thuần túy, không thêm text khác
+- Xác định răng theo hệ FDI (VD: 11, 12, 21, 22, 36…)
+- Mô tả chính xác vị trí và mức độ tổn thương
+- Đưa ra đề xuất điều trị phù hợp
+
+FORMAT JSON (bắt buộc):
+{
+  "analysis": "<tổng quan về hình ảnh, 1-3 câu tiếng Việt>",
+  "findings": [
+    {
+      "tooth_number": <số FDI hoặc null nếu là toàn hàm/mô mềm>,
+      "scope": "<tooth | full_mouth | soft_tissue>",
+      "area": "<mặt răng nếu là tooth: occlusal/mesial/distal/lingual/buccal, hoặc bỏ trống>",
+      "condition": "<tình trạng bằng tiếng Việt: sâu răng, viêm tủy, viêm quanh răng, tổn thương…>",
+      "description": "<mô tả chi tiết tổn thương bằng tiếng Việt, 1-2 câu>",
+      "recommendation": "<đề xuất điều trị bằng tiếng Việt, 1-2 câu>"
+    }
+  ]
+}
+
+QUY TẮC QUAN TRỌNG:
+- findings có thể là mảng rỗng [] nếu không phát hiện bất thường
+- tooth_number dùng hệ FDI (VD: 11= răng cửa trên phải, 36= răng hàm dưới trái)
+- scope="tooth" khi chỉ 1 răng, scope="full_mouth" khi nhiều răng, scope="soft_tissue" khi là mô mềm`;
+
+    // Try Cloudflare AI
+    if (AI && typeof (AI as { run?: unknown }).run === "function") {
+      try {
+        const result = await (AI as { run: (model: string, inputs: object) => Promise<{ response?: string }> }).run(
+          "@cf/llama-3.1-8b-instruct",
+          {
+            messages: [
+              {
+                role: "system",
+                content: "Bạn là bác sĩ nha khoa giàu kinh nghiệm. Luôn trả lời đúng format JSON, không thêm text khác ngoài JSON.",
+              },
+              { role: "user", content: prompt },
+            ],
+            max_tokens: 1536,
+            temperature: 0.2,
+          },
+        );
+        const raw = (result as { response?: string }).response || "{}";
+        const parsed = parseAnalyzeImageResponse(raw);
+        if (parsed) {
+          return { ...parsed, ai_model: "llama-3.1-8b-instruct", generated_at: new Date().toISOString() };
+        }
+      } catch {
+        // fall through
+      }
+    }
+
+    // Fallback
+    return {
+      analysis: `Đã tiếp nhận hình ảnh ${typeLabel}. Vui lòng xem xét thủ công.`,
+      findings: [],
+      ai_model: "structured-fallback",
+      generated_at: new Date().toISOString(),
+    };
   },
 };
 
@@ -345,6 +448,29 @@ function parseAiPlanResponse(raw: string): GeneratePlanResult | null {
       notes: String(parsed.notes || ""),
       ai_model: "llama-3.1-8b-instruct",
       generated_at: new Date().toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseAnalyzeImageResponse(raw: string): { analysis: string; findings: ImageAnalysisFinding[] } | null {
+  try {
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
+    const parsed = JSON.parse(jsonMatch[0]);
+    return {
+      analysis: String(parsed.analysis || ""),
+      findings: Array.isArray(parsed.findings)
+        ? parsed.findings.map((f: Record<string, unknown>) => ({
+            tooth_number: f.tooth_number == null ? null : (Number(f.tooth_number) || 0),
+            scope: (String(f.scope || "tooth")) as ImageAnalysisFinding["scope"],
+            area: f.area ? String(f.area) : undefined,
+            condition: String(f.condition || "Không xác định"),
+            description: String(f.description || ""),
+            recommendation: String(f.recommendation || ""),
+          }))
+        : [],
     };
   } catch {
     return null;

@@ -2,6 +2,7 @@
  * AI routes:
  *   POST /api/ai/summarize — generate visit summary using AI
  *   POST /api/ai/generate-plan — generate treatment plan from clinical findings
+ *   POST /api/ai/analyze-image — analyze medical image (CBCT, scan, photos)
  */
 
 import { Hono } from "hono";
