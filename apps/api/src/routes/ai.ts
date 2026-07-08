@@ -18,6 +18,13 @@ import { voiceFindingsService } from "../services/voice-findings.service";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
+const aiAnalyzeImageSchema = z.object({
+  file_id: z.string().min(1),
+  visit_id: z.string().min(1),
+  image_type: z.enum(["cbct", "panoramic", "intraoral", "photo", "other"]).optional(),
+  prompt: z.string().optional(),
+});
+
 router.use("*", requireAuth());
 router.use("*", requirePermission(PERMISSIONS.READ_PATIENTS));
 
@@ -79,7 +86,11 @@ router.post(
     const jwt = getJwt(c);
     const { file_id, visit_id, image_type, prompt } = c.req.valid("json");
     const result = await aiService.analyzeImage(
-      { db: c.env.DB, AI: (c.env as Record<string, unknown>).AI },
+      {
+        db: c.env.DB,
+        AI: (c.env as Record<string, unknown>).AI,
+        FILES: c.env.FILES,
+      },
       file_id,
       image_type,
       prompt,

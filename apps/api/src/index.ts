@@ -41,6 +41,7 @@ export type Env = {
   DB: D1Database;
   FILES: R2Bucket;
   JOBS: Queue;
+  AI: unknown; // Cloudflare Workers AI binding
   ENVIRONMENT: string;
   FRONTEND_ORIGIN: string;
   LARK_APP_ID?: string;

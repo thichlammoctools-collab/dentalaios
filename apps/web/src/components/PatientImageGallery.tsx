@@ -18,9 +18,8 @@ import {
 } from "@/components/ui/dialog";
 import { apiDelete, apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
-import type { PatientImage, PatientImageType } from "@shared/types";
+import type { PatientImage, PatientImageType, AnalyzeImageResult } from "@shared/types";
 import { PATIENT_IMAGE_TYPE_LABELS } from "@shared/types";
-import type { AnalyzeImageResult } from "@shared/types";
 
 interface PatientImageGalleryProps {
   patientId: string;

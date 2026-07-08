@@ -1,11 +1,11 @@
 /**
  * AI service — uses Cloudflare Workers AI to generate visit summaries and treatment plans.
  *
- * Model: @cf/llama-3.1-8b-instruct (available on all Cloudflare plans)
+ * Model: @cf/meta/llama-4-scout-17b-16e-instruct (17B params, superior Vietnamese support)
  * Fallback: returns a structured summary / rule-based plan if AI is not configured.
  */
 
-import type { D1Database } from "@cloudflare/workers-types";
+import type { D1Database, R2Bucket, R2ObjectBody } from "@cloudflare/workers-types";
 import { createVisitsRepository } from "../repositories/visits.repo";
 import { createFindingsRepository } from "../repositories/findings.repo";
 import { createTreatmentPlansRepository } from "../repositories/treatment-plans.repo";
@@ -55,6 +55,16 @@ export interface AnalyzeImageResult {
   generated_at: string;
 }
 
+// ─── Utilities ───────────────────────────────────────────────────
+
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
 export const aiService = {
   // ─── Summarize ─────────────────────────────────────────────────
   async summarizeVisit(deps: AiDeps, tenantId: string, visitId: string): Promise<SummarizeResult> {
@@ -86,7 +96,7 @@ export const aiService = {
     if (AI && typeof (AI as { run?: unknown }).run === "function") {
       try {
         const result = await (AI as { run: (model: string, inputs: object) => Promise<{ response?: string }> }).run(
-          "@cf/llama-3.1-8b-instruct",
+          "@cf/meta/llama-4-scout-17b-16e-instruct",
           {
             messages: [
               { role: "system", content: "Bạn là trợ lý nha khoa chuyên nghiệp. Viết tóm tắt bệnh án bằng tiếng Việt, ngắn gọn, dễ hiểu. Dùng ngôn ngữ thân thiện, phù hợp để bác sĩ đọc lại nhanh." },
@@ -98,7 +108,7 @@ export const aiService = {
         );
         return {
           summary: (result as { response?: string }).response || "Không có phản hồi từ AI.",
-          ai_model: "llama-3.1-8b-instruct",
+          ai_model: "llama-4-scout-17b",
           generated_at: new Date().toISOString(),
         };
       } catch {
@@ -171,7 +181,7 @@ QUY TẮC QUAN TRỌNG:
     if (AI && typeof (AI as { run?: unknown }).run === "function") {
       try {
         const result = await (AI as { run: (model: string, inputs: object) => Promise<{ response?: string }> }).run(
-          "@cf/llama-3.1-8b-instruct",
+          "@cf/meta/llama-4-scout-17b-16e-instruct",
           {
             messages: [
               { role: "system", content: "Bạn là bác sĩ nha khoa chuyên nghiệp. Luôn trả lời đúng format JSON, không thêm text khác." },
@@ -184,7 +194,7 @@ QUY TẮC QUAN TRỌNG:
         const raw = (result as { response?: string }).response || "{}";
         const parsed = parseAiPlanResponse(raw);
         if (parsed) {
-          return { ...parsed, ai_model: "llama-3.1-8b-instruct", generated_at: new Date().toISOString() };
+          return { ...parsed, ai_model: "llama-4-scout-17b", generated_at: new Date().toISOString() };
         }
       } catch {
         // fall through
@@ -216,7 +226,7 @@ QUY TẮC QUAN TRỌNG:
     };
     const typeLabel = imageTypeLabels[imageType] ?? "Hình ảnh y khoa";
 
-    const prompt = optionalPrompt
+    const textPrompt = optionalPrompt
       ?? `Phân tích ${typeLabel} trong nha khoa và trả về JSON chính xác theo format bên dưới.
 
 YÊU CẦU:
@@ -245,18 +255,80 @@ QUY TẮC QUAN TRỌNG:
 - tooth_number dùng hệ FDI (VD: 11= răng cửa trên phải, 36= răng hàm dưới trái)
 - scope="tooth" khi chỉ 1 răng, scope="full_mouth" khi nhiều răng, scope="soft_tissue" khi là mô mềm`;
 
-    // Try Cloudflare AI
+    // Step 1: Fetch image from R2
+    let imageBase64: string | null = null;
+    let mimeType = "image/jpeg";
+    if (FILES) {
+      try {
+        const r2Obj = await FILES.get(fileId);
+        if (r2Obj && "arrayBuffer" in r2Obj) {
+          const buf = await (r2Obj as R2ObjectBody).arrayBuffer();
+          // Limit to 5MB to avoid token limits
+          const MAX_SIZE = 5 * 1024 * 1024;
+          const truncated = buf.byteLength > MAX_SIZE ? buf.slice(0, MAX_SIZE) : buf;
+          const bytes = new Uint8Array(truncated);
+          imageBase64 = uint8ArrayToBase64(bytes);
+          // Try to detect mime type from content-type header
+          const ct = (r2Obj as R2ObjectBody).httpMetadata?.contentType;
+          if (ct) mimeType = ct;
+        }
+      } catch {
+        // R2 fetch failed — continue with text-only analysis
+      }
+    }
+
+    // Step 2: Try vision model with base64 image
+    if (
+      AI &&
+      typeof (AI as { run?: unknown }).run === "function" &&
+      imageBase64
+    ) {
+      try {
+        const result = await (AI as { run: (model: string, inputs: object) => Promise<unknown> }).run(
+          "@cf/meta/llama-3.2-11b-vision-instruct",
+          {
+            messages: [
+              {
+                role: "system",
+                content: "Bạn là bác sĩ nha khoa giàu kinh nghiệm. Khi nhìn hình ảnh y khoa, hãy mô tả chính xác những gì bạn thấy, xác định răng theo hệ FDI, và trả lời đúng format JSON, không thêm text khác ngoài JSON.",
+              },
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: textPrompt },
+                  {
+                    type: "image_url",
+                    image_url: { url: `data:${mimeType};base64,${imageBase64}` },
+                  },
+                ],
+              },
+            ],
+            max_tokens: 1536,
+            temperature: 0.2,
+          },
+        );
+        const raw = (result as { response?: string })?.response || "{}";
+        const parsed = parseAnalyzeImageResponse(raw);
+        if (parsed) {
+          return { ...parsed, ai_model: "llama-3.2-11b-vision", generated_at: new Date().toISOString() };
+        }
+      } catch {
+        // fall through to text-only
+      }
+    }
+
+    // Step 3: Try base AI binding (text-only fallback)
     if (AI && typeof (AI as { run?: unknown }).run === "function") {
       try {
         const result = await (AI as { run: (model: string, inputs: object) => Promise<{ response?: string }> }).run(
-          "@cf/llama-3.1-8b-instruct",
+          "@cf/meta/llama-4-scout-17b-16e-instruct",
           {
             messages: [
               {
                 role: "system",
                 content: "Bạn là bác sĩ nha khoa giàu kinh nghiệm. Luôn trả lời đúng format JSON, không thêm text khác ngoài JSON.",
               },
-              { role: "user", content: prompt },
+              { role: "user", content: imageBase64 ? `${textPrompt}\n\n[Lưu ý: Không thể truy cập hình ảnh. Phân tích dựa trên thông tin có sẵn.]` : textPrompt },
             ],
             max_tokens: 1536,
             temperature: 0.2,
@@ -265,14 +337,14 @@ QUY TẮC QUAN TRỌNG:
         const raw = (result as { response?: string }).response || "{}";
         const parsed = parseAnalyzeImageResponse(raw);
         if (parsed) {
-          return { ...parsed, ai_model: "llama-3.1-8b-instruct", generated_at: new Date().toISOString() };
+          return { ...parsed, ai_model: "llama-4-scout-17b", generated_at: new Date().toISOString() };
         }
       } catch {
         // fall through
       }
     }
 
-    // Fallback
+    // Step 4: Final fallback
     return {
       analysis: `Đã tiếp nhận hình ảnh ${typeLabel}. Vui lòng xem xét thủ công.`,
       findings: [],
@@ -446,7 +518,7 @@ function parseAiPlanResponse(raw: string): GeneratePlanResult | null {
         cost: Number(item.cost) || 0,
       })),
       notes: String(parsed.notes || ""),
-      ai_model: "llama-3.1-8b-instruct",
+      ai_model: "llama-4-scout-17b",
       generated_at: new Date().toISOString(),
     };
   } catch {

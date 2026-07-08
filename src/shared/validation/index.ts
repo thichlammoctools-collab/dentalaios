@@ -285,9 +285,17 @@ export type UserUpdateInput = z.infer<typeof userUpdateSchema>;
 
 // ──────────────── Roles ────────────────
 
+export const roleCreateSchema = z.object({
+  name: nonEmpty(50),
+  description: optionalText(200),
+  permissions: z.array(z.string()).default([]),
+});
+
 export const roleUpdateSchema = z.object({
   name: nonEmpty(50).optional(),
+  description: optionalText(200).optional(),
   permissions: z.array(z.string()).optional(),
 });
 
+export type RoleCreateInput = z.infer<typeof roleCreateSchema>;
 export type RoleUpdateInput = z.infer<typeof roleUpdateSchema>;

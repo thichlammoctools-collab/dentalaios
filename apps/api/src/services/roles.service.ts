@@ -8,6 +8,21 @@ export const rolesService = {
     return createRolesRepository(db).list(tenantId);
   },
 
+  async create(
+    db: D1Database,
+    tenantId: string,
+    data: { name: string; description?: string; permissions?: string[] },
+  ): Promise<Role> {
+    try {
+      return await createRolesRepository(db).create(tenantId, data);
+    } catch (err) {
+      if (err instanceof Error && /UNIQUE/i.test(err.message)) {
+        throw new ConflictError("Role name đã tồn tại trong tenant này");
+      }
+      throw err;
+    }
+  },
+
   async update(
     db: D1Database,
     tenantId: string,

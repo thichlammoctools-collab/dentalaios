@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { roleUpdateSchema } from "@shared/validation";
+import { roleCreateSchema, roleUpdateSchema } from "@shared/validation";
 import { PERMISSIONS } from "@shared/constants";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
@@ -21,6 +21,20 @@ router.get(
     const jwt = getJwt(c);
     const items = await rolesService.list(c.env.DB, jwt.tenant_id);
     return c.json({ items, total: items.length });
+  },
+);
+
+// POST /api/roles
+router.post(
+  "/",
+  requirePermission(PERMISSIONS.MANAGE_ROLES),
+  auditLog("create", "role"),
+  zValidator("json", roleCreateSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const data = c.req.valid("json");
+    const role = await rolesService.create(c.env.DB, jwt.tenant_id, data);
+    return c.json(role, 201);
   },
 );
 

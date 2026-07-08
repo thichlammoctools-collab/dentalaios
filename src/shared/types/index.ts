@@ -33,6 +33,7 @@ export interface Role {
   id: string;
   tenant_id: string;
   name: string;
+  description?: string;
   permissions: string[]; // JSON array stored as TEXT in D1
   created_at: string;
 }
@@ -411,4 +412,20 @@ export interface PatientImage {
   original_size?: number;
   uploader_name?: string;
   created_at: string;
+}
+
+export interface ImageAnalysisFinding {
+  tooth_number: number | null;
+  scope: "tooth" | "full_mouth" | "soft_tissue";
+  area?: string;
+  condition: string;
+  description: string;
+  recommendation: string;
+}
+
+export interface AnalyzeImageResult {
+  analysis: string;
+  findings: ImageAnalysisFinding[];
+  ai_model: string;
+  generated_at: string;
 }

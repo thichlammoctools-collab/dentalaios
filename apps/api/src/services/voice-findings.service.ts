@@ -1,7 +1,7 @@
 /**
  * Voice-to-findings service — parses spoken dental observations into structured ClinicalFinding objects.
  *
- * Uses Cloudflare Workers AI (@cf/llama-3.1-8b-instruct) to convert free-form Vietnamese
+ * Uses Cloudflare Workers AI (@cf/meta/llama-4-scout-17b-16e-instruct) to convert free-form Vietnamese
  * transcript text into a list of structured findings (tooth number, scope, condition, notes).
  *
  * Falls back to a rule-based parser if AI is unavailable.
@@ -63,7 +63,7 @@ export const voiceFindingsService = {
     if (AI && typeof (AI as { run?: unknown }).run === "function") {
       try {
         const result = await (AI as { run: (model: string, inputs: object) => Promise<{ response?: string }> }).run(
-          "@cf/llama-3.1-8b-instruct",
+          "@cf/meta/llama-4-scout-17b-16e-instruct",
           {
             messages: [
               {
@@ -107,7 +107,7 @@ Format:
         if (parsed && parsed.findings.length > 0) {
           return {
             findings: parsed.findings,
-            ai_model: "llama-3.1-8b-instruct",
+            ai_model: "llama-4-scout-17b",
             generated_at: new Date().toISOString(),
           };
         }
