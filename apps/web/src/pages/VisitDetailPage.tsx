@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { VisitForm } from "@/components/VisitForm";
 import { FdiToothChart } from "@/components/FdiToothChart";
 import { FindingsList } from "@/components/FindingsList";
+import { PatientImageGallery } from "@/components/PatientImageGallery";
 import { Dialog, DialogBody, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
@@ -522,6 +523,13 @@ export function VisitDetailPage() {
               setFindings((prev) => prev.map((f) => (f.id === updated.id ? updated : f)))
             }
           />
+        </CardContent>
+      </Card>
+
+      {/* Images */}
+      <Card>
+        <CardContent className="pt-4">
+          <PatientImageGallery patientId={visit.patient_id} visitId={visit.id} />
         </CardContent>
       </Card>
 

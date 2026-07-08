@@ -119,7 +119,7 @@ app.route("/api/auth", authRoutes);
 
 // Registration (public)
 app.route("/api/register", registerRoutes);
-app.route("/api/invite", inviteRoutes);
+app.route("/api/invites", inviteRoutes);
 
 // Dashboard
 app.route("/api/dashboard", dashboardRoutes);
@@ -147,6 +147,7 @@ app.route("/api/users", usersRoutes);
 app.route("/api/roles", rolesRoutes);
 app.route("/api/files", filesRoutes);
 app.route("/api/clinic", clinicRoutes);
+app.route("/api/patient-images", patientImagesRoutes);
 
 // 404
 app.notFound((c) => c.json({ error: "Not found", code: "not_found" }, 404));

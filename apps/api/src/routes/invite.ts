@@ -1,21 +1,22 @@
 /**
  * Invite routes — auth required, admin only:
- *   GET  /api/invite              — list pending invites
- *   POST /api/invite              — create invite link
- *   DELETE /api/invite/:id       — revoke invite
- *   POST /api/invite/accept      — accept invite (public, token-based)
+ *   GET  /api/invites           — list pending invites
+ *   POST /api/invites           — create invite link
+ *   DELETE /api/invites/:id     — revoke invite
+ *   POST /api/invites/accept   — accept invite (public)
  */
-
 import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
-import { inviteAcceptSchema } from "@shared/validation";
-import { PERMISSIONS } from "@shared/constants";
+import { zValidator } from "@hono/zod-validator";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
 import { requirePermission } from "../middleware/rbac";
 import type { AuthContext } from "../middleware/auth";
+import { PERMISSIONS } from "@shared/constants";
 import { registerService } from "../services/register.service";
+
+type Bindings = Env;
+type Variables = AuthContext;
 
 function getBaseUrl(c: { env: { FRONTEND_ORIGIN?: string }; req: { header: (n: string) => string | undefined } }): string {
   const origin = c.req.header("origin");
@@ -23,11 +24,16 @@ function getBaseUrl(c: { env: { FRONTEND_ORIGIN?: string }; req: { header: (n: s
   return c.env.FRONTEND_ORIGIN || "https://dentalaios-web.pages.dev";
 }
 
-const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
+const router = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // ── Public ───────────────────────────────────────────────────────────────────
 
-// POST /api/invite/accept
+const inviteAcceptSchema = z.object({
+  token: z.string().min(1),
+  name: z.string().min(1).max(100),
+  password: z.string().min(6),
+});
+
 router.post(
   "/accept",
   zValidator("json", inviteAcceptSchema),
@@ -45,42 +51,65 @@ router.post(
 
 const inviteCreateSchema = z.object({
   email: z.string().email("Email không hợp lệ"),
-  role_id: z.string().min(1),
-  branch_id: z.string().min(1),
+  role_name: z.enum(["doctor", "assistant", "admin"]),
 });
 
 router.use("*", requireAuth());
 router.use("*", requirePermission(PERMISSIONS.MANAGE_USERS));
 
-// GET /api/invite — list pending invites
+// GET /api/invites — list pending invites
 router.get("/", async (c) => {
   const jwt = getJwt(c);
   const rows = await c.env.DB
     .prepare(
-      `SELECT id, token, email, role_id, branch_id, expires_at, created_at
-         FROM invite_tokens
-         WHERE tenant_id = ? AND accepted_at IS NULL AND expires_at > datetime('now')
-         ORDER BY created_at DESC`,
+      `SELECT t.id, t.token, t.email, t.role_id, r.name as role_name, t.branch_id,
+              t.expires_at, t.created_at
+         FROM invite_tokens t
+         LEFT JOIN roles r ON r.id = t.role_id
+         WHERE t.tenant_id = ? AND t.accepted_at IS NULL AND t.expires_at > datetime('now')
+         ORDER BY t.created_at DESC`,
     )
     .bind(jwt.tenant_id)
     .all();
-  return c.json({ items: rows.results || [], total: rows.results?.length || 0 });
+  return c.json(rows.results || []);
 });
 
-// POST /api/invite — create invite
+// POST /api/invites — create invite
 router.post("/", zValidator("json", inviteCreateSchema), async (c) => {
   const jwt = getJwt(c);
-  const { email, role_id, branch_id } = c.req.valid("json");
+  const { email, role_name } = c.req.valid("json");
+
+  // Look up role_id by role_name for this tenant
+  const roleRow = await c.env.DB
+    .prepare("SELECT id FROM roles WHERE name = ? AND tenant_id = ?")
+    .bind(role_name, jwt.tenant_id)
+    .first<{ id: string }>();
+
+  if (!roleRow) {
+    return c.json({ error: `Role "${role_name}" not found` }, 400);
+  }
+
+  // Use first branch if none specified
+  const branchRow = await c.env.DB
+    .prepare("SELECT id FROM branches WHERE tenant_id = ? LIMIT 1")
+    .bind(jwt.tenant_id)
+    .first<{ id: string }>();
+
+  if (!branchRow) {
+    return c.json({ error: "No branch found" }, 400);
+  }
+
   const result = await registerService.createInvite(
     { db: c.env.DB, jwtSecret: c.env.JWT_SECRET, baseUrl: getBaseUrl(c) },
     jwt.sub,
     jwt.tenant_id,
-    { email, role_id, branch_id },
+    { email, role_id: roleRow.id, branch_id: branchRow.id },
   );
+
   return c.json(result, 201);
 });
 
-// DELETE /api/invite/:id — revoke invite
+// DELETE /api/invites/:id — revoke invite
 router.delete("/:id", async (c) => {
   const jwt = getJwt(c);
   const res = await c.env.DB
@@ -88,7 +117,7 @@ router.delete("/:id", async (c) => {
     .bind(c.req.param("id"), jwt.tenant_id)
     .run();
   if (res.meta.changes === 0) {
-    return c.json({ error: "Invite not found", code: "not_found" }, 404);
+    return c.json({ error: "Invite not found" }, 404);
   }
   return c.json({ ok: true });
 });

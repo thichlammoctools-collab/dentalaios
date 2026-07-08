@@ -6,8 +6,9 @@ interface Invite {
   id: string;
   token: string;
   email: string;
+  role_id: string;
   role_name: string;
-  status: string;
+  branch_id: string;
   expires_at: string;
   created_at: string;
 }
@@ -71,16 +72,15 @@ export function MembersSettingsPage() {
     const fd = new FormData(form);
     setCreating(true);
     try {
-      const invite = await apiPost<Invite>("/api/invites", {
+      const result = await apiPost<{ invite_link: string }>("/api/invites", {
         email: fd.get("email"),
         role_name: fd.get("role_name"),
       });
-      setInvites((prev) => [invite, ...prev]);
-      const link = `${window.location.origin}/invite/${invite.token}`;
-      setLastLink(link);
-      await navigator.clipboard.writeText(link).catch(() => {});
-      setCopied(invite.id);
-      setTimeout(() => setCopied(null), 2000);
+      setLastLink(result.invite_link);
+      await navigator.clipboard.writeText(result.invite_link).catch(() => {});
+      setCopied("last");
+      setTimeout(() => setCopied(null), 3000);
+      await loadInvites();
       form.reset();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi tạo lời mời");
@@ -100,10 +100,10 @@ export function MembersSettingsPage() {
     try {
       const emails = emailList.split("\n").map((e) => e.trim()).filter(Boolean);
       for (const email of emails) {
-        const invite = await apiPost<Invite>("/api/invites", { email, role_name: role });
-        setInvites((prev) => [invite, ...prev]);
+        await apiPost("/api/invites", { email, role_name: role });
       }
       toast.success(`Đã tạo ${emails.length} lời mời`);
+      await loadInvites();
       setCreatingAll(false);
       const modal = document.getElementById("bulk-modal") as HTMLDialogElement | null;
       modal?.close();
@@ -141,7 +141,7 @@ export function MembersSettingsPage() {
     return `${window.location.origin}/invite/${token}`;
   }
 
-  const pending = invites.filter((i) => i.status === "pending");
+  const pending = invites;
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">

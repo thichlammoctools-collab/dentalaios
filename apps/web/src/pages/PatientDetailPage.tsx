@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PatientImageGallery } from "@/components/PatientImageGallery";
 import {
   Table,
   TableBody,
@@ -112,6 +113,7 @@ export function PatientDetailPage() {
           <TabsTrigger value="visits">Lượt khám ({visits.length})</TabsTrigger>
           <TabsTrigger value="plans">Kế hoạch ({plans.length})</TabsTrigger>
           <TabsTrigger value="payments">Thanh toán ({payments.length})</TabsTrigger>
+          <TabsTrigger value="images">Hình ảnh</TabsTrigger>
         </TabsList>
 
         <TabsContent value="info">
@@ -423,6 +425,14 @@ export function PatientDetailPage() {
                   </TableBody>
                 </Table>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="images">
+          <Card>
+            <CardContent className="pt-4">
+              <PatientImageGallery patientId={patient.id} />
             </CardContent>
           </Card>
         </TabsContent>

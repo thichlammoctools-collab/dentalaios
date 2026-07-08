@@ -126,7 +126,7 @@ router.get(
 router.delete(
   "/:id",
   requireAuth(),
-  requirePermission(PERMISSIONS.MANAGE_PATIENTS),
+  requirePermission(PERMISSIONS.WRITE_PATIENTS),
   auditLog("delete", "patient_image"),
   async (c) => {
     const jwt = getJwt(c);
