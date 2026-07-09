@@ -14,7 +14,8 @@ export function buildEnv(db: MockD1, overrides: Partial<Env> = {}): Env {
     ENVIRONMENT: "test",
     FRONTEND_ORIGIN: "http://localhost:5173",
     JWT_SECRET: TEST_JWT_SECRET,
-    LARK_APP_ID: undefined,
+    ENCRYPTION_KEY: undefined, // 32-byte hex key — only needed when testing Lark config
+    LARK_APP_ID: undefined,    // DEPRECATED — kept for backward compat
     LARK_APP_SECRET: undefined,
     R2_ACCOUNT_ID: undefined,
     R2_ACCESS_KEY_ID: undefined,

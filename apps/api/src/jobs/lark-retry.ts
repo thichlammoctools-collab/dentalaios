@@ -91,15 +91,20 @@ async function processOne(msg: LarkRetryMessage, env: Env): Promise<void> {
   const itemCount = Number(itemsRow?.n ?? 0);
 
   // Retry
-  const result = await larkService.createHandover(env, {
-    patient: { name: planRow.patient_name, phone: planRow.patient_phone },
-    plan: {
-      id: planRow.id,
-      status: "approved",
+  const result = await larkService.createHandover(
+    env.DB,
+    msg.tenant_id,
+    {
+      patient: { name: planRow.patient_name, phone: planRow.patient_phone },
+      plan: {
+        id: planRow.id,
+        status: "approved",
+      },
+      itemCount,
+      approverName: "System Retry",
     },
-    itemCount,
-    approverName: "System Retry",
-  });
+    env.ENCRYPTION_KEY,
+  );
 
   // Update log (scoped by tenant_id to prevent cross-tenant writes)
   await env.DB.prepare(

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiGet, apiPost, apiPatch, apiDelete, ApiError } from "@/lib/api";
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import { Dialog, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -25,6 +25,16 @@ interface ClinicData {
   branches: Branch[];
 }
 
+interface LarkConfig {
+  tenant_id: string;
+  app_id: string;
+  has_secret: boolean;
+  calendar_id?: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export function ClinicSettingsPage() {
   const { session } = useAuth();
   const [data, setData] = useState<ClinicData | null>(null);
@@ -41,6 +51,14 @@ export function ClinicSettingsPage() {
   const [branchForm, setBranchForm] = useState({ name: "", address: "" });
   const [savingBranch, setSavingBranch] = useState(false);
 
+  // Lark integration
+  const [larkConfig, setLarkConfig] = useState<LarkConfig | null>(null);
+  const [larkDialogOpen, setLarkDialogOpen] = useState(false);
+  const [larkForm, setLarkForm] = useState({ app_id: "", app_secret: "", calendar_id: "" });
+  const [savingLark, setSavingLark] = useState(false);
+  const [testingLark, setTestingLark] = useState(false);
+  const [deletingLark, setDeletingLark] = useState(false);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -48,9 +66,13 @@ export function ClinicSettingsPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const res = await apiGet<ClinicData>("/api/clinic");
-      setData(res);
-      setClinicName(res.tenant.name);
+      const [clinicRes, larkRes] = await Promise.all([
+        apiGet<ClinicData>("/api/clinic"),
+        apiGet<{ config: LarkConfig | null }>(`/api/clinic/lark`),
+      ]);
+      setData(clinicRes);
+      setClinicName(clinicRes.tenant.name);
+      setLarkConfig(larkRes.config);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi tải dữ liệu");
     } finally {
@@ -122,6 +144,79 @@ export function ClinicSettingsPage() {
       toast.success("Đã xóa chi nhánh");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi xóa");
+    }
+  }
+
+  // ─────── Lark integration handlers ───────
+
+  function openLarkForm() {
+    setLarkForm({
+      app_id: larkConfig?.app_id ?? "",
+      app_secret: "", // always blank on open — never pre-fill secret
+      calendar_id: larkConfig?.calendar_id ?? "",
+    });
+    setLarkDialogOpen(true);
+  }
+
+  async function saveLarkConfig() {
+    setSavingLark(true);
+    try {
+      const res = await apiPut<{ config: LarkConfig }>("/api/clinic/lark", {
+        app_id: larkForm.app_id.trim(),
+        app_secret: larkForm.app_secret.trim(),
+        calendar_id: larkForm.calendar_id.trim() || undefined,
+      });
+      setLarkConfig(res.config);
+      setLarkDialogOpen(false);
+      toast.success("Đã lưu cấu hình Lark");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi lưu cấu hình Lark");
+    } finally {
+      setSavingLark(false);
+    }
+  }
+
+  async function testLarkConnection() {
+    setTestingLark(true);
+    try {
+      // Test with what the user typed in the form (before saving)
+      if (larkForm.app_id && larkForm.app_secret) {
+        const res = await apiPost<{ ok: boolean; error?: string }>("/api/clinic/lark/test", {
+          app_id: larkForm.app_id.trim(),
+          app_secret: larkForm.app_secret.trim(),
+        });
+        if (res.ok) {
+          toast.success("Kết nối Lark thành công");
+        } else {
+          toast.error(`Kết nối thất bại: ${res.error ?? "Lỗi không xác định"}`);
+        }
+      } else {
+        // Test with stored config
+        const res = await apiPost<{ ok: boolean; error?: string }>("/api/clinic/lark/test");
+        if (res.ok) {
+          toast.success("Kết nối Lark thành công");
+        } else {
+          toast.error(`Kết nối thất bại: ${res.error ?? "Lỗi không xác định"}`);
+        }
+      }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi kiểm tra kết nối");
+    } finally {
+      setTestingLark(false);
+    }
+  }
+
+  async function deleteLarkIntegration() {
+    if (!confirm("Ngắt kết nối Lark? Thao tác này sẽ xóa cấu hình hiện tại.")) return;
+    setDeletingLark(true);
+    try {
+      await apiDelete("/api/clinic/lark");
+      setLarkConfig(null);
+      toast.success("Đã ngắt kết nối Lark");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi xóa cấu hình Lark");
+    } finally {
+      setDeletingLark(false);
     }
   }
 
@@ -256,6 +351,85 @@ export function ClinicSettingsPage() {
         </div>
       </section>
 
+      {/* Lark integration */}
+      <section className="space-y-4">
+        <h2 className="text-base font-semibold">Tích hợp Lark</h2>
+        <div className="rounded-lg border border-border bg-card p-4">
+          {larkConfig ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Đã kết nối</span>
+                    {larkConfig.enabled ? (
+                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                        Đang hoạt động
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
+                        Tạm tắt
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    App ID: <code className="bg-muted px-1 rounded">{larkConfig.app_id}</code>
+                  </p>
+                  {larkConfig.calendar_id && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Calendar ID: <code className="bg-muted px-1 rounded">{larkConfig.calendar_id}</code>
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Cập nhật: {new Date(larkConfig.updated_at).toLocaleString("vi-VN")}
+                  </p>
+                </div>
+                {isAdmin && (
+                  <div className="flex flex-col gap-2 shrink-0">
+                    <button
+                      onClick={openLarkForm}
+                      className="rounded-md border border-input px-3 py-1.5 text-sm hover:bg-muted"
+                    >
+                      Cập nhật
+                    </button>
+                    <button
+                      onClick={testLarkConnection}
+                      disabled={testingLark}
+                      className="rounded-md border border-input px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50"
+                    >
+                      {testingLark ? "Đang kiểm tra..." : "Kiểm tra kết nối"}
+                    </button>
+                    <button
+                      onClick={deleteLarkIntegration}
+                      disabled={deletingLark}
+                      className="rounded-md border border-destructive/30 px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                    >
+                      {deletingLark ? "..." : "Ngắt kết nối"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <span className="font-medium">Chưa cấu hình</span>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Kết nối Lark để đồng bộ bàn giao ca điều trị sang workspace của phòng khám.
+                </p>
+              </div>
+              {isAdmin && (
+                <button
+                  onClick={openLarkForm}
+                  className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 shrink-0"
+                >
+                  Cấu hình ngay
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* Branch dialog */}
       <Dialog open={branchDialogOpen} onOpenChange={setBranchDialogOpen}>
         <DialogHeader>
@@ -306,6 +480,89 @@ export function ClinicSettingsPage() {
           >
             {savingBranch ? "Đang lưu..." : editingBranch ? "Cập nhật" : "Thêm mới"}
           </button>
+        </DialogFooter>
+      </Dialog>
+
+      {/* Lark config dialog */}
+      <Dialog open={larkDialogOpen} onOpenChange={setLarkDialogOpen}>
+        <DialogHeader>
+          <DialogTitle>
+            {larkConfig ? "Cập nhật cấu hình Lark" : "Kết nối Lark"}
+          </DialogTitle>
+          <DialogDescription>
+            Nhập thông tin Lark App để đồng bộ bàn giao ca điều trị.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3 mt-4">
+          <div>
+            <label className="text-sm font-medium block mb-1">
+              App ID <span className="text-destructive">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={larkForm.app_id}
+              onChange={(e) => setLarkForm((f) => ({ ...f, app_id: e.target.value }))}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/40"
+              placeholder="cli_xxxxxxxxxxxxxxxx"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">
+              App Secret <span className="text-destructive">*</span>
+              {!larkConfig && <span className="text-muted-foreground font-normal ml-1">(bắt buộc khi cấu hình lần đầu)</span>}
+            </label>
+            <input
+              type="password"
+              required
+              value={larkForm.app_secret}
+              onChange={(e) => setLarkForm((f) => ({ ...f, app_secret: e.target.value }))}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/40"
+              placeholder={larkConfig ? "Để trống nếu không muốn thay đổi" : "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"}
+            />
+            {larkConfig && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Đang lưu giá trị ẩn danh. Nhập giá trị mới nếu muốn thay đổi.
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Calendar ID <span className="text-muted-foreground font-normal">(tuỳ chọn)</span></label>
+            <input
+              type="text"
+              value={larkForm.calendar_id}
+              onChange={(e) => setLarkForm((f) => ({ ...f, calendar_id: e.target.value }))}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/40"
+              placeholder="primary (mặc định)"
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="flex-col sm:flex-row gap-2 mt-4">
+          <button
+            onClick={testLarkConnection}
+            disabled={testingLark || !larkForm.app_id.trim() || !larkForm.app_secret.trim()}
+            className="rounded-md border border-input px-4 py-2 text-sm hover:bg-muted disabled:opacity-50"
+          >
+            {testingLark ? "Đang kiểm tra..." : "Kiểm tra kết nối"}
+          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setLarkDialogOpen(false)}
+              className="rounded-md border border-input px-4 py-2 text-sm hover:bg-muted"
+            >
+              Hủy
+            </button>
+            <button
+              onClick={saveLarkConfig}
+              disabled={savingLark || !larkForm.app_id.trim() || !larkForm.app_secret.trim()}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {savingLark ? "Đang lưu..." : larkConfig ? "Cập nhật" : "Lưu & kết nối"}
+            </button>
+          </div>
         </DialogFooter>
       </Dialog>
     </div>

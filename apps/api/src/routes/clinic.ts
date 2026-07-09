@@ -17,7 +17,8 @@ import { requirePermission } from "../middleware/rbac";
 import { auditLog } from "../middleware/audit";
 import type { AuthContext } from "../middleware/auth";
 import { clinicService } from "../services/clinic.service";
-import { NotFoundError } from "../lib/errors";
+import { testLarkCredentials } from "../lib/lark-client";
+import { NotFoundError, ValidationError } from "../lib/errors";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -94,6 +95,109 @@ router.delete(
     const deleted = await clinicService.deleteBranch(c.env.DB, jwt.tenant_id, c.req.param("id"));
     if (!deleted) throw new NotFoundError("Branch not found");
     return c.json({ ok: true });
+  },
+);
+
+// ──────────────── Per-tenant Lark configuration ────────────────
+
+const larkConfigSchema = z.object({
+  app_id: z.string().min(1).max(200),
+  app_secret: z.string().min(1).max(500),
+  calendar_id: z.string().max(200).optional(),
+  enabled: z.boolean().optional(),
+});
+
+function requireEncryptionKey(env: Env): string {
+  if (!env.ENCRYPTION_KEY) {
+    throw new ValidationError(
+      "Server is missing ENCRYPTION_KEY — Lark integration unavailable",
+    );
+  }
+  return env.ENCRYPTION_KEY;
+}
+
+// GET /api/clinic/lark — fetch this tenant's Lark config (no secret in response)
+router.get(
+  "/lark",
+  requirePermission(PERMISSIONS.MANAGE_USERS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const config = await clinicService.getLarkConfig(c.env.DB, jwt.tenant_id);
+    return c.json({ config: config ?? null });
+  },
+);
+
+// PUT /api/clinic/lark — save/update Lark config (encrypts secret at rest)
+router.put(
+  "/lark",
+  requirePermission(PERMISSIONS.MANAGE_USERS),
+  auditLog("update", "lark_config"),
+  zValidator("json", larkConfigSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const key = requireEncryptionKey(c.env);
+    const body = c.req.valid("json");
+    const config = await clinicService.saveLarkConfig(
+      c.env.DB,
+      jwt.tenant_id,
+      body,
+      key,
+    );
+    return c.json({ config });
+  },
+);
+
+// DELETE /api/clinic/lark — remove Lark integration (hard delete)
+router.delete(
+  "/lark",
+  requirePermission(PERMISSIONS.MANAGE_USERS),
+  auditLog("delete", "lark_config"),
+  async (c) => {
+    const jwt = getJwt(c);
+    const ok = await clinicService.deleteLarkConfig(c.env.DB, jwt.tenant_id);
+    if (!ok) throw new NotFoundError("Lark config not found");
+    return c.json({ ok: true });
+  },
+);
+
+// POST /api/clinic/lark/test — test stored credentials by calling Lark auth
+router.post(
+  "/lark/test",
+  requirePermission(PERMISSIONS.MANAGE_USERS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const key = requireEncryptionKey(c.env);
+
+    // If request body carries app_id + app_secret, test those directly (preview before save).
+    // Otherwise test the stored config.
+    let body: { app_id?: string; app_secret?: string } = {};
+    try {
+      const text = await c.req.text();
+      if (text) body = JSON.parse(text) as typeof body;
+    } catch {
+      /* empty body is fine — fall through to stored config test */
+    }
+
+    let appId: string | undefined;
+    let appSecret: string | undefined;
+
+    if (body.app_id && body.app_secret) {
+      appId = body.app_id;
+      appSecret = body.app_secret;
+    } else {
+      const config = await clinicService.getLarkConfig(c.env.DB, jwt.tenant_id);
+      if (!config) throw new ValidationError("Chưa có cấu hình Lark");
+      const repo = (
+        await import("../repositories/lark-config.repo")
+      ).createLarkConfigRepository(c.env.DB);
+      const decrypted = await repo.getByTenant(jwt.tenant_id, key);
+      if (!decrypted) throw new NotFoundError("Stored Lark config missing");
+      appId = decrypted.app_id;
+      appSecret = decrypted.app_secret;
+    }
+
+    const result = await testLarkCredentials(appId, appSecret);
+    return c.json(result);
   },
 );
 

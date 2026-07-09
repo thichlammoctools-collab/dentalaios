@@ -115,16 +115,21 @@ router.post(
     const realPatient = await patientService.get(c.env.DB, jwt.tenant_id, plan.patient_id);
     if (!realPatient) throw new ValidationError("Patient not found");
 
-    const result = await larkService.createHandover(c.env, {
-      patient: { name: realPatient.name, phone: realPatient.phone },
-      plan: {
-        id: plan.id,
-        status: plan.status,
+    const result = await larkService.createHandover(
+      c.env.DB,
+      jwt.tenant_id,
+      {
+        patient: { name: realPatient.name, phone: realPatient.phone },
+        plan: {
+          id: plan.id,
+          status: plan.status,
+        },
+        itemCount: items.length,
+        approverName: me.user.name,
+        scheduledAt: body.scheduled_at,
       },
-      itemCount: items.length,
-      approverName: me.user.name,
-      scheduledAt: body.scheduled_at,
-    });
+      c.env.ENCRYPTION_KEY,
+    );
 
     // Log to lark_sync_logs
     await c.env.DB.prepare(

@@ -49,7 +49,7 @@ describe("GET /api/patients", () => {
       "/api/patients",
       { method: "GET" },
       // minimal env
-      { DB: undefined, FILES: {} as R2Bucket, JOBS: {} as Queue, ENVIRONMENT: "test", FRONTEND_ORIGIN: "", JWT_SECRET: "test", LARK_APP_ID: undefined, LARK_APP_SECRET: undefined, R2_ACCOUNT_ID: undefined, R2_ACCESS_KEY_ID: undefined, R2_SECRET_ACCESS_KEY: undefined } as any,
+      { DB: undefined, FILES: {} as R2Bucket, JOBS: {} as Queue, ENVIRONMENT: "test", FRONTEND_ORIGIN: "", JWT_SECRET: "test", ENCRYPTION_KEY: undefined, LARK_APP_ID: undefined, LARK_APP_SECRET: undefined, R2_ACCOUNT_ID: undefined, R2_ACCESS_KEY_ID: undefined, R2_SECRET_ACCESS_KEY: undefined } as any,
     );
     expect(res.status).toBe(401);
   });

@@ -4,12 +4,15 @@
  * Architecture rule #7: ONLY operational fields (patient name, procedure count,
  * scheduled time). NO diagnosis details, NO clinical notes.
  *
- * If LARK_APP_ID or LARK_APP_SECRET missing → returns mock result so dev
- * can test the full workflow without Lark account.
+ * Per-tenant: credentials are read from the lark_configs D1 table using
+ * the tenant's own app_id + app_secret. If the tenant has not configured
+ * Lark, the call is silently mocked so the rest of the workflow still works.
  */
 
+import type { D1Database } from "@cloudflare/workers-types";
 import type { Patient, TreatmentPlan } from "@shared/types";
 import { createLarkTask, createLarkCalendarEvent } from "../lib/lark-client";
+import { createLarkConfigRepository } from "../repositories/lark-config.repo";
 import { newId } from "../lib/ids";
 
 export interface LarkHandoverInput {
@@ -29,9 +32,19 @@ export interface LarkHandoverResult {
 }
 
 export const larkService = {
+  /**
+   * Create a Lark task (+ optional calendar event) for a treatment plan handover.
+   *
+   * @param db        — D1 database (to look up per-tenant Lark credentials)
+   * @param tenantId  — tenant requesting the handover
+   * @param input     — operational fields only (rule #7)
+   * @param encryptionKey — ENCRYPTION_KEY Worker secret to decrypt stored secret
+   */
   async createHandover(
-    env: { LARK_APP_ID?: string; LARK_APP_SECRET?: string },
+    db: D1Database,
+    tenantId: string,
     input: LarkHandoverInput,
+    encryptionKey?: string,
   ): Promise<LarkHandoverResult> {
     // Operational summary only — never clinical details (rule #7).
     // No diagnosis, no procedure specifics, no financial data.
@@ -46,13 +59,29 @@ export const larkService = {
       .filter(Boolean)
       .join("\n");
 
-    const appId = env.LARK_APP_ID;
-    const appSecret = env.LARK_APP_SECRET;
+    // Read per-tenant Lark credentials from D1
+    let appId: string | undefined;
+    let appSecret: string | undefined;
+    let calendarId: string | undefined;
+
+    if (encryptionKey) {
+      try {
+        const repo = createLarkConfigRepository(db);
+        const config = await repo.getByTenant(tenantId, encryptionKey);
+        if (config && config.enabled) {
+          appId = config.app_id;
+          appSecret = config.app_secret;
+          calendarId = config.calendar_id ?? undefined;
+        }
+      } catch (err) {
+        console.error("[lark] failed to read per-tenant config:", err);
+      }
+    }
 
     if (!appId || !appSecret) {
-      // Mock fallback
+      // Mock fallback — tenant hasn't configured Lark or credentials are missing
       console.warn(
-        "[lark] LARK_APP_ID / LARK_APP_SECRET not set — returning mocked result",
+        `[lark] No Lark config for tenant ${tenantId} — returning mocked result`,
       );
       return {
         mocked: true,
@@ -76,6 +105,7 @@ export const larkService = {
         description,
         start: start.toISOString(),
         end: end.toISOString(),
+        calendarId,
       });
       calendarEventId = cal.eventId;
     }

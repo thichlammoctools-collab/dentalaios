@@ -44,8 +44,9 @@ export type Env = {
   AI: unknown; // Cloudflare Workers AI binding
   ENVIRONMENT: string;
   FRONTEND_ORIGIN: string;
-  LARK_APP_ID?: string;
-  LARK_APP_SECRET?: string;
+  ENCRYPTION_KEY?: string; // 64-char hex (32 bytes) — AES-256-GCM key for encrypting secrets at rest
+  LARK_APP_ID?: string;    // DEPRECATED — kept as global fallback; prefer per-tenant lark_configs
+  LARK_APP_SECRET?: string;// DEPRECATED — kept as global fallback; prefer per-tenant lark_configs
   JWT_SECRET?: string;
   R2_ACCOUNT_ID?: string;
   R2_ACCESS_KEY_ID?: string;
