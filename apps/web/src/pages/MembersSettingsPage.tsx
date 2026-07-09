@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiGet, apiPost, apiDelete, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
+import { Dialog, DialogHeader, DialogTitle, DialogBody, DialogFooter } from "@/components/ui/dialog";
 
 interface Invite {
   id: string;
@@ -49,6 +50,7 @@ export function MembersSettingsPage() {
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [creatingAll, setCreatingAll] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   useEffect(() => {
     loadInvites();
@@ -105,8 +107,7 @@ export function MembersSettingsPage() {
       toast.success(`Đã tạo ${emails.length} lời mời`);
       await loadInvites();
       setCreatingAll(false);
-      const modal = document.getElementById("bulk-modal") as HTMLDialogElement | null;
-      modal?.close();
+      setBulkOpen(false);
       form.reset();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi tạo lời mời");
@@ -152,10 +153,7 @@ export function MembersSettingsPage() {
           <p className="text-sm text-muted-foreground mt-0.5">Quản lý lời mời tham gia phòng khám</p>
         </div>
         <button
-          onClick={() => {
-            const modal = document.getElementById("bulk-modal") as HTMLDialogElement | null;
-            modal?.showModal();
-          }}
+          onClick={() => setBulkOpen(true)}
           className="flex items-center gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent"
         >
           <MailIcon />
@@ -292,29 +290,12 @@ export function MembersSettingsPage() {
       )}
 
       {/* Bulk invite modal */}
-      <dialog
-        id="bulk-modal"
-        className="fixed inset-0 z-50 w-full max-w-lg rounded-2xl border border-border bg-background p-0 shadow-2xl backdrop:bg-black/60 backdrop:backdrop-blur-sm open:animate-in open:fade-in-0 open:zoom-in-95"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) (e.currentTarget as HTMLDialogElement).close();
-        }}
-      >
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="text-lg font-bold text-foreground">Gửi lời mời hàng loạt</h2>
-            <button
-              onClick={() => {
-                const modal = document.getElementById("bulk-modal") as HTMLDialogElement | null;
-                modal?.close();
-              }}
-              className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-            >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <form onSubmit={createBulkInvite} className="space-y-4">
+      <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
+        <DialogHeader>
+          <DialogTitle>Gửi lời mời hàng loạt</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={createBulkInvite} className="flex flex-col flex-1 min-h-0">
+          <DialogBody className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Email (mỗi dòng 1 email)</label>
               <textarea
@@ -336,28 +317,25 @@ export function MembersSettingsPage() {
                 <option value="admin">Quản trị</option>
               </select>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const modal = document.getElementById("bulk-modal") as HTMLDialogElement | null;
-                  modal?.close();
-                }}
-                className="h-10 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-              >
-                Hủy
-              </button>
-              <button
-                type="submit"
-                disabled={creatingAll}
-                className="h-10 rounded-lg bg-primary text-primary-foreground px-5 text-sm font-semibold transition-colors hover:opacity-90 disabled:opacity-50"
-              >
-                {creatingAll ? "Đang tạo…" : "Gửi tất cả"}
-              </button>
-            </div>
-          </form>
-        </div>
-      </dialog>
+          </DialogBody>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setBulkOpen(false)}
+              className="h-10 rounded-lg border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              disabled={creatingAll}
+              className="h-10 rounded-lg bg-primary text-primary-foreground px-5 text-sm font-semibold transition-colors hover:opacity-90 disabled:opacity-50"
+            >
+              {creatingAll ? "Đang tạo…" : "Gửi tất cả"}
+            </button>
+          </DialogFooter>
+        </form>
+      </Dialog>
     </div>
   );
 }
