@@ -249,6 +249,29 @@ export interface LarkSyncLog {
   created_at: string;
 }
 
+/**
+ * Per-tenant Lark configuration. Returned to clients WITHOUT the secret —
+ * only `app_id`, `enabled`, and `calendar_id` are visible to the UI.
+ * The secret is encrypted at rest in D1 (AES-256-GCM) and never leaves the Worker.
+ */
+export interface LarkConfigPublic {
+  tenant_id: string;
+  app_id: string;
+  /** True if a secret is configured (regardless of value). */
+  has_secret: boolean;
+  calendar_id?: string;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LarkConfigUpdate {
+  app_id: string;
+  app_secret: string;
+  calendar_id?: string;
+  enabled?: boolean;
+}
+
 // ───────────────────────── Voice ─────────────────────────
 
 export interface VoiceParsedFinding {

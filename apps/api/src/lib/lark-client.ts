@@ -4,6 +4,10 @@
  * Architecture rule #7: ONLY send operational fields to Lark.
  * Never include diagnosis details, treatment notes, or patient clinical data.
  *
+ * Multi-tenant: token cache is keyed by appId+appSecret so two clinics with
+ * different Lark apps do NOT share tokens. (Previously this was a module-level
+ * singleton — that was a security bug fixed here.)
+ *
  * If credentials are missing, callers should use lark-mock.ts instead.
  */
 
@@ -14,15 +18,25 @@ interface TokenCache {
   expiresAt: number;
 }
 
-let cachedToken: TokenCache | null = null;
+/**
+ * Per-appId token cache. Keyed by `${appId}::${appSecret}` to avoid any
+ * cross-tenant token bleed. In Workers, module state can be shared across
+ * requests in the same isolate, so this Map must be scoped by credentials.
+ */
+const tokenCache = new Map<string, TokenCache>();
+
+function cacheKey(appId: string, appSecret: string): string {
+  return `${appId}::${appSecret}`;
+}
 
 async function getTenantAccessToken(
   appId: string,
   appSecret: string,
 ): Promise<string> {
-  // Reuse cached token if still valid (5 min safety margin)
-  if (cachedToken && cachedToken.expiresAt - 300_000 > Date.now()) {
-    return cachedToken.token;
+  const key = cacheKey(appId, appSecret);
+  const cached = tokenCache.get(key);
+  if (cached && cached.expiresAt - 300_000 > Date.now()) {
+    return cached.token;
   }
   const res = await fetch(`${LARK_BASE}/auth/v3/tenant_access_token/internal`, {
     method: "POST",
@@ -39,10 +53,10 @@ async function getTenantAccessToken(
   if (!data.tenant_access_token) {
     throw new Error(`Lark auth error: ${data.code} ${data.msg}`);
   }
-  cachedToken = {
+  tokenCache.set(key, {
     token: data.tenant_access_token,
     expiresAt: Date.now() + (data.expire ?? 7200) * 1000,
-  };
+  });
   return data.tenant_access_token;
 }
 
@@ -132,4 +146,43 @@ export async function createLarkCalendarEvent(
     throw new Error(`Lark calendar error: ${data.code} ${data.msg}`);
   }
   return { eventId: data.data.event.id };
+}
+
+/**
+ * Test whether the supplied Lark credentials are valid by fetching
+ * a tenant_access_token. Returns true on success, false (with error) on failure.
+ *
+ * Used by the admin "Test connection" button in Clinic Settings.
+ */
+export async function testLarkCredentials(
+  appId: string,
+  appSecret: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(`${LARK_BASE}/auth/v3/tenant_access_token/internal`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ app_id: appId, app_secret: appSecret }),
+    });
+    const data = (await res.json()) as {
+      tenant_access_token?: string;
+      expire?: number;
+      code?: number;
+      msg?: string;
+    };
+    if (data.tenant_access_token) {
+      // Pre-warm the cache so the next real call skips the auth roundtrip.
+      tokenCache.set(cacheKey(appId, appSecret), {
+        token: data.tenant_access_token,
+        expiresAt: Date.now() + (data.expire ?? 7200) * 1000,
+      });
+      return { ok: true };
+    }
+    return { ok: false, error: `${data.code ?? "?"} ${data.msg ?? "unknown error"}` };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
