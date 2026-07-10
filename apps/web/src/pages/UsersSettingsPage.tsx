@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Dialog, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
@@ -252,7 +252,7 @@ export function UsersSettingsPage() {
           <DialogHeader>
             <DialogTitle>Tạo user mới</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3">
+          <DialogBody className="grid gap-3">
 
             <SectionDivider icon={<UserIcon />}>Thông tin đăng nhập</SectionDivider>
 
@@ -315,9 +315,9 @@ export function UsersSettingsPage() {
                 ))}
               </Select>
             </div>
-          </div>
+          </DialogBody>
 
-          <DialogFooter className="mt-4">
+          <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpenCreate(false)}>
               Hủy
             </Button>
@@ -334,7 +334,7 @@ export function UsersSettingsPage() {
           <DialogHeader>
             <DialogTitle>Sửa user</DialogTitle>
           </DialogHeader>
-          <div className="px-5 py-4 sm:px-6 sm:py-5 space-y-5 overflow-y-auto max-h-[60dvh]">
+          <DialogBody className="space-y-5">
 
             {/* Personal info section */}
             <div className="space-y-3">
@@ -425,7 +425,7 @@ export function UsersSettingsPage() {
               </div>
             </div>
 
-          </div>
+          </DialogBody>
 
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" onClick={() => setOpenEdit(false)}>

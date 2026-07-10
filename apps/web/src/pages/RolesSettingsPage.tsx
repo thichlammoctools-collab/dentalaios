@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Dialog, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
@@ -154,7 +154,7 @@ export function RolesSettingsPage() {
           <DialogHeader>
             <DialogTitle>Tạo vai trò mới</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3 mt-2">
+          <DialogBody className="grid gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="r-name">
                 Tên vai trò <span className="text-red-500">*</span>
@@ -176,8 +176,8 @@ export function RolesSettingsPage() {
                 placeholder="Mô tả ngắn về vai trò này"
               />
             </div>
-          </div>
-          <DialogFooter className="mt-4">
+          </DialogBody>
+          <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpenCreate(false)}>
               Hủy
             </Button>
@@ -194,7 +194,7 @@ export function RolesSettingsPage() {
           <DialogHeader>
             <DialogTitle>Sửa vai trò</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3 mt-2">
+          <DialogBody className="grid gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="re-name">
                 Tên vai trò <span className="text-red-500">*</span>
@@ -216,8 +216,8 @@ export function RolesSettingsPage() {
                 placeholder="Mô tả ngắn về vai trò này"
               />
             </div>
-          </div>
-          <DialogFooter className="mt-4">
+          </DialogBody>
+          <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpenEdit(false)}>
               Hủy
             </Button>

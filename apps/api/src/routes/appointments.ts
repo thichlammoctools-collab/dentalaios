@@ -87,6 +87,7 @@ router.get(
   async (c) => {
     const jwt = getJwt(c);
     const apt = await appointmentService.get(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    return c.json(apt);
   },
 );
 
@@ -116,3 +117,7 @@ router.delete(
       cancelled_reason: "Hủy bởi người dùng",
     });
     return c.json(cancelled, 200);
+  },
+);
+
+export default router;

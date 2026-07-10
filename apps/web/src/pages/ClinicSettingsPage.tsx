@@ -3,7 +3,7 @@ import { apiGet, apiPost, apiPatch, apiDelete, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import { BranchForm } from "@/components/BranchForm";
-import { Dialog, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogBody } from "@/components/ui/dialog";
 import type { Branch, Tenant } from "@shared/types";
 
 interface ClinicData {
@@ -433,7 +433,7 @@ export function ClinicSettingsPage() {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 mt-4">
+        <DialogBody className="space-y-3">
           <div>
             <label className="text-sm font-medium block mb-1">
               App ID <span className="text-destructive">*</span>
@@ -477,9 +477,9 @@ export function ClinicSettingsPage() {
               placeholder="primary (mặc định)"
             />
           </div>
-        </div>
+        </DialogBody>
 
-        <DialogFooter className="flex-col sm:flex-row gap-2 mt-4">
+        <DialogFooter className="flex-col sm:flex-row gap-2">
           <button
             onClick={testLarkConnection}
             disabled={testingLark || !larkForm.app_id.trim() || !larkForm.app_secret.trim()}
