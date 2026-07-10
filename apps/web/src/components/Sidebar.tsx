@@ -6,7 +6,7 @@ interface NavItem {
   label: string;
   href: string;
   match: (path: string) => boolean;
-  icon: "calendar" | "patients" | "settings" | "users" | "members" | "clinic" | "roles" | "audit";
+  icon: "calendar" | "patients" | "settings" | "users" | "members" | "clinic" | "roles" | "audit" | "schedule";
 }
 
 const ICONS: Record<NavItem["icon"], React.ReactNode> = {
@@ -59,10 +59,18 @@ const ICONS: Record<NavItem["icon"], React.ReactNode> = {
       <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
     </svg>
   ),
+  schedule: (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4M8 2v4M3 10h18" />
+      <path d="M8 14h2v2H8zM14 14h2v2h-2z" />
+    </svg>
+  ),
 };
 
 const NAV: NavItem[] = [
   { label: "Hôm nay", href: ROUTES.TODAY, match: (p) => p === ROUTES.TODAY, icon: "calendar" },
+  { label: "Lịch hẹn", href: ROUTES.SCHEDULE, match: (p) => p.startsWith("/schedule"), icon: "schedule" },
   { label: "Bệnh nhân", href: ROUTES.PATIENTS, match: (p) => p.startsWith("/patients"), icon: "patients" },
   {
     label: "Cài đặt",
