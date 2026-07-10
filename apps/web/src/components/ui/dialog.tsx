@@ -68,7 +68,7 @@ interface DialogHeaderProps {
 
 export function DialogHeader({ className, children }: DialogHeaderProps) {
   return (
-    <div className={cn("flex-shrink-0 border-b border-border px-5 pt-5 pb-4 sm:px-6 sm:pt-6 sm:pb-4", className)}>
+    <div className={cn("flex-shrink-0 border-b border-border px-6 pt-5 pb-4 sm:px-8 sm:pt-6 sm:pb-4", className)}>
       {children}
     </div>
   );
@@ -84,7 +84,7 @@ export function DialogDescription({ children }: { children: ReactNode }) {
 
 export function DialogBody({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <div className={cn("flex-1 overflow-y-auto px-5 py-4 sm:px-6 sm:py-5", className)}>
+    <div className={cn("flex-1 overflow-y-auto px-6 py-4 sm:px-8 sm:py-5", className)}>
       {children}
     </div>
   );
@@ -92,7 +92,7 @@ export function DialogBody({ className, children }: { className?: string; childr
 
 export function DialogFooter({ className, children }: DialogHeaderProps) {
   return (
-    <div className={cn("flex-shrink-0 border-t border-border px-5 pb-5 pt-4 sm:px-6 sm:pb-6", className)}>
+    <div className={cn("flex-shrink-0 border-t border-border px-6 pb-5 pt-4 sm:px-8 sm:pb-6", className)}>
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         {children}
       </div>
