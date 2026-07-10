@@ -1,24 +1,10 @@
 import { useEffect, useState } from "react";
-import { apiGet, apiPost, apiPut, apiPatch, apiDelete, ApiError } from "@/lib/api";
+import { apiGet, apiPost, apiPatch, apiDelete, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
+import { BranchForm } from "@/components/BranchForm";
 import { Dialog, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-
-interface Branch {
-  id: string;
-  tenant_id: string;
-  name: string;
-  address: string;
-  created_at: string;
-}
-
-interface Tenant {
-  id: string;
-  name: string;
-  slug?: string;
-  is_active: boolean;
-  created_at: string;
-}
+import type { Branch, Tenant } from "@shared/types";
 
 interface ClinicData {
   tenant: Tenant;
@@ -45,11 +31,9 @@ export function ClinicSettingsPage() {
   const [clinicName, setClinicName] = useState("");
   const [savingName, setSavingName] = useState(false);
 
-  // Branch dialog
+  // Branch dialog (open/close + which branch to edit; form logic lives in BranchForm)
   const [branchDialogOpen, setBranchDialogOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
-  const [branchForm, setBranchForm] = useState({ name: "", address: "" });
-  const [savingBranch, setSavingBranch] = useState(false);
 
   // Lark integration
   const [larkConfig, setLarkConfig] = useState<LarkConfig | null>(null);
@@ -97,42 +81,21 @@ export function ClinicSettingsPage() {
 
   function openAddBranch() {
     setEditingBranch(null);
-    setBranchForm({ name: "", address: "" });
     setBranchDialogOpen(true);
   }
 
   function openEditBranch(branch: Branch) {
     setEditingBranch(branch);
-    setBranchForm({ name: branch.name, address: branch.address });
     setBranchDialogOpen(true);
   }
 
-  async function saveBranch() {
-    setSavingBranch(true);
+  /** Called by BranchForm after successful save — refresh the list from server. */
+  async function refreshBranches() {
     try {
-      if (editingBranch) {
-        const updated = await apiPatch<Branch>(`/api/clinic/branches/${editingBranch.id}`, {
-          name: branchForm.name.trim(),
-          address: branchForm.address.trim(),
-        });
-        setData((prev) => prev ? {
-          ...prev,
-          branches: prev.branches.map((b) => b.id === updated.id ? updated : b),
-        } : prev);
-        toast.success("Đã cập nhật chi nhánh");
-      } else {
-        const created = await apiPost<Branch>("/api/clinic/branches", {
-          name: branchForm.name.trim(),
-          address: branchForm.address.trim(),
-        });
-        setData((prev) => prev ? { ...prev, branches: [...prev.branches, created] } : prev);
-        toast.success("Đã thêm chi nhánh");
-      }
-      setBranchDialogOpen(false);
+      const clinicRes = await apiGet<ClinicData>("/api/clinic");
+      setData((prev) => prev ? { ...prev, branches: clinicRes.branches } : prev);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Lỗi lưu");
-    } finally {
-      setSavingBranch(false);
+      toast.error(err instanceof ApiError ? err.message : "Lỗi tải chi nhánh");
     }
   }
 
@@ -320,9 +283,30 @@ export function ClinicSettingsPage() {
                       <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">Hiện tại</span>
                     )}
                   </div>
+
+                  {/* Address */}
                   {branch.address && (
                     <p className="text-sm text-muted-foreground mt-1">{branch.address}</p>
                   )}
+
+                  {/* Contact row */}
+                  {(branch.phone || branch.email) && (
+                    <div className="text-sm text-muted-foreground mt-1 flex flex-wrap gap-x-4">
+                      {branch.phone && <span>SĐT: {branch.phone}</span>}
+                      {branch.email && <span>Email: {branch.email}</span>}
+                    </div>
+                  )}
+
+                  {/* Manager + opening date row */}
+                  {(branch.manager_name || branch.opening_date) && (
+                    <div className="text-sm text-muted-foreground mt-1 flex flex-wrap gap-x-4">
+                      {branch.manager_name && <span>Phụ trách: {branch.manager_name}</span>}
+                      {branch.opening_date && (
+                        <span>Khai trương: {new Date(branch.opening_date).toLocaleDateString("vi-VN")}</span>
+                      )}
+                    </div>
+                  )}
+
                   <p className="text-xs text-muted-foreground mt-1">
                     Tạo: {new Date(branch.created_at).toLocaleDateString("vi-VN")}
                   </p>
@@ -414,7 +398,7 @@ export function ClinicSettingsPage() {
               <div className="flex-1 min-w-0">
                 <span className="font-medium">Chưa cấu hình</span>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Kết nối Lark để đồng bộ bàn giao ca điều trị sang workspace của phòng khám.
+                  Kết nối Lark để đồng bộ bàn giao ca điều trị và thông báo chi nhánh mới sang workspace của phòng khám.
                 </p>
               </div>
               {isAdmin && (
@@ -430,58 +414,13 @@ export function ClinicSettingsPage() {
         </div>
       </section>
 
-      {/* Branch dialog */}
-      <Dialog open={branchDialogOpen} onOpenChange={setBranchDialogOpen}>
-        <DialogHeader>
-          <DialogTitle>
-            {editingBranch ? "Sửa chi nhánh" : "Thêm chi nhánh mới"}
-          </DialogTitle>
-          <DialogDescription>
-            {editingBranch ? "Cập nhật thông tin chi nhánh." : "Tạo một chi nhánh mới cho phòng khám."}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-3 mt-4">
-          <div>
-            <label className="text-sm font-medium block mb-1">Tên chi nhánh <span className="text-destructive">*</span></label>
-            <input
-              type="text"
-              required
-              value={branchForm.name}
-              onChange={(e) => setBranchForm((f) => ({ ...f, name: e.target.value }))}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/40"
-              placeholder="Chi nhánh 1"
-              autoFocus
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium block mb-1">Địa chỉ</label>
-            <textarea
-              value={branchForm.address}
-              onChange={(e) => setBranchForm((f) => ({ ...f, address: e.target.value }))}
-              rows={2}
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/40 resize-none"
-              placeholder="123 Đường ABC, Quận 1, TP.HCM"
-            />
-          </div>
-        </div>
-
-        <DialogFooter>
-          <button
-            onClick={() => setBranchDialogOpen(false)}
-            className="rounded-md border border-input px-4 py-2 text-sm hover:bg-muted"
-          >
-            Hủy
-          </button>
-          <button
-            onClick={saveBranch}
-            disabled={savingBranch || !branchForm.name.trim()}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
-            {savingBranch ? "Đang lưu..." : editingBranch ? "Cập nhật" : "Thêm mới"}
-          </button>
-        </DialogFooter>
-      </Dialog>
+      {/* Branch form dialog (component-managed) */}
+      <BranchForm
+        open={branchDialogOpen}
+        onOpenChange={setBranchDialogOpen}
+        branch={editingBranch}
+        onSaved={refreshBranches}
+      />
 
       {/* Lark config dialog */}
       <Dialog open={larkDialogOpen} onOpenChange={setLarkDialogOpen}>
@@ -490,7 +429,7 @@ export function ClinicSettingsPage() {
             {larkConfig ? "Cập nhật cấu hình Lark" : "Kết nối Lark"}
           </DialogTitle>
           <DialogDescription>
-            Nhập thông tin Lark App để đồng bộ bàn giao ca điều trị.
+            Nhập thông tin Lark App để đồng bộ bàn giao ca điều trị và thông báo chi nhánh mới.
           </DialogDescription>
         </DialogHeader>
 

@@ -164,7 +164,6 @@ async function validateScheduleConstraints(
   const weekday = weekdayFromDate(startISO);
   const slotStart = timeFromISO(startISO);
   const slotEnd = timeFromISO(endISO);
-
   // 1. Check doctor has working schedule for this weekday
   const docRepo = createDoctorSchedulesRepository(db);
   const docSchedules = await docRepo.listByDoctor(tenantId, branchId, clinicianId);
