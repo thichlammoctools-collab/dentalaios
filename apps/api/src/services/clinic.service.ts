@@ -33,7 +33,14 @@ export const clinicService = {
   async createBranch(
     db: D1Database,
     tenantId: string,
-    data: { name: string; address?: string },
+    data: {
+      name: string;
+      address?: string;
+      phone?: string;
+      email?: string;
+      manager_name?: string;
+      opening_date?: string | null;
+    },
   ): Promise<Branch> {
     return createBranchRepository(db).create(tenantId, data);
   },
@@ -42,7 +49,14 @@ export const clinicService = {
     db: D1Database,
     tenantId: string,
     branchId: string,
-    data: { name?: string; address?: string },
+    data: {
+      name?: string;
+      address?: string;
+      phone?: string;
+      email?: string;
+      manager_name?: string;
+      opening_date?: string | null;
+    },
   ): Promise<Branch | null> {
     return createBranchRepository(db).update(tenantId, branchId, data);
   },

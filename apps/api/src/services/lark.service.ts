@@ -1,8 +1,8 @@
 /**
- * Lark service — Task + Calendar creation for treatment plan handover.
+ * Lark service — Task + Calendar creation.
  *
  * Architecture rule #7: ONLY operational fields (patient name, procedure count,
- * scheduled time). NO diagnosis details, NO clinical notes.
+ * scheduled time, branch info). NO diagnosis details, NO clinical notes.
  *
  * Per-tenant: credentials are read from the lark_configs D1 table using
  * the tenant's own app_id + app_secret. If the tenant has not configured
@@ -21,6 +21,16 @@ export interface LarkHandoverInput {
   itemCount: number;
   approverName: string;
   scheduledAt?: string; // ISO
+}
+
+export interface LarkBranchNotifyInput {
+  name: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  manager_name?: string;
+  opening_date?: string; // YYYY-MM-DD
+  createdBy: string;
 }
 
 export interface LarkHandoverResult {
@@ -59,62 +69,125 @@ export const larkService = {
       .filter(Boolean)
       .join("\n");
 
-    // Read per-tenant Lark credentials from D1
-    let appId: string | undefined;
-    let appSecret: string | undefined;
-    let calendarId: string | undefined;
+    const due = input.scheduledAt;
 
-    if (encryptionKey) {
-      try {
-        const repo = createLarkConfigRepository(db);
-        const config = await repo.getByTenant(tenantId, encryptionKey);
-        if (config && config.enabled) {
-          appId = config.app_id;
-          appSecret = config.app_secret;
-          calendarId = config.calendar_id ?? undefined;
-        }
-      } catch (err) {
-        console.error("[lark] failed to read per-tenant config:", err);
-      }
-    }
-
-    if (!appId || !appSecret) {
-      // Mock fallback — tenant hasn't configured Lark or credentials are missing
-      console.warn(
-        `[lark] No Lark config for tenant ${tenantId} — returning mocked result`,
-      );
-      return {
-        mocked: true,
-        taskId: `mock-task-${newId()}`,
-        warning: "Lark credentials not configured — task was mocked",
-      };
-    }
-
-    const taskResult = await createLarkTask(appId, appSecret, {
+    return executeLarkCall(db, tenantId, encryptionKey, {
       summary,
       description,
-      due: input.scheduledAt,
+      due,
+      openingDate: input.scheduledAt,
     });
+  },
 
-    let calendarEventId: string | undefined;
-    if (input.scheduledAt) {
-      const start = new Date(input.scheduledAt);
-      const end = new Date(start.getTime() + 30 * 60 * 1000); // 30 min default
-      const cal = await createLarkCalendarEvent(appId, appSecret, {
-        summary,
-        description,
-        start: start.toISOString(),
-        end: end.toISOString(),
-        calendarId,
-      });
-      calendarEventId = cal.eventId;
-    }
+  /**
+   * Create a Lark task + calendar event for a newly-created branch.
+   *
+   * Task is always created. Calendar event is only created when `opening_date`
+   * is provided.
+   */
+  async createBranchNotify(
+    db: D1Database,
+    tenantId: string,
+    input: LarkBranchNotifyInput,
+    encryptionKey?: string,
+  ): Promise<LarkHandoverResult> {
+    const summary = `Chi nhánh mới: ${input.name}`;
+    const description = [
+      `Chi nhánh: ${input.name}`,
+      input.address ? `Địa chỉ: ${input.address}` : null,
+      input.phone ? `SĐT: ${input.phone}` : null,
+      input.email ? `Email: ${input.email}` : null,
+      input.manager_name ? `Quản lý: ${input.manager_name}` : null,
+      input.opening_date ? `Ngày khai trương: ${input.opening_date}` : null,
+      `Tạo bởi: ${input.createdBy}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
 
-    return {
-      mocked: false,
-      taskId: taskResult.taskId,
-      taskUrl: taskResult.url,
-      calendarEventId,
-    };
+    // Lark Calendar uses ISO timestamp. For all-day opening dates, set 09:00 local.
+    const openingDate = input.opening_date
+      ? `${input.opening_date}T09:00:00+07:00`
+      : undefined;
+
+    return executeLarkCall(db, tenantId, encryptionKey, {
+      summary,
+      description,
+      due: openingDate,
+      openingDate,
+    });
   },
 };
+
+/**
+ * Internal helper: read per-tenant Lark credentials and call Lark API.
+ * Returns mocked result if credentials are missing.
+ */
+async function executeLarkCall(
+  db: D1Database,
+  tenantId: string,
+  encryptionKey: string | undefined,
+  params: {
+    summary: string;
+    description: string;
+    due?: string;
+    openingDate?: string;
+  },
+): Promise<LarkHandoverResult> {
+  // Read per-tenant Lark credentials from D1
+  let appId: string | undefined;
+  let appSecret: string | undefined;
+  let calendarId: string | undefined;
+
+  if (encryptionKey) {
+    try {
+      const repo = createLarkConfigRepository(db);
+      const config = await repo.getByTenant(tenantId, encryptionKey);
+      if (config && config.enabled) {
+        appId = config.app_id;
+        appSecret = config.app_secret;
+        calendarId = config.calendar_id ?? undefined;
+      }
+    } catch (err) {
+      console.error("[lark] failed to read per-tenant config:", err);
+    }
+  }
+
+  if (!appId || !appSecret) {
+    // Mock fallback — tenant hasn't configured Lark or credentials are missing
+    console.warn(
+      `[lark] No Lark config for tenant ${tenantId} — returning mocked result`,
+    );
+    return {
+      mocked: true,
+      taskId: `mock-task-${newId()}`,
+      warning: "Lark credentials not configured — task was mocked",
+    };
+  }
+
+  const taskResult = await createLarkTask(appId, appSecret, {
+    summary: params.summary,
+    description: params.description,
+    due: params.due,
+  });
+
+  let calendarEventId: string | undefined;
+  if (params.openingDate) {
+    const start = new Date(params.openingDate);
+    const end = new Date(start.getTime() + 30 * 60 * 1000); // 30 min default
+    const cal = await createLarkCalendarEvent(appId, appSecret, {
+      summary: params.summary,
+      description: params.description,
+      start: start.toISOString(),
+      end: end.toISOString(),
+      calendarId,
+    });
+    calendarEventId = cal.eventId;
+  }
+
+  return {
+    mocked: false,
+    taskId: taskResult.taskId,
+    taskUrl: taskResult.url,
+    calendarEventId,
+  };
+}

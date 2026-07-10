@@ -1,9 +1,10 @@
 /**
- * Lark retry queue consumer.
+ * Lark queue consumer.
  *
- * Reads messages from `dentalaios-jobs` queue.
- * Each message references a `lark_sync_logs` row that previously failed.
- * Worker retries the Lark call and updates the log status.
+ * Reads messages from `dentalaios-jobs` queue and dispatches by message type:
+ *
+ *   - "lark_retry"        → retry a previously-failed treatment-plan handover
+ *   - "branch_lark_sync"  → notify Lark about a newly-created branch
  *
  * Max 3 retries (configured in wrangler.jsonc).
  * After 3 failures → DLQ (Cloudflare Queues auto-routes).
@@ -21,17 +22,30 @@ export interface LarkRetryMessage {
   attempt: number;
 }
 
+export interface BranchLarkSyncMessage {
+  type: "branch_lark_sync";
+  branch_id: string;
+  tenant_id: string;
+  created_by: string;
+}
+
+export type LarkQueueMessage = LarkRetryMessage | BranchLarkSyncMessage;
+
 export async function larkRetryConsumer(
-  batch: MessageBatch<LarkRetryMessage>,
+  batch: MessageBatch<LarkQueueMessage>,
   env: Env,
 ): Promise<void> {
   for (const msg of batch.messages) {
     try {
-      await processOne(msg.body, env);
+      if (msg.body.type === "lark_retry") {
+        await processLarkRetry(msg.body, env);
+      } else if (msg.body.type === "branch_lark_sync") {
+        await processBranchSync(msg.body, env);
+      }
       msg.ack();
     } catch (err) {
       console.error(
-        `[lark-retry] failed attempt=${msg.body.attempt} entity=${msg.body.entity_id}:`,
+        `[lark-queue] failed type=${msg.body.type}:`,
         err instanceof Error ? err.message : String(err),
       );
       msg.retry();
@@ -39,7 +53,7 @@ export async function larkRetryConsumer(
   }
 }
 
-async function processOne(msg: LarkRetryMessage, env: Env): Promise<void> {
+async function processLarkRetry(msg: LarkRetryMessage, env: Env): Promise<void> {
   // Look up original log entry to reconstruct the payload
   const logRow = await env.DB.prepare(
     "SELECT * FROM lark_sync_logs WHERE id = ? AND tenant_id = ? LIMIT 1",
@@ -112,6 +126,71 @@ async function processOne(msg: LarkRetryMessage, env: Env): Promise<void> {
      SET lark_event_id = ?, status = ?, error = ?
      WHERE id = ? AND tenant_id = ?`,
   )
-    .bind(result.taskId, result.mocked ? "failed" : "synced", result.warning ?? null, msg.lark_sync_log_id, msg.tenant_id)
+    .bind(
+      result.taskId,
+      result.mocked ? "failed" : "synced",
+      result.warning ?? null,
+      msg.lark_sync_log_id,
+      msg.tenant_id,
+    )
+    .run();
+}
+
+/**
+ * Process a branch creation Lark notification.
+ * Reads branch from D1, calls larkService.createBranchNotify,
+ * and writes a lark_sync_logs row for auditability.
+ */
+async function processBranchSync(msg: BranchLarkSyncMessage, env: Env): Promise<void> {
+  // Read branch row from D1
+  const branchRow = await env.DB.prepare(
+    "SELECT * FROM branches WHERE id = ? AND tenant_id = ? LIMIT 1",
+  )
+    .bind(msg.branch_id, msg.tenant_id)
+    .first<{
+      id: string;
+      tenant_id: string;
+      name: string;
+      address: string;
+      phone: string;
+      email: string;
+      manager_name: string;
+      opening_date: string | null;
+    } | null>();
+
+  if (!branchRow) {
+    console.warn(`[branch-sync] branch not found: ${msg.branch_id}`);
+    return;
+  }
+
+  const result = await larkService.createBranchNotify(
+    env.DB,
+    msg.tenant_id,
+    {
+      name: branchRow.name,
+      address: branchRow.address || undefined,
+      phone: branchRow.phone || undefined,
+      email: branchRow.email || undefined,
+      manager_name: branchRow.manager_name || undefined,
+      opening_date: branchRow.opening_date || undefined,
+      createdBy: msg.created_by,
+    },
+    env.ENCRYPTION_KEY,
+  );
+
+  // Write sync log row
+  await env.DB.prepare(
+    `INSERT INTO lark_sync_logs
+       (id, tenant_id, entity_type, entity_id, lark_event_id, status, error)
+     VALUES (?, ?, 'branch', ?, ?, ?, ?)`,
+  )
+    .bind(
+      crypto.randomUUID(),
+      msg.tenant_id,
+      branchRow.id,
+      result.taskId,
+      result.mocked ? "failed" : "synced",
+      result.warning ?? null,
+    )
     .run();
 }

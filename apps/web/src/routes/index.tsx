@@ -55,6 +55,22 @@ export function AppRoutes() {
         }
       />
       <Route
+        path={ROUTES.SCHEDULE}
+        element={
+          <Protected>
+            <SchedulePage />
+          </Protected>
+        }
+      />
+      <Route
+        path={ROUTES.SCHEDULE_NEW}
+        element={
+          <Protected>
+            <ScheduleNewPage />
+          </Protected>
+        }
+      />
+      <Route
         path={ROUTES.PATIENTS}
         element={
           <Protected>
