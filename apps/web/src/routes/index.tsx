@@ -17,6 +17,8 @@ import { ClinicSettingsPage } from "@/pages/ClinicSettingsPage";
 import { RolesSettingsPage } from "@/pages/RolesSettingsPage";
 import { AuditLogsPage } from "@/pages/AuditLogsPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
+import { SchedulePage } from "@/pages/SchedulePage";
+import { ScheduleNewPage } from "@/pages/ScheduleNewPage";
 import { RequireAuth } from "@/components/RequireAuth";
 import { AppShell } from "@/components/AppShell";
 

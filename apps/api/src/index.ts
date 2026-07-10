@@ -37,6 +37,7 @@ import filesRoutes from "./routes/files";
 import clinicRoutes from "./routes/clinic";
 import patientImagesRoutes from "./routes/patient-images";
 import appointmentsRoutes from "./routes/appointments";
+import schedulesRoutes from "./routes/schedules";
 
 export type Env = {
   DB: D1Database;
@@ -154,6 +155,10 @@ app.route("/api/roles", rolesRoutes);
 app.route("/api/files", filesRoutes);
 app.route("/api/clinic", clinicRoutes);
 app.route("/api/patient-images", patientImagesRoutes);
+
+// Appointments + Schedules
+app.route("/api/appointments", appointmentsRoutes);
+app.route("/api/schedules", schedulesRoutes);
 
 // 404
 app.notFound((c) => c.json({ error: "Not found", code: "not_found" }, 404));

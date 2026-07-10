@@ -11,6 +11,8 @@ export const ROUTES = {
   PATIENT_DETAIL: "/patients/:id",
   VISIT_DETAIL: "/visits/:id",
   TREATMENT_PLAN: "/treatment-plans/:id",
+  SCHEDULE: "/schedule",
+  SCHEDULE_NEW: "/schedule/new",
   SETTINGS_USERS: "/settings/users",
   SETTINGS_MEMBERS: "/settings/members",
   SETTINGS_ROLES: "/settings/roles",
@@ -54,6 +56,23 @@ export const VISIT_STATUSES = ["in_progress", "completed", "cancelled"] as const
 
 /** Treatment plan statuses (mirrors TreatmentPlanStatus in types). */
 export const PLAN_STATUSES = ["draft", "approved", "completed", "cancelled"] as const;
+
+/** Appointment statuses (mirrors AppointmentStatus in types). */
+export const APPOINTMENT_STATUSES = ["booked", "confirmed", "arrived", "completed", "cancelled", "no_show"] as const;
+
+/** Vietnamese labels for appointment statuses. */
+export const APPOINTMENT_STATUS_LABELS: Record<(typeof APPOINTMENT_STATUSES)[number], string> = {
+  booked: "Chờ xác nhận",
+  confirmed: "Đã xác nhận",
+  arrived: "Đã đến",
+  completed: "Hoàn thành",
+  cancelled: "Đã hủy",
+  no_show: "Không đến",
+};
+
+/** Default clinic operating hours when clinic_schedules row is missing. */
+export const DEFAULT_CLINIC_OPEN = "08:00";
+export const DEFAULT_CLINIC_CLOSE = "17:00";
 
 /** Default currency for V1 — Vietnam. */
 export const DEFAULT_CURRENCY = "VND";
