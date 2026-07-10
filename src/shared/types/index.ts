@@ -356,6 +356,65 @@ export interface JwtPayload {
   iat: number;
 }
 
+// ───────────────────────── Appointments ─────────────────────────
+
+export type AppointmentStatus =
+  | "booked"      // Created, waiting for patient confirmation
+  | "confirmed"   // Patient confirmed
+  | "arrived"     // Patient arrived at clinic
+  | "completed"   // Visit happened, appointment fulfilled
+  | "cancelled"   // Cancelled by clinic or patient
+  | "no_show";    // Patient did not show up
+
+export type AppointmentSource = "manual" | "ai_chat" | "ai_next_visit" | "reschedule";
+
+export interface Appointment {
+  id: string;
+  tenant_id: string;
+  branch_id: string;
+  clinician_id: string;
+  patient_id: string;
+  source_visit_id?: string;
+  scheduled_at: string;  // ISO datetime
+  duration_min: number;
+  status: AppointmentStatus;
+  procedure?: string;
+  notes?: string;
+  source: AppointmentSource;
+  lark_event_id?: string;
+  reminder_sent_at?: string;
+  reminder_method?: string;
+  cancelled_reason?: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ───────────────────────── Schedules ─────────────────────────
+
+export interface ClinicSchedule {
+  id: string;
+  tenant_id: string;
+  branch_id: string;
+  weekday: number;  // 1=Mon..7=Sun
+  open_time: string;  // "HH:MM"
+  close_time: string; // "HH:MM"
+  is_closed: boolean;
+  created_at: string;
+}
+
+export interface DoctorSchedule {
+  id: string;
+  tenant_id: string;
+  branch_id: string;
+  doctor_id: string;
+  weekday: number;  // 1=Mon..7=Sun
+  start_time: string;
+  end_time: string;
+  slot_minutes: number;
+  created_at: string;
+}
+
 // ───────────────────────── SaaS Registration ─────────────────────────
 
 export interface RegisterRequest {

@@ -299,3 +299,69 @@ export const roleUpdateSchema = z.object({
 
 export type RoleCreateInput = z.infer<typeof roleCreateSchema>;
 export type RoleUpdateInput = z.infer<typeof roleUpdateSchema>;
+
+// ──────────────── Appointment ────────────────
+
+export const appointmentCreateSchema = z.object({
+  patient_id: z.string().min(1),
+  clinician_id: z.string().min(1),
+  scheduled_at: z.string().datetime({ offset: true }),
+  duration_min: z.number().int().min(15).max(480).default(30),
+  procedure: optionalText(100),
+  notes: optionalText(2000),
+  source_visit_id: z.string().min(1).optional(),
+  source: z.enum(["manual", "ai_chat", "ai_next_visit", "reschedule"]).default("manual"),
+});
+
+export const appointmentUpdateSchema = z.object({
+  status: z.enum(["booked", "confirmed", "arrived", "completed", "cancelled", "no_show"]).optional(),
+  scheduled_at: z.string().datetime({ offset: true }).optional(),
+  duration_min: z.number().int().min(15).max(480).optional(),
+  procedure: optionalText(100).optional(),
+  notes: optionalText(2000).optional(),
+  cancelled_reason: optionalText(500).optional(),
+});
+
+export const appointmentSlotQuerySchema = z.object({
+  doctor_id: z.string().min(1),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+export type AppointmentCreateInput = z.infer<typeof appointmentCreateSchema>;
+export type AppointmentUpdateInput = z.infer<typeof appointmentUpdateSchema>;
+export type AppointmentSlotQuery = z.infer<typeof appointmentSlotQuerySchema>;
+
+// ──────────────── Doctor Schedule ────────────────
+
+export const doctorScheduleEntrySchema = z.object({
+  weekday: z.number().int().min(1).max(7),
+  start_time: z.string().regex(/^\d{2}:\d{2}$/),
+  end_time: z.string().regex(/^\d{2}:\d{2}$/),
+  slot_minutes: z.number().int().min(15).max(120).default(30),
+});
+
+export const doctorScheduleBulkUpdateSchema = z.object({
+  doctor_id: z.string().min(1),
+  branch_id: z.string().min(1),
+  entries: z.array(doctorScheduleEntrySchema).max(7),
+});
+
+export type DoctorScheduleEntry = z.infer<typeof doctorScheduleEntrySchema>;
+export type DoctorScheduleBulkUpdate = z.infer<typeof doctorScheduleBulkUpdateSchema>;
+
+// ──────────────── Clinic Schedule ────────────────
+
+export const clinicScheduleEntrySchema = z.object({
+  weekday: z.number().int().min(1).max(7),
+  open_time: z.string().regex(/^\d{2}:\d{2}$/),
+  close_time: z.string().regex(/^\d{2}:\d{2}$/),
+  is_closed: z.boolean().default(false),
+});
+
+export const clinicScheduleBulkUpdateSchema = z.object({
+  branch_id: z.string().min(1),
+  entries: z.array(clinicScheduleEntrySchema).max(7),
+});
+
+export type ClinicScheduleEntry = z.infer<typeof clinicScheduleEntrySchema>;
+export type ClinicScheduleBulkUpdate = z.infer<typeof clinicScheduleBulkUpdateSchema>;
