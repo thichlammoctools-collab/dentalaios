@@ -6,6 +6,7 @@
 export const ROUTES = {
   LOGIN: "/login",
   TODAY: "/today",
+  CALENDAR: "/calendar",
   PATIENTS: "/patients",
   PATIENT_DETAIL: "/patients/:id",
   VISIT_DETAIL: "/visits/:id",

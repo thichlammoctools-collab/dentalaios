@@ -283,6 +283,31 @@ export type AiAnalyzeImageInput = z.infer<typeof aiAnalyzeImageSchema>;
 export type UserCreateInput = z.infer<typeof userCreateSchema>;
 export type UserUpdateInput = z.infer<typeof userUpdateSchema>;
 
+// ──────────────── Appointments ────────────────
+
+export const appointmentCreateSchema = z.object({
+  patient_id: z.string().min(1),
+  branch_id: z.string().min(1), // injected by route from JWT
+  doctor_id: z.string().min(1).optional(),
+  scheduled_at: z.string().datetime({ offset: true }),
+  duration_minutes: z.number().int().positive().max(480).default(60),
+  room: optionalText(100),
+  notes: optionalText(500),
+});
+
+export const appointmentUpdateSchema = z.object({
+  scheduled_at: z.string().datetime({ offset: true }).optional(),
+  duration_minutes: z.number().int().positive().max(480).optional(),
+  room: optionalText(100).optional(),
+  notes: optionalText(500).optional(),
+  status: z.enum(["scheduled", "confirmed", "completed", "cancelled", "no_show"]).optional(),
+  doctor_id: z.string().min(1).nullable().optional(),
+  doctor_name: z.string().min(1).nullable().optional(),
+});
+
+export type AppointmentCreateInput = z.infer<typeof appointmentCreateSchema>;
+export type AppointmentUpdateInput = z.infer<typeof appointmentUpdateSchema>;
+
 // ──────────────── Roles ────────────────
 
 export const roleCreateSchema = z.object({

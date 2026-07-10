@@ -2,7 +2,7 @@
 # Run from repo root: powershell -ExecutionPolicy Bypass -File deploy.ps1
 
 $ErrorActionPreference = "Stop"
-$env:CLOUDFLARE_API_TOKEN = "cfut_0LKl0F0xMjWjihrWE7Po8JWUpQJBJdAA8KQdCsh6b5f5da5f"
+$env:CLOUDFLARE_API_TOKEN = "cfut_aV43XAEeMnIkjpwsQLxsUDmhFldW92bD3Get1jxbd9e290d9"
 $env:CLOUDFLARE_ACCOUNT_ID = "6c99b69a2ef00c1754fae70793262cd3"
 
 Write-Host "==> Step 1: Apply D1 migrations to remote" -ForegroundColor Cyan

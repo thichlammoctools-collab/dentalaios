@@ -21,12 +21,9 @@ export function createPatientImagesRepository(db: D1Database): PatientImagesRepo
       const offset = opts.offset ?? 0;
       const result = await db
         .prepare(
-          `SELECT pi.*,
-                  u.name AS uploader_name,
-                  fo.filename, fo.content_type, fo.size
+          `SELECT pi.*, u.name AS uploader_name
              FROM patient_images pi
              JOIN users u ON u.id = pi.uploaded_by
-             JOIN file_objects fo ON fo.id = pi.file_id
              WHERE pi.tenant_id = ? AND pi.patient_id = ?
              ORDER BY pi.created_at DESC
              LIMIT ? OFFSET ?`,
@@ -41,12 +38,9 @@ export function createPatientImagesRepository(db: D1Database): PatientImagesRepo
       const offset = opts.offset ?? 0;
       const result = await db
         .prepare(
-          `SELECT pi.*,
-                  u.name AS uploader_name,
-                  fo.filename, fo.content_type, fo.size
+          `SELECT pi.*, u.name AS uploader_name
              FROM patient_images pi
              JOIN users u ON u.id = pi.uploaded_by
-             JOIN file_objects fo ON fo.id = pi.file_id
              WHERE pi.tenant_id = ? AND pi.visit_id = ?
              ORDER BY pi.created_at DESC
              LIMIT ? OFFSET ?`,
@@ -59,12 +53,9 @@ export function createPatientImagesRepository(db: D1Database): PatientImagesRepo
     async getById(tenantId, id) {
       const row = (await db
         .prepare(
-          `SELECT pi.*,
-                  u.name AS uploader_name,
-                  fo.filename, fo.content_type, fo.size
+          `SELECT pi.*, u.name AS uploader_name
              FROM patient_images pi
              JOIN users u ON u.id = pi.uploaded_by
-             JOIN file_objects fo ON fo.id = pi.file_id
              WHERE pi.tenant_id = ? AND pi.id = ? LIMIT 1`,
         )
         .bind(tenantId, id)
@@ -124,9 +115,6 @@ function mapImage(row: D1Row): PatientImage {
     original_name: (row.original_name as string | null) ?? undefined,
     original_size: (row.original_size as number | null) ?? undefined,
     uploader_name: (row.uploader_name as string | null) ?? undefined,
-    filename: (row.filename as string | null) ?? undefined,
-    content_type: (row.content_type as string | null) ?? undefined,
-    size: (row.size as number | null) ?? undefined,
     created_at: row.created_at as string,
   };
 }

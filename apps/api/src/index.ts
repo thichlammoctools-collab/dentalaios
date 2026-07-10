@@ -36,6 +36,7 @@ import rolesRoutes from "./routes/roles";
 import filesRoutes from "./routes/files";
 import clinicRoutes from "./routes/clinic";
 import patientImagesRoutes from "./routes/patient-images";
+import appointmentsRoutes from "./routes/appointments";
 
 export type Env = {
   DB: D1Database;
@@ -142,6 +143,9 @@ app.route("/api/treatment-plans", treatmentPlansExtras);
 
 // Payments
 app.route("/api/payments", paymentsRoutes);
+
+// Appointments
+app.route("/api/appointments", appointmentsRoutes);
 
 // Operations
 app.route("/api/audit-logs", auditRoutes);

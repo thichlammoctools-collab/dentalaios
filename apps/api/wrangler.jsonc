@@ -26,7 +26,7 @@
   "r2_buckets": [
     {
       "binding": "FILES",
-      "bucket_name": "dentalaios-files"
+      "bucket_name": "dentalaios"
     }
   ],
   "queues": {
@@ -46,3 +46,9 @@
     ]
   }
 }
+
+
+
+
+
+

@@ -63,6 +63,7 @@ const ICONS: Record<NavItem["icon"], React.ReactNode> = {
 
 const NAV: NavItem[] = [
   { label: "Hôm nay", href: ROUTES.TODAY, match: (p) => p === ROUTES.TODAY, icon: "calendar" },
+  { label: "Lịch hẹn", href: ROUTES.CALENDAR, match: (p) => p === ROUTES.CALENDAR, icon: "calendar" },
   { label: "Bệnh nhân", href: ROUTES.PATIENTS, match: (p) => p.startsWith("/patients"), icon: "patients" },
   {
     label: "Cài đặt",

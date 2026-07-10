@@ -10,6 +10,7 @@ import { PatientsPage } from "@/pages/PatientsPage";
 import { PatientDetailPage } from "@/pages/PatientDetailPage";
 import { VisitDetailPage } from "@/pages/VisitDetailPage";
 import { TreatmentPlanDetailPage } from "@/pages/TreatmentPlanDetailPage";
+import { CalendarPage } from "@/pages/CalendarPage";
 import { UsersSettingsPage } from "@/pages/UsersSettingsPage";
 import { MembersSettingsPage } from "@/pages/MembersSettingsPage";
 import { ClinicSettingsPage } from "@/pages/ClinicSettingsPage";
@@ -49,6 +50,14 @@ export function AppRoutes() {
         element={
           <Protected>
             <TodayPage />
+          </Protected>
+        }
+      />
+      <Route
+        path={ROUTES.CALENDAR}
+        element={
+          <Protected>
+            <CalendarPage />
           </Protected>
         }
       />
