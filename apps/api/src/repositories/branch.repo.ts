@@ -2,11 +2,29 @@ import type { D1Database } from "@cloudflare/workers-types";
 import type { Branch } from "@shared/types";
 import type { D1Row } from "./base";
 
+export interface BranchCreateInput {
+  name: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  manager_name?: string;
+  opening_date?: string | null;
+}
+
+export interface BranchUpdateInput {
+  name?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  manager_name?: string;
+  opening_date?: string | null;
+}
+
 export interface BranchRepository {
   list(tenantId: string): Promise<Branch[]>;
   getById(tenantId: string, id: string): Promise<Branch | null>;
-  create(tenantId: string, data: { name: string; address?: string }): Promise<Branch>;
-  update(tenantId: string, id: string, data: { name?: string; address?: string }): Promise<Branch | null>;
+  create(tenantId: string, data: BranchCreateInput): Promise<Branch>;
+  update(tenantId: string, id: string, data: BranchUpdateInput): Promise<Branch | null>;
   delete(tenantId: string, id: string): Promise<boolean>;
 }
 
@@ -31,8 +49,21 @@ export function createBranchRepository(db: D1Database): BranchRepository {
     async create(tenantId, data) {
       const id = crypto.randomUUID();
       await db
-        .prepare("INSERT INTO branches (id, tenant_id, name, address) VALUES (?, ?, ?, ?)")
-        .bind(id, tenantId, data.name.trim(), data.address?.trim() || "")
+        .prepare(
+          `INSERT INTO branches
+             (id, tenant_id, name, address, phone, email, manager_name, opening_date)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(
+          id,
+          tenantId,
+          data.name.trim(),
+          data.address?.trim() || "",
+          data.phone?.trim() || "",
+          data.email?.trim() || "",
+          data.manager_name?.trim() || "",
+          data.opening_date ?? null,
+        )
         .run();
       const row = await db
         .prepare("SELECT * FROM branches WHERE id = ? LIMIT 1")
@@ -45,8 +76,30 @@ export function createBranchRepository(db: D1Database): BranchRepository {
     async update(tenantId, id, data) {
       const fields: string[] = [];
       const binds: unknown[] = [];
-      if (data.name !== undefined) { fields.push("name = ?"); binds.push(data.name.trim()); }
-      if (data.address !== undefined) { fields.push("address = ?"); binds.push(data.address.trim()); }
+      if (data.name !== undefined) {
+        fields.push("name = ?");
+        binds.push(data.name.trim());
+      }
+      if (data.address !== undefined) {
+        fields.push("address = ?");
+        binds.push(data.address.trim());
+      }
+      if (data.phone !== undefined) {
+        fields.push("phone = ?");
+        binds.push(data.phone.trim());
+      }
+      if (data.email !== undefined) {
+        fields.push("email = ?");
+        binds.push(data.email.trim());
+      }
+      if (data.manager_name !== undefined) {
+        fields.push("manager_name = ?");
+        binds.push(data.manager_name.trim());
+      }
+      if (data.opening_date !== undefined) {
+        fields.push("opening_date = ?");
+        binds.push(data.opening_date || null);
+      }
       if (fields.length === 0) return this.getById(tenantId, id);
       binds.push(tenantId, id);
       await db
@@ -72,6 +125,10 @@ function mapBranch(row: D1Row): Branch {
     tenant_id: row.tenant_id as string,
     name: row.name as string,
     address: row.address as string,
+    phone: row.phone as string,
+    email: row.email as string,
+    manager_name: row.manager_name as string,
+    opening_date: (row.opening_date as string | null) ?? null,
     created_at: row.created_at as string,
   };
 }

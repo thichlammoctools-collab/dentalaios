@@ -179,13 +179,13 @@ app.onError((err, c) => {
   return c.json({ error: "Internal server error", code: "internal_error" }, 500);
 });
 
-// Queue consumer handler (Phase 5)
+// Queue consumer handler
 import { larkRetryConsumer } from "./jobs/lark-retry";
 import type { MessageBatch } from "@cloudflare/workers-types";
-import type { LarkRetryMessage } from "./jobs/lark-retry";
+import type { LarkQueueMessage } from "./jobs/lark-retry";
 
 async function queueHandler(
-  batch: MessageBatch<LarkRetryMessage>,
+  batch: MessageBatch<LarkQueueMessage>,
   env: Env,
 ): Promise<void> {
   await larkRetryConsumer(batch, env);

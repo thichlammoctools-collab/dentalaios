@@ -262,6 +262,10 @@ function mapUserWithContext(row: D1Row): UserWithContext {
     tenant_id: row.b_tenant_id as string,
     name: row.b_name as string,
     address: row.b_address as string,
+    phone: "",
+    email: "",
+    manager_name: "",
+    opening_date: null,
     created_at: row.b_created_at as string,
   };
   return {

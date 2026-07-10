@@ -56,10 +56,25 @@ export function AppRoutes() {
         }
       />
       <Route
+<<<<<<< HEAD
         path={ROUTES.CALENDAR}
         element={
           <Protected>
             <CalendarPage />
+=======
+        path={ROUTES.SCHEDULE}
+        element={
+          <Protected>
+            <SchedulePage />
+          </Protected>
+        }
+      />
+      <Route
+        path={ROUTES.SCHEDULE_NEW}
+        element={
+          <Protected>
+            <ScheduleNewPage />
+>>>>>>> 68e9a7d22d6b0340ddc080706c6ebda6141e6c9b
           </Protected>
         }
       />

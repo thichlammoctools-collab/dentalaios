@@ -11,12 +11,14 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { PERMISSIONS } from "@shared/constants";
+import { branchCreateSchema, branchUpdateSchema } from "@shared/validation";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
 import { requirePermission } from "../middleware/rbac";
 import { auditLog } from "../middleware/audit";
 import type { AuthContext } from "../middleware/auth";
 import { clinicService } from "../services/clinic.service";
+import { authService } from "../services/auth.service";
 import { testLarkCredentials } from "../lib/lark-client";
 import { NotFoundError, ValidationError } from "../lib/errors";
 
@@ -55,14 +57,32 @@ router.post(
   "/branches",
   requirePermission(PERMISSIONS.MANAGE_USERS),
   auditLog("create", "branch"),
-  zValidator("json", z.object({
-    name: z.string().min(1).max(200),
-    address: z.string().max(500).optional(),
-  })),
+  zValidator("json", branchCreateSchema),
   async (c) => {
     const jwt = getJwt(c);
-    const { name, address } = c.req.valid("json");
-    const branch = await clinicService.createBranch(c.env.DB, jwt.tenant_id, { name, address });
+    const data = c.req.valid("json");
+    const branch = await clinicService.createBranch(c.env.DB, jwt.tenant_id, data);
+
+    // Enqueue async Lark notification (Task + optional Calendar event).
+    // Skip silently if JOBS binding is missing (e.g. local dev without queue).
+    if (c.env.JOBS) {
+      try {
+        const me = await authService.getMe(
+          { db: c.env.DB, jwtSecret: c.env.JWT_SECRET },
+          jwt.sub,
+          jwt.tenant_id,
+        );
+        await c.env.JOBS.send({
+          type: "branch_lark_sync",
+          branch_id: branch.id,
+          tenant_id: jwt.tenant_id,
+          created_by: me?.user.name ?? "Admin",
+        });
+      } catch (err) {
+        console.error("[/branches POST] failed to enqueue Lark sync:", err);
+      }
+    }
+
     return c.json(branch, 201);
   },
 );
@@ -72,14 +92,11 @@ router.patch(
   "/branches/:id",
   requirePermission(PERMISSIONS.MANAGE_USERS),
   auditLog("update", "branch"),
-  zValidator("json", z.object({
-    name: z.string().min(1).max(200).optional(),
-    address: z.string().max(500).optional(),
-  })),
+  zValidator("json", branchUpdateSchema),
   async (c) => {
     const jwt = getJwt(c);
-    const { name, address } = c.req.valid("json");
-    const updated = await clinicService.updateBranch(c.env.DB, jwt.tenant_id, c.req.param("id"), { name, address });
+    const data = c.req.valid("json");
+    const updated = await clinicService.updateBranch(c.env.DB, jwt.tenant_id, c.req.param("id"), data);
     if (!updated) throw new NotFoundError("Branch not found");
     return c.json(updated);
   },

@@ -390,3 +390,22 @@ export const clinicScheduleBulkUpdateSchema = z.object({
 
 export type ClinicScheduleEntry = z.infer<typeof clinicScheduleEntrySchema>;
 export type ClinicScheduleBulkUpdate = z.infer<typeof clinicScheduleBulkUpdateSchema>;
+
+// ──────────────── Branch ────────────────
+
+export const branchCreateSchema = z.object({
+  name: nonEmpty(200),
+  address: optionalText(500),
+  phone: optionalText(20),
+  email: optionalText(200).refine(
+    (v) => v === undefined || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+    { message: "Email không hợp lệ" },
+  ),
+  manager_name: optionalText(200),
+  opening_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});
+
+export const branchUpdateSchema = branchCreateSchema.partial();
+
+export type BranchCreateInput = z.infer<typeof branchCreateSchema>;
+export type BranchUpdateInput = z.infer<typeof branchUpdateSchema>;

@@ -26,6 +26,10 @@ export interface Branch {
   tenant_id: string;
   name: string;
   address: string;
+  phone: string;
+  email: string;
+  manager_name: string;
+  opening_date: string | null;
   created_at: string;
 }
 

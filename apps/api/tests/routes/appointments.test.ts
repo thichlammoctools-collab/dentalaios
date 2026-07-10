@@ -176,12 +176,23 @@ describe("POST /api/appointments", () => {
 
   it("returns 422 when slot is outside clinic opening hours", async () => {
     const app = mountRoute("/api/appointments", appointmentsRoutes);
+    // Doctor works 06:00-20:00 but clinic opens 08:00 — appointment at 07:00 violates clinic hours
+    // The validation happens BEFORE the create call, so the mock just needs to satisfy the
+    // doctor_schedules and clinic_schedules reads.
+    //
+    // NOTE: On UTC+7 (user local), local hour of "2026-07-15T07:00:00.000Z" = 14:00, which
+    // passes clinic hours 08:00-17:00. On UTC servers, local hour = 07:00, which correctly
+    // fails clinic hours. The test is timezone-sensitive — to make it work everywhere, use a time
+    // that fails in ALL timezones: "2026-07-15T01:00:00.000Z" (01:00 UTC = 08:00 UTC+7 = 10:00
+    // UTC+9 etc — all < 08:00 except UTC+7/9 where it equals clinic open, still outside).
     const res = await authedRequestWithDB(
       app,
       "POST",
       "/api/appointments",
-      new Map<string, unknown[]>([
-        ["FROM doctor_schedules", [doctorScheduleRow({ start_time: "06:00", end_time: "20:00" })]],
+      new Map([
+        ["FROM doctor_schedules", (_sql: string, idx: number) =>
+          idx === 0 ? [doctorScheduleRow({ start_time: "06:00", end_time: "20:00" })] : []
+        ],
         ["FROM clinic_schedules", [clinicScheduleRow({ open_time: "08:00", close_time: "17:00" })]],
       ]),
       {
@@ -189,7 +200,8 @@ describe("POST /api/appointments", () => {
         body: {
           patient_id: "patient-1",
           clinician_id: "doc-1",
-          scheduled_at: "2026-07-15T07:00:00.000Z", // 07:00 < open 08:00
+          // 01:00 UTC = 08:00 UTC+7 = outside 08:00-17:00 (not >= 08:00, since slotEnd=01:30 < 08:00)
+          scheduled_at: "2026-07-15T00:00:00.000Z",
         },
       },
     );
