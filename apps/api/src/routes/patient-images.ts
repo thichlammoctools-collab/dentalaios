@@ -63,7 +63,7 @@ router.post(
       content_type: body.content_type,
       size: body.size,
       isThumb: false,
-    });
+    }, { userId: jwt.sub });
 
     // Also presign thumbnail version (smaller, same content_type)
     const thumb = await patientImagesService.presignUpload(c.env, jwt.tenant_id, {
@@ -71,7 +71,7 @@ router.post(
       content_type: body.content_type,
       size: Math.min(body.size, 500_000), // max 500KB for thumb
       isThumb: true,
-    });
+    }, { userId: jwt.sub });
 
     return c.json({
       file_id: main.fileId,
@@ -113,7 +113,9 @@ router.get(
   async (c) => {
     const jwt = getJwt(c);
     const img = await patientImagesService.getById(c.env.DB, jwt.tenant_id, c.req.param("id"));
-    const url = await filesService.getDownloadUrl(c.env, img.file_id);
+    const fileObj = await filesService.getById(c.env.DB, jwt.tenant_id, img.file_id);
+    if (!fileObj) return c.json({ error: "File not found", code: "not_found" }, 404);
+    const url = await filesService.getDownloadUrl(c.env, fileObj.r2_key);
     return c.json({ url });
   },
 );

@@ -48,6 +48,7 @@ export const patientImagesService = {
     env: Env,
     tenantId: string,
     input: { filename: string; content_type: string; size: number; isThumb?: boolean },
+    opts?: { userId?: string },
   ): Promise<{ fileId: string; r2_key: string; uploadUrl: string; expiresIn: number }> {
     if (input.size > MAX_IMAGE_SIZE) {
       throw new Error(`File too large: max ${MAX_IMAGE_SIZE / 1024 / 1024} MB`);
@@ -58,7 +59,7 @@ export const patientImagesService = {
       content_type: input.content_type,
       size: input.size,
       prefix,
-    });
+    }, opts?.userId ? { db: env.DB, userId: opts.userId } : undefined);
   },
 
   async create(
@@ -77,17 +78,15 @@ export const patientImagesService = {
   async remove(db: D1Database, env: Env, tenantId: string, id: string): Promise<boolean> {
     const img = await createPatientImagesRepository(db).getById(tenantId, id);
     if (!img) return false;
-    // Delete the R2 file (file_objects cascade handles the file_object row)
-    try {
-      await env.FILES.delete(img.file_id);
-    } catch {
-      // R2 delete is best-effort; metadata is already deleted below
+    // Look up r2_key from file_objects before deleting (R2 expects r2_key, not file_id UUID)
+    const fileObj = await filesService.getById(db, tenantId, img.file_id);
+    if (fileObj) {
+      try { await env.FILES.delete(fileObj.r2_key); } catch { /* best-effort */ }
     }
     if (img.thumb_key) {
-      try {
-        await env.FILES.delete(img.thumb_key);
-      } catch {
-        // best-effort
+      const thumbObj = await filesService.getById(db, tenantId, img.thumb_key);
+      if (thumbObj) {
+        try { await env.FILES.delete(thumbObj.r2_key); } catch { /* best-effort */ }
       }
     }
     return createPatientImagesRepository(db).delete(tenantId, id);

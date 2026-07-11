@@ -35,6 +35,7 @@ export const filesService = {
     env: { FILES: R2Bucket; R2_ACCOUNT_ID?: string; R2_ACCESS_KEY_ID?: string; R2_SECRET_ACCESS_KEY?: string },
     tenantId: string,
     input: PresignInput,
+    opts?: { db?: D1Database; userId?: string },
   ): Promise<PresignResult> {
     if (input.size > MAX_FILE_SIZE) {
       throw new Error(`File too large: max ${MAX_FILE_SIZE / 1024 / 1024} MB`);
@@ -47,6 +48,17 @@ export const filesService = {
     // Sanitize filename
     const safe = input.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
     const r2_key = `tenant-${tenantId}/${input.prefix ?? "files"}/${fileId}-${safe}`;
+
+    // If db provided, create file_objects row now (needed by patient_images FK)
+    if (opts?.db && opts.userId) {
+      await opts.db
+        .prepare(
+          `INSERT INTO file_objects (id, tenant_id, r2_key, filename, content_type, size, uploaded_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(fileId, tenantId, r2_key, input.filename, input.content_type, input.size, opts.userId)
+        .run();
+    }
 
     if (!env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY || !env.R2_ACCOUNT_ID) {
       throw new Error("R2 S3 credentials not configured (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)");
