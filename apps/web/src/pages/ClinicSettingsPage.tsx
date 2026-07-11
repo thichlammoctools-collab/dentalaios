@@ -196,7 +196,7 @@ export function ClinicSettingsPage() {
   const isAdmin = session?.role?.name === "admin";
 
   return (
-    <div className="space-y-8 px-6 py-6 max-w-2xl">
+    <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Cài đặt phòng khám</h1>
         <p className="text-sm text-muted-foreground mt-1">
