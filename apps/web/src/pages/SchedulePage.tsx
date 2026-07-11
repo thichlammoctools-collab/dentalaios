@@ -45,7 +45,9 @@ export function SchedulePage() {
     Promise.all([
       apiGet<AppointmentsResponse>(`/api/appointments?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`),
       apiGet<PatientsResponse>(`/api/patients?limit=200`),
-      apiGet<UsersResponse>(`/api/users?limit=100`),
+      session?.branch?.id
+        ? apiGet<UsersResponse>(`/api/users/branch/${session.branch.id}`)
+        : Promise.resolve({ items: [] as UserWithDetails[] }),
     ]).then(([appts, pats, us]) => {
       if (!mounted) return;
       setAppointments(appts.items);
@@ -289,9 +291,11 @@ function EditAppointmentDialog({
   const [notes, setNotes] = useState(appointment.notes ?? "");
   const [status, setStatus] = useState(appointment.status);
   const [clinicianId, setClinicianId] = useState(appointment.clinician_id);
+  const [assistantId, setAssistantId] = useState(appointment.assistant_id ?? "");
   const [saving, setSaving] = useState(false);
 
   const doctorsOnly = doctors.filter((u) => u.role_name === "doctor");
+  const assistantsOnly = doctors.filter((u) => u.role_name === "assistant");
 
   async function handleSave() {
     setSaving(true);
@@ -302,6 +306,7 @@ function EditAppointmentDialog({
         duration_min: durationMin,
         status,
         clinician_id: clinicianId,
+        assistant_id: assistantId || null,
         procedure: procedure || undefined,
         notes: notes || undefined,
       });
@@ -330,6 +335,19 @@ function EditAppointmentDialog({
             ))}
           </Select>
         </div>
+
+        {/* Phụ tá chính */}
+        {assistantsOnly.length > 0 && (
+          <div className="grid gap-1.5">
+            <Label>Phụ tá chính</Label>
+            <Select value={assistantId} onChange={(e) => setAssistantId(e.target.value)}>
+              <option value="">— Không chọn —</option>
+              {assistantsOnly.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </Select>
+          </div>
+        )}
 
         {/* Trạng thái */}
         <div className="grid gap-1.5">

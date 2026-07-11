@@ -34,6 +34,7 @@ export function AppointmentForm({
   const [users, setUsers] = useState<UserWithDetails[]>([]);
   const [patientId, setPatientId] = useState("");
   const [clinicianId, setClinicianId] = useState("");
+  const [assistantId, setAssistantId] = useState("");
   const [date, setDate] = useState(initialDate ?? ymd(new Date()));
   const [time, setTime] = useState(
     initialHour != null ? `${String(initialHour).padStart(2, "0")}:00` : "09:00",
@@ -68,6 +69,7 @@ export function AppointmentForm({
 
   function resetForm() {
     setPatientId("");
+    setAssistantId("");
     setProcedure("");
     setNotes("");
     setPatientSearch("");
@@ -85,6 +87,7 @@ export function AppointmentForm({
       const created = await apiPost<Appointment>("/api/appointments", {
         patient_id: patientId,
         clinician_id: clinicianId,
+        assistant_id: assistantId || undefined,
         scheduled_at,
         duration_min: durationMin,
         procedure: procedure || undefined,
@@ -103,6 +106,7 @@ export function AppointmentForm({
   }
 
   const doctors = users.filter((u) => u.role_name === "doctor");
+  const assistants = users.filter((u) => u.role_name === "assistant");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -150,6 +154,23 @@ export function AppointmentForm({
               ))}
             </Select>
           </div>
+
+          {/* Phụ tá chính (optional) */}
+          {assistants.length > 0 && (
+            <div className="grid gap-1.5">
+              <Label htmlFor="assistant">Phụ tá chính</Label>
+              <Select
+                id="assistant"
+                value={assistantId}
+                onChange={(e) => setAssistantId(e.target.value)}
+              >
+                <option value="">— Không chọn —</option>
+                {assistants.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </Select>
+            </div>
+          )}
 
           {/* Date + Time */}
           <div className="grid grid-cols-2 gap-3">

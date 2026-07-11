@@ -23,10 +23,12 @@ export function ScheduleNewPage() {
   const navigate = useNavigate();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [doctors, setDoctors] = useState<UserWithDetails[]>([]);
+  const [allUsers, setAllUsers] = useState<UserWithDetails[]>([]);
   const [saving, setSaving] = useState(false);
 
   const [patientId, setPatientId] = useState("");
   const [clinicianId, setClinicianId] = useState("");
+  const [assistantId, setAssistantId] = useState("");
   const [date, setDate] = useState(() => ymd(new Date()));
   const [time, setTime] = useState("09:00");
   const [durationMin, setDurationMin] = useState(30);
@@ -38,7 +40,10 @@ export function ScheduleNewPage() {
   useEffect(() => {
     if (!session?.branch?.id) return;
     apiGet<UsersResponse>(`/api/users/branch/${session.branch.id}`)
-      .then((res) => setDoctors(res.items.filter((u) => u.role_name === "doctor")))
+      .then((res) => {
+        setAllUsers(res.items);
+        setDoctors(res.items.filter((u) => u.role_name === "doctor"));
+      })
       .catch(() => {});
     apiGet<PatientsResponse>(`/api/patients?limit=200&search=${encodeURIComponent(patientSearch)}`)
       .then((res) => setPatients(res.items))
@@ -94,6 +99,7 @@ export function ScheduleNewPage() {
       await apiPost<Appointment>("/api/appointments", {
         patient_id: patientId,
         clinician_id: clinicianId,
+        assistant_id: assistantId || undefined,
         scheduled_at,
         duration_min: durationMin,
         procedure: procedure || undefined,
@@ -158,6 +164,18 @@ export function ScheduleNewPage() {
                     ))}
                   </Select>
                 </div>
+
+                {allUsers.filter((u) => u.role_name === "assistant").length > 0 && (
+                  <div className="grid gap-1.5">
+                    <Label>Phụ tá chính</Label>
+                    <Select value={assistantId} onChange={(e) => setAssistantId(e.target.value)}>
+                      <option value="">— Không chọn —</option>
+                      {allUsers.filter((u) => u.role_name === "assistant").map((a) => (
+                        <option key={a.id} value={a.id}>{a.name}</option>
+                      ))}
+                    </Select>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="grid gap-1.5">

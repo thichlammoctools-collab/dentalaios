@@ -312,6 +312,7 @@ export type RoleUpdateInput = z.infer<typeof roleUpdateSchema>;
 export const appointmentCreateSchema = z.object({
   patient_id: z.string().min(1),
   clinician_id: z.string().min(1),
+  assistant_id: z.string().min(1).optional(),
   scheduled_at: z.string().datetime({ offset: true }),
   duration_min: z.number().int().min(15).max(480).default(30),
   procedure: optionalText(100),
@@ -324,6 +325,7 @@ export const appointmentUpdateSchema = z.object({
   scheduled_at: z.string().datetime({ offset: true }).optional(),
   duration_min: z.number().int().min(15).max(480).optional(),
   clinician_id: z.string().min(1).optional(),
+  assistant_id: z.string().min(1).nullable().optional(),
   status: z.enum(["booked", "confirmed", "arrived", "completed", "cancelled", "no_show"]).optional(),
   procedure: optionalText(100).optional(),
   notes: optionalText(2000).optional(),

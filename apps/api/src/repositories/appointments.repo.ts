@@ -86,10 +86,10 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
       await db
         .prepare(
           `INSERT INTO appointments
-             (id, tenant_id, branch_id, clinician_id, patient_id, source_visit_id,
-              scheduled_at, duration_min, status, procedure, notes, source,
-              lark_event_id, reminder_sent_at, reminder_method, cancelled_reason, created_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             (id, tenant_id, branch_id, clinician_id, patient_id, assistant_id,
+              source_visit_id, scheduled_at, duration_min, status, procedure, notes,
+              source, lark_event_id, reminder_sent_at, reminder_method, cancelled_reason, created_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
@@ -97,6 +97,7 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
           data.branch_id,
           data.clinician_id,
           data.patient_id,
+          data.assistant_id ?? null,
           data.source_visit_id ?? null,
           data.scheduled_at,
           data.duration_min,
@@ -124,6 +125,7 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
         "scheduled_at",
         "duration_min",
         "clinician_id",
+        "assistant_id",
         "procedure",
         "notes",
         "cancelled_reason",
@@ -177,6 +179,7 @@ function mapAppointment(row: D1Row): Appointment {
     branch_id: row.branch_id as string,
     clinician_id: row.clinician_id as string,
     patient_id: row.patient_id as string,
+    assistant_id: (row.assistant_id as string | null) ?? undefined,
     source_visit_id: (row.source_visit_id as string | null) ?? undefined,
     scheduled_at: row.scheduled_at as string,
     duration_min: row.duration_min as number,

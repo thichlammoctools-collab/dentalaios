@@ -378,6 +378,7 @@ export interface Appointment {
   branch_id: string;
   clinician_id: string;
   patient_id: string;
+  assistant_id?: string;
   source_visit_id?: string;
   scheduled_at: string;  // ISO datetime
   duration_min: number;
