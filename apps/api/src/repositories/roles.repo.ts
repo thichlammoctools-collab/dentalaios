@@ -9,7 +9,7 @@ export interface RolesRepository {
   update(
     tenantId: string,
     id: string,
-    data: { name?: string; permissions?: string[] },
+    data: { name?: string; description?: string; permissions?: string[] },
   ): Promise<Role | null>;
 }
 

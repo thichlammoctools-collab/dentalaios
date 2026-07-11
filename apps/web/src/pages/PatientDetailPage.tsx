@@ -21,6 +21,7 @@ import { PaymentForm } from "@/components/PaymentForm";
 import { apiGet, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
+import { MARKETING_SOURCE_LABELS, type MarketingSource } from "@shared/constants";
 import type {
   Patient,
   MedicalAlert,
@@ -215,7 +216,11 @@ export function PatientDetailPage() {
                   <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                     <div>
                       <p className="text-muted-foreground text-xs">Nguồn bệnh nhân</p>
-                      <p className="font-medium">{patient.marketing_source || "—"}</p>
+                      <p className="font-medium">
+                        {patient.marketing_source
+                          ? MARKETING_SOURCE_LABELS[patient.marketing_source as MarketingSource] ?? patient.marketing_source
+                          : "—"}
+                      </p>
                     </div>
                     <div>
                       <p className="text-muted-foreground text-xs">Loại giới thiệu</p>

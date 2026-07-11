@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth-context";
 import type { Patient } from "@shared/types";
 import type { UserWithDetails } from "@shared/types";
 import type { PatientCreateInput } from "@shared/validation";
+import { MARKETING_SOURCES, MARKETING_SOURCE_LABELS } from "@shared/constants";
 
 interface PatientFormProps {
   open: boolean;
@@ -261,12 +262,16 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
 
           <div className="grid gap-1.5">
             <Label htmlFor="pf-mkt">Biết phòng khám qua kênh nào?</Label>
-            <Input
+            <Select
               id="pf-mkt"
               value={marketingSource}
               onChange={(e) => setMarketingSource(e.target.value)}
-              placeholder="VD: Google, Facebook, Giới thiệu, Bệnh viện…"
-            />
+            >
+              <option value="">— Chưa chọn —</option>
+              {MARKETING_SOURCES.map((src) => (
+                <option key={src} value={src}>{MARKETING_SOURCE_LABELS[src]}</option>
+              ))}
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

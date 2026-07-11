@@ -5,7 +5,7 @@
  * Rule #6: file access is always checked by Worker.
  */
 
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
 import type { FileObject } from "@shared/types";
@@ -71,6 +71,25 @@ export const filesService = {
     const uploadUrl = await getSignedUrl(client, command, { expiresIn: PRESIGN_EXPIRES });
 
     return { fileId, r2_key, uploadUrl, expiresIn: PRESIGN_EXPIRES };
+  },
+
+  async getDownloadUrl(
+    env: { R2_ACCOUNT_ID?: string; R2_ACCESS_KEY_ID?: string; R2_SECRET_ACCESS_KEY?: string },
+    r2_key: string,
+  ): Promise<string> {
+    if (!env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY || !env.R2_ACCOUNT_ID) {
+      throw new Error("R2 S3 credentials not configured");
+    }
+    const client = new S3Client({
+      region: "auto",
+      endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: env.R2_ACCESS_KEY_ID,
+        secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+      },
+    });
+    const command = new GetObjectCommand({ Bucket: "dentalaios-files", Key: r2_key });
+    return await getSignedUrl(client, command, { expiresIn: PRESIGN_EXPIRES });
   },
 
   async recordUpload(

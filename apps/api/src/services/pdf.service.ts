@@ -83,7 +83,7 @@ export async function buildProposalPdf(input: {
     approved_at?: string | null;
     created_at: string;
   };
-  items: { tooth_number: number; procedure: string; description: string; unit_cost: number; status: string }[];
+  items: { tooth_number?: number; procedure: string; description: string; unit_cost: number; status: string }[];
   approverName: string;
 }): Promise<Uint8Array> {
   const { tenant, branch, patient, plan, items, approverName } = input;
@@ -197,7 +197,7 @@ export async function buildProposalPdf(input: {
     line(L, y - ROW_H, R, y - ROW_H, 0.5, C.border);
 
     const cy = y - ROW_H / 2 + 4;
-    const toothStr = `#${item.tooth_number}`;
+    const toothStr = item.tooth_number != null ? `#${item.tooth_number}` : "—";
     const toothW = bold.widthOfTextAtSize(toothStr, 9) + 8;
     page.drawRectangle({ x: COL_TOOTH + 2, y: cy - 8, width: toothW, height: 16, color: C.blueLight });
     txt(bold, toothStr, COL_TOOTH + 5, cy - 2, 9, C.blue);

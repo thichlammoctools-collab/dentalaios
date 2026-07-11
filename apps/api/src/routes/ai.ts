@@ -83,7 +83,6 @@ router.post(
   requirePermission(PERMISSIONS.READ_PATIENTS),
   zValidator("json", aiAnalyzeImageSchema),
   async (c) => {
-    const jwt = getJwt(c);
     const { file_id, visit_id, image_type, prompt } = c.req.valid("json");
     const result = await aiService.analyzeImage(
       {
@@ -92,7 +91,7 @@ router.post(
         FILES: c.env.FILES,
       },
       file_id,
-      image_type,
+      image_type ?? "other",
       prompt,
     );
     return c.json({ ...result, visit_id });

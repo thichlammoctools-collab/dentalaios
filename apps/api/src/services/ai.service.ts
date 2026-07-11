@@ -368,7 +368,7 @@ interface SummaryData {
 
 function buildSummaryData(opts: {
   patient: Awaited<ReturnType<ReturnType<typeof createPatientsRepository>["getById"]>>;
-  visit: Awaited<ReturnType<ReturnType<typeof createVisitsRepository>["getById"]>>;
+  visit: NonNullable<Awaited<ReturnType<ReturnType<typeof createVisitsRepository>["getById"]>>>;
   findings: Awaited<ReturnType<ReturnType<typeof createFindingsRepository>["listByVisit"]>>;
   planItems: SummaryData["planItems"];
 }): SummaryData {
@@ -633,7 +633,7 @@ function buildFallbackPlan(
   const patientName = patient?.name || "bệnh nhân";
   return {
     items,
-    notes: `Kế hoạch điều trị cho ${patientName} dựa trên clinical findings từ lượt khám ngày ${new Date(visit.date).toLocaleDateString("vi-VN")}. Chi phí là ước tính, cần điều chỉnh theo thực tế.`,
+    notes: `Kế hoạch điều trị cho ${patientName} dựa trên clinical findings${visit ? ` từ lượt khám ngày ${new Date(visit.date).toLocaleDateString("vi-VN")}` : ""}. Chi phí là ước tính, cần điều chỉnh theo thực tế.`,
     ai_model: "structured-fallback",
     generated_at: new Date().toISOString(),
   };

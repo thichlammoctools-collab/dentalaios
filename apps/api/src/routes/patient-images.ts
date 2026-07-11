@@ -10,7 +10,7 @@
 
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { patientImageCreateSchema } from "@shared/validation";
+import { patientImageCreateSchema, patientImagePresignSchema } from "@shared/validation";
 import { PERMISSIONS } from "@shared/constants";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
@@ -53,11 +53,7 @@ router.post(
   "/presign",
   requireAuth(),
   requirePermission(PERMISSIONS.READ_PATIENTS),
-  zValidator("json", patientImageCreateSchema.pick({
-    filename: true,
-    content_type: true,
-    size: true,
-  })),
+  zValidator("json", patientImagePresignSchema),
   async (c) => {
     const jwt = getJwt(c);
     const body = c.req.valid("json");
@@ -102,7 +98,7 @@ router.post(
       c.env.DB,
       c.env,
       jwt.tenant_id,
-      jwt.user_id,
+      jwt.sub,
       body,
     );
     return c.json(created, 201);
@@ -117,7 +113,7 @@ router.get(
   async (c) => {
     const jwt = getJwt(c);
     const img = await patientImagesService.getById(c.env.DB, jwt.tenant_id, c.req.param("id"));
-    const url = await filesService.getPresignedUrl(c.env, jwt.tenant_id, img.file_id);
+    const url = await filesService.getDownloadUrl(c.env, img.file_id);
     return c.json({ url });
   },
 );

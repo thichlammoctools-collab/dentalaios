@@ -114,7 +114,7 @@ export const patientCreateSchema = z.object({
   family_phone: z.string().max(20).transform((s) => (s === "" ? undefined : s)).optional(),
   family_relation: optionalText(50),
   // Marketing source
-  marketing_source: optionalText(200),
+  marketing_source: z.enum(["bang_hieu","facebook","youtube","tiktok","zalo","website","google_map","gioi_thieu","khac"]).optional(),
   // Referral tracking
   referral_type: z.enum(["doctor", "staff", "other", "ad", "none"]).optional(),
   referral_user_id: z.string().min(1).nullable().optional(),
@@ -271,6 +271,13 @@ export const patientImageCreateSchema = z.object({
   original_size: z.number().int().positive().optional(),
 });
 export type PatientImageCreateInput = z.infer<typeof patientImageCreateSchema>;
+
+export const patientImagePresignSchema = z.object({
+  filename: z.string().min(1).max(200),
+  content_type: z.string().min(1).max(100),
+  size: z.number().int().positive(),
+});
+export type PatientImagePresignInput = z.infer<typeof patientImagePresignSchema>;
 
 export const aiAnalyzeImageSchema = z.object({
   file_id: z.string().min(1),

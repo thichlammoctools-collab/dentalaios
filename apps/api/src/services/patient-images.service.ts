@@ -63,7 +63,7 @@ export const patientImagesService = {
 
   async create(
     db: D1Database,
-    env: Env,
+    _env: Env,
     tenantId: string,
     userId: string,
     data: PatientImageCreateInput,
