@@ -70,6 +70,7 @@ export const appointmentsService = {
     const updated = await repo.update(tenantId, id, {
       scheduled_at: input.scheduled_at,
       duration_min: input.duration_min,
+      clinician_id: input.clinician_id,
       status: input.status,
       procedure: input.procedure,
       notes: input.notes,

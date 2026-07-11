@@ -323,6 +323,7 @@ export const appointmentCreateSchema = z.object({
 export const appointmentUpdateSchema = z.object({
   scheduled_at: z.string().datetime({ offset: true }).optional(),
   duration_min: z.number().int().min(15).max(480).optional(),
+  clinician_id: z.string().min(1).optional(),
   status: z.enum(["booked", "confirmed", "arrived", "completed", "cancelled", "no_show"]).optional(),
   procedure: optionalText(100).optional(),
   notes: optionalText(2000).optional(),

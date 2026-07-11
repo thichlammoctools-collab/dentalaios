@@ -288,6 +288,7 @@ function EditAppointmentDialog({
   const [procedure, setProcedure] = useState(appointment.procedure ?? "");
   const [notes, setNotes] = useState(appointment.notes ?? "");
   const [status, setStatus] = useState(appointment.status);
+  const [clinicianId, setClinicianId] = useState(appointment.clinician_id);
   const [saving, setSaving] = useState(false);
 
   const doctorsOnly = doctors.filter((u) => u.role_name === "doctor");
@@ -300,6 +301,7 @@ function EditAppointmentDialog({
         scheduled_at,
         duration_min: durationMin,
         status,
+        clinician_id: clinicianId,
         procedure: procedure || undefined,
         notes: notes || undefined,
       });
@@ -319,10 +321,10 @@ function EditAppointmentDialog({
         <DialogTitle>Sửa lịch hẹn</DialogTitle>
       </DialogHeader>
       <DialogBody className="grid gap-3">
-        {/* Bác sĩ — read-only */}
+        {/* Bác sĩ */}
         <div className="grid gap-1.5">
           <Label>Bác sĩ</Label>
-          <Select value={appointment.clinician_id} disabled>
+          <Select value={clinicianId} onChange={(e) => setClinicianId(e.target.value)}>
             {doctorsOnly.map((d) => (
               <option key={d.id} value={d.id}>{d.name}</option>
             ))}

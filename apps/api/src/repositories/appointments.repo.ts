@@ -123,6 +123,7 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
         "status",
         "scheduled_at",
         "duration_min",
+        "clinician_id",
         "procedure",
         "notes",
         "cancelled_reason",
