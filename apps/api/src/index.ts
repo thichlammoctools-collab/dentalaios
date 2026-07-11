@@ -175,8 +175,8 @@ app.onError((err, c) => {
       err.status as 400 | 401 | 403 | 404 | 409 | 422 | 500,
     );
   }
-  console.error("Unhandled error:", err.message);
-  return c.json({ error: "Internal server error", code: "internal_error" }, 500);
+  console.error("Unhandled error:", err.message, err.stack);
+  return c.json({ error: "Internal server error", code: "internal_error", detail: err.message }, 500);
 });
 
 // Queue consumer handler

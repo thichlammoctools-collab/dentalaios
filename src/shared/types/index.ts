@@ -238,32 +238,6 @@ export interface AuditLog {
   created_at: string;
 }
 
-// ───────────────────────── Appointments ─────────────────────────
-
-export type AppointmentStatus = "scheduled" | "confirmed" | "completed" | "cancelled" | "no_show";
-
-export interface Appointment {
-  id: string;
-  tenant_id: string;
-  patient_id: string;
-  branch_id: string;
-  doctor_id?: string;
-  doctor_name?: string;
-  scheduled_at: string; // ISO datetime
-  duration_minutes: number;
-  room?: string;
-  notes?: string;
-  status: AppointmentStatus;
-  lark_event_id?: string;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  // Enriched fields (populated by joins)
-  patient_name?: string;
-  patient_phone?: string;
-  branch_name?: string;
-}
-
 // ───────────────────────── Lark sync ─────────────────────────
 
 export type LarkSyncStatus = "pending" | "synced" | "failed";

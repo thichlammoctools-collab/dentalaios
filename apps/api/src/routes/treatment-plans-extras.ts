@@ -27,9 +27,8 @@ router.get(
     const planId = c.req.param("id");
 
     let plan;
-    let items: Awaited<ReturnType<typeof planService.listItems>> = [];
+    let items;
     let me;
-    let patient;
 
     try {
       [plan, items, me] = await Promise.all([
@@ -48,7 +47,8 @@ router.get(
 
     if (!plan) throw new ValidationError("Ke hoach khong ton tai");
     if (!me) throw new ValidationError("User not found");
-    console.log("[/pdf] plan:", plan.id, "tenant:", me.tenant.name, "branch:", me.branch.name, "patient:", patient?.name, "items:", items.length);
+
+    let patient;
     try {
       patient = await patientService.get(c.env.DB, jwt.tenant_id, plan.patient_id);
     } catch (err) {
@@ -59,7 +59,6 @@ router.get(
 
     let bytes: Uint8Array;
     try {
-      console.log("[/pdf] building PDF with:", JSON.stringify({ tenant: me.tenant.name, branch: me.branch.name, patient: patient.name, items: items.length }));
       bytes = await buildProposalPdf({
         tenant: me.tenant,
         branch: me.branch,
@@ -68,7 +67,6 @@ router.get(
         items,
         approverName: me.user.name,
       });
-      console.log("[/pdf] PDF built, bytes:", bytes.length);
     } catch (err) {
       console.error("[/pdf] buildProposalPdf failed:", err);
       throw err;

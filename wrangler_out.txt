@@ -18,3 +18,445 @@ env.JWT_SECRET ("(hidden)")                                   Environment Variab
 
 ⎔ Starting local server...
 [wrangler:info] Ready on http://127.0.0.1:8788
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mAI bindings always access remote resources, and so may incur usage charges even in local dev. To suppress this warning, set `remote: true` for the binding definition in your configuration file.[0m
+
+
+⎔ Reloading local server...
+⎔ Local server updated and ready
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mBuild failed with 1 error:[0m
+
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mExpected ")" but found "}"[0m
+  
+      src/index.ts:181:0:
+  [37m      181 │ [32m}[37m);
+            │ [32m^[37m
+            ╵ [32m)[0m
+  
+  
+
+
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mAI bindings always access remote resources, and so may incur usage charges even in local dev. To suppress this warning, set `remote: true` for the binding definition in your configuration file.[0m
+
+
+⎔ Reloading local server...
+⎔ Local server updated and ready
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mBuild failed with 2 errors:[0m
+
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mMultiple exports with the same name "appointmentUpdateSchema"[0m
+  
+      ../../src/shared/validation/index.ts:328:13:
+  [37m      328 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+    The name "appointmentUpdateSchema" was originally exported here:
+  
+      ../../src/shared/validation/index.ts:316:13:
+  [37m      316 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mThe symbol "appointmentUpdateSchema" has already been declared[0m
+  
+      ../../src/shared/validation/index.ts:328:13:
+  [37m      328 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+    The symbol "appointmentUpdateSchema" was originally declared here:
+  
+      ../../src/shared/validation/index.ts:316:13:
+  [37m      316 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+
+
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mBuild failed with 2 errors:[0m
+
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mMultiple exports with the same name "appointmentUpdateSchema"[0m
+  
+      ../../src/shared/validation/index.ts:328:13:
+  [37m      328 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+    The name "appointmentUpdateSchema" was originally exported here:
+  
+      ../../src/shared/validation/index.ts:316:13:
+  [37m      316 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mThe symbol "appointmentUpdateSchema" has already been declared[0m
+  
+      ../../src/shared/validation/index.ts:328:13:
+  [37m      328 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+    The symbol "appointmentUpdateSchema" was originally declared here:
+  
+      ../../src/shared/validation/index.ts:316:13:
+  [37m      316 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+
+
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mBuild failed with 4 errors:[0m
+
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mCould not resolve "C:\\Github\\dentalaios\\node_modules\\wrangler\\templates\\modules-watch-stub.js"[0m
+  
+  
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mCould not resolve "C:\\Github\\dentalaios\\node_modules\\wrangler\\wrangler-dist\\ProxyServerWorker.js"[0m
+  
+      .wrangler/tmp/bundle-1gg17D/middleware-insertion-facade.js:1:43:
+  [37m      1 │ ...PORTS from [32m"C:\\Github\\dentalaios\\node_modules\\wrangler\\wran[37m...
+          ╵               [32m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mCould not resolve "C:\\Github\\dentalaios\\node_modules\\wrangler\\templates\\middleware\\middleware-ensure-req-body-drained.ts"[0m
+  
+      .wrangler/tmp/bundle-1gg17D/middleware-insertion-facade.js:2:38:
+  [37m      2 │ ...E_0__ from [32m"C:\\Github\\dentalaios\\node_modules\\wrangler\\temp[37m...
+          ╵               [32m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mCould not resolve "C:\\Github\\dentalaios\\node_modules\\wrangler\\templates\\middleware\\common.ts"[0m
+  
+      .wrangler/tmp/bundle-1gg17D/middleware-loader.entry.ts:7:67:
+  [37m      7 │ ...her } from [32m"C:\\Github\\dentalaios\\node_modules\\wrangler\\temp[37m...
+          ╵               [32m~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+
+
+⎔ Starting remote preview...
+⎔ Detected changes, restarted server.
+Total Upload: 106.07 KiB / gzip: 22.05 KiB
+Preview token expired, fetching a new one
+Total Upload: 106.07 KiB / gzip: 22.05 KiB
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mBuild failed with 2 errors:[0m
+
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mMultiple exports with the same name "appointmentUpdateSchema"[0m
+  
+      ../../src/shared/validation/index.ts:328:13:
+  [37m      328 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+    The name "appointmentUpdateSchema" was originally exported here:
+  
+      ../../src/shared/validation/index.ts:316:13:
+  [37m      316 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mThe symbol "appointmentUpdateSchema" has already been declared[0m
+  
+      ../../src/shared/validation/index.ts:328:13:
+  [37m      328 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+    The symbol "appointmentUpdateSchema" was originally declared here:
+  
+      ../../src/shared/validation/index.ts:316:13:
+  [37m      316 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+
+
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mBuild failed with 2 errors:[0m
+
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mMultiple exports with the same name "appointmentUpdateSchema"[0m
+  
+      ../../src/shared/validation/index.ts:328:13:
+  [37m      328 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+    The name "appointmentUpdateSchema" was originally exported here:
+  
+      ../../src/shared/validation/index.ts:316:13:
+  [37m      316 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mThe symbol "appointmentUpdateSchema" has already been declared[0m
+  
+      ../../src/shared/validation/index.ts:328:13:
+  [37m      328 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+    The symbol "appointmentUpdateSchema" was originally declared here:
+  
+      ../../src/shared/validation/index.ts:316:13:
+  [37m      316 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+
+
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mBuild failed with 2 errors:[0m
+
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mMultiple exports with the same name "appointmentUpdateSchema"[0m
+  
+      ../../src/shared/validation/index.ts:328:13:
+  [37m      328 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+    The name "appointmentUpdateSchema" was originally exported here:
+  
+      ../../src/shared/validation/index.ts:316:13:
+  [37m      316 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mThe symbol "appointmentUpdateSchema" has already been declared[0m
+  
+      ../../src/shared/validation/index.ts:328:13:
+  [37m      328 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+    The symbol "appointmentUpdateSchema" was originally declared here:
+  
+      ../../src/shared/validation/index.ts:316:13:
+  [37m      316 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+
+
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mBuild failed with 2 errors:[0m
+
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mMultiple exports with the same name "appointmentUpdateSchema"[0m
+  
+      ../../src/shared/validation/index.ts:328:13:
+  [37m      328 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+    The name "appointmentUpdateSchema" was originally exported here:
+  
+      ../../src/shared/validation/index.ts:316:13:
+  [37m      316 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mThe symbol "appointmentUpdateSchema" has already been declared[0m
+  
+      ../../src/shared/validation/index.ts:328:13:
+  [37m      328 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+    The symbol "appointmentUpdateSchema" was originally declared here:
+  
+      ../../src/shared/validation/index.ts:316:13:
+  [37m      316 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+
+
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mBuild failed with 2 errors:[0m
+
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mMultiple exports with the same name "appointmentUpdateSchema"[0m
+  
+      ../../src/shared/validation/index.ts:328:13:
+  [37m      328 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+    The name "appointmentUpdateSchema" was originally exported here:
+  
+      ../../src/shared/validation/index.ts:316:13:
+  [37m      316 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mThe symbol "appointmentUpdateSchema" has already been declared[0m
+  
+      ../../src/shared/validation/index.ts:328:13:
+  [37m      328 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+    The symbol "appointmentUpdateSchema" was originally declared here:
+  
+      ../../src/shared/validation/index.ts:316:13:
+  [37m      316 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+
+
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mBuild failed with 2 errors:[0m
+
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mMultiple exports with the same name "appointmentUpdateSchema"[0m
+  
+      ../../src/shared/validation/index.ts:328:13:
+  [37m      328 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+    The name "appointmentUpdateSchema" was originally exported here:
+  
+      ../../src/shared/validation/index.ts:316:13:
+  [37m      316 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mThe symbol "appointmentUpdateSchema" has already been declared[0m
+  
+      ../../src/shared/validation/index.ts:328:13:
+  [37m      328 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+    The symbol "appointmentUpdateSchema" was originally declared here:
+  
+      ../../src/shared/validation/index.ts:316:13:
+  [37m      316 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+
+
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mBuild failed with 2 errors:[0m
+
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mMultiple exports with the same name "appointmentUpdateSchema"[0m
+  
+      ../../src/shared/validation/index.ts:328:13:
+  [37m      328 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+    The name "appointmentUpdateSchema" was originally exported here:
+  
+      ../../src/shared/validation/index.ts:316:13:
+  [37m      316 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mThe symbol "appointmentUpdateSchema" has already been declared[0m
+  
+      ../../src/shared/validation/index.ts:328:13:
+  [37m      328 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+    The symbol "appointmentUpdateSchema" was originally declared here:
+  
+      ../../src/shared/validation/index.ts:316:13:
+  [37m      316 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+
+
+[31mX [41;31m[[41;97mERROR[41;31m][0m [1mBuild failed with 2 errors:[0m
+
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mMultiple exports with the same name "appointmentUpdateSchema"[0m
+  
+      ../../src/shared/validation/index.ts:328:13:
+  [37m      328 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+    The name "appointmentUpdateSchema" was originally exported here:
+  
+      ../../src/shared/validation/index.ts:316:13:
+  [37m      316 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+  [31mX [41;31m[[41;97mERROR[41;31m][0m [1mThe symbol "appointmentUpdateSchema" has already been declared[0m
+  
+      ../../src/shared/validation/index.ts:328:13:
+  [37m      328 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+    The symbol "appointmentUpdateSchema" was originally declared here:
+  
+      ../../src/shared/validation/index.ts:316:13:
+  [37m      316 │ export const [32mappointmentUpdateSchema[37m = z.object({
+            ╵              [32m~~~~~~~~~~~~~~~~~~~~~~~[0m
+  
+  
+
+
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mAI bindings always access remote resources, and so may incur usage charges even in local dev. To suppress this warning, set `remote: true` for the binding definition in your configuration file.[0m
+
+
+⎔ Reloading local server...
+⎔ Local server updated and ready
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mAI bindings always access remote resources, and so may incur usage charges even in local dev. To suppress this warning, set `remote: true` for the binding definition in your configuration file.[0m
+
+
+⎔ Reloading local server...
+⎔ Local server updated and ready
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mAI bindings always access remote resources, and so may incur usage charges even in local dev. To suppress this warning, set `remote: true` for the binding definition in your configuration file.[0m
+
+
+⎔ Reloading local server...
+⎔ Local server updated and ready
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mAI bindings always access remote resources, and so may incur usage charges even in local dev. To suppress this warning, set `remote: true` for the binding definition in your configuration file.[0m
+
+
+⎔ Reloading local server...
+⎔ Local server updated and ready
+⎔ Starting remote preview...
+⎔ Detected changes, restarted server.
+Total Upload: 106.07 KiB / gzip: 22.05 KiB
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mAI bindings always access remote resources, and so may incur usage charges even in local dev. To suppress this warning, set `remote: true` for the binding definition in your configuration file.[0m
+
+
+⎔ Reloading local server...
+Preview token expired, fetching a new one
+⎔ Local server updated and ready
+Total Upload: 106.07 KiB / gzip: 22.05 KiB
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mAI bindings always access remote resources, and so may incur usage charges even in local dev. To suppress this warning, set `remote: true` for the binding definition in your configuration file.[0m
+
+
+⎔ Reloading local server...
+⎔ Local server updated and ready
+⎔ Starting remote preview...
+⎔ Detected changes, restarted server.
+Total Upload: 106.07 KiB / gzip: 22.05 KiB
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mAI bindings always access remote resources, and so may incur usage charges even in local dev. To suppress this warning, set `remote: true` for the binding definition in your configuration file.[0m
+
+
+⎔ Reloading local server...
+⎔ Local server updated and ready
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mAI bindings always access remote resources, and so may incur usage charges even in local dev. To suppress this warning, set `remote: true` for the binding definition in your configuration file.[0m
+
+
+⎔ Reloading local server...
+⎔ Local server updated and ready
+⎔ Refreshing preview token...
+Total Upload: 106.07 KiB / gzip: 22.05 KiB
+✔ Preview token refreshed successfully
+⎔ Refreshing preview token...
+Total Upload: 106.07 KiB / gzip: 22.05 KiB
+✔ Preview token refreshed successfully
+⎔ Refreshing preview token...
+Total Upload: 106.07 KiB / gzip: 22.05 KiB
+✔ Preview token refreshed successfully
+ing local server...
+⎔ Local server updated and ready
+Total Upload: 106.07 KiB / gzip: 22.05 KiB
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mAI bindings always access remote resources, and so may incur usage charges even in local dev. To suppress this warning, set `remote: true` for the binding definition in your configuration file.[0m
+
+
+⎔ Reloading local server...
+⎔ Local server updated and ready
+⎔ Starting remote preview...
+⎔ Detected changes, restarted server.
+Total Upload: 106.07 KiB / gzip: 22.05 KiB
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mAI bindings always access remote resources, and so may incur usage charges even in local dev. To suppress this warning, set `remote: true` for the binding definition in your configuration file.[0m
+
+
+⎔ Reloading local server...
+⎔ Local server updated and ready
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mAI bindings always access remote resources, and so may incur usage charges even in local dev. To suppress this warning, set `remote: true` for the binding definition in your configuration file.[0m
+
+
+⎔ Reloading local server...
+⎔ Local server updated and ready
+⎔ Refreshing preview token...
+Total Upload: 106.07 KiB / gzip: 22.05 KiB
+✔ Preview token refreshed successfully
+⎔ Refreshing preview token...
+Total Upload: 106.07 KiB / gzip: 22.05 KiB
+✔ Preview token refreshed successfully
+⎔ Refreshing preview token...
+Total Upload: 106.07 KiB / gzip: 22.05 KiB
+✔ Preview token refreshed successfully

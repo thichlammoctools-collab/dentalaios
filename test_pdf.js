@@ -1,5 +1,5 @@
 const fs = require("node:fs");
-const BASE = "http://127.0.0.1:8788";
+const BASE = "https://dentalaios.thichlammoctools.workers.dev";
 
 async function main() {
   const loginRes = await fetch(`${BASE}/api/auth/login`, {

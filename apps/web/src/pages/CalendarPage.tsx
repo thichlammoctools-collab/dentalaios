@@ -1,34 +1,35 @@
 import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { apiGet, apiPost, apiPatch, apiDelete, ApiError } from "@/lib/api";
+import { apiGet, apiPost, apiPatch, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
-import { formatDateTime } from "@/lib/utils";
-import type { Appointment, Patient } from "@shared/types";
+import type { Appointment, Patient, User } from "@shared/types";
 
 interface AppointmentsResponse { items: Appointment[]; total: number }
 interface PatientsResponse { items: Patient[]; total: number }
+interface UsersResponse { items: User[]; total: number }
 
 const STATUS_LABELS: Record<string, string> = {
-  scheduled: "Đã đặt",
+  booked: "Đã đặt",
   confirmed: "Xác nhận",
+  arrived: "Đã đến",
   completed: "Hoàn thành",
   cancelled: "Đã hủy",
   no_show: "Không đến",
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  scheduled: "bg-blue-100 text-blue-700 border-blue-200",
-  confirmed: "bg-amber-100 text-amber-700 border-amber-200",
-  completed: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  cancelled: "bg-gray-100 text-gray-500 border-gray-200",
-  no_show: "bg-red-100 text-red-700 border-red-200",
+const STATUS_DOT: Record<string, string> = {
+  booked: "bg-blue-500",
+  confirmed: "bg-amber-500",
+  arrived: "bg-indigo-500",
+  completed: "bg-emerald-500",
+  cancelled: "bg-gray-400",
+  no_show: "bg-red-500",
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -43,8 +44,7 @@ function endOfMonth(year: number, month: number) {
 
 function startOfWeek(date: Date) {
   const d = new Date(date);
-  const day = d.getDay();
-  d.setDate(d.getDate() - day);
+  d.setDate(d.getDate() - d.getDay());
   return d;
 }
 
@@ -58,9 +58,9 @@ function isoDate(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
-function isoDatetime(date: Date, hour = 9, min = 0) {
-  const d = new Date(date);
-  d.setHours(hour, min, 0, 0);
+function isoDatetime(dateStr: string, hour: number, min: number): string {
+  const d = new Date(dateStr + "T00:00:00Z");
+  d.setUTCHours(hour, min, 0, 0);
   return d.toISOString();
 }
 
@@ -70,44 +70,37 @@ const MONTH_NAMES = [
 ];
 const DAY_NAMES = ["CN","T2","T3","T4","T5","T6","T7"];
 
-interface DayCell {
-  date: Date;
-  iso: string;
-  isCurrentMonth: boolean;
-  isToday: boolean;
-  appointments: Appointment[];
-}
-
 // ─── CalendarPage ──────────────────────────────────────────────────────────────
 
 export function CalendarPage() {
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
-  const [viewMonth, setViewMonth] = useState(today.getMonth()); // 0-indexed
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Week detail view
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const weekStart = selectedDate ? startOfWeek(selectedDate) : null;
 
-  // Form dialog
   const [formOpen, setFormOpen] = useState(false);
   const [editAppt, setEditAppt] = useState<Appointment | null>(null);
   const [saving, setSaving] = useState(false);
+
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [doctors, setDoctors] = useState<User[]>([]);
   const [patientSearch, setPatientSearch] = useState("");
 
   const [form, setForm] = useState({
     patient_id: "",
+    clinician_id: "",
     scheduled_date: "",
     scheduled_time: "09:00",
-    duration_minutes: "60",
-    room: "",
+    duration_min: 30,
+    procedure: "",
     notes: "",
   });
 
-  // ─── Load appointments for the current month ───────────────────────────────
+  // ─── Load appointments ───────────────────────────────────────────────────
   const loadMonth = useCallback(async (year: number, month: number) => {
     setLoading(true);
     try {
@@ -132,15 +125,13 @@ export function CalendarPage() {
   const monthDays = (() => {
     const start = startOfMonth(viewYear, viewMonth);
     const end = endOfMonth(viewYear, viewMonth);
-    const days: DayCell[] = [];
+    const days: { date: Date; iso: string; isCurrentMonth: boolean; isToday: boolean; appointments: Appointment[] }[] = [];
 
-    // Pad start with days from previous month
-    const startDow = start.getDay(); // 0=Sun
+    const startDow = start.getDay();
     for (let i = startDow - 1; i >= 0; i--) {
       const d = addDays(start, -(i + 1));
       days.push({ date: d, iso: isoDate(d), isCurrentMonth: false, isToday: false, appointments: [] });
     }
-
     for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
       const iso = isoDate(d);
       days.push({
@@ -151,8 +142,6 @@ export function CalendarPage() {
         appointments: appointments.filter((a) => a.scheduled_at.slice(0, 10) === iso),
       });
     }
-
-    // Pad end to complete the last week
     const remaining = 7 - (days.length % 7);
     if (remaining < 7) {
       for (let i = 1; i <= remaining; i++) {
@@ -160,7 +149,6 @@ export function CalendarPage() {
         days.push({ date: d, iso: isoDate(d), isCurrentMonth: false, isToday: false, appointments: [] });
       }
     }
-
     return days;
   })();
 
@@ -195,18 +183,22 @@ export function CalendarPage() {
     const d = date ?? selectedDate ?? today;
     setForm({
       patient_id: "",
+      clinician_id: "",
       scheduled_date: isoDate(d),
       scheduled_time: "09:00",
-      duration_minutes: "60",
-      room: "",
+      duration_min: 30,
+      procedure: "",
       notes: "",
     });
     setPatientSearch("");
     setFormOpen(true);
-    // Load patients for search
     try {
-      const res = await apiGet<PatientsResponse>("/api/patients?limit=50");
-      setPatients(res.items);
+      const [p, u] = await Promise.all([
+        apiGet<PatientsResponse>("/api/patients?limit=100"),
+        apiGet<UsersResponse>("/api/users?limit=100"),
+      ]);
+      setPatients(p.items);
+      setDoctors(u.items);
     } catch { /* ignore */ }
   }
 
@@ -215,36 +207,37 @@ export function CalendarPage() {
     const d = new Date(appt.scheduled_at);
     setForm({
       patient_id: appt.patient_id,
+      clinician_id: appt.clinician_id,
       scheduled_date: isoDate(d),
       scheduled_time: `${String(d.getUTCHours()).padStart(2,"0")}:${String(d.getUTCMinutes()).padStart(2,"0")}`,
-      duration_minutes: String(appt.duration_minutes),
-      room: appt.room ?? "",
+      duration_min: appt.duration_min,
+      procedure: appt.procedure ?? "",
       notes: appt.notes ?? "",
     });
     setPatientSearch("");
     setFormOpen(true);
-    setPatients([
-      { id: appt.patient_id, tenant_id: "", branch_id: "", name: appt.patient_name ?? "", date_of_birth: "", gender: "M", phone: appt.patient_phone ?? "", created_at: "" } as Patient,
-    ]);
+    // Pre-populate with this appointment's patient + all users
+    setPatients([{ id: appt.patient_id, tenant_id: "", branch_id: "", name: appt.patient_name ?? "", date_of_birth: "", gender: "M", phone: appt.patient_phone ?? "", created_at: "" } as Patient]);
+    apiGet<UsersResponse>("/api/users?limit=100").then((u) => setDoctors(u.items)).catch(() => {});
   }
 
   // ─── Submit ───────────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.patient_id || !form.scheduled_date || !form.scheduled_time) {
+    if (!form.patient_id || !form.scheduled_date || !form.scheduled_time || !form.clinician_id) {
       toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
       return;
     }
     setSaving(true);
     try {
       const [h, m] = form.scheduled_time.split(":").map(Number);
-      const scheduled_at = isoDatetime(new Date(form.scheduled_date + "T00:00:00"), h, m);
+      const scheduled_at = isoDatetime(form.scheduled_date, h, m);
       const payload = {
         patient_id: form.patient_id,
-        // branch_id injected from JWT by the API route
+        clinician_id: form.clinician_id,
         scheduled_at,
-        duration_minutes: parseInt(form.duration_minutes),
-        room: form.room || undefined,
+        duration_min: form.duration_min,
+        procedure: form.procedure || undefined,
         notes: form.notes || undefined,
       };
       if (editAppt) {
@@ -274,11 +267,18 @@ export function CalendarPage() {
     }
   }
 
-  // Filter patients by search
   const filteredPatients = patients.filter((p) =>
     p.name.toLowerCase().includes(patientSearch.toLowerCase()) ||
     p.phone.includes(patientSearch),
   );
+
+  function apptDot(status: string) {
+    return STATUS_DOT[status] ?? "bg-gray-400";
+  }
+
+  function apptLabel(status: string) {
+    return STATUS_LABELS[status] ?? status;
+  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-4 p-4 sm:space-y-4 sm:p-6">
@@ -306,7 +306,7 @@ export function CalendarPage() {
         </Button>
       </div>
 
-      {/* Week detail view */}
+      {/* Week detail */}
       {weekDays && (
         <Card>
           <CardHeader className="pb-2">
@@ -336,30 +336,21 @@ export function CalendarPage() {
                           key={a.id}
                           onClick={() => openEditForm(a)}
                           className="w-full truncate rounded px-1.5 py-0.5 text-left text-xs font-medium cursor-pointer hover:opacity-80"
-                          title={`${a.patient_name} - ${a.scheduled_at ? new Date(a.scheduled_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : ""}`}
+                          title={`${a.patient_name} ${a.scheduled_at ? new Date(a.scheduled_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : ""}`}
                         >
-                          <span className={`inline-block h-1.5 w-1.5 rounded-full mr-1 ${
-                            a.status === "confirmed" ? "bg-amber-500" :
-                            a.status === "completed" ? "bg-emerald-500" :
-                            a.status === "cancelled" ? "bg-gray-400" :
-                            "bg-blue-500"
-                          }`} />
+                          <span className={`inline-block h-1.5 w-1.5 rounded-full mr-1 ${apptDot(a.status)}`} />
                           {a.scheduled_at ? new Date(a.scheduled_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : ""} {a.patient_name}
                         </button>
                       ))}
                       {day.appointments.length > 4 && (
-                        <p className="text-center text-[10px] text-muted-foreground">
-                          +{day.appointments.length - 4} more
-                        </p>
+                        <p className="text-center text-[10px] text-muted-foreground">+{day.appointments.length - 4}</p>
                       )}
                     </div>
                   )}
                   <button
                     onClick={() => openCreateForm(day.date)}
                     className="mt-1 w-full rounded border border-dashed border-border py-0.5 text-xs text-muted-foreground hover:border-primary hover:text-primary"
-                  >
-                    +
-                  </button>
+                  >+</button>
                 </div>
               ))}
             </div>
@@ -370,16 +361,11 @@ export function CalendarPage() {
       {/* Month grid */}
       <Card>
         <CardContent className="p-0">
-          {/* Day headers */}
           <div className="grid grid-cols-7 border-b border-border">
             {DAY_NAMES.map((d) => (
-              <div key={d} className="py-2 text-center text-xs font-semibold text-muted-foreground">
-                {d}
-              </div>
+              <div key={d} className="py-2 text-center text-xs font-semibold text-muted-foreground">{d}</div>
             ))}
           </div>
-
-          {/* Day cells */}
           <div className="grid grid-cols-7">
             {monthDays.map((day, idx) => {
               const hasAppts = day.appointments.length > 0;
@@ -402,7 +388,6 @@ export function CalendarPage() {
                   `}>
                     {day.date.getDate()}
                   </span>
-
                   {hasAppts && (
                     <div className="mt-1 space-y-0.5">
                       {day.appointments.slice(0, 3).map((a) => (
@@ -420,9 +405,7 @@ export function CalendarPage() {
                         </div>
                       ))}
                       {day.appointments.length > 3 && (
-                        <div className="text-[10px] text-muted-foreground">
-                          +{day.appointments.length - 3}
-                        </div>
+                        <div className="text-[10px] text-muted-foreground">+{day.appointments.length - 3}</div>
                       )}
                     </div>
                   )}
@@ -437,7 +420,7 @@ export function CalendarPage() {
       <div className="flex flex-wrap gap-3 text-xs">
         {Object.entries(STATUS_LABELS).map(([k, v]) => (
           <div key={k} className="flex items-center gap-1.5">
-            <span className={`inline-block h-2 w-2 rounded-full ${k === "scheduled" ? "bg-blue-500" : k === "confirmed" ? "bg-amber-500" : k === "completed" ? "bg-emerald-500" : k === "cancelled" ? "bg-gray-400" : "bg-red-500"}`} />
+            <span className={`inline-block h-2 w-2 rounded-full ${apptDot(k)}`} />
             {v}
           </div>
         ))}
@@ -449,116 +432,131 @@ export function CalendarPage() {
           <DialogTitle>{editAppt ? "Sửa lịch hẹn" : "Tạo lịch hẹn"}</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 px-6 pb-6">            {/* Patient search */}
+        <form onSubmit={handleSubmit} className="space-y-4 px-6 pb-6">
+
+          {/* Doctor */}
+          <div className="space-y-1.5">
+            <Label htmlFor="clinician">Bác sĩ *</Label>
+            <Select
+              id="clinician"
+              value={form.clinician_id}
+              onChange={(e) => setForm((f) => ({ ...f, clinician_id: e.target.value }))}
+              required
+            >
+              <option value="">— Chọn bác sĩ —</option>
+              {doctors.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </Select>
+          </div>
+
+          {/* Patient */}
+          <div className="space-y-1.5">
+            <Label htmlFor="patient">Bệnh nhân *</Label>
+            <Input
+              id="patient-search"
+              placeholder="Tìm tên hoặc SĐT..."
+              value={patientSearch}
+              onChange={(e) => setPatientSearch(e.target.value)}
+              className="mb-1"
+            />
+            <Select
+              id="patient"
+              value={form.patient_id}
+              onChange={(e) => setForm((f) => ({ ...f, patient_id: e.target.value }))}
+              required
+            >
+              <option value="">— Chọn bệnh nhân —</option>
+              {filteredPatients.map((p) => (
+                <option key={p.id} value={p.id}>{p.name} — {p.phone}</option>
+              ))}
+            </Select>
+          </div>
+
+          {/* Date + time */}
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="patient">Bệnh nhân *</Label>
+              <Label htmlFor="date">Ngày *</Label>
               <Input
-                id="patient-search"
-                placeholder="Tìm tên hoặc SĐT..."
-                value={patientSearch}
-                onChange={(e) => setPatientSearch(e.target.value)}
-                className="mb-1"
-              />
-              <select
-                id="patient"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={form.patient_id}
-                onChange={(e) => setForm((f) => ({ ...f, patient_id: e.target.value }))}
+                id="date"
+                type="date"
+                value={form.scheduled_date}
+                onChange={(e) => setForm((f) => ({ ...f, scheduled_date: e.target.value }))}
                 required
-              >
-                <option value="">— Chọn bệnh nhân —</option>
-                {filteredPatients.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} — {p.phone}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Date + time */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="date">Ngày *</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={form.scheduled_date}
-                  onChange={(e) => setForm((f) => ({ ...f, scheduled_date: e.target.value }))}
-                  required
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="time">Giờ *</Label>
-                <Input
-                  id="time"
-                  type="time"
-                  value={form.scheduled_time}
-                  onChange={(e) => setForm((f) => ({ ...f, scheduled_time: e.target.value }))}
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Duration + Room */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="duration">Thời lượng (phút)</Label>
-                <Select
-                  id="duration"
-                  value={form.duration_minutes}
-                  onChange={(e) => setForm((f) => ({ ...f, duration_minutes: e.target.value }))}
-                >
-                  <option value="15">15 phút</option>
-                  <option value="30">30 phút</option>
-                  <option value="45">45 phút</option>
-                  <option value="60">1 giờ</option>
-                  <option value="90">1.5 giờ</option>
-                  <option value="120">2 giờ</option>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="room">Phòng</Label>
-                <Input
-                  id="room"
-                  placeholder="VD: Phòng 1"
-                  value={form.room}
-                  onChange={(e) => setForm((f) => ({ ...f, room: e.target.value }))}
-                />
-              </div>
-            </div>
-
-            {/* Notes */}
-            <div className="space-y-1.5">
-              <Label htmlFor="notes">Ghi chú</Label>
-              <Textarea
-                id="notes"
-                placeholder="Ghi chú thêm..."
-                rows={2}
-                value={form.notes}
-                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
               />
             </div>
-
-            {/* Actions */}
-            <div className="flex items-center justify-between">
-              {editAppt && editAppt.status !== "cancelled" && (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => { setFormOpen(false); handleCancel(editAppt); }}
-                >
-                  Hủy lịch
-                </Button>
-              )}
-              <div className="ml-auto flex gap-2">
-                <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>Đóng</Button>
-                <Button type="submit" disabled={saving}>
-                  {saving ? "Đang lưu..." : editAppt ? "Lưu" : "Tạo lịch"}
-                </Button>
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="time">Giờ *</Label>
+              <Input
+                id="time"
+                type="time"
+                value={form.scheduled_time}
+                onChange={(e) => setForm((f) => ({ ...f, scheduled_time: e.target.value }))}
+                required
+              />
             </div>
-          </form>
+          </div>
+
+          {/* Duration + Procedure */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="duration">Thời lượng</Label>
+              <Select
+                id="duration"
+                value={String(form.duration_min)}
+                onChange={(e) => setForm((f) => ({ ...f, duration_min: parseInt(e.target.value) }))}
+              >
+                <option value="15">15 phút</option>
+                <option value="30">30 phút</option>
+                <option value="45">45 phút</option>
+                <option value="60">1 giờ</option>
+                <option value="90">1.5 giờ</option>
+                <option value="120">2 giờ</option>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="procedure">Hạng mục</Label>
+              <Input
+                id="procedure"
+                placeholder="VD: Khám tổng quát"
+                value={form.procedure}
+                onChange={(e) => setForm((f) => ({ ...f, procedure: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-1.5">
+            <Label htmlFor="notes">Ghi chú</Label>
+            <Textarea
+              id="notes"
+              placeholder="Ghi chú thêm..."
+              rows={2}
+              value={form.notes}
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-between">
+            {editAppt && editAppt.status !== "cancelled" && (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={() => { setFormOpen(false); handleCancel(editAppt); }}
+              >
+                Hủy lịch
+              </Button>
+            )}
+            <div className="ml-auto flex gap-2">
+              <Button type="button" variant="outline" onClick={() => setFormOpen(false)}>Đóng</Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Đang lưu..." : editAppt ? "Lưu" : "Tạo lịch"}
+              </Button>
+            </div>
+          </div>
+        </form>
       </Dialog>
     </div>
   );

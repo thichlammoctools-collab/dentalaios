@@ -37,6 +37,10 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
   return {
     async list(tenantId, opts = {}) {
       const limit = Math.min(opts.limit ?? 100, 500);
+      const offset = opts.offset ?? 0;
+      const conditions: string[] = [`a.tenant_id = ?`];
+      const binds: unknown[] = [tenantId];
+
       if (opts.branchId) {
         conditions.push("a.branch_id = ?");
         binds.push(opts.branchId);

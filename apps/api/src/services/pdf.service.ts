@@ -1,14 +1,32 @@
 /**
  * Treatment plan proposal PDF generator — clean A4 layout.
  *
- * Uses pdf-lib with built-in Helvetica (no external font fetching needed).
- * Vietnamese diacritics will render as best-effort ASCII fallback.
+ * Uses pdf-lib StandardFonts (Helvetica) with diacritics stripped from
+ * Vietnamese text so WinAnsi encoding always succeeds.
  */
 
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 function formatVnd(amount: number): string {
   return new Intl.NumberFormat("vi-VN").format(amount) + " VND";
+}
+
+/** Strip Vietnamese diacritics → ASCII base form. */
+function strip(s: string): string {
+  return s
+    .replace(/[àáạảãâầấậẩẫăằắặẳẵ]/g, "a")
+    .replace(/[ÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴ]/g, "A")
+    .replace(/[èéẹẻẽêềếệểễ]/g, "e")
+    .replace(/[ÈÉẸẺẼÊỀẾỆỂỄ]/g, "E")
+    .replace(/[ìíịỉĩ]/g, "i")
+    .replace(/[ÌÍỊỈĨ]/g, "I")
+    .replace(/[òóọỏõôồốộổỗơờớợởỡ]/g, "o")
+    .replace(/[ÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠ]/g, "O")
+    .replace(/[ùúụủũưừứựửữ]/g, "u")
+    .replace(/[ÙÚỤỦŨƯỪỨỰỬỮ]/g, "U")
+    .replace(/[ỳýỵỷỹ]/g, "y")
+    .replace(/[ỲÝỴỶỸ]/g, "Y")
+    .replace(/[đĐ]/g, "d");
 }
 
 const C = {
@@ -84,39 +102,31 @@ export async function buildProposalPdf(input: {
   const lh = 14;
 
   function txt(f: typeof font, s: string, x: number, sy: number, size: number, color = C.dark, align: "left" | "right" = "left") {
-    let dx = x;
-    if (align === "right") {
-      dx = x - f.widthOfTextAtSize(s, size);
-    }
-    page.drawText(s, { x: dx, y: sy, size, font: f, color });
+    const safe = strip(s);
+    const dx = align === "right" ? x - f.widthOfTextAtSize(safe, size) : x;
+    page.drawText(safe, { x: dx, y: sy, size, font: f, color });
   }
 
   function line(x1: number, y1: number, x2: number, y2: number, thick = 0.5, color = C.border) {
     page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: thick, color });
   }
 
-  function rect(x: number, y: number, w: number, h: number, fill = C.white, stroke?: ReturnType<typeof rgb>, thick = 0.5) {
-    page.drawRectangle({ x, y: y - h, height: h, width: w, color: fill, borderColor: stroke, borderWidth: thick });
-  }
-
   function checkPage(need: number) {
     if (y - need < 70) {
       page = pdf.addPage([595.28, 841.89]);
       y = 800;
-      return true;
     }
-    return false;
   }
 
   // ── Top bar ──────────────────────────────────────────────────
   page.drawRectangle({ x: 0, y: 815, width: PAGE_W, height: 26, color: C.blue });
-  txt(bold, tenant.name.toUpperCase(), L, 822, 13, C.white);
+  txt(bold, strip(tenant.name).toUpperCase(), L, 822, 13, C.white);
 
   // ── Clinic info ───────────────────────────────────────────────
   y = 790;
   txt(bold, "PHIEU DE XUAT DIEU TRI / TREATMENT PLAN", L, y, 15, C.blue);
   y -= lh * 0.8;
-  txt(font, `${branch.name}  |  ${branch.address}`, L, y, 9, C.gray);
+  txt(font, `${strip(branch.name)}  |  ${strip(branch.address)}`, L, y, 9, C.gray);
   y -= lh * 0.8;
   if (tenant.email) txt(font, `Email: ${tenant.email}`, L, y, 9, C.gray);
   y -= lh;
@@ -144,7 +154,7 @@ export async function buildProposalPdf(input: {
   const row = lh + 3;
 
   txt(bold, "Ho va ten:", L + 10, py, 9, C.gray);
-  txt(bold, patient.name, L + 75, py, 10, C.dark);
+  txt(bold, strip(patient.name), L + 75, py, 10, C.dark);
 
   txt(bold, "Ngay sinh:", mid, py, 9, C.gray);
   txt(font, patient.date_of_birth, mid + 70, py, 10, C.dark);
@@ -193,8 +203,8 @@ export async function buildProposalPdf(input: {
     txt(bold, toothStr, COL_TOOTH + 5, cy - 2, 9, C.blue);
 
     const procLabel = PROC_LABELS[item.procedure] || item.procedure;
-    txt(font, procLabel, COL_PROC, cy - 2, 9, C.dark);
-    txt(font, item.description, COL_DESC, cy + 3, 8, C.gray);
+    txt(font, strip(procLabel), COL_PROC, cy - 2, 9, C.dark);
+    txt(font, strip(item.description), COL_DESC, cy + 3, 8, C.gray);
 
     txt(font, formatVnd(item.unit_cost), COL_UNIT, cy - 2, 9, C.dark, "right");
     txt(bold, formatVnd(item.unit_cost), COL_TOTAL, cy - 2, 9, C.dark, "right");
@@ -220,7 +230,7 @@ export async function buildProposalPdf(input: {
     checkPage(56);
     page.drawRectangle({ x: L, y: y - 48, width: CW, height: 48, color: C.tealLight, borderColor: C.teal, borderWidth: 1 });
     txt(bold, "Ghi chu / Notes", L + 10, y - 14, 9, C.teal);
-    txt(font, plan.notes, L + 10, y - 28, 9, C.dark);
+    txt(font, strip(plan.notes), L + 10, y - 28, 9, C.dark);
     y -= 48 + lh;
   }
 
@@ -232,7 +242,7 @@ export async function buildProposalPdf(input: {
   page.drawRectangle({ x: L, y: y - 80, width: sigW, height: 80, color: C.white, borderColor: C.border, borderWidth: 1 });
   line(L, y - 30, L + sigW, y - 30, 0.5, C.border);
   txt(bold, "XAC NHAN CUA PHONG KHAM", L + 10, y - 20, 8, C.gray);
-  txt(font, `Nguoi duyet: ${approverName}`, L + 10, y - 42, 9, C.dark);
+  txt(font, `Nguoi duyet: ${strip(approverName)}`, L + 10, y - 42, 9, C.dark);
   if (plan.approved_at) {
     txt(font, `Ngay: ${new Date(plan.approved_at).toLocaleDateString("vi-VN")}`, L + 10, y - 56, 9, C.gray);
   }
@@ -248,7 +258,7 @@ export async function buildProposalPdf(input: {
   // ── Footer ───────────────────────────────────────────────────
   const footerY = 30;
   line(L, footerY + 12, R, footerY + 12, 0.5, C.border);
-  txt(font, `${tenant.name}  |  Ma: ${plan.id}`, L, footerY, 8, C.gray);
+  txt(font, `${strip(tenant.name)}  |  Ma: ${plan.id}`, L, footerY, 8, C.gray);
   txt(font, "Trang " + pdf.getPageCount(), R, footerY, 8, C.gray, "right");
   txt(font, "Tai lieu chi co tinh thong tin — Khong thanh lap quan he phap ly.", L, footerY - 10, 7, C.gray);
   txt(font, "This document is for informational purposes only.", L, footerY - 18, 7, C.gray);

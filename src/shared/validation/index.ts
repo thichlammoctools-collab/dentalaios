@@ -314,21 +314,20 @@ export const appointmentCreateSchema = z.object({
 });
 
 export const appointmentUpdateSchema = z.object({
-  status: z.enum(["booked", "confirmed", "arrived", "completed", "cancelled", "no_show"]).optional(),
   scheduled_at: z.string().datetime({ offset: true }).optional(),
   duration_min: z.number().int().min(15).max(480).optional(),
+  status: z.enum(["booked", "confirmed", "arrived", "completed", "cancelled", "no_show"]).optional(),
   procedure: optionalText(100).optional(),
   notes: optionalText(2000).optional(),
   cancelled_reason: optionalText(500).optional(),
 });
 
+export type AppointmentCreateInput = z.infer<typeof appointmentCreateSchema>;
+export type AppointmentUpdateInput = z.infer<typeof appointmentUpdateSchema>;
 export const appointmentSlotQuerySchema = z.object({
   doctor_id: z.string().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
-
-export type AppointmentCreateInput = z.infer<typeof appointmentCreateSchema>;
-export type AppointmentUpdateInput = z.infer<typeof appointmentUpdateSchema>;
 export type AppointmentSlotQuery = z.infer<typeof appointmentSlotQuerySchema>;
 
 // ──────────────── Doctor Schedule ────────────────

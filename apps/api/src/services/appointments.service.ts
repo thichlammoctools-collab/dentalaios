@@ -32,21 +32,23 @@ export const appointmentsService = {
     db: D1Database,
     tenantId: string,
     userId: string,
+    branchId: string,
     input: AppointmentCreateInput,
     encryptionKey?: string,
   ): Promise<Appointment> {
     const repo = createAppointmentsRepository(db);
 
     const appt = await repo.create(tenantId, {
+      branch_id: branchId,
+      clinician_id: input.clinician_id,
       patient_id: input.patient_id,
-      branch_id: input.branch_id,
-      doctor_id: input.doctor_id,
-      doctor_name: undefined,
+      source_visit_id: input.source_visit_id,
       scheduled_at: input.scheduled_at,
-      duration_minutes: input.duration_minutes ?? 60,
-      room: input.room,
+      duration_min: input.duration_min ?? 30,
+      status: "booked",
+      procedure: input.procedure,
       notes: input.notes,
-      status: "scheduled",
+      source: input.source ?? "manual",
       created_by: userId,
     });
 
@@ -67,12 +69,11 @@ export const appointmentsService = {
 
     const updated = await repo.update(tenantId, id, {
       scheduled_at: input.scheduled_at,
-      duration_minutes: input.duration_minutes,
-      room: input.room,
-      notes: input.notes,
+      duration_min: input.duration_min,
       status: input.status,
-      doctor_id: input.doctor_id ?? undefined,
-      doctor_name: input.doctor_name ?? undefined,
+      procedure: input.procedure,
+      notes: input.notes,
+      cancelled_reason: input.cancelled_reason,
     });
 
     if (updated && (input.scheduled_at || input.status)) {
@@ -82,8 +83,19 @@ export const appointmentsService = {
     return updated!;
   },
 
-  async cancel(db: D1Database, tenantId: string, id: string): Promise<Appointment> {
-    return this.update(db, tenantId, id, { status: "cancelled" });
+  async cancel(db: D1Database, tenantId: string, id: string, reason?: string): Promise<Appointment> {
+    return this.update(db, tenantId, id, { status: "cancelled", cancelled_reason: reason });
+  },
+
+  async findConflicts(
+    db: D1Database,
+    tenantId: string,
+    clinicianId: string,
+    startISO: string,
+    endISO: string,
+    excludeId?: string,
+  ): Promise<Appointment[]> {
+    return createAppointmentsRepository(db).findConflicts(tenantId, clinicianId, startISO, endISO, excludeId);
   },
 };
 
@@ -116,14 +128,11 @@ async function syncToLarkCalendar(
 
   try {
     const start = new Date(appt.scheduled_at);
-    const end = new Date(start.getTime() + appt.duration_minutes * 60 * 1000);
+    const end = new Date(start.getTime() + appt.duration_min * 60 * 1000);
 
-    const summary = `Lịch hẹn: ${appt.patient_name ?? "Bệnh nhân"}`;
+    const summary = `Lịch hẹn khám`;
     const description = [
-      `Bệnh nhân: ${appt.patient_name ?? "—"}`,
-      appt.patient_phone ? `SĐT: ${appt.patient_phone}` : null,
-      appt.room ? `Phòng: ${appt.room}` : null,
-      appt.doctor_name ? `Bác sĩ: ${appt.doctor_name}` : null,
+      appt.procedure ? `Hạng mục: ${appt.procedure}` : null,
       appt.notes ? `Ghi chú: ${appt.notes}` : null,
       `Mã lịch hẹn: ${appt.id}`,
     ].filter(Boolean).join("\n");
@@ -135,7 +144,7 @@ async function syncToLarkCalendar(
       calendarId: calendarId ?? "primary",
     });
 
-    await createAppointmentsRepository(db).updateLarkEventId(tenantId, appt.id, result.eventId);
+    await createAppointmentsRepository(db).update(tenantId, appt.id, { lark_event_id: result.eventId });
   } catch (err) {
     console.warn(`[appointments] Lark sync failed for ${appt.id}:`, err);
   }
