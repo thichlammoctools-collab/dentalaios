@@ -7,6 +7,7 @@ import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/c
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { AppointmentCard } from "@/components/schedule/AppointmentCard";
 import { AppointmentForm } from "@/components/schedule/AppointmentForm";
@@ -31,6 +32,11 @@ export function SchedulePage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
+
+  // Filters (Day view)
+  const [filterStatuses, setFilterStatuses] = useState<Set<string>>(new Set());
+  const [filterClinician, setFilterClinician] = useState("");
+  const [filterAssistant, setFilterAssistant] = useState("");
 
   // Compute week range from selectedDate
   const weekDays = useMemo(() => getWeekDays(selectedDate), [selectedDate]);
@@ -73,10 +79,22 @@ export function SchedulePage() {
     return m;
   }, [users]);
 
-  // Day view: filter today
-  const dayAppts = appointments
-    .filter((a) => isoToYmd(a.scheduled_at) === ymd(selectedDate))
+  // Day view: filter today + multi-filter
+  const dayApptsAll = appointments.filter((a) => isoToYmd(a.scheduled_at) === ymd(selectedDate));
+  const dayAppts = dayApptsAll
+    .filter((a) => filterStatuses.size === 0 || filterStatuses.has(a.status))
+    .filter((a) => !filterClinician || a.clinician_id === filterClinician)
+    .filter((a) => !filterAssistant || a.assistant_id === filterAssistant)
     .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
+
+  function toggleStatus(s: string) {
+    setFilterStatuses((prev) => {
+      const next = new Set(prev);
+      if (next.has(s)) next.delete(s);
+      else next.add(s);
+      return next;
+    });
+  }
 
   // Week view: bucket by date
   const weekByDate = useMemo(() => {
@@ -128,7 +146,13 @@ export function SchedulePage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
-                <span>{formatDate(selectedDate.toISOString())}</span>
+                <span className="flex items-center gap-2">
+                  {formatDate(selectedDate.toISOString())}
+                  <Badge variant="outline" className="text-[10px]">
+                    {dayApptsAll.length} lịch
+                    {dayAppts.length !== dayApptsAll.length && ` (hiện ${dayAppts.length})`}
+                  </Badge>
+                </span>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" onClick={() => shiftDay(-1)}>← Trước</Button>
                   <Button variant="outline" size="sm" onClick={() => setSelectedDate(new Date())}>Hôm nay</Button>
@@ -137,13 +161,95 @@ export function SchedulePage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
+              {/* Filter bar */}
+              <div className="mb-4 space-y-2 rounded-lg border border-border bg-muted/20 p-3">
+                {/* Status toggles */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground">Trạng thái:</span>
+                  {(["booked", "confirmed", "arrived", "completed", "cancelled", "no_show"] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => toggleStatus(s)}
+                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-all ${filterStatuses.size === 0 || filterStatuses.has(s) ? statusBgClass(s) : "bg-muted/40 text-muted-foreground opacity-50 line-through"}`}
+                    >
+                      {statusLabelVi(s)}
+                    </button>
+                  ))}
+                  {filterStatuses.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setFilterStatuses(new Set())}
+                      className="text-[11px] text-blue-600 hover:underline"
+                    >
+                      Xóa trạng thái
+                    </button>
+                  )}
+                </div>
+
+                {/* Clinician + Assistant dropdowns */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <Label htmlFor="filter-doctor" className="text-xs">BS:</Label>
+                    <Select
+                      id="filter-doctor"
+                      value={filterClinician}
+                      onChange={(e) => setFilterClinician(e.target.value)}
+                      className="h-7 w-44 text-xs"
+                    >
+                      <option value="">Tất cả</option>
+                      {users.filter((u) => u.role_name === "doctor").map((d) => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </Select>
+                  </div>
+
+                  {users.filter((u) => u.role_name === "assistant").length > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <Label htmlFor="filter-assistant" className="text-xs">Phụ tá:</Label>
+                      <Select
+                        id="filter-assistant"
+                        value={filterAssistant}
+                        onChange={(e) => setFilterAssistant(e.target.value)}
+                        className="h-7 w-44 text-xs"
+                      >
+                        <option value="">Tất cả</option>
+                        <option value="__none__">— Không có —</option>
+                        {users.filter((u) => u.role_name === "assistant").map((a) => (
+                          <option key={a.id} value={a.id}>{a.name}</option>
+                        ))}
+                      </Select>
+                    </div>
+                  )}
+
+                  {(filterClinician || filterAssistant || filterStatuses.size > 0) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setFilterClinician("");
+                        setFilterAssistant("");
+                        setFilterStatuses(new Set());
+                      }}
+                      className="h-7 text-xs"
+                    >
+                      ✕ Xóa hết lọc
+                    </Button>
+                  )}
+                </div>
+              </div>
+
               {loading ? (
                 <div className="h-40 flex items-center justify-center">
                   <div className="h-6 w-6 animate-spin rounded-full border-3 border-muted border-t-primary" />
                 </div>
               ) : dayAppts.length === 0 ? (
                 <div className="py-10 text-center">
-                  <p className="text-sm text-muted-foreground">Chưa có lịch hẹn nào trong ngày này</p>
+                  <p className="text-sm text-muted-foreground">
+                    {dayApptsAll.length === 0
+                      ? "Chưa có lịch hẹn nào trong ngày này"
+                      : "Không có lịch hẹn nào khớp với bộ lọc"}
+                  </p>
                   <Button className="mt-4" onClick={() => setCreateOpen(true)}>
                     + Tạo lịch hẹn
                   </Button>
@@ -153,14 +259,70 @@ export function SchedulePage() {
                   {dayAppts.map((a) => {
                     const patient = patientsById.get(a.patient_id);
                     const doctor = usersById.get(a.clinician_id);
+                    const assistant = a.assistant_id ? usersById.get(a.assistant_id) : null;
+                    const endTime = new Date(new Date(a.scheduled_at).getTime() + a.duration_min * 60 * 1000);
                     return (
-                      <AppointmentCard
+                      <div
                         key={a.id}
-                        appointment={a}
-                        patientName={patient?.name}
-                        doctorName={doctor?.name}
                         onClick={() => setEditing(a)}
-                      />
+                        className={`cursor-pointer rounded-lg border-l-4 px-3 py-2.5 transition-all hover:shadow-md hover:bg-accent/40 ${statusBorderClass(a.status)}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          {/* Time block */}
+                          <div className="shrink-0 text-center">
+                            <div className="font-mono text-base font-bold leading-tight">
+                              {formatTime(a.scheduled_at)}
+                            </div>
+                            <div className="font-mono text-[11px] text-muted-foreground">
+                              → {formatTime(endTime.toISOString())}
+                            </div>
+                            <div className="mt-1 text-[10px] font-medium text-muted-foreground">
+                              {a.duration_min}p
+                            </div>
+                          </div>
+
+                          {/* Vertical divider */}
+                          <div className="self-stretch border-l border-border/60" />
+
+                          {/* Main content */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-baseline justify-between gap-2">
+                              <p className="truncate font-semibold">
+                                {patient?.name ?? <span className="font-mono text-xs text-muted-foreground">{a.patient_id.slice(0, 8)}</span>}
+                              </p>
+                              <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-medium ${statusBgClass(a.status)}`}>
+                                {statusLabelVi(a.status)}
+                              </span>
+                            </div>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <span className="text-[10px] uppercase opacity-70">BS</span>
+                                <span className="font-medium text-foreground">{doctor?.name ?? "—"}</span>
+                              </span>
+                              {assistant && (
+                                <span className="flex items-center gap-1">
+                                  <span className="text-[10px] uppercase opacity-70">Phụ tá</span>
+                                  <span className="font-medium text-foreground">{assistant.name}</span>
+                                </span>
+                              )}
+                              {a.procedure && (
+                                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">
+                                  {a.procedure}
+                                </span>
+                              )}
+                              <span className="ml-auto text-[10px]">
+                                {a.source === "ai_chat" && "✨ AI chat"}
+                                {a.source === "ai_next_visit" && "🤖 AI suggest"}
+                              </span>
+                            </div>
+                            {a.notes && (
+                              <p className="mt-1 truncate text-[11px] text-muted-foreground italic">
+                                💬 {a.notes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
