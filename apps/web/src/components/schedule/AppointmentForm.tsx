@@ -1,5 +1,4 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +9,6 @@ import { apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import type { Appointment, Patient, UserWithDetails } from "@shared/types";
-import { ROUTES } from "@shared/constants";
 import { combineDateTime, ymd } from "@/lib/utils";
 
 interface AppointmentFormProps {
@@ -32,7 +30,6 @@ export function AppointmentForm({
   onCreated,
 }: AppointmentFormProps) {
   const { session } = useAuth();
-  const navigate = useNavigate();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [users, setUsers] = useState<UserWithDetails[]>([]);
   const [patientId, setPatientId] = useState("");
@@ -98,7 +95,6 @@ export function AppointmentForm({
       onCreated?.(created);
       onOpenChange(false);
       resetForm();
-      navigate(ROUTES.SCHEDULE);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi tạo lịch hẹn");
     } finally {

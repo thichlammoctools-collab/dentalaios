@@ -3,12 +3,18 @@ import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { AppointmentCard } from "@/components/schedule/AppointmentCard";
 import { AppointmentForm } from "@/components/schedule/AppointmentForm";
-import { apiGet } from "@/lib/api";
+import { apiGet, apiPatch, ApiError } from "@/lib/api";
+import { toast } from "@/lib/toast";
 import type { Appointment, Patient, UserWithDetails } from "@shared/types";
 import { ROUTES } from "@shared/constants";
-import { formatDate, getWeekDays, isoToYmd, weekdayLabel, ymd } from "@/lib/utils";
+import { formatDate, getWeekDays, isoToYmd, weekdayLabel, ymd, combineDateTime } from "@/lib/utils";
 
 interface AppointmentsResponse { items: Appointment[]; total: number }
 interface PatientsResponse { items: Patient[]; total: number }
@@ -21,6 +27,8 @@ export function SchedulePage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<Appointment | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   // Compute week range from selectedDate
   const weekDays = useMemo(() => getWeekDays(selectedDate), [selectedDate]);
@@ -47,7 +55,7 @@ export function SchedulePage() {
       .finally(() => mounted && setLoading(false));
 
     return () => { mounted = false; };
-  }, [weekDays]);
+  }, [weekDays, refreshTick]);
 
   const patientsById = useMemo(() => {
     const m = new Map<string, Patient>();
@@ -147,6 +155,7 @@ export function SchedulePage() {
                         appointment={a}
                         patientName={patient?.name}
                         doctorName={doctor?.name}
+                        onClick={() => setEditing(a)}
                       />
                     );
                   })}
@@ -209,6 +218,7 @@ export function SchedulePage() {
                                   appointment={a}
                                   patientName={patient?.name}
                                   compact
+                                  onClick={() => setEditing(a)}
                                 />
                               );
                             })
@@ -232,9 +242,149 @@ export function SchedulePage() {
 
       <AppointmentForm
         open={createOpen}
-        onOpenChange={setCreateOpen}
+        onOpenChange={(open) => {
+          setCreateOpen(open);
+          if (!open) setRefreshTick((t) => t + 1);
+        }}
         initialDate={ymd(selectedDate)}
       />
+
+      {editing && (
+        <EditAppointmentDialog
+          appointment={editing}
+          doctors={users}
+          onClose={() => {
+            setEditing(null);
+            setRefreshTick((t) => t + 1);
+          }}
+          onSaved={(updated) => {
+            setAppointments((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// ─── Edit Appointment Dialog ────────────────────────────────────────────────────
+
+function EditAppointmentDialog({
+  appointment,
+  doctors,
+  onClose,
+  onSaved,
+}: {
+  appointment: Appointment;
+  doctors: UserWithDetails[];
+  onClose: () => void;
+  onSaved: (appt: Appointment) => void;
+}) {
+  const apptDate = new Date(appointment.scheduled_at);
+  const [date, setDate] = useState(ymd(apptDate));
+  const [time, setTime] = useState(
+    `${String(apptDate.getUTCHours()).padStart(2, "0")}:${String(apptDate.getUTCMinutes()).padStart(2, "0")}`,
+  );
+  const [durationMin, setDurationMin] = useState(appointment.duration_min);
+  const [procedure, setProcedure] = useState(appointment.procedure ?? "");
+  const [notes, setNotes] = useState(appointment.notes ?? "");
+  const [status, setStatus] = useState(appointment.status);
+  const [saving, setSaving] = useState(false);
+
+  const doctorsOnly = doctors.filter((u) => u.role_name === "doctor");
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const scheduled_at = combineDateTime(date, time);
+      const updated = await apiPatch<Appointment>(`/api/appointments/${appointment.id}`, {
+        scheduled_at,
+        duration_min: durationMin,
+        status,
+        procedure: procedure || undefined,
+        notes: notes || undefined,
+      });
+      onSaved(updated);
+      toast.success("Đã cập nhật lịch hẹn");
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi cập nhật");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogHeader>
+        <DialogTitle>Sửa lịch hẹn</DialogTitle>
+      </DialogHeader>
+      <DialogBody className="grid gap-3">
+        {/* Bác sĩ — read-only */}
+        <div className="grid gap-1.5">
+          <Label>Bác sĩ</Label>
+          <Select value={appointment.clinician_id} disabled>
+            {doctorsOnly.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </Select>
+        </div>
+
+        {/* Trạng thái */}
+        <div className="grid gap-1.5">
+          <Label>Trạng thái</Label>
+          <Select value={status} onChange={(e) => setStatus(e.target.value as Appointment["status"])}>
+            <option value="booked">Đã đặt</option>
+            <option value="confirmed">Xác nhận</option>
+            <option value="arrived">Đã đến</option>
+            <option value="completed">Hoàn thành</option>
+            <option value="cancelled">Hủy</option>
+            <option value="no_show">Không đến</option>
+          </Select>
+        </div>
+
+        {/* Ngày + Giờ */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-1.5">
+            <Label>Ngày</Label>
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Giờ</Label>
+            <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+          </div>
+        </div>
+
+        {/* Thời lượng */}
+        <div className="grid gap-1.5">
+          <Label>Thời lượng (phút)</Label>
+          <Select value={String(durationMin)} onChange={(e) => setDurationMin(Number(e.target.value))}>
+            <option value="15">15 phút</option>
+            <option value="30">30 phút</option>
+            <option value="45">45 phút</option>
+            <option value="60">60 phút</option>
+            <option value="90">90 phút</option>
+            <option value="120">120 phút</option>
+          </Select>
+        </div>
+
+        {/* Hạng mục */}
+        <div className="grid gap-1.5">
+          <Label>Hạng mục</Label>
+          <Input value={procedure} onChange={(e) => setProcedure(e.target.value)} placeholder="VD: scaling, filling…" />
+        </div>
+
+        {/* Ghi chú */}
+        <div className="grid gap-1.5">
+          <Label>Ghi chú</Label>
+          <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </div>
+      </DialogBody>
+      <DialogFooter className="mt-4">
+        <Button type="button" variant="outline" onClick={onClose}>Đóng</Button>
+        <Button type="button" disabled={saving} onClick={handleSave}>
+          {saving ? "Đang lưu…" : "Lưu thay đổi"}
+        </Button>
+      </DialogFooter>
+    </Dialog>
   );
 }
