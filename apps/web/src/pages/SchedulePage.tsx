@@ -12,6 +12,7 @@ import { AppointmentCard } from "@/components/schedule/AppointmentCard";
 import { AppointmentForm } from "@/components/schedule/AppointmentForm";
 import { apiGet, apiPatch, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
+import { useAuth } from "@/lib/auth-context";
 import type { Appointment, Patient, UserWithDetails } from "@shared/types";
 import { ROUTES } from "@shared/constants";
 import { formatDate, getWeekDays, isoToYmd, weekdayLabel, ymd, combineDateTime } from "@/lib/utils";
@@ -21,6 +22,7 @@ interface PatientsResponse { items: Patient[]; total: number }
 interface UsersResponse { items: UserWithDetails[]; total: number }
 
 export function SchedulePage() {
+  const { session } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [users, setUsers] = useState<UserWithDetails[]>([]);
