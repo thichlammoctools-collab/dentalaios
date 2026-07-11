@@ -15,7 +15,7 @@ import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import type { Appointment, Patient, UserWithDetails } from "@shared/types";
 import { ROUTES } from "@shared/constants";
-import { formatDate, getWeekDays, isoToYmd, weekdayLabel, ymd, combineDateTime } from "@/lib/utils";
+import { formatDate, formatTime, getWeekDays, isoToYmd, weekdayLabel, ymd, combineDateTime } from "@/lib/utils";
 
 interface AppointmentsResponse { items: Appointment[]; total: number }
 interface PatientsResponse { items: Patient[]; total: number }
@@ -199,7 +199,7 @@ export function SchedulePage() {
                     return (
                       <div
                         key={dayYmd}
-                        className={`min-h-32 rounded-lg border p-2 ${isSelected ? "border-primary bg-primary/5" : isToday ? "border-amber-400 bg-amber-50/30" : "border-border"}`}
+                        className={`flex min-h-[200px] flex-col rounded-lg border p-2 transition-colors hover:bg-accent/30 ${isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : isToday ? "border-amber-400 bg-amber-50/30" : "border-border"}`}
                         onClick={() => setSelectedDate(day)}
                       >
                         <div className="mb-2 flex items-baseline justify-between">
@@ -210,27 +210,46 @@ export function SchedulePage() {
                             {day.getDate()}
                           </div>
                         </div>
-                        <div className="space-y-1">
+                        <div className="space-y-1 overflow-y-auto pr-1" style={{ maxHeight: "380px" }}>
                           {dayAppts.length === 0 ? (
-                            <p className="text-[10px] text-muted-foreground">—</p>
+                            <p className="py-3 text-center text-[10px] text-muted-foreground/60">—</p>
                           ) : (
-                            dayAppts.slice(0, 4).map((a) => {
+                            dayAppts.map((a) => {
                               const patient = patientsById.get(a.patient_id);
+                              const doctor = usersById.get(a.clinician_id);
                               return (
-                                <AppointmentCard
+                                <div
                                   key={a.id}
-                                  appointment={a}
-                                  patientName={patient?.name}
-                                  compact
-                                  onClick={() => setEditing(a)}
-                                />
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditing(a);
+                                  }}
+                                  className={`cursor-pointer rounded-md border-l-2 px-2 py-1.5 text-xs transition-colors hover:bg-accent/50 ${statusBorderClass(a.status)}`}
+                                >
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="font-mono font-semibold">{formatTime(a.scheduled_at)}</span>
+                                    <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium ${statusBgClass(a.status)}`}>
+                                      {statusLabelVi(a.status)}
+                                    </span>
+                                  </div>
+                                  <div className="mt-0.5 truncate font-medium">
+                                    {patient?.name ?? a.patient_id.slice(0, 8)}
+                                  </div>
+                                  {a.procedure && (
+                                    <div className="truncate text-[10px] text-muted-foreground">
+                                      {a.procedure}
+                                    </div>
+                                  )}
+                                </div>
                               );
                             })
                           )}
-                          {dayAppts.length > 4 && (
-                            <p className="text-[10px] text-muted-foreground">+{dayAppts.length - 4}</p>
-                          )}
                         </div>
+                        {dayAppts.length > 0 && (
+                          <div className="mt-1 text-center text-[10px] font-medium text-muted-foreground">
+                            {dayAppts.length} lịch hẹn
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -268,6 +287,44 @@ export function SchedulePage() {
       )}
     </div>
   );
+}
+
+// ─── Status helpers for week view ──────────────────────────────────────────────
+
+function statusBorderClass(status: string): string {
+  switch (status) {
+    case "booked": return "border-l-slate-400 bg-slate-50/50 dark:bg-slate-900/30";
+    case "confirmed": return "border-l-blue-500 bg-blue-50/50 dark:bg-blue-900/30";
+    case "arrived": return "border-l-amber-500 bg-amber-50/50 dark:bg-amber-900/30";
+    case "completed": return "border-l-emerald-500 bg-emerald-50/50 dark:bg-emerald-900/30";
+    case "cancelled": return "border-l-red-400 bg-red-50/30 dark:bg-red-900/20 opacity-60";
+    case "no_show": return "border-l-slate-300 bg-slate-50/30 dark:bg-slate-900/20 opacity-60";
+    default: return "border-l-border bg-card";
+  }
+}
+
+function statusBgClass(status: string): string {
+  switch (status) {
+    case "booked": return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+    case "confirmed": return "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300";
+    case "arrived": return "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300";
+    case "completed": return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300";
+    case "cancelled": return "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300";
+    case "no_show": return "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400";
+    default: return "bg-muted text-muted-foreground";
+  }
+}
+
+function statusLabelVi(status: string): string {
+  switch (status) {
+    case "booked": return "Đặt";
+    case "confirmed": return "Xác nhận";
+    case "arrived": return "Đến";
+    case "completed": return "Xong";
+    case "cancelled": return "Hủy";
+    case "no_show": return "Vắng";
+    default: return status;
+  }
 }
 
 // ─── Edit Appointment Dialog ────────────────────────────────────────────────────
