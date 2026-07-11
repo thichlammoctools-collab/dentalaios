@@ -15,6 +15,7 @@ import { requirePermission } from "../middleware/rbac";
 import type { AuthContext } from "../middleware/auth";
 import { aiService } from "../services/ai.service";
 import { voiceFindingsService } from "../services/voice-findings.service";
+import { aiAppointmentService } from "../services/ai-appointment.service";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -95,6 +96,44 @@ router.post(
       prompt,
     );
     return c.json({ ...result, visit_id });
+  },
+);
+
+// POST /api/ai/parse-appointment-chat
+// Body: { message: string }
+// 1-shot NL → Appointment JSON. Frontend then pre-fills AppointmentForm.
+router.post(
+  "/parse-appointment-chat",
+  requirePermission(PERMISSIONS.WRITE_APPOINTMENTS),
+  zValidator("json", z.object({ message: z.string().min(1).max(1000) })),
+  async (c) => {
+    const jwt = getJwt(c);
+    const { message } = c.req.valid("json");
+    const result = await aiAppointmentService.parseChatMessage(
+      { db: c.env.DB, AI: (c.env as Record<string, unknown>).AI },
+      jwt.tenant_id,
+      message,
+    );
+    return c.json(result);
+  },
+);
+
+// POST /api/ai/suggest-next-appointment
+// Body: { visit_id: string }
+// Returns suggested date/time/procedure for follow-up based on visit findings + treatment plan.
+router.post(
+  "/suggest-next-appointment",
+  requirePermission(PERMISSIONS.WRITE_APPOINTMENTS),
+  zValidator("json", z.object({ visit_id: z.string().min(1) })),
+  async (c) => {
+    const jwt = getJwt(c);
+    const { visit_id } = c.req.valid("json");
+    const result = await aiAppointmentService.suggestNextAppointment(
+      { db: c.env.DB, AI: (c.env as Record<string, unknown>).AI },
+      jwt.tenant_id,
+      visit_id,
+    );
+    return c.json(result);
   },
 );
 

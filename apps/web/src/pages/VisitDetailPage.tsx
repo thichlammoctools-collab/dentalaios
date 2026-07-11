@@ -286,6 +286,18 @@ export function VisitDetailPage() {
   const [savingPlan, setSavingPlan] = useState(false);
   const [voiceDialogOpen, setVoiceDialogOpen] = useState(false);
 
+  const [suggestNextLoading, setSuggestNextLoading] = useState(false);
+  const [suggestNextResult, setSuggestNextResult] = useState<{
+    suggested_date: string;
+    suggested_time: string;
+    duration_min: number;
+    procedure: string | null;
+    reason: string;
+    notes: string;
+  } | null>(null);
+  const [suggestNextDialogOpen, setSuggestNextDialogOpen] = useState(false);
+  const [creatingAppointment, setCreatingAppointment] = useState(false);
+
   async function load() {
     if (!id) return;
     setLoading(true);
@@ -304,6 +316,60 @@ export function VisitDetailPage() {
   }
 
   useEffect(() => { load(); }, [id]);
+
+  async function onSuggestNext() {
+    if (!visit) return;
+    setSuggestNextLoading(true);
+    try {
+      const res = await apiPost<{
+        suggestion: {
+          suggested_date: string;
+          suggested_time: string;
+          duration_min: number;
+          procedure: string | null;
+          reason: string;
+          notes: string;
+        } | null;
+        ai_model: string;
+      }>("/api/ai/suggest-next-appointment", { visit_id: visit.id });
+      if (!res.suggestion) {
+        toast.error("AI không thể đề xuất lịch cho visit này");
+        return;
+      }
+      setSuggestNextResult(res.suggestion);
+      setSuggestNextDialogOpen(true);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi AI");
+    } finally {
+      setSuggestNextLoading(false);
+    }
+  }
+
+  async function onCreateFromSuggestion() {
+    if (!visit || !suggestNextResult) return;
+    setCreatingAppointment(true);
+    try {
+      const scheduledAt = `${suggestNextResult.suggested_date}T${suggestNextResult.suggested_time}:00`;
+      const isoScheduledAt = new Date(scheduledAt).toISOString();
+      await apiPost("/api/appointments", {
+        patient_id: visit.patient_id,
+        clinician_id: visit.clinician_id,
+        scheduled_at: isoScheduledAt,
+        duration_min: suggestNextResult.duration_min,
+        procedure: suggestNextResult.procedure ?? undefined,
+        notes: suggestNextResult.notes ?? undefined,
+        source_visit_id: visit.id,
+        source: "ai_next_visit",
+      });
+      toast.success("Đã tạo lịch hẹn tiếp theo");
+      setSuggestNextDialogOpen(false);
+      setSuggestNextResult(null);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi tạo lịch");
+    } finally {
+      setCreatingAppointment(false);
+    }
+  }
 
   async function onCreatePlan() {
     if (!visit) return;
@@ -553,6 +619,15 @@ export function VisitDetailPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
           </svg>
           {generatingPlan ? "Đang tạo…" : "Tạo kế hoạch AI"}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onSuggestNext}
+          disabled={suggestNextLoading}
+          className="gap-1.5"
+        >
+          {suggestNextLoading ? "Đang gợi ý…" : "📅 Tạo lịch tái khám"}
         </Button>
         <div className="ml-auto">
           <Button size="sm" onClick={onCreatePlan} className="gap-1.5">
@@ -839,6 +914,71 @@ export function VisitDetailPage() {
           setVoiceDialogOpen(false);
         }}
       />
+
+      {/* Suggest Next Appointment Dialog */}
+      <Dialog open={suggestNextDialogOpen} onOpenChange={setSuggestNextDialogOpen}>
+        <DialogBody>
+          <DialogHeader>
+            <DialogTitle>📅 Gợi ý lịch tái khám</DialogTitle>
+          </DialogHeader>
+          {suggestNextResult && (
+            <div className="space-y-3">
+              <div className="rounded-md border bg-gradient-to-br from-blue-50 to-purple-50 p-3">
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Ngày đề xuất</p>
+                    <p className="font-mono font-medium">{suggestNextResult.suggested_date}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Giờ</p>
+                    <p className="font-mono font-medium">{suggestNextResult.suggested_time}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Thời lượng</p>
+                    <p className="font-medium">{suggestNextResult.duration_min} phút</p>
+                  </div>
+                  {suggestNextResult.procedure && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Thủ thuật</p>
+                      <p className="font-mono text-sm">{suggestNextResult.procedure}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs text-muted-foreground">Lý do</p>
+                <p className="text-sm">{suggestNextResult.reason}</p>
+              </div>
+
+              {suggestNextResult.notes && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Ghi chú</p>
+                  <p className="text-sm">{suggestNextResult.notes}</p>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setSuggestNextDialogOpen(false)}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  type="button"
+                  onClick={onCreateFromSuggestion}
+                  disabled={creatingAppointment}
+                  className="bg-gradient-to-r from-blue-600 to-purple-600"
+                >
+                  {creatingAppointment ? "Đang tạo…" : "Tạo lịch hẹn"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogBody>
+      </Dialog>
     </div>
   );
 }
