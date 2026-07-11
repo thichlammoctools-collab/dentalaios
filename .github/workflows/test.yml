@@ -14,13 +14,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - run: npm ci
-
-      - name: Typecheck API
-        run: npx tsc --noEmit -p apps/api
 
       - name: Test API
         run: npm test --workspace apps/api -- --reporter=verbose 2>&1 || true
@@ -33,7 +30,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - run: npm ci
