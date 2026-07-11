@@ -38,7 +38,10 @@ jobs:
 
       # ─── Build Frontend ───────────────────────────────
       - name: Build Frontend
-        run: npm run build --workspace apps/web
+        working-directory: apps/web
+        run: npm run build
+        env:
+          VITE_API_URL: https://dentalaios.thichlammoctools.workers.dev
 
       # ─── Deploy Frontend to Pages ─────────────────────
       - name: Deploy Frontend
