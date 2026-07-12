@@ -1,6 +1,10 @@
 /**
  * Appointments service — creates appointments and syncs to Lark Calendar.
  *
+ * Conflict detection: when create/update changes scheduled_at / duration /
+ * clinician_id, the service checks for overlapping appointments for that
+ * clinician. Returns ConflictError (→ 409) when overlap found.
+ *
  * Architecture rule #7: ONLY operational fields to Lark.
  * (patient name, phone, scheduled time — no clinical details.)
  */
@@ -11,7 +15,37 @@ import type { AppointmentCreateInput, AppointmentUpdateInput } from "@shared/val
 import { createAppointmentsRepository } from "../repositories/appointments.repo";
 import { createLarkConfigRepository } from "../repositories/lark-config.repo";
 import { createLarkCalendarEvent } from "../lib/lark-client";
-import { NotFoundError } from "../lib/errors";
+import { ConflictError, NotFoundError } from "../lib/errors";
+
+// ─── Helpers ──────────────────────────────────────────────────
+
+/** Compute [startISO, endISO) for a scheduled_at + duration_min pair. */
+function interval(scheduledAt: string, durationMin: number): { start: string; end: string } {
+  const end = new Date(scheduledAt);
+  end.setMinutes(end.getMinutes() + durationMin);
+  return { start: scheduledAt, end: end.toISOString() };
+}
+
+/** Throw ConflictError when overlapping appointments exist for clinician. */
+async function assertNoConflict(
+  db: D1Database,
+  tenantId: string,
+  clinicianId: string,
+  startISO: string,
+  endISO: string,
+  excludeId?: string,
+): Promise<void> {
+  const repo = createAppointmentsRepository(db);
+  const conflicts = await repo.findConflicts(tenantId, clinicianId, startISO, endISO, excludeId);
+  if (conflicts.length > 0) {
+    const at = new Date(startISO).toLocaleString("vi-VN");
+    throw new ConflictError(
+      `Bác sĩ đã có lịch hẹn trùng khung giờ này (${at}). Vui lòng chọn giờ khác.`,
+    );
+  }
+}
+
+// ─── Public API ───────────────────────────────────────────────
 
 export const appointmentsService = {
   list(
@@ -37,6 +71,11 @@ export const appointmentsService = {
     encryptionKey?: string,
   ): Promise<Appointment> {
     const repo = createAppointmentsRepository(db);
+    const duration = input.duration_min ?? 30;
+    const { start, end } = interval(input.scheduled_at, duration);
+
+    // Conflict check: same clinician, overlapping [start, end)
+    await assertNoConflict(db, tenantId, input.clinician_id, start, end);
 
     const appt = await repo.create(tenantId, {
       branch_id: branchId,
@@ -45,7 +84,7 @@ export const appointmentsService = {
       assistant_id: input.assistant_id,
       source_visit_id: input.source_visit_id,
       scheduled_at: input.scheduled_at,
-      duration_min: input.duration_min ?? 30,
+      duration_min: duration,
       status: "booked",
       procedure: input.procedure,
       notes: input.notes,
@@ -67,6 +106,30 @@ export const appointmentsService = {
     const repo = createAppointmentsRepository(db);
     const existing = await repo.getById(tenantId, id);
     if (!existing) throw new NotFoundError("Appointment not found");
+
+    // Re-check conflicts only if anything affecting time/doctor changed
+    const newClinician = input.clinician_id ?? existing.clinician_id;
+    const newDuration = input.duration_min ?? existing.duration_min;
+    const newScheduledAt = input.scheduled_at ?? existing.scheduled_at;
+    const rescheduling =
+      input.scheduled_at !== undefined ||
+      input.duration_min !== undefined ||
+      input.clinician_id !== undefined;
+
+    if (rescheduling) {
+      const { start, end } = interval(newScheduledAt, newDuration);
+      // Don't conflict-check a cancelled or no_show appointment against itself
+      const skipSelf =
+        existing.status === "cancelled" || existing.status === "no_show";
+      await assertNoConflict(
+        db,
+        tenantId,
+        newClinician,
+        start,
+        end,
+        skipSelf ? undefined : id,
+      );
+    }
 
     const updated = await repo.update(tenantId, id, {
       scheduled_at: input.scheduled_at,
@@ -99,6 +162,30 @@ export const appointmentsService = {
     excludeId?: string,
   ): Promise<Appointment[]> {
     return createAppointmentsRepository(db).findConflicts(tenantId, clinicianId, startISO, endISO, excludeId);
+  },
+
+  /**
+   * Get busy intervals (existing appointments) for a clinician on a given date.
+   * Frontend uses this to compute free slots via doctor schedule.
+   * @param date YYYY-MM-DD
+   */
+  async getBusySlots(
+    db: D1Database,
+    tenantId: string,
+    clinicianId: string,
+    date: string,
+  ): Promise<Pick<Appointment, "scheduled_at" | "duration_min" | "id">[]> {
+    const dayStart = `${date}T00:00:00.000Z`;
+    const dayEnd = `${date}T23:59:59.999Z`;
+    const repo = createAppointmentsRepository(db);
+    const busy = await repo.list(tenantId, {
+      clinicianId,
+      from: dayStart,
+      to: dayEnd,
+    });
+    return busy
+      .filter((a) => a.status !== "cancelled" && a.status !== "no_show")
+      .map((a) => ({ id: a.id, scheduled_at: a.scheduled_at, duration_min: a.duration_min }));
   },
 };
 

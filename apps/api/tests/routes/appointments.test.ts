@@ -71,16 +71,18 @@ describe("GET /api/appointments", () => {
 });
 
 describe("POST /api/appointments", () => {
-  it("returns 201 + appointment for valid input", async () => {
+  it("returns 201 + appointment for valid input (no conflict)", async () => {
     const app = mountRoute("/api/appointments", appointmentsRoutes);
     const res = await authedRequestWithDB(
       app,
       "POST",
       "/api/appointments",
       new Map<string, unknown[]>([
-        // INSERT appointments (no fragment match)
-        // post-insert getById
-        ["FROM appointments", [appointmentRow()]],
+        // Conflict check (findConflicts) returns empty → no overlap
+        // Post-insert getById returns the created row
+        ["FROM appointments", (_sql: string, idx: number) =>
+          idx === 0 ? [] : [appointmentRow()]
+        ],
       ]),
       {
         permissions: ["write_appointments"],
@@ -197,6 +199,36 @@ describe("PATCH /api/appointments/:id", () => {
   });
 });
 
+describe("POST /api/appointments", () => {
+  it("returns 409 when clinician has overlapping appointment (conflict detected)", async () => {
+    const app = mountRoute("/api/appointments", appointmentsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/appointments",
+      new Map([
+        // Conflict check returns existing overlapping appointment
+        ["FROM appointments", (_sql: string, idx: number) =>
+          idx === 0 ? [appointmentRow()] : []
+        ],
+      ]),
+      {
+        permissions: ["write_appointments"],
+        body: {
+          patient_id: "patient-2",
+          clinician_id: "doc-1",
+          scheduled_at: "2026-07-15T08:00:00.000Z",
+          duration_min: 30,
+        },
+      },
+    );
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code: string; error: string };
+    expect(body.code).toBe("conflict");
+    expect(body.error).toContain("trùng");
+  });
+});
+
 describe("DELETE /api/appointments/:id", () => {
   it("soft cancels appointment", async () => {
     const app = mountRoute("/api/appointments", appointmentsRoutes);
@@ -205,6 +237,7 @@ describe("DELETE /api/appointments/:id", () => {
       "DELETE",
       "/api/appointments/appt-1",
       new Map([
+        // getById → existing booked appointment
         ["FROM appointments", [appointmentRow()]],
       ]),
       {
@@ -212,5 +245,77 @@ describe("DELETE /api/appointments/:id", () => {
       },
     );
     expect(res.status).toBe(200);
+  });
+
+  it("returns 409 when rescheduling conflicts with another appointment", async () => {
+    const app = mountRoute("/api/appointments", appointmentsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "PATCH",
+      "/api/appointments/appt-1",
+      new Map([
+        // getAllForCheck + conflict check (first query = conflict, second = getById after update)
+        ["FROM appointments", (_sql: string, idx: number) => {
+          if (idx === 0) return [appointmentRow()]; // existing appointment (getById)
+          if (idx === 1) return [appointmentRow({ id: "conflict-1" })]; // conflict check
+          return [appointmentRow()]; // getById after update
+        }],
+      ]),
+      {
+        permissions: ["write_appointments"],
+        body: {
+          // Try to reschedule to a time that conflicts
+          scheduled_at: "2026-07-15T08:30:00.000Z", // overlaps with existing 08:00-08:30
+        },
+      },
+    );
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { code: string; error: string };
+    expect(body.code).toBe("conflict");
+  });
+
+  it("returns 409 when changing doctor to one with existing conflict", async () => {
+    const app = mountRoute("/api/appointments", appointmentsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "PATCH",
+      "/api/appointments/appt-1",
+      new Map([
+        ["FROM appointments", (_sql: string, idx: number) => {
+          if (idx === 0) return [appointmentRow()]; // existing
+          if (idx === 1) return [appointmentRow({ clinician_id: "new-doc" })]; // conflict with new doctor
+          return [appointmentRow({ clinician_id: "new-doc" })];
+        }],
+      ]),
+      {
+        permissions: ["write_appointments"],
+        body: {
+          clinician_id: "new-doc",
+        },
+      },
+    );
+    expect(res.status).toBe(409);
+  });
+});
+
+describe("GET /api/appointments/slots", () => {
+  it("excludes cancelled appointments from busy slots", async () => {
+    const app = mountRoute("/api/appointments", appointmentsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "GET",
+      "/api/appointments/slots?doctor_id=doc-1&date=2026-07-15",
+      new Map([
+        ["FROM appointments", [
+          appointmentRow({ status: "confirmed" }),
+          appointmentRow({ id: "appt-2", status: "cancelled" }),
+        ]],
+      ]),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { items: { scheduled_at: string }[]; total: number };
+    // cancelled one should be excluded by getBusySlots filter
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0].scheduled_at).toBe("2026-07-15T08:00:00.000Z");
   });
 });

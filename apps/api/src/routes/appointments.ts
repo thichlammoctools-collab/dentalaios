@@ -8,7 +8,6 @@ import { requirePermission } from "../middleware/rbac";
 import { auditLog } from "../middleware/audit";
 import type { AuthContext } from "../middleware/auth";
 import { appointmentsService } from "../services/appointments.service";
-import { createAppointmentsRepository } from "../repositories/appointments.repo";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -60,15 +59,12 @@ router.get(
   async (c) => {
     const jwt = getJwt(c);
     const { doctor_id, date } = c.req.valid("query");
-    const repo = createAppointmentsRepository(c.env.DB);
-    const dayStart = `${date}T00:00:00.000Z`;
-    const dayEnd = `${date}T23:59:59.999Z`;
-    const busy = await repo.list(jwt.tenant_id, {
-      clinicianId: doctor_id,
-      from: dayStart,
-      to: dayEnd,
-    });
-    const items = busy.map((a) => ({ scheduled_at: a.scheduled_at, duration_min: a.duration_min }));
+    const items = await appointmentsService.getBusySlots(
+      c.env.DB,
+      jwt.tenant_id,
+      doctor_id,
+      date,
+    );
     return c.json({ items, total: items.length });
   },
 );
