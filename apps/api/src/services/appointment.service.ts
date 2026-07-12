@@ -105,7 +105,16 @@ export const appointmentService = {
     }
 
     const repo = createAppointmentsRepository(db);
-    const updated = await repo.update(tenantId, id, data);
+    const updated = await repo.update(tenantId, id, {
+      scheduled_at: data.scheduled_at,
+      duration_min: data.duration_min,
+      clinician_id: data.clinician_id,
+      assistant_id: data.assistant_id ?? undefined,
+      status: data.status,
+      procedure: data.procedure,
+      notes: data.notes,
+      cancelled_reason: data.cancelled_reason,
+    });
     if (!updated) throw new NotFoundError("Appointment not found");
     return updated;
   },
