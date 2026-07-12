@@ -148,6 +148,64 @@ export async function createLarkCalendarEvent(
   return { eventId: data.data.event.id };
 }
 
+/** Update an existing Lark calendar event (e.g. after rescheduling). */
+export async function updateLarkCalendarEvent(
+  appId: string,
+  appSecret: string,
+  eventId: string,
+  input: LarkCalendarEventInput,
+): Promise<void> {
+  const token = await getTenantAccessToken(appId, appSecret);
+  const calendarId = input.calendarId ?? "primary";
+  const res = await fetch(
+    `${LARK_BASE}/calendar/v4/calendars/${calendarId}/events/${eventId}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        summary: input.summary,
+        description: input.description,
+        start_time: { timestamp: Math.floor(new Date(input.start).getTime() / 1000) },
+        end_time: { timestamp: Math.floor(new Date(input.end).getTime() / 1000) },
+      }),
+    },
+  );
+  if (!res.ok) throw new Error(`Lark calendar update failed: ${res.status}`);
+  const data = (await res.json()) as { code?: number; msg?: string };
+  if (data.code !== 0) {
+    throw new Error(`Lark calendar update error: ${data.code} ${data.msg}`);
+  }
+}
+
+/** Delete a Lark calendar event (e.g. when appointment is cancelled). */
+export async function deleteLarkCalendarEvent(
+  appId: string,
+  appSecret: string,
+  eventId: string,
+  calendarId = "primary",
+): Promise<void> {
+  const token = await getTenantAccessToken(appId, appSecret);
+  const res = await fetch(
+    `${LARK_BASE}/calendar/v4/calendars/${calendarId}/events/${eventId}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+  // 404 is acceptable — event may already be deleted from Lark side.
+  if (res.status === 404) return;
+  if (!res.ok) throw new Error(`Lark calendar delete failed: ${res.status}`);
+  const data = (await res.json()) as { code?: number; msg?: string };
+  if (data.code !== 0) {
+    throw new Error(`Lark calendar delete error: ${data.code} ${data.msg}`);
+  }
+}
+
 /**
  * Test whether the supplied Lark credentials are valid by fetching
  * a tenant_access_token. Returns true on success, false (with error) on failure.

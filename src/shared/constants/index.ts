@@ -44,6 +44,7 @@ export const PERMISSIONS = {
   MANAGE_USERS: "manage_users",
   MANAGE_ROLES: "manage_roles",
   MANAGE_PATIENTS: "manage_patients",
+  MANAGE_SCHEDULE: "manage_schedule",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

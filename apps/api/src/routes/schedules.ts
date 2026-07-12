@@ -39,7 +39,7 @@ router.get(
 // PUT /api/schedules/clinic/:branchId
 router.put(
   "/clinic/:branchId",
-  requirePermission(PERMISSIONS.WRITE_APPOINTMENTS),
+  requirePermission(PERMISSIONS.MANAGE_SCHEDULE),
   auditLog("update", "clinic_schedule"),
   zValidator("json", clinicScheduleBulkUpdateSchema),
   async (c) => {
@@ -70,7 +70,7 @@ router.get(
 // PUT /api/schedules/doctor/:doctorId
 router.put(
   "/doctor/:doctorId",
-  requirePermission(PERMISSIONS.WRITE_APPOINTMENTS),
+  requirePermission(PERMISSIONS.MANAGE_SCHEDULE),
   auditLog("update", "doctor_schedule"),
   zValidator("json", doctorScheduleBulkUpdateSchema),
   async (c) => {

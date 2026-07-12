@@ -14,7 +14,11 @@ import type { Appointment } from "@shared/types";
 import type { AppointmentCreateInput, AppointmentUpdateInput } from "@shared/validation";
 import { createAppointmentsRepository } from "../repositories/appointments.repo";
 import { createLarkConfigRepository } from "../repositories/lark-config.repo";
-import { createLarkCalendarEvent } from "../lib/lark-client";
+import {
+  createLarkCalendarEvent,
+  updateLarkCalendarEvent,
+  deleteLarkCalendarEvent,
+} from "../lib/lark-client";
 import { ConflictError, NotFoundError } from "../lib/errors";
 
 // ─── Helpers ──────────────────────────────────────────────────
@@ -142,11 +146,30 @@ export const appointmentsService = {
       cancelled_reason: input.cancelled_reason,
     });
 
-    if (updated && (input.scheduled_at || input.status)) {
-      await syncToLarkCalendar(db, tenantId, updated, encryptionKey);
+    if (!updated) throw new NotFoundError("Appointment not found");
+
+    // Lark sync — update event if rescheduled, delete if cancelled.
+    // Hook only when something visible to Lark changed.
+    const larkRescheduled =
+      existing.lark_event_id &&
+      (input.scheduled_at !== undefined ||
+        input.duration_min !== undefined ||
+        input.procedure !== undefined);
+    const larkCancelled =
+      existing.lark_event_id && input.status === "cancelled";
+
+    if (larkCancelled) {
+      await deleteFromLark(db, tenantId, existing.lark_event_id!, encryptionKey);
+      // Clear lark_event_id so we don't try to delete twice
+      await createAppointmentsRepository(db).update(tenantId, id, {
+        lark_event_id: undefined,
+      });
+      updated.lark_event_id = undefined;
+    } else if (larkRescheduled) {
+      await updateInLark(db, tenantId, updated, encryptionKey);
     }
 
-    return updated!;
+    return updated;
   },
 
   async cancel(db: D1Database, tenantId: string, id: string, reason?: string): Promise<Appointment> {
@@ -189,53 +212,103 @@ export const appointmentsService = {
   },
 };
 
-/** Only operational fields sent to Lark (rule #7). Silently skips if not configured. */
+/** Resolve Lark credentials from tenant config. Returns null if not configured. */
+async function resolveLarkCredentials(
+  db: D1Database,
+  tenantId: string,
+  encryptionKey?: string,
+): Promise<{ appId: string; appSecret: string; calendarId: string } | null> {
+  if (!encryptionKey) return null;
+  try {
+    const larkRepo = createLarkConfigRepository(db);
+    const config = await larkRepo.getByTenant(tenantId, encryptionKey);
+    if (config?.enabled) {
+      return {
+        appId: config.app_id,
+        appSecret: config.app_secret,
+        calendarId: config.calendar_id ?? "primary",
+      };
+    }
+  } catch {
+    // not configured
+  }
+  return null;
+}
+
+function buildEventPayload(appt: Appointment) {
+  const start = new Date(appt.scheduled_at);
+  const end = new Date(start.getTime() + appt.duration_min * 60 * 1000);
+  const summary = `Lịch hẹn khám`;
+  const description = [
+    appt.procedure ? `Hạng mục: ${appt.procedure}` : null,
+    appt.notes ? `Ghi chú: ${appt.notes}` : null,
+    `Mã lịch hẹn: ${appt.id}`,
+  ].filter(Boolean).join("\n");
+  return {
+    summary,
+    description,
+    start: start.toISOString(),
+    end: end.toISOString(),
+  };
+}
+
+/** Create event in Lark Calendar (rule #7: operational fields only). */
 async function syncToLarkCalendar(
   db: D1Database,
   tenantId: string,
   appt: Appointment,
   encryptionKey?: string,
 ): Promise<void> {
-  let appId: string | undefined;
-  let appSecret: string | undefined;
-  let calendarId: string | undefined;
-
-  if (encryptionKey) {
-    try {
-      const larkRepo = createLarkConfigRepository(db);
-      const config = await larkRepo.getByTenant(tenantId, encryptionKey);
-      if (config?.enabled) {
-        appId = config.app_id;
-        appSecret = config.app_secret;
-        calendarId = config.calendar_id ?? undefined;
-      }
-    } catch {
-      // not configured — skip
-    }
-  }
-
-  if (!appId || !appSecret) return;
+  const creds = await resolveLarkCredentials(db, tenantId, encryptionKey);
+  if (!creds) return;
 
   try {
-    const start = new Date(appt.scheduled_at);
-    const end = new Date(start.getTime() + appt.duration_min * 60 * 1000);
-
-    const summary = `Lịch hẹn khám`;
-    const description = [
-      appt.procedure ? `Hạng mục: ${appt.procedure}` : null,
-      appt.notes ? `Ghi chú: ${appt.notes}` : null,
-      `Mã lịch hẹn: ${appt.id}`,
-    ].filter(Boolean).join("\n");
-
-    const result = await createLarkCalendarEvent(appId, appSecret, {
-      summary, description,
-      start: start.toISOString(),
-      end: end.toISOString(),
-      calendarId: calendarId ?? "primary",
+    const payload = buildEventPayload(appt);
+    const result = await createLarkCalendarEvent(creds.appId, creds.appSecret, {
+      ...payload,
+      calendarId: creds.calendarId,
     });
-
-    await createAppointmentsRepository(db).update(tenantId, appt.id, { lark_event_id: result.eventId });
+    await createAppointmentsRepository(db).update(tenantId, appt.id, {
+      lark_event_id: result.eventId,
+    });
   } catch (err) {
     console.warn(`[appointments] Lark sync failed for ${appt.id}:`, err);
+  }
+}
+
+/** Update existing Lark event (after reschedule). Silently skips if not configured. */
+async function updateInLark(
+  db: D1Database,
+  tenantId: string,
+  appt: Appointment,
+  encryptionKey?: string,
+): Promise<void> {
+  if (!appt.lark_event_id) return;
+  const creds = await resolveLarkCredentials(db, tenantId, encryptionKey);
+  if (!creds) return;
+  try {
+    const payload = buildEventPayload(appt);
+    await updateLarkCalendarEvent(creds.appId, creds.appSecret, appt.lark_event_id, {
+      ...payload,
+      calendarId: creds.calendarId,
+    });
+  } catch (err) {
+    console.warn(`[appointments] Lark update failed for ${appt.id}:`, err);
+  }
+}
+
+/** Delete Lark event (after cancel). Silently skips if not configured. */
+async function deleteFromLark(
+  db: D1Database,
+  tenantId: string,
+  eventId: string,
+  encryptionKey?: string,
+): Promise<void> {
+  const creds = await resolveLarkCredentials(db, tenantId, encryptionKey);
+  if (!creds) return;
+  try {
+    await deleteLarkCalendarEvent(creds.appId, creds.appSecret, eventId, creds.calendarId);
+  } catch (err) {
+    console.warn(`[appointments] Lark delete failed for ${eventId}:`, err);
   }
 }
