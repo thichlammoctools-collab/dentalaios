@@ -269,15 +269,12 @@ export function SchedulePage() {
                       >
                         <div className="flex items-start gap-3">
                           {/* Time block */}
-                          <div className="shrink-0 text-center">
-                            <div className="font-mono text-base font-bold leading-tight">
-                              {formatTime(a.scheduled_at)}
+                          <div className="shrink-0 min-w-[80px] text-center">
+                            <div className="font-mono text-xl font-bold leading-tight tabular-nums">
+                              {formatTime(a.scheduled_at)} → {formatTime(endTime.toISOString())}
                             </div>
-                            <div className="font-mono text-[11px] text-muted-foreground">
-                              → {formatTime(endTime.toISOString())}
-                            </div>
-                            <div className="mt-1 text-[10px] font-medium text-muted-foreground">
-                              {a.duration_min}p
+                            <div className="font-mono text-sm font-medium text-muted-foreground tabular-nums">
+                              {a.duration_min} phút
                             </div>
                           </div>
 

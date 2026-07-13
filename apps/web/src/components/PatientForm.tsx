@@ -53,11 +53,11 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
   const [users, setUsers] = useState<UserWithDetails[]>([]);
 
   useEffect(() => {
-    if (!open) return;
-    apiGet<UserWithDetails[]>("/api/users")
-      .then((data) => setUsers(Array.isArray(data) ? data : []))
+    if (!open || !branchId) return;
+    apiGet<{ items: UserWithDetails[] }>(`/api/users/branch/${branchId}`)
+      .then((res) => setUsers(Array.isArray(res?.items) ? res.items : []))
       .catch(() => setUsers([]));
-  }, [open]);
+  }, [open, branchId]);
 
   useEffect(() => {
     if (open) {
@@ -329,7 +329,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
                 <Select id="pf-ref-user" value={referralUserId} onChange={(e) => setReferralUserId(e.target.value)}>
                   <option value="">— Chọn người giới thiệu —</option>
                   {(users ?? []).map((u) => (
-                    <option key={u.id} value={u.id}>{u.name} ({u.role.name})</option>
+                    <option key={u.id} value={u.id}>{u.name} ({u.role_name})</option>
                   ))}
                 </Select>
               </div>
