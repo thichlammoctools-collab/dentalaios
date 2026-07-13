@@ -2,8 +2,7 @@
  * Patient images routes:
  *   GET  /api/patient-images?patient_id=xxx          — list by patient
  *   GET  /api/patient-images/visit/:visitId          — list by visit
- *   POST /api/patient-images/presign                 — get presigned upload URL
- *   POST /api/patient-images                         — record upload metadata
+ *   POST /api/patient-images/file                    — upload image through Worker
  *   GET  /api/patient-images/:id/file                — stream an image through Worker
  *   DELETE /api/patient-images/:id                    — delete image + R2 file
  */

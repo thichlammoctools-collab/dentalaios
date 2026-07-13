@@ -19,6 +19,7 @@ import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { VisitForm } from "@/components/VisitForm";
 import { MedicalAlertsList } from "@/components/MedicalAlertsList";
 import { PaymentForm } from "@/components/PaymentForm";
+import { PaymentDetailDialog } from "@/components/PaymentDetailDialog";
 import { AppointmentCard } from "@/components/schedule/AppointmentCard";
 import {
   Dialog,
@@ -58,6 +59,7 @@ export function PatientDetailPage() {
   const [openEdit, setOpenEdit] = useState(false);
   const [openVisit, setOpenVisit] = useState(false);
   const [openPayment, setOpenPayment] = useState(false);
+  const [viewingPaymentId, setViewingPaymentId] = useState<string | null>(null);
   const [planToDelete, setPlanToDelete] = useState<TreatmentPlan | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -452,6 +454,7 @@ export function PatientDetailPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Mã thanh toán</TableHead>
                       <TableHead>Ngày</TableHead>
                       <TableHead>Số tiền</TableHead>
                       <TableHead>Phương thức</TableHead>
@@ -461,7 +464,12 @@ export function PatientDetailPage() {
                   </TableHeader>
                   <TableBody>
                     {payments.map((p) => (
-                      <TableRow key={p.id}>
+                      <TableRow
+                        key={p.id}
+                        className="cursor-pointer"
+                        onClick={() => setViewingPaymentId(p.id)}
+                      >
+                        <TableCell className="font-mono">{p.code}</TableCell>
                         <TableCell>{formatDateTime(p.created_at)}</TableCell>
                         <TableCell>{formatCurrency(p.amount, p.currency)}</TableCell>
                         <TableCell>{p.method}</TableCell>
@@ -544,6 +552,13 @@ export function PatientDetailPage() {
         patientId={patient.id}
         plans={plans.filter((p) => p.status === "approved" || p.status === "completed")}
         onCreated={(pay) => setPayments((prev) => [pay, ...prev])}
+      />
+      <PaymentDetailDialog
+        paymentId={viewingPaymentId}
+        onClose={() => setViewingPaymentId(null)}
+        onSaved={(pay) =>
+          setPayments((prev) => prev.map((x) => (x.id === pay.id ? pay : x)))
+        }
       />
       <Dialog open={planToDelete !== null} onOpenChange={(o) => !o && setPlanToDelete(null)}>
         <DialogHeader>
