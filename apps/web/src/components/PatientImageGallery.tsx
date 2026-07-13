@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { apiBlob, apiDelete, apiGet, apiPost, ApiError } from "@/lib/api";
+import { api, apiBlob, apiDelete, apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import type { PatientImage, PatientImageType, AnalyzeImageResult } from "@shared/types";
 import { PATIENT_IMAGE_TYPE_LABELS } from "@shared/types";
@@ -80,46 +80,19 @@ export function PatientImageGallery({
       // Compress image client-side
       const { blob, originalSize } = await compressImage(file);
 
-      // Get presigned URL
-      const presign = await apiPost<{
-        file_id: string;
-        r2_key: string;
-        upload_url: string;
-        expires_in: number;
-        thumb_key: string;
-        thumb_upload_url: string;
-      }>("/api/patient-images/presign", {
-        filename: file.name,
-        content_type: file.type || "image/jpeg",
-        size: blob.size,
-      });
-
-      // Upload main image to R2
-      const uploadRes = await fetch(presign.upload_url, {
-        method: "PUT",
-        body: blob,
-        headers: { "Content-Type": file.type || "image/jpeg" },
-      });
-      if (!uploadRes.ok) throw new Error("Upload failed: " + uploadRes.status);
-
-      // Upload thumbnail (smaller version)
-      const thumbBlob = await compressImage(blob, 400, 0.7);
-      await fetch(presign.thumb_upload_url, {
-        method: "PUT",
-        body: thumbBlob,
-        headers: { "Content-Type": file.type || "image/jpeg" },
-      });
-
-      // Record metadata
-      await apiPost("/api/patient-images", {
+      const params = new URLSearchParams({
         patient_id: patientId,
-        visit_id: visitId || undefined,
         image_type: detectImageType(file.name, file.type),
-        description: "",
-        file_id: presign.file_id,
-        thumb_key: presign.thumb_key,
-        original_name: file.name,
-        original_size: originalSize,
+        original_size: String(originalSize),
+      });
+      if (visitId) params.set("visit_id", visitId);
+      await api(`/api/patient-images/file?${params}`, {
+        method: "POST",
+        body: blob,
+        headers: {
+          "Content-Type": blob.type || "image/jpeg",
+          "X-Image-Filename": file.name,
+        },
       });
 
       toast.success("Đã tải lên hình ảnh");
