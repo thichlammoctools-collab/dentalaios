@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { apiDelete, apiGet, apiPost, ApiError } from "@/lib/api";
+import { apiBlob, apiDelete, apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import type { PatientImage, PatientImageType, AnalyzeImageResult } from "@shared/types";
 import { PATIENT_IMAGE_TYPE_LABELS } from "@shared/types";
@@ -152,9 +152,9 @@ export function PatientImageGallery({
     setAnalysisResult(null);
     setViewUrl(null);
     try {
-      // Get presigned URL for the image
-      const urlRes = await apiGet<{ url: string }>(`/api/patient-images/${img.id}/url`);
-      setViewUrl(urlRes.url);
+      // Load the private R2 object through the Worker.
+      const image = await apiBlob(`/api/patient-images/${img.id}/file`);
+      setViewUrl(URL.createObjectURL(image));
 
       const result = await apiPost<AnalyzeImageResult & { visit_id?: string }>(
         "/api/ai/analyze-image",
@@ -431,10 +431,13 @@ function ImageThumbnail({ img }: { img: PatientImage }) {
 
   useEffect(() => {
     let cancelled = false;
+    let objectUrl: string | null = null;
     setLoading(true);
-    apiGet<{ url: string }>(`/api/patient-images/${img.id}/url`)
-      .then((res) => {
-        if (!cancelled) setSrc(res.url);
+    apiBlob(`/api/patient-images/${img.id}/file`)
+      .then((image) => {
+        objectUrl = URL.createObjectURL(image);
+        if (!cancelled) setSrc(objectUrl);
+        else URL.revokeObjectURL(objectUrl);
       })
       .catch(() => {
         if (!cancelled) setLoading(false);
@@ -442,7 +445,10 @@ function ImageThumbnail({ img }: { img: PatientImage }) {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [img.id]);
 
   if (loading || !src) {

@@ -4,7 +4,7 @@
  *   GET  /api/patient-images/visit/:visitId          — list by visit
  *   POST /api/patient-images/presign                 — get presigned upload URL
  *   POST /api/patient-images                         — record upload metadata
- *   GET  /api/patient-images/:id/url                 — get download URL for an image
+ *   GET  /api/patient-images/:id/file                — stream an image through Worker
  *   DELETE /api/patient-images/:id                    — delete image + R2 file
  */
 
@@ -105,9 +105,9 @@ router.post(
   },
 );
 
-// GET /api/patient-images/:id/url — get presigned download URL
+// GET /api/patient-images/:id/file — stream private R2 object through Worker
 router.get(
-  "/:id/url",
+  "/:id/file",
   requireAuth(),
   requirePermission(PERMISSIONS.READ_PATIENTS),
   async (c) => {
@@ -115,8 +115,16 @@ router.get(
     const img = await patientImagesService.getById(c.env.DB, jwt.tenant_id, c.req.param("id"));
     const fileObj = await filesService.getById(c.env.DB, jwt.tenant_id, img.file_id);
     if (!fileObj) return c.json({ error: "File not found", code: "not_found" }, 404);
-    const url = await filesService.getDownloadUrl(c.env, fileObj.r2_key);
-    return c.json({ url });
+    const object = await filesService.download(c.env, fileObj.r2_key);
+    if (!object) return c.json({ error: "File missing in storage", code: "not_found" }, 404);
+    return new Response(object.body, {
+      headers: {
+        "Content-Type": fileObj.content_type,
+        "Content-Length": String(fileObj.size),
+        "Cache-Control": "private, max-age=300",
+        ETag: object.httpEtag,
+      },
+    });
   },
 );
 

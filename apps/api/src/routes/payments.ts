@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { paymentCreateSchema } from "@shared/validation";
+import { paymentCreateSchema, paymentUpdateSchema } from "@shared/validation";
 import { PERMISSIONS } from "@shared/constants";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
@@ -29,6 +29,17 @@ router.get(
   },
 );
 
+// GET /api/payments/:id
+router.get(
+  "/:id",
+  requirePermission(PERMISSIONS.WRITE_PAYMENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const payment = await paymentService.get(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    return c.json(payment);
+  },
+);
+
 // POST /api/payments
 router.post(
   "/",
@@ -43,6 +54,20 @@ router.post(
   },
 );
 
+// PATCH /api/payments/:id — edit amount, method, reference, notes (status goes via /confirm or /fail)
+router.patch(
+  "/:id",
+  requirePermission(PERMISSIONS.WRITE_PAYMENTS),
+  auditLog("update", "payment"),
+  zValidator("json", paymentUpdateSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const patch = c.req.valid("json");
+    const updated = await paymentService.update(c.env.DB, jwt.tenant_id, c.req.param("id"), patch);
+    return c.json(updated);
+  },
+);
+
 // POST /api/payments/:id/confirm
 router.post(
   "/:id/confirm",
@@ -51,6 +76,18 @@ router.post(
   async (c) => {
     const jwt = getJwt(c);
     const updated = await paymentService.confirm(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    return c.json(updated, 200);
+  },
+);
+
+// POST /api/payments/:id/fail
+router.post(
+  "/:id/fail",
+  requirePermission(PERMISSIONS.WRITE_PAYMENTS),
+  auditLog("update_status", "payment"),
+  async (c) => {
+    const jwt = getJwt(c);
+    const updated = await paymentService.markFailed(c.env.DB, jwt.tenant_id, c.req.param("id"));
     return c.json(updated, 200);
   },
 );

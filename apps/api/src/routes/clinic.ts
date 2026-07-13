@@ -11,7 +11,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { PERMISSIONS } from "@shared/constants";
-import { branchCreateSchema, branchUpdateSchema } from "@shared/validation";
+import { branchCreateSchema, branchUpdateSchema, paymentPrefixSchema } from "@shared/validation";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
 import { requirePermission } from "../middleware/rbac";
@@ -21,6 +21,7 @@ import { clinicService } from "../services/clinic.service";
 import { authService } from "../services/auth.service";
 import { testLarkCredentials } from "../lib/lark-client";
 import { NotFoundError, ValidationError } from "../lib/errors";
+import { paymentService } from "../services/payment.service";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -219,3 +220,28 @@ router.post(
 );
 
 export default router;
+
+// ──────────────── Payment code prefix (admin only) ────────────────
+
+// GET /api/clinic/payment-prefix — fetch this tenant's payment code prefix
+router.get(
+  "/payment-prefix",
+  requirePermission(PERMISSIONS.MANAGE_USERS),
+  async (c) => {
+    const jwt = getJwt(c);
+    return c.json(await paymentService.getPaymentPrefix(c.env.DB, jwt.tenant_id));
+  },
+);
+
+// PUT /api/clinic/payment-prefix — set the tenant's payment code prefix
+router.put(
+  "/payment-prefix",
+  requirePermission(PERMISSIONS.MANAGE_USERS),
+  auditLog("update", "tenant_setting"),
+  zValidator("json", paymentPrefixSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const { prefix } = c.req.valid("json");
+    return c.json(await paymentService.setPaymentPrefix(c.env.DB, jwt.tenant_id, prefix));
+  },
+);
