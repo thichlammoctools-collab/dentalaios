@@ -7,6 +7,21 @@ export interface PaymentsRepository {
   getById(tenantId: string, id: string): Promise<Payment | null>;
   create(tenantId: string, data: Omit<Payment, "id" | "tenant_id" | "created_at" | "status">): Promise<Payment>;
   updateStatus(tenantId: string, id: string, status: Payment["status"]): Promise<Payment | null>;
+  /**
+   * Patch a subset of editable fields (amount, method, reference, notes).
+   * Status and code are NOT settable here — use updateStatus for status,
+   * and code is immutable.
+   */
+  updateEditable(
+    tenantId: string,
+    id: string,
+    patch: {
+      amount?: number;
+      method?: Payment["method"];
+      reference?: string | null;
+      notes?: string | null;
+    },
+  ): Promise<Payment | null>;
 }
 
 export function createPaymentsRepository(db: D1Database): PaymentsRepository {
@@ -46,8 +61,9 @@ export function createPaymentsRepository(db: D1Database): PaymentsRepository {
       await db
         .prepare(
           `INSERT INTO payments
-             (id, tenant_id, treatment_plan_id, patient_id, amount, currency, method, reference, notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             (id, tenant_id, treatment_plan_id, patient_id, amount, currency,
+              method, reference, notes, code)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
@@ -59,6 +75,7 @@ export function createPaymentsRepository(db: D1Database): PaymentsRepository {
           data.method,
           data.reference ?? null,
           data.notes ?? null,
+          data.code,
         )
         .run();
       const created = await this.getById(tenantId, id);
@@ -70,6 +87,39 @@ export function createPaymentsRepository(db: D1Database): PaymentsRepository {
       await db
         .prepare("UPDATE payments SET status = ? WHERE tenant_id = ? AND id = ?")
         .bind(status, tenantId, id)
+        .run();
+      return this.getById(tenantId, id);
+    },
+
+    async updateEditable(tenantId, id, patch) {
+      const sets: string[] = [];
+      const binds: unknown[] = [];
+      if (patch.amount !== undefined) {
+        sets.push("amount = ?");
+        binds.push(patch.amount);
+      }
+      if (patch.method !== undefined) {
+        sets.push("method = ?");
+        binds.push(patch.method);
+      }
+      if (patch.reference !== undefined) {
+        sets.push("reference = ?");
+        binds.push(patch.reference);
+      }
+      if (patch.notes !== undefined) {
+        sets.push("notes = ?");
+        binds.push(patch.notes);
+      }
+      if (sets.length === 0) {
+        // Empty patch — return current row.
+        return this.getById(tenantId, id);
+      }
+      binds.push(tenantId, id);
+      await db
+        .prepare(
+          `UPDATE payments SET ${sets.join(", ")} WHERE tenant_id = ? AND id = ?`,
+        )
+        .bind(...binds)
         .run();
       return this.getById(tenantId, id);
     },
@@ -88,6 +138,7 @@ function mapPayment(row: D1Row): Payment {
     status: row.status as Payment["status"],
     reference: (row.reference as string | null) ?? undefined,
     notes: (row.notes as string | null) ?? undefined,
+    code: row.code as string,
     created_at: row.created_at as string,
   };
 }

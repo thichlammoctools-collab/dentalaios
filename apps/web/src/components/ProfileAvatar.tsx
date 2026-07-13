@@ -36,17 +36,23 @@ export function ProfileAvatar({
 
   useEffect(() => {
     let cancelled = false;
+    let objectUrl: string | null = null;
     setUrl(null);
     if (!entityId || !avatarFileId) return;
 
     apiBlob(`/api/avatars/${subject}/${entityId}/file`)
       .then((image) => {
-        if (!cancelled) setUrl(URL.createObjectURL(image));
+        objectUrl = URL.createObjectURL(image);
+        if (!cancelled) setUrl(objectUrl);
+        else URL.revokeObjectURL(objectUrl);
       })
       .catch(() => {
         if (!cancelled) setUrl(null);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [avatarFileId, entityId, subject]);
 
   async function upload(file: File) {

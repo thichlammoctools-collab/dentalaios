@@ -231,6 +231,37 @@ export const paymentCreateSchema = z.object({
 
 export type PaymentCreateInput = z.infer<typeof paymentCreateSchema>;
 
+/**
+ * Patch schema for editing an existing payment.
+ *
+ * `.strict()` is critical: it rejects any field other than these four
+ * (status, code, patient_id, treatment_plan_id). Status changes go through
+ * the dedicated /confirm and /fail endpoints, not PATCH.
+ */
+export const paymentUpdateSchema = z
+  .object({
+    amount: z.number().positive("Số tiền phải > 0").optional(),
+    method: z.enum(["cash", "transfer", "card", "other"]).optional(),
+    reference: optionalText(200),
+    notes: optionalText(500),
+  })
+  .strict();
+
+export type PaymentUpdateInput = z.infer<typeof paymentUpdateSchema>;
+
+/** Tenant-configurable payment code prefix (e.g. "TT", "PK1"). */
+export const paymentPrefixSchema = z.object({
+  prefix: z
+    .string()
+    .trim()
+    .min(2, "Tối thiểu 2 ký tự")
+    .max(8, "Tối đa 8 ký tự")
+    .regex(/^[A-Z0-9]+$/, "Chỉ gồm chữ in hoa và số, không dấu")
+    .transform((v) => v.toUpperCase()),
+});
+
+export type PaymentPrefixInput = z.infer<typeof paymentPrefixSchema>;
+
 // ──────────────── Medical alerts ────────────────
 
 export const medicalAlertCreateSchema = z.object({

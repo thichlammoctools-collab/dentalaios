@@ -213,6 +213,7 @@ export interface Payment {
   status: PaymentStatus;
   reference?: string; // bank txn ref / receipt number
   notes?: string;
+  code: string;       // immutable human-readable code, e.g. "TT-20260713-0001"
   created_at: string;
 }
 

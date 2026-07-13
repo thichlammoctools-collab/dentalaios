@@ -102,7 +102,12 @@ router.delete(
   auditLog("cancel", "appointment"),
   async (c) => {
     const jwt = getJwt(c);
-    await appointmentsService.cancel(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    let reason: string | undefined;
+    try {
+      const body = await c.req.json<{ reason?: string }>();
+      reason = body.reason || undefined;
+    } catch { /* body is optional */ }
+    await appointmentsService.cancel(c.env.DB, jwt.tenant_id, c.req.param("id"), reason);
     return c.json({ ok: true }, 200);
   },
 );

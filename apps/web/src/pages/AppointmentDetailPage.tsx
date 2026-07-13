@@ -89,7 +89,7 @@ export function AppointmentDetailPage() {
 
   async function handleCancel(reason: string) {
     try {
-      await apiDelete(`/api/appointments/${appt!.id}`, { body: JSON.stringify({ reason }) });
+      await apiDelete(`/api/appointments/${appt!.id}`, { reason });
       toast.success("Đã hủy lịch hẹn");
       setCancelOpen(false);
       setAppt((prev) => prev ? { ...prev, status: "cancelled", cancelled_reason: reason } : prev);
