@@ -51,7 +51,10 @@ router.post(
 
 const inviteCreateSchema = z.object({
   email: z.string().email("Email không hợp lệ"),
-  role_name: z.enum(["doctor", "assistant", "admin"]),
+  role_name: z.enum([
+    "doctor", "assistant", "admin", "receptionist",
+    "Quản lý", "Kế toán", "Nhân sự", "Marketing", "Bảo vệ",
+  ]),
 });
 
 router.use("*", requireAuth());

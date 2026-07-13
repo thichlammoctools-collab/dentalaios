@@ -21,7 +21,12 @@ INSERT OR IGNORE INTO roles (id, tenant_id, name, permissions) VALUES
   ('role-admin',        'tenant-demo', 'admin',        '["all"]'),
   ('role-doctor',       'tenant-demo', 'doctor',       '["read_patients","write_findings","write_plans","approve_plans"]'),
   ('role-assistant',    'tenant-demo', 'assistant',    '["read_patients","write_visits"]'),
-  ('role-receptionist', 'tenant-demo', 'receptionist', '["read_patients","write_payments","write_appointments"]');
+  ('role-receptionist', 'tenant-demo', 'receptionist', '["read_patients","write_payments","write_appointments"]'),
+  ('role-quan-ly',      'tenant-demo', 'Quản lý',     '["all"]'),
+  ('role-ke-toan',      'tenant-demo', 'Kế toán',     '["read_patients","write_payments"]'),
+  ('role-nhan-su',      'tenant-demo', 'Nhân sự',     '["manage_users","read_patients"]'),
+  ('role-marketing',    'tenant-demo', 'Marketing',   '["read_patients"]'),
+  ('role-bao-ve',       'tenant-demo', 'Bảo vệ',      '[]');
 
 -- ──────────────── Demo users (all share password "password123") ────────────────
 INSERT OR IGNORE INTO users (id, tenant_id, branch_id, role_id, email, name, password_hash) VALUES

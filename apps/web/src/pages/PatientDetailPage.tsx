@@ -505,7 +505,7 @@ export function PatientDetailPage() {
                       key={apt.id}
                       appointment={apt}
                       patientName={patient.name}
-                      compact
+                      onClick={() => navigate(`/appointments/${apt.id}`)}
                     />
                   ))}
                 </div>

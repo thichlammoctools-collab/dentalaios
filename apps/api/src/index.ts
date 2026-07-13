@@ -104,7 +104,7 @@ app.use(
       return "";
     },
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Avatar-Filename"],
     credentials: true,
     maxAge: 86400,
   }),

@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from "react";
-import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "@/lib/api";
+import { api, apiBlob, apiDelete, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 
 type AvatarSubject = "users" | "patients";
@@ -39,9 +39,9 @@ export function ProfileAvatar({
     setUrl(null);
     if (!entityId || !avatarFileId) return;
 
-    apiGet<{ url: string | null }>(`/api/avatars/${subject}/${entityId}/url`)
-      .then((response) => {
-        if (!cancelled) setUrl(response.url);
+    apiBlob(`/api/avatars/${subject}/${entityId}/file`)
+      .then((image) => {
+        if (!cancelled) setUrl(URL.createObjectURL(image));
       })
       .catch(() => {
         if (!cancelled) setUrl(null);
@@ -58,17 +58,14 @@ export function ProfileAvatar({
     setLoading(true);
     try {
       const image = await resizeAvatar(file);
-      const presign = await apiPost<{ file_id: string; upload_url: string }>(
-        `/api/avatars/${subject}/${entityId}/presign`,
-        { filename: file.name, content_type: "image/jpeg", size: image.size },
-      );
-      const uploadResponse = await fetch(presign.upload_url, {
+      await api(`/api/avatars/${subject}/${entityId}/file`, {
         method: "PUT",
         body: image,
-        headers: { "Content-Type": "image/jpeg" },
+        headers: {
+          "Content-Type": "image/jpeg",
+          "X-Avatar-Filename": file.name,
+        },
       });
-      if (!uploadResponse.ok) throw new Error(`Upload failed: ${uploadResponse.status}`);
-      await apiPut(`/api/avatars/${subject}/${entityId}`, { file_id: presign.file_id });
       setUrl(URL.createObjectURL(image));
       toast.success("Đã cập nhật ảnh đại diện");
       onChanged?.();

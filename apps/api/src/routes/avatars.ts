@@ -1,6 +1,4 @@
 import { Hono } from "hono";
-import { zValidator } from "@hono/zod-validator";
-import { avatarFileSchema, avatarPresignSchema } from "@shared/validation";
 import { PERMISSIONS } from "@shared/constants";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
@@ -13,6 +11,10 @@ const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
 router.use("*", requireAuth());
 
+function isAvatarSubject(subject: string): subject is AvatarSubject {
+  return subject === "users" || subject === "patients";
+}
+
 function permissionFor(subject: AvatarSubject) {
   return subject === "users" ? PERMISSIONS.MANAGE_USERS : PERMISSIONS.READ_PATIENTS;
 }
@@ -22,64 +24,61 @@ function writePermissionFor(subject: AvatarSubject) {
 }
 
 router.post(
-  "/:subject/:id/presign",
+  "/:subject/:id/file",
   async (c, next) => {
-    const subject = c.req.param("subject") as AvatarSubject;
+    const subject = c.req.param("subject");
+    if (!isAvatarSubject(subject)) return c.json({ error: "Invalid profile type", code: "bad_request" }, 400);
     return requirePermission(writePermissionFor(subject))(c, next);
   },
-  zValidator("json", avatarPresignSchema),
+  auditLog("update", "avatar"),
   async (c) => {
     const jwt = getJwt(c);
     const subject = c.req.param("subject") as AvatarSubject;
-    if (subject !== "users" && subject !== "patients") return c.json({ error: "Invalid profile type", code: "bad_request" }, 400);
-    const result = await avatarService.presign(c.env.DB, c.env, jwt.tenant_id, jwt.sub, subject, c.req.param("id"), c.req.valid("json"));
-    return c.json({ file_id: result.fileId, upload_url: result.uploadUrl, expires_in: result.expiresIn });
+    const contentType = c.req.header("content-type")?.split(";", 1)[0] ?? "";
+    const filename = c.req.header("x-avatar-filename") ?? "avatar.jpg";
+    const updated = await avatarService.upload(c.env.DB, c.env, jwt.tenant_id, jwt.sub, subject, c.req.param("id"), {
+      filename,
+      content_type: contentType,
+      body: await c.req.raw.arrayBuffer(),
+    });
+    return c.json(updated);
   },
 );
 
 router.get(
-  "/:subject/:id/url",
+  "/:subject/:id/file",
   async (c, next) => {
-    const subject = c.req.param("subject") as AvatarSubject;
+    const subject = c.req.param("subject");
+    if (!isAvatarSubject(subject)) return c.json({ error: "Invalid profile type", code: "bad_request" }, 400);
     return requirePermission(permissionFor(subject))(c, next);
   },
   async (c) => {
     const jwt = getJwt(c);
     const subject = c.req.param("subject") as AvatarSubject;
-    if (subject !== "users" && subject !== "patients") return c.json({ error: "Invalid profile type", code: "bad_request" }, 400);
-    const url = await avatarService.getUrl(c.env.DB, c.env, jwt.tenant_id, subject, c.req.param("id"));
-    return c.json({ url });
-  },
-);
-
-router.put(
-  "/:subject/:id",
-  async (c, next) => {
-    const subject = c.req.param("subject") as AvatarSubject;
-    return requirePermission(writePermissionFor(subject))(c, next);
-  },
-  auditLog("update", "avatar"),
-  zValidator("json", avatarFileSchema),
-  async (c) => {
-    const jwt = getJwt(c);
-    const subject = c.req.param("subject") as AvatarSubject;
-    if (subject !== "users" && subject !== "patients") return c.json({ error: "Invalid profile type", code: "bad_request" }, 400);
-    const updated = await avatarService.setFile(c.env.DB, c.env, jwt.tenant_id, subject, c.req.param("id"), c.req.valid("json").file_id);
-    return c.json(updated);
+    const file = await avatarService.getFile(c.env.DB, c.env, jwt.tenant_id, subject, c.req.param("id"));
+    if (!file) return c.json({ error: "Avatar not found", code: "not_found" }, 404);
+    return new Response(file.object.body, {
+      headers: {
+        "Content-Type": file.contentType,
+        "Content-Length": String(file.size),
+        "Cache-Control": "private, max-age=300",
+        ETag: file.object.httpEtag,
+      },
+    });
   },
 );
 
 router.delete(
   "/:subject/:id",
   async (c, next) => {
-    const subject = c.req.param("subject") as AvatarSubject;
+    const subject = c.req.param("subject");
+    if (!isAvatarSubject(subject)) return c.json({ error: "Invalid profile type", code: "bad_request" }, 400);
     return requirePermission(writePermissionFor(subject))(c, next);
   },
   auditLog("delete", "avatar"),
   async (c) => {
     const jwt = getJwt(c);
     const subject = c.req.param("subject") as AvatarSubject;
-    if (subject !== "users" && subject !== "patients") return c.json({ error: "Invalid profile type", code: "bad_request" }, 400);
     const updated = await avatarService.remove(c.env.DB, c.env, jwt.tenant_id, subject, c.req.param("id"));
     return c.json(updated);
   },

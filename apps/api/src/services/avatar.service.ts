@@ -1,6 +1,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import type { Env } from "../index";
 import { NotFoundError } from "../lib/errors";
+import { newId } from "../lib/ids";
 import { createPatientsRepository } from "../repositories/patients.repo";
 import { createUsersRepository } from "../repositories/users.repo";
 import { filesService } from "./files.service";
@@ -8,27 +9,55 @@ import { filesService } from "./files.service";
 export type AvatarSubject = "users" | "patients";
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
+const ALLOWED_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export const avatarService = {
-  async presign(
+  async upload(
     db: D1Database,
     env: Env,
     tenantId: string,
     userId: string,
     subject: AvatarSubject,
     id: string,
-    input: { filename: string; content_type: string; size: number },
+    input: { filename: string; content_type: string; body: ArrayBuffer },
   ) {
-    await this.getSubject(db, tenantId, subject, id);
-    if (input.size > MAX_AVATAR_SIZE) {
+    const entity = await this.getSubject(db, tenantId, subject, id);
+    if (!ALLOWED_CONTENT_TYPES.has(input.content_type)) {
+      throw new Error("Unsupported avatar format");
+    }
+    if (input.body.byteLength > MAX_AVATAR_SIZE) {
       throw new Error("Avatar must be 5 MB or smaller");
     }
-    return filesService.presign(
-      env,
-      tenantId,
-      { ...input, prefix: `avatars/${subject}/${id}` },
-      { db, userId },
-    );
+    const fileId = newId();
+    const safeFilename = input.filename.replace(/[^a-zA-Z0-9._-]/g, "_") || "avatar.jpg";
+    const r2Key = `tenant-${tenantId}/avatars/${subject}/${id}/${fileId}-${safeFilename}`;
+
+    await env.FILES.put(r2Key, input.body, {
+      httpMetadata: { contentType: input.content_type },
+    });
+
+    try {
+      await db
+        .prepare(
+          `INSERT INTO file_objects (id, tenant_id, r2_key, filename, content_type, size, uploaded_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(fileId, tenantId, r2Key, input.filename, input.content_type, input.body.byteLength, userId)
+        .run();
+
+      const previousFileId = entity.avatar_file_id;
+      const updated = subject === "users"
+        ? await createUsersRepository(db).update(tenantId, id, { avatar_file_id: fileId })
+        : await createPatientsRepository(db).update(tenantId, id, { avatar_file_id: fileId });
+      if (!updated) throw new NotFoundError("Profile not found");
+      if (previousFileId && previousFileId !== fileId) {
+        await filesService.remove(db, env, tenantId, previousFileId);
+      }
+      return updated;
+    } catch (error) {
+      await env.FILES.delete(r2Key);
+      throw error;
+    }
   },
 
   async setFile(
@@ -57,18 +86,20 @@ export const avatarService = {
     return updated;
   },
 
-  async getUrl(
+  async getFile(
     db: D1Database,
     env: Env,
     tenantId: string,
     subject: AvatarSubject,
     id: string,
-  ): Promise<string | null> {
+  ) {
     const entity = await this.getSubject(db, tenantId, subject, id);
     if (!entity.avatar_file_id) return null;
     const file = await filesService.getById(db, tenantId, entity.avatar_file_id);
     if (!file) return null;
-    return filesService.getDownloadUrl(env, file.r2_key);
+    const object = await filesService.download(env, file.r2_key);
+    if (!object) return null;
+    return { object, contentType: file.content_type, size: file.size };
   },
 
   async remove(
