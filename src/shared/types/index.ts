@@ -103,6 +103,17 @@ export interface MedicalAlert {
   created_at: string;
 }
 
+/** Immutable note entry on a patient's record, including its author. */
+export interface PatientNote {
+  id: string;
+  tenant_id: string;
+  patient_id: string;
+  user_id: string;
+  user_name: string;
+  content: string;
+  created_at: string;
+}
+
 // ───────────────────────── Clinical ─────────────────────────
 
 export type VisitStatus = "in_progress" | "completed" | "cancelled";

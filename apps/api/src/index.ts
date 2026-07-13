@@ -30,6 +30,7 @@ import treatmentPlansRoutes from "./routes/treatment-plans";
 import treatmentPlansExtras from "./routes/treatment-plans-extras";
 import paymentsRoutes from "./routes/payments";
 import medicalAlertsRoutes from "./routes/medical-alerts";
+import patientNotesRoutes from "./routes/patient-notes";
 import auditRoutes from "./routes/audit";
 import usersRoutes from "./routes/users";
 import rolesRoutes from "./routes/roles";
@@ -135,6 +136,7 @@ app.route("/api/ai", aiRoutes);
 // Clinical — patients (also handles /:id/alerts via sub-router)
 app.route("/api/patients", patientsRoutes);
 app.route("/api/patients", medicalAlertsRoutes);
+app.route("/api/patients", patientNotesRoutes);
 
 // Visits
 app.route("/api/visits", visitsRoutes);
@@ -178,7 +180,7 @@ app.onError((err, c) => {
     );
   }
   console.error("Unhandled error:", err.message, err.stack);
-  return c.json({ error: "Internal server error", code: "internal_error", detail: err.message }, 500);
+  return c.json({ error: "Internal server error", code: "internal_error" }, 500);
 });
 
 // Queue consumer handler

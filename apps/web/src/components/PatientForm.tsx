@@ -33,7 +33,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
   const [phone, setPhone] = useState(patient?.phone ?? "");
   const [email, setEmail] = useState(patient?.email ?? "");
   const [address, setAddress] = useState(patient?.address ?? "");
-  const [notes, setNotes] = useState(patient?.notes ?? "");
+  const [initialNote, setInitialNote] = useState("");
   const [cccd, setCccd] = useState(patient?.cccd ?? "");
   const [saving, setSaving] = useState(false);
 
@@ -68,7 +68,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
       setPhone(patient?.phone ?? "");
       setEmail(patient?.email ?? "");
       setAddress(patient?.address ?? "");
-      setNotes(patient?.notes ?? "");
+      setInitialNote("");
       setCccd(patient?.cccd ?? "");
       setFamilyName(patient?.family_name ?? "");
       setFamilyPhone(patient?.family_phone ?? "");
@@ -95,7 +95,6 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
         phone,
         email: email || undefined,
         address: address || undefined,
-        notes: notes || undefined,
         family_name: familyName || undefined,
         family_phone: familyPhone || undefined,
         family_relation: familyRelation || undefined,
@@ -114,6 +113,9 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
         onSaved?.();
       } else {
         const created = await apiPost<Patient>("/api/patients", payload);
+        if (initialNote.trim()) {
+          await apiPost(`/api/patients/${created.id}/notes`, { content: initialNote });
+        }
         toast.success("Đã tạo bệnh nhân");
         onOpenChange(false);
         navigate(`/patients/${created.id}`);
@@ -363,17 +365,19 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
             </>
           )}
 
-          {/* ─── 5. Ghi chú ─── */}
-          <SectionDivider icon={<NotesIcon />}>Ghi chú</SectionDivider>
-
-          <div className="grid gap-1.5">
-            <Textarea
-              rows={3}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Ghi chú thêm về bệnh nhân…"
-            />
-          </div>
+          {!isEdit && (
+            <>
+              <SectionDivider icon={<NotesIcon />}>Ghi chú ban đầu</SectionDivider>
+              <div className="grid gap-1.5">
+                <Textarea
+                  rows={3}
+                  value={initialNote}
+                  onChange={(e) => setInitialNote(e.target.value)}
+                  placeholder="Ghi chú thêm về bệnh nhân…"
+                />
+              </div>
+            </>
+          )}
         </DialogBody>
 
         <DialogFooter className="mt-4">

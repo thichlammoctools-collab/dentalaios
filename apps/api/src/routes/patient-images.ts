@@ -11,6 +11,10 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { PERMISSIONS } from "@shared/constants";
+import {
+  patientImagePresignSchema,
+  patientImageCreateSchema,
+} from "@shared/validation";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
 import { requirePermission } from "../middleware/rbac";
@@ -54,6 +58,62 @@ const imageUploadQuerySchema = z.object({
   description: z.string().max(500).optional(),
   original_size: z.coerce.number().int().positive(),
 });
+
+// POST /api/patient-images/presign — get presigned upload URLs (main + thumb)
+router.post(
+  "/presign",
+  requireAuth(),
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  zValidator(
+    "json",
+    patientImagePresignSchema.extend({
+      // Thumb is generated client-side at fixed dimensions — small upper bound.
+      thumb_size: z.number().int().positive().max(2 * 1024 * 1024).optional(),
+    }),
+  ),
+  async (c) => {
+    const jwt = getJwt(c);
+    const input = c.req.valid("json");
+    const thumbSize = input.thumb_size ?? 100 * 1024;
+    const [main, thumb] = await Promise.all([
+      patientImagesService.presignUpload(
+        c.env,
+        jwt.tenant_id,
+        { filename: input.filename, content_type: input.content_type, size: input.size, isThumb: false },
+        { userId: jwt.sub },
+      ),
+      patientImagesService.presignUpload(
+        c.env,
+        jwt.tenant_id,
+        { filename: `thumb-${input.filename}`, content_type: input.content_type, size: thumbSize, isThumb: true },
+        { userId: jwt.sub },
+      ),
+    ]);
+    return c.json({
+      file_id: main.fileId,
+      r2_key: main.r2_key,
+      upload_url: main.uploadUrl,
+      expires_in: main.expiresIn,
+      thumb_key: thumb.fileId,
+      thumb_upload_url: thumb.uploadUrl,
+    });
+  },
+);
+
+// POST /api/patient-images — record metadata after client uploaded to R2
+router.post(
+  "/",
+  requireAuth(),
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  auditLog("create", "patient_image"),
+  zValidator("json", patientImageCreateSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const input = c.req.valid("json");
+    const created = await patientImagesService.create(c.env.DB, c.env, jwt.tenant_id, jwt.sub, input);
+    return c.json(created, 201);
+  },
+);
 
 // POST /api/patient-images/file — upload directly through the Worker R2 binding
 router.post(

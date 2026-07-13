@@ -4,7 +4,7 @@ import type { PaymentCreateInput, PaymentUpdateInput } from "@shared/validation"
 import { createPaymentsRepository } from "../repositories/payments.repo";
 import { createTreatmentPlansRepository } from "../repositories/treatment-plans.repo";
 import { createTenantSettingsRepository } from "../repositories/tenant-settings.repo";
-import { NotFoundError } from "../lib/errors";
+import { NotFoundError, ValidationError } from "../lib/errors";
 import { paymentCodeService } from "./payment-code.service";
 
 const DEFAULT_PREFIX = "TT";
@@ -29,6 +29,9 @@ export const paymentService = {
     // Ensure plan exists in tenant
     const plan = await createTreatmentPlansRepository(db).getById(tenantId, data.treatment_plan_id);
     if (!plan) throw new NotFoundError("Treatment plan not found");
+    if (plan.patient_id !== data.patient_id) {
+      throw new ValidationError("patient_id không khớp với treatment plan");
+    }
 
     // Atomically allocate the next human-readable code for this tenant.
     const { code } = await paymentCodeService.allocate(db, tenantId);

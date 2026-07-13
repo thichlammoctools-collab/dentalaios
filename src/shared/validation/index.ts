@@ -130,6 +130,12 @@ export const patientUpdateSchema = patientCreateSchema.partial();
 export type PatientCreateInput = z.infer<typeof patientCreateSchema>;
 export type PatientUpdateInput = z.infer<typeof patientUpdateSchema>;
 
+export const patientNoteCreateSchema = z.object({
+  content: nonEmpty(2000),
+});
+
+export type PatientNoteCreateInput = z.infer<typeof patientNoteCreateSchema>;
+
 // ──────────────── Visit ────────────────
 
 export const visitCreateSchema = z.object({

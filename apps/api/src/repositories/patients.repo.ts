@@ -146,6 +146,7 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
         db.prepare("DELETE FROM treatment_plans WHERE tenant_id = ? AND patient_id = ?").bind(tenantId, id),
         db.prepare("DELETE FROM patient_images WHERE tenant_id = ? AND patient_id = ?").bind(tenantId, id),
         db.prepare("DELETE FROM medical_alerts WHERE tenant_id = ? AND patient_id = ?").bind(tenantId, id),
+        db.prepare("DELETE FROM patient_notes WHERE tenant_id = ? AND patient_id = ?").bind(tenantId, id),
         db.prepare("DELETE FROM clinical_findings WHERE tenant_id = ? AND visit_id IN (SELECT id FROM visits WHERE tenant_id = ? AND patient_id = ?)").bind(tenantId, tenantId, id),
         db.prepare("DELETE FROM visits WHERE tenant_id = ? AND patient_id = ?").bind(tenantId, id),
         db.prepare("DELETE FROM patients WHERE tenant_id = ? AND id = ?").bind(tenantId, id),

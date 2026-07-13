@@ -18,6 +18,7 @@ import { PatientForm } from "@/components/PatientForm";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { VisitForm } from "@/components/VisitForm";
 import { MedicalAlertsList } from "@/components/MedicalAlertsList";
+import { PatientNotesTimeline } from "@/components/PatientNotesTimeline";
 import { PaymentForm } from "@/components/PaymentForm";
 import { PaymentDetailDialog } from "@/components/PaymentDetailDialog";
 import { AppointmentCard } from "@/components/schedule/AppointmentCard";
@@ -39,6 +40,7 @@ import type {
   TreatmentPlan,
   Payment,
   Appointment,
+  PatientNote,
 } from "@shared/types";
 
 interface ListResponse<T> {
@@ -55,6 +57,7 @@ export function PatientDetailPage() {
   const [plans, setPlans] = useState<TreatmentPlan[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [notes, setNotes] = useState<PatientNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [openEdit, setOpenEdit] = useState(false);
   const [openVisit, setOpenVisit] = useState(false);
@@ -68,12 +71,13 @@ export function PatientDetailPage() {
     setLoading(true);
     try {
       const p = await apiGet<Patient>(`/api/patients/${id}`);
-      const [a, v, tp, pay, apt] = await Promise.all([
+      const [a, v, tp, pay, apt, pn] = await Promise.all([
         apiGet<ListResponse<MedicalAlert>>(`/api/patients/${id}/alerts`),
         apiGet<ListResponse<Visit>>(`/api/visits?patient_id=${id}`),
         apiGet<ListResponse<TreatmentPlan>>(`/api/treatment-plans?patient_id=${id}`),
         apiGet<ListResponse<Payment>>(`/api/payments?patient_id=${id}`),
         apiGet<ListResponse<Appointment>>(`/api/appointments?patient_id=${id}`),
+        apiGet<ListResponse<PatientNote>>(`/api/patients/${id}/notes`),
       ]);
       setPatient(p);
       setAlerts(a.items);
@@ -81,6 +85,7 @@ export function PatientDetailPage() {
       setPlans(tp.items);
       setPayments(pay.items);
       setAppointments(apt.items);
+      setNotes(pn.items);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi tải");
     } finally {
@@ -296,7 +301,11 @@ export function PatientDetailPage() {
               <div>
                 <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-2">Ghi chú</p>
                 <div className="rounded-lg border border-border bg-muted/20 p-4">
-                  <p className="font-medium whitespace-pre-wrap">{patient.notes || "—"}</p>
+                  <PatientNotesTimeline
+                    patientId={patient.id}
+                    notes={notes}
+                    onCreated={(note) => setNotes((current) => [note, ...current])}
+                  />
                 </div>
               </div>
 

@@ -207,8 +207,9 @@ export const registerService = {
          JOIN branches b ON b.id = it.branch_id
          WHERE it.token = ? AND it.expires_at > datetime('now') AND it.accepted_at IS NULL
          LIMIT 1`,
-      )
-      .first();
+       )
+       .bind(data.token)
+       .first();
 
     if (!row) throw new NotFoundError("Link mời không hợp lệ hoặc đã hết hạn");
 
