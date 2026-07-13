@@ -21,8 +21,11 @@ const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
 const aiAnalyzeImageSchema = z.object({
   file_id: z.string().min(1),
-  visit_id: z.string().min(1),
-  image_type: z.enum(["cbct", "panoramic", "intraoral", "photo", "other"]).optional(),
+  visit_id: z.string().min(1).optional(),
+  image_type: z.enum([
+    "cbct", "panoramic", "intraoral", "photo", "other",
+    "scan_3d", "dicom", "photo_before", "photo_after", "xray",
+  ]).optional(),
   prompt: z.string().optional(),
 });
 
