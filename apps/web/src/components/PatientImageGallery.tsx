@@ -206,8 +206,8 @@ export function PatientImageGallery({
               disabled={uploading}
               className="hidden"
             />
-            <Button size="sm" disabled={uploading} as="span">
-              {uploading ? "Đang tải…" : "+ Tải ảnh lên"}
+            <Button size="sm" disabled={uploading} asChild>
+              <span>{uploading ? "Đang tải…" : "+ Tải ảnh lên"}</span>
             </Button>
           </label>
         </div>
@@ -265,8 +265,8 @@ export function PatientImageGallery({
                 disabled={uploading}
                 className="hidden"
               />
-              <Button size="sm" variant="outline" disabled={uploading} as="span">
-                + Tải ảnh đầu tiên
+              <Button size="sm" variant="outline" disabled={uploading} asChild>
+                <span>+ Tải ảnh đầu tiên</span>
               </Button>
             </label>
           )}
@@ -310,8 +310,8 @@ export function PatientImageGallery({
             disabled={uploading}
             className="hidden"
           />
-          <Button size="sm" variant="outline" disabled={uploading} as="span">
-            {uploading ? "Đang tải…" : "+ Tải thêm ảnh"}
+          <Button size="sm" variant="outline" disabled={uploading} asChild>
+            <span>{uploading ? "Đang tải…" : "+ Tải thêm ảnh"}</span>
           </Button>
         </label>
       )}

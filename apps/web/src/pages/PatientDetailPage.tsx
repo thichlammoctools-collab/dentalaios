@@ -18,6 +18,7 @@ import { PatientForm } from "@/components/PatientForm";
 import { VisitForm } from "@/components/VisitForm";
 import { MedicalAlertsList } from "@/components/MedicalAlertsList";
 import { PaymentForm } from "@/components/PaymentForm";
+import { AppointmentCard } from "@/components/schedule/AppointmentCard";
 import { apiGet, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
@@ -28,6 +29,7 @@ import type {
   Visit,
   TreatmentPlan,
   Payment,
+  Appointment,
 } from "@shared/types";
 
 interface ListResponse<T> {
@@ -43,6 +45,7 @@ export function PatientDetailPage() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [plans, setPlans] = useState<TreatmentPlan[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [openEdit, setOpenEdit] = useState(false);
   const [openVisit, setOpenVisit] = useState(false);
@@ -53,17 +56,19 @@ export function PatientDetailPage() {
     setLoading(true);
     try {
       const p = await apiGet<Patient>(`/api/patients/${id}`);
-      const [a, v, tp, pay] = await Promise.all([
+      const [a, v, tp, pay, apt] = await Promise.all([
         apiGet<ListResponse<MedicalAlert>>(`/api/patients/${id}/alerts`),
         apiGet<ListResponse<Visit>>(`/api/visits?patient_id=${id}`),
         apiGet<ListResponse<TreatmentPlan>>(`/api/treatment-plans?patient_id=${id}`),
         apiGet<ListResponse<Payment>>(`/api/payments?patient_id=${id}`),
+        apiGet<ListResponse<Appointment>>(`/api/appointments?patient_id=${id}`),
       ]);
       setPatient(p);
       setAlerts(a.items);
       setVisits(v.items);
       setPlans(tp.items);
       setPayments(pay.items);
+      setAppointments(apt.items);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi tải");
     } finally {
@@ -114,6 +119,7 @@ export function PatientDetailPage() {
           <TabsTrigger value="visits">Lượt khám ({visits.length})</TabsTrigger>
           <TabsTrigger value="plans">Kế hoạch ({plans.length})</TabsTrigger>
           <TabsTrigger value="payments">Thanh toán ({payments.length})</TabsTrigger>
+          <TabsTrigger value="appointments">Lịch hẹn ({appointments.length})</TabsTrigger>
           <TabsTrigger value="images">Hình ảnh</TabsTrigger>
         </TabsList>
 
@@ -429,6 +435,30 @@ export function PatientDetailPage() {
                     ))}
                   </TableBody>
                 </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="appointments">
+          <Card>
+            <CardHeader>
+              <CardTitle>Lịch hẹn</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {appointments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Chưa có lịch hẹn nào.</p>
+              ) : (
+                <div className="space-y-2">
+                  {appointments.map((apt) => (
+                    <AppointmentCard
+                      key={apt.id}
+                      appointment={apt}
+                      patientName={patient.name}
+                      compact
+                    />
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>

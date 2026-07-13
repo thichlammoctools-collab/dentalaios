@@ -442,8 +442,7 @@ export function VisitDetailPage() {
         currency: "VND",
       });
       for (const item of editableItems) {
-        await apiPost("/api/treatment-plans/items", {
-          plan_id: plan.id,
+        await apiPost(`/api/treatment-plans/${plan.id}/items`, {
           tooth_number: item.tooth,
           procedure: item.procedure,
           description: item.description,
@@ -723,7 +722,7 @@ export function VisitDetailPage() {
       </Dialog>
 
       {/* ─── AI Generate Plan Dialog ──────────────────────── */}
-      <Dialog open={planDialogOpen} onOpenChange={setPlanDialogOpen}>
+      <Dialog open={planDialogOpen} onOpenChange={setPlanDialogOpen} className="sm:max-w-3xl">
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 shadow-lg">
@@ -738,7 +737,7 @@ export function VisitDetailPage() {
           </div>
         </DialogHeader>
 
-        <DialogBody className="px-5 py-5">
+        <DialogBody className="px-6 py-5 sm:px-8 sm:py-6">
           {generatingPlan ? (
             <div className="flex flex-col items-center gap-4 py-14">
               <div className="relative">
