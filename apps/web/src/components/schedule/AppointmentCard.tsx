@@ -2,7 +2,7 @@ import type { Appointment } from "@shared/types";
 import { APPOINTMENT_STATUS_LABELS } from "@shared/constants";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatTime } from "@/lib/utils";
+import { formatTime, isoToYmd } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 interface AppointmentCardProps {
@@ -55,6 +55,9 @@ export function AppointmentCard({
       <CardContent className={cn("p-3", compact ? "p-2" : "")}>
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
+            {!compact && (
+              <p className="mb-0.5 text-xs text-muted-foreground">{isoToYmd(appointment.scheduled_at)}</p>
+            )}
             <div className="flex items-center gap-2 text-sm font-medium">
               <span>{formatTime(appointment.scheduled_at)}</span>
               <span className="text-muted-foreground">–</span>
@@ -66,11 +69,16 @@ export function AppointmentCard({
                 {patientName ?? <span className="font-mono text-xs text-muted-foreground">{appointment.patient_id.slice(0, 8)}…</span>}
               </p>
             )}
-            {!compact && (appointment.procedure || doctorName) && (
-              <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+            {!compact && (appointment.procedure || doctorName || appointment.notes) && (
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 {appointment.procedure && <Badge variant="outline" className="text-[10px]">{appointment.procedure}</Badge>}
                 {doctorName && <span>BS: {doctorName}</span>}
               </div>
+            )}
+            {!compact && appointment.notes && (
+              <p className="mt-1 truncate text-xs text-muted-foreground italic">
+                💬 {appointment.notes}
+              </p>
             )}
           </div>
           <Badge variant={statusVariant[appointment.status] ?? "outline"} className="shrink-0">

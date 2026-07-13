@@ -18,6 +18,7 @@ import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import { cn, formatDate } from "@/lib/utils";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 import type { User, Role, Branch } from "@shared/types";
 
 interface UsersResponse {
@@ -189,7 +190,7 @@ export function UsersSettingsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Email</TableHead>
-                  <TableHead>Họ tên</TableHead>
+                  <TableHead>Nhân viên</TableHead>
                   <TableHead>Vai trò</TableHead>
                   <TableHead>Chi nhánh</TableHead>
                   <TableHead>Trạng thái</TableHead>
@@ -204,7 +205,12 @@ export function UsersSettingsPage() {
                   return (
                     <TableRow key={u.id}>
                       <TableCell className="font-mono">{u.email}</TableCell>
-                      <TableCell>{u.name}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2.5">
+                          <ProfileAvatar subject="users" entityId={u.id} name={u.name} avatarFileId={u.avatar_file_id} size="sm" />
+                          <span>{u.name}</span>
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Badge variant="outline">{role?.name ?? "—"}</Badge>
                       </TableCell>
@@ -343,6 +349,17 @@ export function UsersSettingsPage() {
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Thông tin cá nhân</span>
               </div>
               <div className="bg-muted/40 rounded-xl p-4 space-y-3">
+                <div className="flex justify-center pb-1">
+                  <ProfileAvatar
+                    subject="users"
+                    entityId={editUser?.id}
+                    name={editForm.name}
+                    avatarFileId={editUser?.avatar_file_id}
+                    size="lg"
+                    editable
+                    onChanged={load}
+                  />
+                </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="e-name" className="text-xs font-medium text-muted-foreground">
                     Họ tên <span className="text-red-500">*</span>

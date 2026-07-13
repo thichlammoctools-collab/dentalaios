@@ -15,10 +15,18 @@ import {
 } from "@/components/ui/table";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { PatientForm } from "@/components/PatientForm";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { VisitForm } from "@/components/VisitForm";
 import { MedicalAlertsList } from "@/components/MedicalAlertsList";
 import { PaymentForm } from "@/components/PaymentForm";
 import { AppointmentCard } from "@/components/schedule/AppointmentCard";
+import {
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { apiGet, apiDelete, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
@@ -50,6 +58,8 @@ export function PatientDetailPage() {
   const [openEdit, setOpenEdit] = useState(false);
   const [openVisit, setOpenVisit] = useState(false);
   const [openPayment, setOpenPayment] = useState(false);
+  const [planToDelete, setPlanToDelete] = useState<TreatmentPlan | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function load() {
     if (!id) return;
@@ -81,14 +91,18 @@ export function PatientDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  async function onDeletePlan(plan: TreatmentPlan) {
-    if (!confirm(`Xóa kế hoạch ngày ${formatDateTime(plan.created_at)}?`)) return;
+  async function confirmDeletePlan() {
+    if (!planToDelete) return;
+    setDeleting(true);
     try {
-      await apiDelete(`/api/treatment-plans/${plan.id}`);
-      setPlans((prev) => prev.filter((x) => x.id !== plan.id));
+      await apiDelete(`/api/treatment-plans/${planToDelete.id}`);
+      setPlans((prev) => prev.filter((x) => x.id !== planToDelete.id));
       toast.success("Đã xóa kế hoạch");
+      setPlanToDelete(null);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi xóa");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -108,16 +122,27 @@ export function PatientDetailPage() {
           { label: patient.name },
         ]}
       />
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">{patient.name}</h1>
-          <p className="text-sm text-muted-foreground">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-4">
+            <ProfileAvatar
+              subject="patients"
+              entityId={patient.id}
+              name={patient.name}
+              avatarFileId={patient.avatar_file_id}
+              size="lg"
+              editable
+              onChanged={load}
+            />
+            <div>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">{patient.name}</h1>
+            <p className="text-sm text-muted-foreground">
             {formatDate(patient.date_of_birth)} ·{" "}
             {patient.gender === "M" ? "Nam" : patient.gender === "F" ? "Nữ" : "Khác"} ·{" "}
             {patient.phone}
             {patient.email && ` · ${patient.email}`}
-          </p>
-        </div>
+            </p>
+            </div>
+          </div>
         <Button variant="outline" onClick={() => setOpenEdit(true)}>
           Sửa
         </Button>
@@ -390,7 +415,7 @@ export function PatientDetailPage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => onDeletePlan(p)}
+                            onClick={() => setPlanToDelete(p)}
                           >
                             Xóa
                           </Button>

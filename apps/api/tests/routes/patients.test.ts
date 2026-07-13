@@ -5,7 +5,9 @@
 import { describe, it, expect } from "vitest";
 import patientsRoutes from "../../src/routes/patients";
 import medicalAlertsRoutes from "../../src/routes/medical-alerts";
+import { createPatientsRepository } from "../../src/repositories/patients.repo";
 import { mountRoute, authedRequestWithDB, authedRequest } from "../helpers/api";
+import { createMockD1 } from "../helpers/mock-db";
 
 const patientRow = (overrides: Record<string, unknown> = {}) => ({
   id: "patient-1",
@@ -266,5 +268,24 @@ describe("DELETE /api/patients/:id", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ok: boolean };
     expect(body.ok).toBe(true);
+  });
+
+  it("deletes clinical records before deleting the patient", async () => {
+    const db = createMockD1();
+    const ok = await createPatientsRepository(db as unknown as D1Database).delete("test-tenant", "patient-1");
+
+    expect(ok).toBe(true);
+    expect(db.__calls.map((call) => call.sql)).toEqual([
+      "DELETE FROM appointments WHERE tenant_id = ? AND patient_id = ?",
+      "DELETE FROM payments WHERE tenant_id = ? AND patient_id = ?",
+      "DELETE FROM treatment_plan_items WHERE tenant_id = ? AND treatment_plan_id IN (SELECT id FROM treatment_plans WHERE tenant_id = ? AND patient_id = ?)",
+      "DELETE FROM treatment_plans WHERE tenant_id = ? AND patient_id = ?",
+      "DELETE FROM patient_images WHERE tenant_id = ? AND patient_id = ?",
+      "DELETE FROM medical_alerts WHERE tenant_id = ? AND patient_id = ?",
+      "DELETE FROM clinical_findings WHERE tenant_id = ? AND visit_id IN (SELECT id FROM visits WHERE tenant_id = ? AND patient_id = ?)",
+      "DELETE FROM visits WHERE tenant_id = ? AND patient_id = ?",
+      "DELETE FROM patients WHERE tenant_id = ? AND id = ?",
+    ]);
+    expect(db.__calls.at(-1)?.binds).toEqual(["test-tenant", "patient-1"]);
   });
 });

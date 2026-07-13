@@ -259,6 +259,18 @@ export const userUpdateSchema = z.object({
   is_active: z.boolean().optional(),
 });
 
+// ──────────────── Avatars ────────────────
+
+export const avatarPresignSchema = z.object({
+  filename: z.string().min(1).max(200),
+  content_type: z.enum(["image/jpeg", "image/png", "image/webp"]),
+  size: z.number().int().positive().max(5 * 1024 * 1024),
+});
+
+export const avatarFileSchema = z.object({
+  file_id: z.string().min(1),
+});
+
 // ──────────────── Patient Images ────────────────
 
 export const patientImageCreateSchema = z.object({

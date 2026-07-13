@@ -150,6 +150,21 @@ export const filesService = {
   ): Promise<R2ObjectBody | null> {
     return env.FILES.get(r2_key);
   },
+
+  async remove(
+    db: D1Database,
+    env: { FILES: R2Bucket },
+    tenantId: string,
+    id: string,
+  ): Promise<void> {
+    const file = await this.getById(db, tenantId, id);
+    if (!file) return;
+    try { await env.FILES.delete(file.r2_key); } catch { /* best-effort storage cleanup */ }
+    await db
+      .prepare("DELETE FROM file_objects WHERE tenant_id = ? AND id = ?")
+      .bind(tenantId, id)
+      .run();
+  },
 };
 
 function mapFile(row: D1Row): FileObject {

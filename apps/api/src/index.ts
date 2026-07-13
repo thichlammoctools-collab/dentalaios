@@ -36,6 +36,7 @@ import rolesRoutes from "./routes/roles";
 import filesRoutes from "./routes/files";
 import clinicRoutes from "./routes/clinic";
 import patientImagesRoutes from "./routes/patient-images";
+import avatarRoutes from "./routes/avatars";
 import appointmentsRoutes from "./routes/appointments";
 import schedulesRoutes from "./routes/schedules";
 
@@ -155,6 +156,7 @@ app.route("/api/roles", rolesRoutes);
 app.route("/api/files", filesRoutes);
 app.route("/api/clinic", clinicRoutes);
 app.route("/api/patient-images", patientImagesRoutes);
+app.route("/api/avatars", avatarRoutes);
 
 // Appointments + Schedules
 app.route("/api/appointments", appointmentsRoutes);

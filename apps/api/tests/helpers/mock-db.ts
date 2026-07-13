@@ -30,6 +30,7 @@ export interface MockD1 {
       run(): Promise<{ meta: { changes: number } }>;
     };
   };
+  batch(statements: Array<{ run(): Promise<{ meta: { changes: number } }> }>): Promise<Array<{ meta: { changes: number } }>>;
   /** Test helpers — not part of D1Database interface */
   __calls: CapturedCall[];
   __sqlContaining(fragment: string): CapturedCall[];
@@ -101,6 +102,9 @@ export function createMockD1(options: MockD1Options = {}): MockD1 {
           };
         },
       };
+    },
+    async batch(statements) {
+      return Promise.all(statements.map((statement) => statement.run()));
     },
     __calls: calls,
     __sqlContaining(fragment: string): CapturedCall[] {

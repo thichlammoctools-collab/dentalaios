@@ -12,7 +12,7 @@ export interface PatientsRepository {
   list(tenantId: string, opts?: Pagination & { branchId?: string; search?: string }): Promise<Patient[]>;
   getById(tenantId: string, id: string): Promise<Patient | null>;
   create(tenantId: string, data: Omit<Patient, "id" | "tenant_id" | "created_at">): Promise<Patient>;
-  update(tenantId: string, id: string, data: Partial<Patient>): Promise<Patient | null>;
+  update(tenantId: string, id: string, data: Omit<Partial<Patient>, "avatar_file_id"> & { avatar_file_id?: string | null }): Promise<Patient | null>;
   delete(tenantId: string, id: string): Promise<boolean>;
 }
 
@@ -108,6 +108,7 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
         "phone",
         "email",
         "notes",
+        "avatar_file_id",
         "address",
         "family_name",
         "family_phone",
@@ -136,11 +137,21 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
     },
 
     async delete(tenantId, id) {
-      const res = await db
-        .prepare("DELETE FROM patients WHERE tenant_id = ? AND id = ?")
-        .bind(tenantId, id)
-        .run();
-      return res.meta.changes > 0;
+      // The patient FK is restrictive on appointments, payments, treatment plans,
+      // and visits. Remove dependents in FK order in one atomic D1 batch.
+      const results = await db.batch([
+        db.prepare("DELETE FROM appointments WHERE tenant_id = ? AND patient_id = ?").bind(tenantId, id),
+        db.prepare("DELETE FROM payments WHERE tenant_id = ? AND patient_id = ?").bind(tenantId, id),
+        db.prepare("DELETE FROM treatment_plan_items WHERE tenant_id = ? AND treatment_plan_id IN (SELECT id FROM treatment_plans WHERE tenant_id = ? AND patient_id = ?)").bind(tenantId, tenantId, id),
+        db.prepare("DELETE FROM treatment_plans WHERE tenant_id = ? AND patient_id = ?").bind(tenantId, id),
+        db.prepare("DELETE FROM patient_images WHERE tenant_id = ? AND patient_id = ?").bind(tenantId, id),
+        db.prepare("DELETE FROM medical_alerts WHERE tenant_id = ? AND patient_id = ?").bind(tenantId, id),
+        db.prepare("DELETE FROM clinical_findings WHERE tenant_id = ? AND visit_id IN (SELECT id FROM visits WHERE tenant_id = ? AND patient_id = ?)").bind(tenantId, tenantId, id),
+        db.prepare("DELETE FROM visits WHERE tenant_id = ? AND patient_id = ?").bind(tenantId, id),
+        db.prepare("DELETE FROM patients WHERE tenant_id = ? AND id = ?").bind(tenantId, id),
+      ]);
+      const patientResult = results.at(-1);
+      return patientResult !== undefined && patientResult.meta.changes > 0;
     },
   };
 }
@@ -156,6 +167,7 @@ function mapPatient(row: D1Row): Patient {
     phone: row.phone as string,
     email: (row.email as string | null) ?? undefined,
     notes: (row.notes as string | null) ?? undefined,
+    avatar_file_id: (row.avatar_file_id as string | null) ?? undefined,
     address: (row.address as string | null) ?? undefined,
     created_at: row.created_at as string,
     family_name: (row.family_name as string | null) ?? undefined,

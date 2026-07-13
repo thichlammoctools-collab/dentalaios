@@ -49,6 +49,7 @@ export interface User {
   role_id: string;
   email: string;
   name: string;
+  avatar_file_id?: string;
   is_active: boolean;
   // password_hash lives in DB but is NEVER returned to clients — repos strip it.
   created_at: string;
@@ -71,6 +72,7 @@ export interface Patient {
   email?: string;
   address?: string;
   notes?: string;
+  avatar_file_id?: string;
   created_at: string;
   // Family contact
   family_name?: string;
