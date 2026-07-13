@@ -545,6 +545,46 @@ export function PatientDetailPage() {
         plans={plans.filter((p) => p.status === "approved" || p.status === "completed")}
         onCreated={(pay) => setPayments((prev) => [pay, ...prev])}
       />
+      <Dialog open={planToDelete !== null} onOpenChange={(o) => !o && setPlanToDelete(null)}>
+        <DialogHeader>
+          <DialogTitle>Xóa kế hoạch điều trị?</DialogTitle>
+        </DialogHeader>
+        <DialogBody>
+          <p className="text-sm text-muted-foreground">
+            Kế hoạch tạo ngày{" "}
+            <strong className="text-foreground">
+              {planToDelete ? formatDateTime(planToDelete.created_at) : ""}
+            </strong>{" "}
+            sẽ bị xóa vĩnh viễn cùng toàn bộ hạng mục bên trong. Hành động này không thể hoàn tác.
+          </p>
+          {planToDelete && planToDelete.total_cost > 0 && (
+            <p className="mt-3 text-sm">
+              Tổng giá trị kế hoạch:{" "}
+              <strong>
+                {formatCurrency(planToDelete.total_cost, planToDelete.currency)}
+              </strong>
+            </p>
+          )}
+        </DialogBody>
+        <DialogFooter className="mt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setPlanToDelete(null)}
+            disabled={deleting}
+          >
+            Hủy
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={confirmDeletePlan}
+            disabled={deleting}
+          >
+            {deleting ? "Đang xóa…" : "Xóa"}
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }
