@@ -34,6 +34,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
   const [email, setEmail] = useState(patient?.email ?? "");
   const [address, setAddress] = useState(patient?.address ?? "");
   const [notes, setNotes] = useState(patient?.notes ?? "");
+  const [cccd, setCccd] = useState(patient?.cccd ?? "");
   const [saving, setSaving] = useState(false);
 
   // Family
@@ -68,6 +69,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
       setEmail(patient?.email ?? "");
       setAddress(patient?.address ?? "");
       setNotes(patient?.notes ?? "");
+      setCccd(patient?.cccd ?? "");
       setFamilyName(patient?.family_name ?? "");
       setFamilyPhone(patient?.family_phone ?? "");
       setFamilyRelation(patient?.family_relation ?? "");
@@ -103,6 +105,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
         referral_type: referralType || undefined,
         referral_user_id: referralUserId || undefined,
         referral_notes: referralNotes || undefined,
+        cccd: cccd || undefined,
       };
       if (isEdit && patient) {
         await apiPut(`/api/patients/${patient.id}`, payload);
@@ -219,6 +222,20 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder="VD: 123 Nguyễn Trãi, Quận 1, TP.HCM"
+            />
+          </div>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="pf-cccd">Số CCCD</Label>
+            <Input
+              id="pf-cccd"
+              type="text"
+              inputMode="numeric"
+              maxLength={12}
+              pattern="[0-9]*"
+              value={cccd}
+              onChange={(e) => setCccd(e.target.value.replace(/\D/g, "").slice(0, 12))}
+              placeholder="VD: 012345678912"
             />
           </div>
 

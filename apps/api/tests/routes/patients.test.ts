@@ -18,6 +18,7 @@ const patientRow = (overrides: Record<string, unknown> = {}) => ({
   email: null,
   notes: null,
   created_at: "2026-01-01",
+  cccd: null,
   ...overrides,
 });
 
@@ -65,7 +66,7 @@ describe("GET /api/patients", () => {
 describe("POST /api/patients", () => {
   it("returns 201 + patient for valid data", async () => {
     const app = mountRoute("/api/patients", patientsRoutes);
-    const createdRow = patientRow({ name: "Test Patient" });
+    const createdRow = patientRow({ name: "Test Patient", cccd: "012345678912" });
     const res = await authedRequestWithDB(
       app,
       "POST",
@@ -78,13 +79,15 @@ describe("POST /api/patients", () => {
           date_of_birth: "1990-01-01",
           gender: "M",
           phone: "0901234567",
+          cccd: "012345678912",
         },
       },
     );
     expect(res.status).toBe(201);
-    const body = (await res.json()) as { id: string; name: string };
+    const body = (await res.json()) as { id: string; name: string; cccd?: string };
     expect(body.id).toBe("patient-1");
     expect(body.name).toBe("Test Patient");
+    expect(body.cccd).toBe("012345678912");
   });
 
   it("returns 400 for missing required field", async () => {
@@ -124,6 +127,27 @@ describe("POST /api/patients", () => {
           date_of_birth: "1990-13-45",
           gender: "M",
           phone: "0901234567",
+        },
+      },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for CCCD that is not 12 digits", async () => {
+    const app = mountRoute("/api/patients", patientsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/patients",
+      new Map(),
+      {
+        body: {
+          branch_id: "test-branch",
+          name: "Test",
+          date_of_birth: "1990-01-01",
+          gender: "M",
+          phone: "0901234567",
+          cccd: "0123456789",
         },
       },
     );

@@ -19,7 +19,7 @@ import { VisitForm } from "@/components/VisitForm";
 import { MedicalAlertsList } from "@/components/MedicalAlertsList";
 import { PaymentForm } from "@/components/PaymentForm";
 import { AppointmentCard } from "@/components/schedule/AppointmentCard";
-import { apiGet, ApiError } from "@/lib/api";
+import { apiGet, apiDelete, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { MARKETING_SOURCE_LABELS, type MarketingSource } from "@shared/constants";
@@ -80,6 +80,17 @@ export function PatientDetailPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  async function onDeletePlan(plan: TreatmentPlan) {
+    if (!confirm(`Xóa kế hoạch ngày ${formatDateTime(plan.created_at)}?`)) return;
+    try {
+      await apiDelete(`/api/treatment-plans/${plan.id}`);
+      setPlans((prev) => prev.filter((x) => x.id !== plan.id));
+      toast.success("Đã xóa kế hoạch");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi xóa");
+    }
+  }
 
   if (loading || !patient) {
     return <p className="px-6 py-6 text-sm text-muted-foreground">Đang tải…</p>;
@@ -158,6 +169,10 @@ export function PatientDetailPage() {
                     <div className="col-span-2">
                       <p className="text-muted-foreground text-xs">Địa chỉ</p>
                       <p className="font-medium">{patient.address || "—"}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-muted-foreground text-xs">Số CCCD</p>
+                      <p className="font-medium">{patient.cccd || "—"}</p>
                     </div>
                     <div className="col-span-2">
                       <p className="text-muted-foreground text-xs">Ngày tạo</p>
@@ -344,6 +359,7 @@ export function PatientDetailPage() {
                       <TableHead>Ngày tạo</TableHead>
                       <TableHead>Trạng thái</TableHead>
                       <TableHead className="text-right">Tổng</TableHead>
+                      <TableHead className="w-24"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -369,6 +385,15 @@ export function PatientDetailPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           {formatCurrency(p.total_cost, p.currency)}
+                        </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onDeletePlan(p)}
+                          >
+                            Xóa
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}

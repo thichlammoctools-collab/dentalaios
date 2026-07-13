@@ -86,6 +86,7 @@ export interface Patient {
   // Body metrics
   height_cm?: number;
   weight_kg?: number;
+  cccd?: string;
 }
 
 export type AlertSeverity = "low" | "medium" | "high";

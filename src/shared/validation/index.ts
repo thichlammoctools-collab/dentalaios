@@ -122,6 +122,7 @@ export const patientCreateSchema = z.object({
   // Body metrics
   height_cm: z.number().positive().max(300).optional(),
   weight_kg: z.number().positive().max(500).optional(),
+  cccd: z.string().regex(/^[0-9]{12}$/, "CCCD phải có đúng 12 chữ số").optional(),
 });
 
 export const patientUpdateSchema = patientCreateSchema.partial();

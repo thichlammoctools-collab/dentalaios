@@ -29,9 +29,9 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
         binds.push(opts.branchId);
       }
       if (opts.search) {
-        conditions.push("(p.name LIKE ? OR p.phone LIKE ?)");
+        conditions.push("(p.name LIKE ? OR p.phone LIKE ? OR p.cccd LIKE ?)");
         const like = `%${opts.search}%`;
-        binds.push(like, like);
+        binds.push(like, like, like);
       }
 
       binds.push(limit, offset);
@@ -66,8 +66,8 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
              (id, tenant_id, branch_id, name, date_of_birth, gender, phone, email, notes, address,
               family_name, family_phone, family_relation, marketing_source,
               referral_type, referral_user_id, referral_notes,
-              height_cm, weight_kg)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              height_cm, weight_kg, cccd)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
@@ -89,6 +89,7 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
           data.referral_notes ?? null,
           data.height_cm ?? null,
           data.weight_kg ?? null,
+          data.cccd ?? null,
         )
         .run();
       const created = await this.getById(tenantId, id);
@@ -117,6 +118,7 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
         "referral_notes",
         "height_cm",
         "weight_kg",
+        "cccd",
       ];
       for (const key of allowed) {
         if (data[key] !== undefined) {
@@ -166,5 +168,6 @@ function mapPatient(row: D1Row): Patient {
     referral_notes: (row.referral_notes as string | null) ?? undefined,
     height_cm: (row.height_cm as number | null) ?? undefined,
     weight_kg: (row.weight_kg as number | null) ?? undefined,
+    cccd: (row.cccd as string | null) ?? undefined,
   };
 }

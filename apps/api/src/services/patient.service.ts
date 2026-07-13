@@ -35,6 +35,7 @@ export const patientService = {
       referral_notes: data.referral_notes,
       height_cm: data.height_cm ?? undefined,
       weight_kg: data.weight_kg ?? undefined,
+      cccd: data.cccd ?? undefined,
     });
   },
 
@@ -61,6 +62,7 @@ export const patientService = {
       referral_notes: data.referral_notes,
       height_cm: data.height_cm ?? undefined,
       weight_kg: data.weight_kg ?? undefined,
+      cccd: data.cccd ?? undefined,
     });
   },
 
