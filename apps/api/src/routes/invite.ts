@@ -14,15 +14,10 @@ import { requirePermission } from "../middleware/rbac";
 import type { AuthContext } from "../middleware/auth";
 import { PERMISSIONS } from "@shared/constants";
 import { registerService } from "../services/register.service";
+import { getFrontendBaseUrl } from "../lib/public-url";
 
 type Bindings = Env;
 type Variables = AuthContext;
-
-function getBaseUrl(c: { env: { FRONTEND_ORIGIN?: string }; req: { header: (n: string) => string | undefined } }): string {
-  const origin = c.req.header("origin");
-  if (origin) return origin;
-  return c.env.FRONTEND_ORIGIN || "https://dentalaios-web.pages.dev";
-}
 
 const router = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -40,7 +35,7 @@ router.post(
   async (c) => {
     const data = c.req.valid("json");
     const result = await registerService.acceptInvite(
-      { db: c.env.DB, jwtSecret: c.env.JWT_SECRET, baseUrl: getBaseUrl(c) },
+      { db: c.env.DB, jwtSecret: c.env.JWT_SECRET, baseUrl: getFrontendBaseUrl(c.env.FRONTEND_ORIGIN) },
       data,
     );
     return c.json(result, 201);
@@ -103,7 +98,7 @@ router.post("/", zValidator("json", inviteCreateSchema), async (c) => {
   }
 
   const result = await registerService.createInvite(
-    { db: c.env.DB, jwtSecret: c.env.JWT_SECRET, baseUrl: getBaseUrl(c) },
+    { db: c.env.DB, jwtSecret: c.env.JWT_SECRET, baseUrl: getFrontendBaseUrl(c.env.FRONTEND_ORIGIN) },
     jwt.sub,
     jwt.tenant_id,
     { email, role_id: roleRow.id, branch_id: branchRow.id },

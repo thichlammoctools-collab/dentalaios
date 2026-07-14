@@ -8,6 +8,7 @@ import { requirePermission } from "../middleware/rbac";
 import { auditLog } from "../middleware/audit";
 import type { AuthContext } from "../middleware/auth";
 import { filesService } from "../services/files.service";
+import { buildPrivateFileHeaders } from "../lib/file-response";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -74,13 +75,7 @@ router.get(
     if (!obj) return c.json({ error: "File missing in storage", code: "not_found" }, 404);
     return new Response(obj.body, {
       status: 200,
-      headers: {
-        "Content-Type": file.content_type,
-        "Content-Length": String(file.size),
-        "Content-Disposition": `inline; filename="${file.filename}"`,
-        "Cache-Control": "private, max-age=300",
-        ETag: obj.httpEtag,
-      },
+      headers: buildPrivateFileHeaders(file.filename, file.content_type, obj.size, obj.httpEtag),
     });
   },
 );

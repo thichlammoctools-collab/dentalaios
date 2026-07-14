@@ -22,6 +22,7 @@ import { auditLog } from "../middleware/audit";
 import type { AuthContext } from "../middleware/auth";
 import { patientImagesService } from "../services/patient-images.service";
 import { filesService } from "../services/files.service";
+import { buildPrivateFileHeaders } from "../lib/file-response";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -150,11 +151,7 @@ router.get(
     const object = await filesService.download(c.env, fileObj.r2_key);
     if (!object) return c.json({ error: "File missing in storage", code: "not_found" }, 404);
     return new Response(object.body, {
-      headers: {
-        "Content-Type": fileObj.content_type,
-        "Cache-Control": "private, max-age=300",
-        ETag: object.httpEtag,
-      },
+      headers: buildPrivateFileHeaders(fileObj.filename, fileObj.content_type, object.size, object.httpEtag),
     });
   },
 );

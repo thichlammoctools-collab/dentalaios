@@ -10,14 +10,9 @@ import { registerSchema, emailVerifySchema } from "@shared/validation";
 import type { Env } from "../index";
 import type { AuthContext } from "../middleware/auth";
 import { registerService } from "../services/register.service";
+import { getFrontendBaseUrl } from "../lib/public-url";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
-
-function getBaseUrl(c: { env: { FRONTEND_ORIGIN?: string }; req: { header: (n: string) => string | undefined } }): string {
-  const origin = c.req.header("origin");
-  if (origin) return origin;
-  return c.env.FRONTEND_ORIGIN || "https://dentalaios-web.pages.dev";
-}
 
 // POST /api/register
 router.post(
@@ -26,7 +21,7 @@ router.post(
   async (c) => {
     const data = c.req.valid("json");
     const result = await registerService.register(
-      { db: c.env.DB, jwtSecret: c.env.JWT_SECRET, baseUrl: getBaseUrl(c) },
+      { db: c.env.DB, jwtSecret: c.env.JWT_SECRET, baseUrl: getFrontendBaseUrl(c.env.FRONTEND_ORIGIN) },
       data,
     );
     return c.json(result, 201);
@@ -40,7 +35,7 @@ router.post(
   async (c) => {
     const data = c.req.valid("json");
     const result = await registerService.verifyEmail(
-      { db: c.env.DB, jwtSecret: c.env.JWT_SECRET, baseUrl: getBaseUrl(c) },
+      { db: c.env.DB, jwtSecret: c.env.JWT_SECRET, baseUrl: getFrontendBaseUrl(c.env.FRONTEND_ORIGIN) },
       data,
     );
     return c.json(result, 200);

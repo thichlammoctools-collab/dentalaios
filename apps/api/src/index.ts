@@ -160,8 +160,7 @@ app.route("/api/clinic", clinicRoutes);
 app.route("/api/patient-images", patientImagesRoutes);
 app.route("/api/avatars", avatarRoutes);
 
-// Appointments + Schedules
-app.route("/api/appointments", appointmentsRoutes);
+// Schedules
 app.route("/api/schedules", schedulesRoutes);
 
 // 404

@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { apiGet, apiPost, apiPut, apiDelete, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
-import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,7 +46,6 @@ function MailIcon() {
 }
 
 export function MembersSettingsPage() {
-  const { session } = useAuth();
   const [invites, setInvites] = useState<Invite[]>([]);
   const [members, setMembers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -189,21 +187,6 @@ export function MembersSettingsPage() {
       toast.error(err instanceof ApiError ? err.message : "Lỗi cập nhật");
     } finally {
       setSavingEdit(false);
-    }
-  }
-
-  async function onDelete(u: User) {
-    if (u.id === session?.user.id) {
-      toast.error("Không thể xóa chính mình");
-      return;
-    }
-    if (!confirm(`Vô hiệu hóa ${u.email}? Họ sẽ không thể đăng nhập.`)) return;
-    try {
-      await apiDelete(`/api/users/${u.id}`);
-      toast.success("Đã vô hiệu hóa");
-      loadAll();
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Lỗi xóa");
     }
   }
 
@@ -521,14 +504,9 @@ export function MembersSettingsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button size="sm" variant="outline" onClick={() => openEditDialog(u)}>
-                          Sửa
-                        </Button>
-                        <Button size="sm" variant="destructive" onClick={() => onDelete(u)}>
-                          Xóa
-                        </Button>
-                      </div>
+                      <Button size="sm" variant="outline" onClick={() => openEditDialog(u)}>
+                        Sửa
+                      </Button>
                     </td>
                   </tr>
                 ))}
