@@ -33,20 +33,21 @@ router.post(
   async (c) => {
     const jwt = getJwt(c);
     const input = c.req.valid("json");
-    const result = await filesService.presign(c.env, jwt.tenant_id, input);
+    const result = await filesService.presign(c.env, jwt.tenant_id, input, {
+      db: c.env.DB,
+      userId: jwt.sub,
+    });
     return c.json(result, 200);
   },
 );
 
 const recordSchema = z.object({
   fileId: z.string().min(1),
-  r2_key: z.string().min(1),
-  filename: z.string().min(1),
-  content_type: z.string().min(1),
-  size: z.number().int().positive(),
 });
 
-// POST /api/files — record uploaded file metadata
+// POST /api/files — finalize a direct upload. File metadata was created by
+// /presign using a server-generated key; accepting r2_key from the client here
+// would bypass tenant isolation.
 router.post(
   "/",
   requirePermission(PERMISSIONS.WRITE_PATIENTS),
@@ -55,13 +56,8 @@ router.post(
   async (c) => {
     const jwt = getJwt(c);
     const input = c.req.valid("json");
-    const file = await filesService.recordUpload(
-      c.env.DB,
-      c.env,
-      jwt.tenant_id,
-      jwt.sub,
-      input,
-    );
+    const file = await filesService.finalizeUpload(c.env.DB, jwt.tenant_id, input.fileId);
+    if (!file) return c.json({ error: "File not found", code: "not_found" }, 404);
     return c.json(file, 201);
   },
 );

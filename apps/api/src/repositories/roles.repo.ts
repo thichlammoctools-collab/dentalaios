@@ -11,6 +11,7 @@ export interface RolesRepository {
     id: string,
     data: { name?: string; description?: string; permissions?: string[] },
   ): Promise<Role | null>;
+  delete(tenantId: string, id: string): Promise<boolean>;
 }
 
 export function createRolesRepository(db: D1Database): RolesRepository {
@@ -73,6 +74,14 @@ export function createRolesRepository(db: D1Database): RolesRepository {
         .bind(...binds)
         .run();
       return this.getById(tenantId, id);
+    },
+
+    async delete(tenantId, id) {
+      const res = await db
+        .prepare("DELETE FROM roles WHERE tenant_id = ? AND id = ?")
+        .bind(tenantId, id)
+        .run();
+      return res.meta.changes > 0;
     },
   };
 }

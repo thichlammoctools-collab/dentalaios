@@ -1,7 +1,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import type { Role } from "@shared/types";
 import { createRolesRepository } from "../repositories/roles.repo";
-import { ConflictError } from "../lib/errors";
+import { ConflictError, ValidationError } from "../lib/errors";
 
 export const rolesService = {
   list(db: D1Database, tenantId: string): Promise<Role[]> {
@@ -38,5 +38,18 @@ export const rolesService = {
       }
       throw err;
     }
+  },
+
+  async remove(db: D1Database, tenantId: string, id: string): Promise<boolean> {
+    // Do not rely on a raw FK violation: return a clear domain error and keep
+    // the role/user relationship intact when the role is still assigned.
+    const assigned = await db
+      .prepare("SELECT 1 FROM users WHERE tenant_id = ? AND role_id = ? LIMIT 1")
+      .bind(tenantId, id)
+      .first();
+    if (assigned) {
+      throw new ValidationError("Không thể xóa vai trò đang được người dùng sử dụng");
+    }
+    return createRolesRepository(db).delete(tenantId, id);
   },
 };

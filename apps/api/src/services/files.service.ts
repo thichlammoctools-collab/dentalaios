@@ -49,17 +49,6 @@ export const filesService = {
     const safe = input.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
     const r2_key = `tenant-${tenantId}/${input.prefix ?? "files"}/${fileId}-${safe}`;
 
-    // If db provided, create file_objects row now (needed by patient_images FK)
-    if (opts?.db && opts.userId) {
-      await opts.db
-        .prepare(
-          `INSERT INTO file_objects (id, tenant_id, r2_key, filename, content_type, size, uploaded_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .bind(fileId, tenantId, r2_key, input.filename, input.content_type, input.size, opts.userId)
-        .run();
-    }
-
     if (!env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY || !env.R2_ACCOUNT_ID) {
       throw new Error("R2 S3 credentials not configured (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)");
     }
@@ -81,6 +70,20 @@ export const filesService = {
     });
 
     const uploadUrl = await getSignedUrl(client, command, { expiresIn: PRESIGN_EXPIRES });
+
+    // Persist the server-generated object identity only after presigning
+    // succeeds. The client is never allowed to choose r2_key: accepting an
+    // arbitrary key here would allow one tenant to create metadata pointing at
+    // another tenant's private R2 object.
+    if (opts?.db && opts.userId) {
+      await opts.db
+        .prepare(
+          `INSERT INTO file_objects (id, tenant_id, r2_key, filename, content_type, size, uploaded_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(fileId, tenantId, r2_key, input.filename, input.content_type, input.size, opts.userId)
+        .run();
+    }
 
     return { fileId, r2_key, uploadUrl, expiresIn: PRESIGN_EXPIRES };
   },
@@ -104,36 +107,17 @@ export const filesService = {
     return await getSignedUrl(client, command, { expiresIn: PRESIGN_EXPIRES });
   },
 
-  async recordUpload(
+  /**
+   * Return a server-created upload record after direct-to-R2 upload.  The
+   * endpoint intentionally receives only `fileId`; r2_key and metadata come
+   * exclusively from the record made during `presign()`.
+   */
+  async finalizeUpload(
     db: D1Database,
-    _env: { FILES: R2Bucket },
     tenantId: string,
-    userId: string,
-    input: { fileId: string; r2_key: string; filename: string; content_type: string; size: number },
-  ): Promise<FileObject> {
-    await db
-      .prepare(
-        `INSERT INTO file_objects
-           (id, tenant_id, r2_key, filename, content_type, size, uploaded_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        input.fileId,
-        tenantId,
-        input.r2_key,
-        input.filename,
-        input.content_type,
-        input.size,
-        userId,
-      )
-      .run();
-
-    const row = (await db
-      .prepare("SELECT * FROM file_objects WHERE tenant_id = ? AND id = ? LIMIT 1")
-      .bind(tenantId, input.fileId)
-      .first()) as D1Row | null;
-    if (!row) throw new Error("Insert succeeded but read failed");
-    return mapFile(row);
+    fileId: string,
+  ): Promise<FileObject | null> {
+    return this.getById(db, tenantId, fileId);
   },
 
   async getById(db: D1Database, tenantId: string, id: string): Promise<FileObject | null> {

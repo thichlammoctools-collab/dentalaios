@@ -208,11 +208,12 @@ QUY TẮC QUAN TRỌNG:
   // ─── Analyze Image ─────────────────────────────────────────────
   async analyzeImage(
     deps: AiDeps,
+    tenantId: string,
     fileId: string,
     imageType: string,
     optionalPrompt?: string,
   ): Promise<AnalyzeImageResult> {
-    const { AI, FILES } = deps;
+    const { AI, FILES, db } = deps;
 
     const imageTypeLabels: Record<string, string> = {
       cbct: "CBCT (Cone Beam CT)",
@@ -255,12 +256,21 @@ QUY TẮC QUAN TRỌNG:
 - tooth_number dùng hệ FDI (VD: 11= răng cửa trên phải, 36= răng hàm dưới trái)
 - scope="tooth" khi chỉ 1 răng, scope="full_mouth" khi nhiều răng, scope="soft_tissue" khi là mô mềm`;
 
-    // Step 1: Fetch image from R2
+    // Step 1: Resolve the database file id in the caller's tenant before
+    // reading R2. `fileId` is an opaque DB UUID, not an R2 key; using it as a
+    // key both fails for valid uploads and lets callers try arbitrary keys.
+    const file = await db
+      .prepare("SELECT r2_key, content_type FROM file_objects WHERE tenant_id = ? AND id = ? LIMIT 1")
+      .bind(tenantId, fileId)
+      .first<{ r2_key: string; content_type: string }>();
+    if (!file) throw new NotFoundError("Image file not found");
+
+    // Step 2: Fetch the tenant-scoped image from R2.
     let imageBase64: string | null = null;
-    let mimeType = "image/jpeg";
+    let mimeType = file.content_type || "image/jpeg";
     if (FILES) {
       try {
-        const r2Obj = await FILES.get(fileId);
+        const r2Obj = await FILES.get(file.r2_key);
         if (r2Obj && "arrayBuffer" in r2Obj) {
           const buf = await (r2Obj as R2ObjectBody).arrayBuffer();
           // Limit to 5MB to avoid token limits
@@ -273,11 +283,13 @@ QUY TẮC QUAN TRỌNG:
           if (ct) mimeType = ct;
         }
       } catch {
-        // R2 fetch failed — continue with text-only analysis
+        throw new NotFoundError("Image file missing in storage");
       }
     }
 
-    // Step 2: Try vision model with base64 image
+    if (!imageBase64) throw new NotFoundError("Image file missing in storage");
+
+    // Step 3: Try vision model with base64 image
     if (
       AI &&
       typeof (AI as { run?: unknown }).run === "function" &&

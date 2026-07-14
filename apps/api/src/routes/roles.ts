@@ -8,6 +8,19 @@ import { requirePermission } from "../middleware/rbac";
 import { auditLog } from "../middleware/audit";
 import type { AuthContext } from "../middleware/auth";
 import { rolesService } from "../services/roles.service";
+import { ForbiddenError } from "../lib/errors";
+
+/**
+ * Permission-set changes are security-sensitive. A user who merely has
+ * `manage_roles` must not be able to add `manage_users` to their own role and
+ * bootstrap into a tenant administrator. Only an existing `all` administrator
+ * can create or change a role's permission set.
+ */
+function requirePermissionSetAdmin(jwt: ReturnType<typeof getJwt>, hasPermissionsField: boolean): void {
+  if (hasPermissionsField && !jwt.permissions.includes(PERMISSIONS.ALL)) {
+    throw new ForbiddenError("Chỉ quản trị viên mới có thể thay đổi quyền của vai trò");
+  }
+}
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -33,6 +46,7 @@ router.post(
   async (c) => {
     const jwt = getJwt(c);
     const data = c.req.valid("json");
+    requirePermissionSetAdmin(jwt, true);
     const role = await rolesService.create(c.env.DB, jwt.tenant_id, data);
     return c.json(role, 201);
   },
@@ -47,9 +61,28 @@ router.put(
   async (c) => {
     const jwt = getJwt(c);
     const data = c.req.valid("json");
+    requirePermissionSetAdmin(jwt, data.permissions !== undefined);
     const updated = await rolesService.update(c.env.DB, jwt.tenant_id, c.req.param("id"), data);
     if (!updated) return c.json({ error: "Role not found", code: "not_found" }, 404);
     return c.json(updated);
+  },
+);
+
+// DELETE /api/roles/:id
+// Deleting a role can lock users out or alter administrative controls, so it
+// is reserved for an already full administrator rather than any role manager.
+router.delete(
+  "/:id",
+  requirePermission(PERMISSIONS.MANAGE_ROLES),
+  auditLog("delete", "role"),
+  async (c) => {
+    const jwt = getJwt(c);
+    if (!jwt.permissions.includes(PERMISSIONS.ALL)) {
+      throw new ForbiddenError("Chỉ quản trị viên mới có thể xóa vai trò");
+    }
+    const ok = await rolesService.remove(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    if (!ok) return c.json({ error: "Role not found", code: "not_found" }, 404);
+    return c.json({ ok: true });
   },
 );
 
