@@ -53,7 +53,7 @@ export const appointmentService = {
       throw new ConflictError("Bác sĩ đã có lịch hẹn trong khung giờ này");
     }
 
-    return repo.create(tenantId, {
+    const created = await repo.create(tenantId, {
       branch_id: branchId,
       clinician_id: data.clinician_id,
       patient_id: data.patient_id,
@@ -66,6 +66,10 @@ export const appointmentService = {
       source: data.source ?? "manual",
       created_by: createdByUserId,
     });
+    if (!created) {
+      throw new ConflictError("Bác sĩ đã có lịch hẹn trong khung giờ này");
+    }
+    return created;
   },
 
   async update(

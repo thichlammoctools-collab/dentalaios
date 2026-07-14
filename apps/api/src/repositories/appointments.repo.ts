@@ -17,7 +17,7 @@ export interface AppointmentsRepository {
   create(
     tenantId: string,
     data: Omit<Appointment, "id" | "tenant_id" | "created_at" | "updated_at">,
-  ): Promise<Appointment>;
+  ): Promise<Appointment | null>;
   update(tenantId: string, id: string, data: Partial<Appointment>): Promise<Appointment | null>;
   /**
    * Find appointments that overlap with [startISO, endISO) for a clinician.
@@ -83,13 +83,29 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
 
     async create(tenantId, data) {
       const id = crypto.randomUUID();
-      await db
+      const start = data.scheduled_at;
+      const end = new Date(start);
+      end.setMinutes(end.getMinutes() + data.duration_min);
+
+      // The preflight SELECT in the service offers a friendly 409 message,
+      // but it is inherently racy. Repeat the overlap predicate inside the
+      // INSERT itself: under concurrent requests only the request whose
+      // condition still holds writes a row.
+      const result = await db
         .prepare(
           `INSERT INTO appointments
-             (id, tenant_id, branch_id, clinician_id, patient_id, assistant_id,
-              source_visit_id, scheduled_at, duration_min, status, procedure, notes,
-              source, lark_event_id, reminder_sent_at, reminder_method, cancelled_reason, created_by)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              (id, tenant_id, branch_id, clinician_id, patient_id, assistant_id,
+               source_visit_id, scheduled_at, duration_min, status, procedure, notes,
+               source, lark_event_id, reminder_sent_at, reminder_method, cancelled_reason, created_by)
+           SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+           WHERE NOT EXISTS (
+             SELECT 1 FROM appointments
+             WHERE tenant_id = ?
+               AND clinician_id = ?
+               AND status NOT IN ('cancelled', 'no_show')
+               AND scheduled_at < ?
+               AND datetime(scheduled_at, '+' || duration_min || ' minutes') > ?
+           )`,
         )
         .bind(
           id,
@@ -110,8 +126,13 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
           data.reminder_method ?? null,
           data.cancelled_reason ?? null,
           data.created_by,
+          tenantId,
+          data.clinician_id,
+          end.toISOString(),
+          start,
         )
         .run();
+      if (result.meta.changes === 0) return null;
       const created = await this.getById(tenantId, id);
       if (!created) throw new Error("Insert succeeded but read failed");
       return created;

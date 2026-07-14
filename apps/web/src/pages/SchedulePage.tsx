@@ -84,7 +84,9 @@ export function SchedulePage() {
   const dayAppts = dayApptsAll
     .filter((a) => filterStatuses.size === 0 || filterStatuses.has(a.status))
     .filter((a) => !filterClinician || a.clinician_id === filterClinician)
-    .filter((a) => !filterAssistant || a.assistant_id === filterAssistant)
+    .filter((a) => !filterAssistant || (
+      filterAssistant === "__none__" ? !a.assistant_id : a.assistant_id === filterAssistant
+    ))
     .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
 
   function toggleStatus(s: string) {

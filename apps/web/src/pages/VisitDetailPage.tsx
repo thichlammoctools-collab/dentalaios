@@ -447,8 +447,6 @@ export function VisitDetailPage() {
           procedure: item.procedure,
           description: item.description,
           unit_cost: item.cost,
-          currency: "VND",
-          status: "proposed",
         });
       }
       toast.success("Da tao kế hoạch điều trị tu AI");

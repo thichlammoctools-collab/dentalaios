@@ -107,6 +107,11 @@ export const appointmentsService = {
       source: input.source ?? "manual",
       created_by: userId,
     });
+    // The repository repeats conflict detection atomically inside INSERT to
+    // close the check-then-insert race window.
+    if (!appt) {
+      throw new ConflictError("Bác sĩ vừa có lịch hẹn trùng khung giờ này. Vui lòng chọn giờ khác.");
+    }
 
     await syncToLarkCalendar(db, tenantId, appt, encryptionKey);
     return appt;

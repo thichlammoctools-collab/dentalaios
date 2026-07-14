@@ -74,7 +74,10 @@ describe("POST /api/patients", () => {
       app,
       "POST",
       "/api/patients",
-      new Map([["FROM patients", [createdRow]]]),
+      new Map([
+        ["FROM branches", [{ id: "test-branch", tenant_id: "test-tenant" }]],
+        ["FROM patients", [createdRow]],
+      ]),
       {
         body: {
           branch_id: "test-branch",
