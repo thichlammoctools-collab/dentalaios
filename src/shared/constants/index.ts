@@ -87,6 +87,7 @@ export const ERROR_CODES = {
   CONFLICT: "conflict",
   RATE_LIMITED: "rate_limited",
   INTERNAL_ERROR: "internal_error",
+  INVALID_REFERENCE: "invalid_reference",
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

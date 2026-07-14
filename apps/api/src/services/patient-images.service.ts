@@ -12,6 +12,7 @@ import type { PatientImageCreateInput } from "@shared/validation";
 import { createPatientImagesRepository } from "../repositories/patient-images.repo";
 import { filesService } from "./files.service";
 import { NotFoundError } from "../lib/errors";
+import { assertAllInTenant } from "../lib/tenant-scope";
 import { newId } from "../lib/ids";
 
 const MAX_IMAGE_SIZE = 50 * 1024 * 1024; // 50 MB
@@ -70,6 +71,12 @@ export const patientImagesService = {
     userId: string,
     data: PatientImageCreateInput,
   ): Promise<PatientImage> {
+    // Ownership check: patient/visit/file must all belong to caller's tenant.
+    await assertAllInTenant(db, tenantId, [
+      { table: "patients", id: data.patient_id },
+      { table: "visits", id: data.visit_id ?? undefined },
+      { table: "file_objects", id: data.file_id },
+    ]);
     return createPatientImagesRepository(db).create(tenantId, {
       ...data,
       uploaded_by: userId,
@@ -95,6 +102,11 @@ export const patientImagesService = {
     if (input.body.byteLength > MAX_IMAGE_SIZE) {
       throw new Error(`File too large: max ${MAX_IMAGE_SIZE / 1024 / 1024} MB`);
     }
+    // Ownership check: patient/visit must belong to caller's tenant.
+    await assertAllInTenant(db, tenantId, [
+      { table: "patients", id: input.patient_id },
+      { table: "visits", id: input.visit_id ?? undefined },
+    ]);
     const safeFilename = input.filename.replace(/[^a-zA-Z0-9._-]/g, "_") || "image";
     const fileId = newId();
     const r2Key = `tenant-${tenantId}/patient-images/${fileId}-${safeFilename}`;

@@ -3,8 +3,9 @@ import type { User } from "@shared/types";
 import type { UserWithDetails } from "../repositories/users.repo";
 import { createUsersRepository } from "../repositories/users.repo";
 import { hashPassword } from "../lib/password";
-import { ConflictError } from "../lib/errors";
-import { isUniqueConstraintError } from "../lib/db-errors";
+import { AppError, ConflictError } from "../lib/errors";
+import { isUniqueConstraintError, isForeignKeyError } from "../lib/db-errors";
+import { ERROR_CODES } from "@shared/constants";
 
 export const usersService = {
   list(db: D1Database, tenantId: string): Promise<User[]> {
@@ -36,6 +37,9 @@ export const usersService = {
       if (isUniqueConstraintError(err)) {
         throw new ConflictError("Email đã tồn tại");
       }
+      if (isForeignKeyError(err)) {
+        throw new AppError("Role hoặc chi nhánh không hợp lệ", 400, ERROR_CODES.INVALID_REFERENCE);
+      }
       throw err;
     }
   },
@@ -58,6 +62,9 @@ export const usersService = {
     } catch (err) {
       if (isUniqueConstraintError(err)) {
         throw new ConflictError("Email đã tồn tại");
+      }
+      if (isForeignKeyError(err)) {
+        throw new AppError("Role hoặc chi nhánh không hợp lệ", 400, ERROR_CODES.INVALID_REFERENCE);
       }
       throw err;
     }

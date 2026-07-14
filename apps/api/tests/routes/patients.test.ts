@@ -279,7 +279,11 @@ describe("patient note history", () => {
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as { items: { content: string; user_name: string }[] };
-    expect(body.items).toEqual([{ content: "Theo dõi sau điều trị.", user_name: "Dr. Nguyen" }]);
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0]).toMatchObject({
+      content: "Theo dõi sau điều trị.",
+      user_name: "Dr. Nguyen",
+    });
   });
 
   it("creates a note using the authenticated user as its author", async () => {

@@ -4,6 +4,7 @@ import type { VisitCreateInput, VisitUpdateInput, FindingCreateInput, FindingUpd
 import { createVisitsRepository } from "../repositories/visits.repo";
 import { createFindingsRepository } from "../repositories/findings.repo";
 import { NotFoundError } from "../lib/errors";
+import { assertAllInTenant } from "../lib/tenant-scope";
 
 export const visitService = {
   list(
@@ -21,6 +22,16 @@ export const visitService = {
   },
 
   async create(db: D1Database, tenantId: string, data: VisitCreateInput): Promise<Visit> {
+    // Ensure every foreign-key reference belongs to the caller's tenant.
+    // Prevents cross-tenant reference injection (H-02) where a caller from
+    // tenant A supplies a patient/branch/user id from tenant B.
+    await assertAllInTenant(db, tenantId, [
+      { table: "patients", id: data.patient_id },
+      { table: "branches", id: data.branch_id },
+      { table: "users", id: data.clinician_id },
+      { table: "users", id: data.treating_clinician_id ?? undefined },
+      { table: "users", id: data.assistant_id ?? undefined },
+    ]);
     return createVisitsRepository(db).create(tenantId, {
       patient_id: data.patient_id,
       branch_id: data.branch_id,
@@ -33,6 +44,11 @@ export const visitService = {
   },
 
   async update(db: D1Database, tenantId: string, id: string, data: VisitUpdateInput): Promise<Visit> {
+    // Ownership check for optional user references on update.
+    await assertAllInTenant(db, tenantId, [
+      { table: "users", id: data.treating_clinician_id ?? undefined },
+      { table: "users", id: data.assistant_id ?? undefined },
+    ]);
     const updated = await createVisitsRepository(db).update(tenantId, id, {
       ...data,
       treating_clinician_id: data.treating_clinician_id ?? undefined,

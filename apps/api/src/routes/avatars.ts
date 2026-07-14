@@ -23,7 +23,7 @@ function writePermissionFor(subject: AvatarSubject) {
   return subject === "users" ? PERMISSIONS.MANAGE_USERS : PERMISSIONS.WRITE_PATIENTS;
 }
 
-router.post(
+router.on(["POST", "PUT"],
   "/:subject/:id/file",
   async (c, next) => {
     const subject = c.req.param("subject");

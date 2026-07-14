@@ -4,6 +4,7 @@ import type { PlanCreateInput, PlanItemCreateInput } from "@shared/validation";
 import { createTreatmentPlansRepository } from "../repositories/treatment-plans.repo";
 import { createTreatmentItemsRepository } from "../repositories/treatment-items.repo";
 import { NotFoundError, ValidationError } from "../lib/errors";
+import { assertAllInTenant } from "../lib/tenant-scope";
 
 export const planService = {
   list(
@@ -25,6 +26,20 @@ export const planService = {
   },
 
   async create(db: D1Database, tenantId: string, data: PlanCreateInput): Promise<TreatmentPlan> {
+    // Enforce that the visit + patient referenced belong to the caller's tenant
+    // and that the visit's own patient_id matches. Prevents cross-tenant plans
+    // (H-02) and plans that link a valid visit to an unrelated patient.
+    await assertAllInTenant(db, tenantId, [
+      { table: "visits", id: data.visit_id },
+      { table: "patients", id: data.patient_id },
+    ]);
+    const visit = await db
+      .prepare("SELECT patient_id FROM visits WHERE tenant_id = ? AND id = ? LIMIT 1")
+      .bind(tenantId, data.visit_id)
+      .first<{ patient_id: string }>();
+    if (!visit || visit.patient_id !== data.patient_id) {
+      throw new ValidationError("patient_id không khớp với visit");
+    }
     return createTreatmentPlansRepository(db).create(tenantId, {
       visit_id: data.visit_id,
       patient_id: data.patient_id,

@@ -12,3 +12,8 @@ export function isUniqueConstraintError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   return /UNIQUE/i.test(err.message);
 }
+
+export function isForeignKeyError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  return /FOREIGN KEY/i.test(err.message);
+}

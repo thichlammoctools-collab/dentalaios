@@ -20,6 +20,7 @@ import {
   deleteLarkCalendarEvent,
 } from "../lib/lark-client";
 import { ConflictError, NotFoundError } from "../lib/errors";
+import { assertAllInTenant } from "../lib/tenant-scope";
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -77,6 +78,16 @@ export const appointmentsService = {
     const repo = createAppointmentsRepository(db);
     const duration = input.duration_min ?? 30;
     const { start, end } = interval(input.scheduled_at, duration);
+
+    // Cross-tenant safety: every referenced ID must belong to this tenant.
+    // Prevents attackers from linking a tenant-A appointment to tenant-B
+    // patient / clinician / visit rows (H-02).
+    await assertAllInTenant(db, tenantId, [
+      { table: "patients", id: input.patient_id },
+      { table: "users", id: input.clinician_id },
+      input.assistant_id ? { table: "users", id: input.assistant_id } : null,
+      input.source_visit_id ? { table: "visits", id: input.source_visit_id } : null,
+    ]);
 
     // Conflict check: same clinician, overlapping [start, end)
     await assertNoConflict(db, tenantId, input.clinician_id, start, end);
