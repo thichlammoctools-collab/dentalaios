@@ -199,8 +199,6 @@ describe("POST /api/treatment-plans/:id/items", () => {
           procedure: "filling",
           description: "test",
           unit_cost: 100,
-          description: "test",
-          unit_cost: 100,
         },
       },
     );

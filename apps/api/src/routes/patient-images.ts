@@ -63,7 +63,7 @@ const imageUploadQuerySchema = z.object({
 router.post(
   "/presign",
   requireAuth(),
-  requirePermission(PERMISSIONS.READ_PATIENTS),
+  requirePermission(PERMISSIONS.WRITE_PATIENTS),
   zValidator(
     "json",
     patientImagePresignSchema.extend({
@@ -104,7 +104,7 @@ router.post(
 router.post(
   "/",
   requireAuth(),
-  requirePermission(PERMISSIONS.READ_PATIENTS),
+  requirePermission(PERMISSIONS.WRITE_PATIENTS),
   auditLog("create", "patient_image"),
   zValidator("json", patientImageCreateSchema),
   async (c) => {
@@ -119,7 +119,7 @@ router.post(
 router.post(
   "/file",
   requireAuth(),
-  requirePermission(PERMISSIONS.READ_PATIENTS),
+  requirePermission(PERMISSIONS.WRITE_PATIENTS),
   auditLog("create", "patient_image"),
   zValidator("query", imageUploadQuerySchema),
   async (c) => {
@@ -152,7 +152,6 @@ router.get(
     return new Response(object.body, {
       headers: {
         "Content-Type": fileObj.content_type,
-        "Content-Length": String(fileObj.size),
         "Cache-Control": "private, max-age=300",
         ETag: object.httpEtag,
       },

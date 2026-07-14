@@ -78,6 +78,9 @@ describe("POST /api/appointments", () => {
       "POST",
       "/api/appointments",
       new Map<string, unknown[]>([
+        ["FROM branches", [{ id: "test-branch", tenant_id: "test-tenant" }]],
+        ["FROM patients", [{ id: "patient-1", tenant_id: "test-tenant" }]],
+        ["FROM users", [{ id: "doc-1", tenant_id: "test-tenant" }]],
         // Conflict check (findConflicts) returns empty → no overlap
         // Post-insert getById returns the created row
         ["FROM appointments", (_sql: string, idx: number) =>
@@ -207,6 +210,9 @@ describe("POST /api/appointments", () => {
       "POST",
       "/api/appointments",
       new Map([
+        ["FROM branches", [{ id: "test-branch", tenant_id: "test-tenant" }]],
+        ["FROM patients", [{ id: "patient-2", tenant_id: "test-tenant" }]],
+        ["FROM users", [{ id: "doc-1", tenant_id: "test-tenant" }]],
         // Conflict check returns existing overlapping appointment
         ["FROM appointments", (_sql: string, idx: number) =>
           idx === 0 ? [appointmentRow()] : []
@@ -281,6 +287,7 @@ describe("DELETE /api/appointments/:id", () => {
       "PATCH",
       "/api/appointments/appt-1",
       new Map([
+        ["FROM users", [{ id: "new-doc", tenant_id: "test-tenant" }]],
         ["FROM appointments", (_sql: string, idx: number) => {
           if (idx === 0) return [appointmentRow()]; // existing
           if (idx === 1) return [appointmentRow({ clinician_id: "new-doc" })]; // conflict with new doctor

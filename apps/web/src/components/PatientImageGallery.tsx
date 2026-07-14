@@ -44,6 +44,8 @@ export function PatientImageGallery({
   const [filterType, setFilterType] = useState<string>("all");
   const [selected, setSelected] = useState<PatientImage | null>(null);
   const [viewUrl, setViewUrl] = useState<string | null>(null);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [viewError, setViewError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalyzeImageResult | null>(null);
@@ -67,6 +69,55 @@ export function PatientImageGallery({
   useEffect(() => {
     load();
   }, [patientId, visitId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    if (!selected) {
+      setViewUrl(null);
+      setViewError(null);
+      setViewLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 30_000);
+
+    setViewUrl(null);
+    setViewError(null);
+    setViewLoading(true);
+    apiBlob(`/api/patient-images/${selected.id}/file`, { signal: controller.signal })
+      .then((image) => {
+        objectUrl = URL.createObjectURL(image);
+        if (!cancelled) setViewUrl(objectUrl);
+        else URL.revokeObjectURL(objectUrl);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setViewError(
+            timedOut
+              ? "Tải hình ảnh quá thời gian. Vui lòng thử lại."
+              : err instanceof ApiError ? err.message : "Không thể tải hình ảnh",
+          );
+        }
+      })
+      .finally(() => {
+        clearTimeout(timeoutId);
+        if (!cancelled) setViewLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [selected?.id]);
 
   const filtered = filterType === "all"
     ? images
@@ -123,12 +174,7 @@ export function PatientImageGallery({
   async function handleAnalyze(img: PatientImage) {
     setAnalyzing(true);
     setAnalysisResult(null);
-    setViewUrl(null);
     try {
-      // Load the private R2 object through the Worker.
-      const image = await apiBlob(`/api/patient-images/${img.id}/file`);
-      setViewUrl(URL.createObjectURL(image));
-
       const result = await apiPost<AnalyzeImageResult & { visit_id?: string }>(
         "/api/ai/analyze-image",
         {
@@ -260,7 +306,7 @@ export function PatientImageGallery({
                   {PATIENT_IMAGE_TYPE_LABELS[img.image_type]}
                 </p>
                 <p className="text-white/70 text-[9px]">
-                  {img.original_name ? `${(img.size! / 1024).toFixed(0)}KB` : ""}
+                  {img.original_size ? `${(img.original_size / 1024).toFixed(0)}KB` : ""}
                 </p>
               </div>
               <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -308,10 +354,18 @@ export function PatientImageGallery({
                 src={viewUrl}
                 alt={selected?.original_name || "Medical image"}
                 className="w-full max-h-[60vh] object-contain"
+                onError={() => {
+                  setViewUrl(null);
+                  setViewError("Định dạng hình ảnh này không thể xem trước trong trình duyệt");
+                }}
               />
+            ) : viewError ? (
+              <div className="w-full min-h-48 flex items-center justify-center px-6 py-10 text-center text-sm text-destructive">
+                {viewError}
+              </div>
             ) : (
               <div className="w-full h-48 flex items-center justify-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-teal-500 border-t-transparent" />
+                {viewLoading && <div className="h-8 w-8 animate-spin rounded-full border-4 border-teal-500 border-t-transparent" />}
               </div>
             )}
           </div>
@@ -401,34 +455,53 @@ export function PatientImageGallery({
 function ImageThumbnail({ img }: { img: PatientImage }) {
   const [src, setSrc] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     let objectUrl: string | null = null;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
+    setSrc(null);
     setLoading(true);
-    apiBlob(`/api/patient-images/${img.id}/file`)
+    setFailed(false);
+    apiBlob(`/api/patient-images/${img.id}/file`, { signal: controller.signal })
       .then((image) => {
         objectUrl = URL.createObjectURL(image);
         if (!cancelled) setSrc(objectUrl);
         else URL.revokeObjectURL(objectUrl);
       })
       .catch(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setFailed(true);
       })
       .finally(() => {
+        clearTimeout(timeoutId);
         if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
+      controller.abort();
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [img.id]);
 
-  if (loading || !src) {
+  if (loading) {
     return (
       <div className="w-full h-full bg-muted/40 animate-pulse flex items-center justify-center">
         <svg className="w-6 h-6 text-muted-foreground/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2 1.879-1.879a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (failed || !src) {
+    return (
+      <div className="w-full h-full bg-muted/40 flex items-center justify-center">
+        <svg className="w-6 h-6 text-muted-foreground/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2 1.879-1.879a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
       </div>
     );
@@ -439,7 +512,7 @@ function ImageThumbnail({ img }: { img: PatientImage }) {
       src={src}
       alt={img.original_name || img.image_type}
       className="w-full h-full object-cover"
-      onError={() => setSrc(null)}
+      onError={() => setFailed(true)}
     />
   );
 }
@@ -484,9 +557,9 @@ async function compressImage(
 
 function detectImageType(filename: string, mimeType: string): PatientImageType {
   const name = filename.toLowerCase();
-  if (name.includes("cbct") || mimeType.includes("dicom") || name.endsWith(".dcm")) return "cbct";
+  if (name.includes("dicom") || mimeType.includes("dicom") || name.endsWith(".dcm")) return "dicom";
+  if (name.includes("cbct")) return "cbct";
   if (name.includes("scan") || name.includes("3d") || name.includes("stl") || name.includes("obj")) return "scan_3d";
-  if (name.includes("dicom") || mimeType.includes("dicom")) return "dicom";
   if (name.includes("before") || name.includes("truoc") || name.includes("trước")) return "photo_before";
   if (name.includes("after") || name.includes("sau") || name.includes("sau")) return "photo_after";
   if (name.includes("xray") || name.includes("x-ray") || name.includes("quang")) return "xray";
