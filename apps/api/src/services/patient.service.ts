@@ -2,6 +2,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import type { Patient } from "@shared/types";
 import type { PatientCreateInput, PatientUpdateInput } from "@shared/validation";
 import { createPatientsRepository } from "../repositories/patients.repo";
+import { assertAllInTenant } from "../lib/tenant-scope";
 
 export const patientService = {
   list(
@@ -17,7 +18,12 @@ export const patientService = {
   },
 
   create(db: D1Database, tenantId: string, data: PatientCreateInput): Promise<Patient> {
-    return createPatientsRepository(db).create(tenantId, {
+    return (async () => {
+      await assertAllInTenant(db, tenantId, [
+        { table: "branches", id: data.branch_id },
+        { table: "users", id: data.referral_user_id ?? undefined },
+      ]);
+      return createPatientsRepository(db).create(tenantId, {
       branch_id: data.branch_id,
       name: data.name,
       date_of_birth: data.date_of_birth,
@@ -35,7 +41,8 @@ export const patientService = {
       height_cm: data.height_cm ?? undefined,
       weight_kg: data.weight_kg ?? undefined,
       cccd: data.cccd ?? undefined,
-    });
+      });
+    })();
   },
 
   update(
@@ -44,7 +51,12 @@ export const patientService = {
     id: string,
     data: PatientUpdateInput,
   ): Promise<Patient | null> {
-    return createPatientsRepository(db).update(tenantId, id, {
+    return (async () => {
+      await assertAllInTenant(db, tenantId, [
+        { table: "branches", id: data.branch_id ?? undefined },
+        { table: "users", id: data.referral_user_id ?? undefined },
+      ]);
+      return createPatientsRepository(db).update(tenantId, id, {
       name: data.name,
       date_of_birth: data.date_of_birth,
       gender: data.gender,
@@ -61,7 +73,8 @@ export const patientService = {
       height_cm: data.height_cm ?? undefined,
       weight_kg: data.weight_kg ?? undefined,
       cccd: data.cccd ?? undefined,
-    });
+      });
+    })();
   },
 
   remove(db: D1Database, tenantId: string, id: string): Promise<boolean> {

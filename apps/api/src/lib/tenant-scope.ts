@@ -76,10 +76,10 @@ export async function assertRowInTenant(
 export async function assertAllInTenant(
   db: D1Database,
   tenantId: string,
-  refs: Array<{ table: ScopedTable; id: string | null | undefined }>,
+  refs: Array<{ table: ScopedTable; id: string | null | undefined } | null>,
 ): Promise<void> {
   for (const ref of refs) {
-    if (ref.id == null || ref.id === "") continue;
+    if (!ref || ref.id == null || ref.id === "") continue;
     await assertRowInTenant(db, ref.table, tenantId, ref.id);
   }
 }

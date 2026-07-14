@@ -21,6 +21,13 @@ interface Invite {
   created_at: string;
 }
 
+interface EditForm {
+  name: string;
+  role_id: string;
+  branch_id: string;
+  is_active: boolean;
+}
+
 function CopyIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
@@ -40,6 +47,7 @@ function MailIcon() {
 }
 
 export function MembersSettingsPage() {
+  const { session } = useAuth();
   const [invites, setInvites] = useState<Invite[]>([]);
   const [members, setMembers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -51,6 +59,10 @@ export function MembersSettingsPage() {
   const [creatingAll, setCreatingAll] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [manual, setManual] = useState({ name: "", email: "", password: "", role_id: "", branch_id: "" });
+  const [openEdit, setOpenEdit] = useState(false);
+  const [editUser, setEditUser] = useState<User | null>(null);
+  const [editForm, setEditForm] = useState<EditForm>({ name: "", role_id: "", branch_id: "", is_active: true });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     loadAll();
@@ -149,6 +161,49 @@ export function MembersSettingsPage() {
       toast.success("Đã thu hồi lời mời");
     } catch {
       toast.error("Lỗi thu hồi lời mời");
+    }
+  }
+
+  function openEditDialog(u: User) {
+    setEditUser(u);
+    setEditForm({ name: u.name, role_id: u.role_id, branch_id: u.branch_id, is_active: u.is_active });
+    setOpenEdit(true);
+  }
+
+  async function onEdit(e: FormEvent) {
+    e.preventDefault();
+    if (!editUser) return;
+    setSavingEdit(true);
+    try {
+      await apiPut(`/api/users/${editUser.id}`, {
+        name: editForm.name,
+        role_id: editForm.role_id,
+        branch_id: editForm.branch_id,
+        is_active: editForm.is_active,
+      });
+      toast.success("Đã cập nhật");
+      setOpenEdit(false);
+      setEditUser(null);
+      loadAll();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi cập nhật");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function onDelete(u: User) {
+    if (u.id === session?.user.id) {
+      toast.error("Không thể xóa chính mình");
+      return;
+    }
+    if (!confirm(`Vô hiệu hóa ${u.email}? Họ sẽ không thể đăng nhập.`)) return;
+    try {
+      await apiDelete(`/api/users/${u.id}`);
+      toast.success("Đã vô hiệu hóa");
+      loadAll();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi xóa");
     }
   }
 
@@ -441,6 +496,7 @@ export function MembersSettingsPage() {
                   <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3">Vai trò</th>
                   <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3">Chi nhánh</th>
                   <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3">Trạng thái</th>
+                  <th className="text-right text-xs font-semibold text-muted-foreground px-4 py-3">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -463,6 +519,16 @@ export function MembersSettingsPage() {
                         <span className={`h-1.5 w-1.5 rounded-full ${u.is_active ? "bg-green-500" : "bg-muted-foreground"}`} />
                         {u.is_active ? "Hoạt động" : "Đã khóa"}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button size="sm" variant="outline" onClick={() => openEditDialog(u)}>
+                          Sửa
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={() => onDelete(u)}>
+                          Xóa
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -516,6 +582,89 @@ export function MembersSettingsPage() {
             >
               {creatingAll ? "Đang tạo…" : "Gửi tất cả"}
             </button>
+          </DialogFooter>
+        </form>
+      </Dialog>
+
+      {/* ─── Edit Member Dialog ─── */}
+      <Dialog open={openEdit} onOpenChange={setOpenEdit}>
+        <form onSubmit={onEdit}>
+          <DialogHeader>
+            <DialogTitle>Sửa thành viên</DialogTitle>
+          </DialogHeader>
+          <DialogBody className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="me-name">
+                Họ tên <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="me-name"
+                required
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                placeholder="VD: Nguyễn Văn A"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="me-role">Vai trò</Label>
+                <Select
+                  id="me-role"
+                  value={editForm.role_id}
+                  onChange={(e) => setEditForm({ ...editForm, role_id: e.target.value })}
+                >
+                  {roles.map((r) => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="me-branch">Chi nhánh</Label>
+                <Select
+                  id="me-branch"
+                  value={editForm.branch_id}
+                  onChange={(e) => setEditForm({ ...editForm, branch_id: e.target.value })}
+                >
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setEditForm({ ...editForm, is_active: !editForm.is_active })}
+                className={cn(
+                  "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+                  editForm.is_active ? "bg-primary" : "bg-muted",
+                )}
+              >
+                <span
+                  className={cn(
+                    "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out",
+                    editForm.is_active ? "translate-x-4" : "translate-x-0",
+                  )}
+                />
+              </button>
+              <Label
+                className={cn(
+                  "text-sm font-medium cursor-pointer transition-colors",
+                  editForm.is_active ? "text-foreground" : "text-muted-foreground",
+                )}
+                onClick={() => setEditForm({ ...editForm, is_active: !editForm.is_active })}
+              >
+                Hoạt động
+              </Label>
+            </div>
+          </DialogBody>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpenEdit(false)}>
+              Hủy
+            </Button>
+            <Button type="submit" disabled={savingEdit}>
+              {savingEdit ? "Đang lưu…" : "Lưu"}
+            </Button>
           </DialogFooter>
         </form>
       </Dialog>

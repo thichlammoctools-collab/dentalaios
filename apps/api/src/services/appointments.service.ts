@@ -83,6 +83,7 @@ export const appointmentsService = {
     // Prevents attackers from linking a tenant-A appointment to tenant-B
     // patient / clinician / visit rows (H-02).
     await assertAllInTenant(db, tenantId, [
+      { table: "branches", id: branchId },
       { table: "patients", id: input.patient_id },
       { table: "users", id: input.clinician_id },
       input.assistant_id ? { table: "users", id: input.assistant_id } : null,
@@ -121,6 +122,11 @@ export const appointmentsService = {
     const repo = createAppointmentsRepository(db);
     const existing = await repo.getById(tenantId, id);
     if (!existing) throw new NotFoundError("Appointment not found");
+
+    await assertAllInTenant(db, tenantId, [
+      { table: "users", id: input.clinician_id ?? undefined },
+      { table: "users", id: input.assistant_id ?? undefined },
+    ]);
 
     // Re-check conflicts only if anything affecting time/doctor changed
     const newClinician = input.clinician_id ?? existing.clinician_id;

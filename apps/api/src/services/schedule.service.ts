@@ -10,6 +10,7 @@ import { DEFAULT_CLINIC_OPEN, DEFAULT_CLINIC_CLOSE } from "@shared/constants";
 import type { DoctorScheduleBulkUpdate, ClinicScheduleBulkUpdate } from "@shared/validation";
 import { createClinicSchedulesRepository } from "../repositories/clinic-schedules.repo";
 import { createDoctorSchedulesRepository } from "../repositories/doctor-schedules.repo";
+import { assertAllInTenant, assertRowInTenant } from "../lib/tenant-scope";
 
 const DEFAULT_SLOT_MINUTES = 30;
 
@@ -53,6 +54,7 @@ export const scheduleService = {
     tenantId: string,
     branchId: string,
   ): Promise<ClinicSchedule[]> {
+    await assertRowInTenant(db, "branches", tenantId, branchId);
     const repo = createClinicSchedulesRepository(db);
     const rows = await repo.listByBranch(tenantId, branchId);
     if (rows.length === 0) return buildDefaultClinicSchedule(tenantId, branchId);
@@ -65,6 +67,7 @@ export const scheduleService = {
     branchId: string,
     data: ClinicScheduleBulkUpdate,
   ): Promise<ClinicSchedule[]> {
+    await assertRowInTenant(db, "branches", tenantId, branchId);
     const repo = createClinicSchedulesRepository(db);
     await repo.upsertBulk(tenantId, branchId, data.entries);
     return repo.listByBranch(tenantId, branchId);
@@ -76,6 +79,10 @@ export const scheduleService = {
     doctorId: string,
     branchId?: string,
   ): Promise<DoctorSchedule[]> {
+    await assertAllInTenant(db, tenantId, [
+      { table: "users", id: doctorId },
+      { table: "branches", id: branchId ?? undefined },
+    ]);
     const repo = createDoctorSchedulesRepository(db);
     const rows = branchId
       ? await repo.listByDoctor(tenantId, branchId, doctorId)
@@ -93,6 +100,10 @@ export const scheduleService = {
     tenantId: string,
     data: DoctorScheduleBulkUpdate,
   ): Promise<DoctorSchedule[]> {
+    await assertAllInTenant(db, tenantId, [
+      { table: "users", id: data.doctor_id },
+      { table: "branches", id: data.branch_id },
+    ]);
     const repo = createDoctorSchedulesRepository(db);
     await repo.upsertBulk(tenantId, data.branch_id, data.doctor_id, data.entries);
     return repo.listByDoctor(tenantId, data.branch_id, data.doctor_id);
