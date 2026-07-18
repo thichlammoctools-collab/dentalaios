@@ -16,6 +16,7 @@ import { hashPassword } from "../lib/password";
 import { signJwt } from "../lib/jwt";
 import { NotFoundError, ConflictError } from "../lib/errors";
 import { newId } from "../lib/ids";
+import { isUniqueConstraintError } from "../lib/db-errors";
 
 function slugify(text: string): string {
   return text
@@ -59,40 +60,42 @@ export const registerService = {
     const slug = slugify(data.clinic_name);
     const password_hash = await hashPassword(data.password);
 
-    await db
-      .prepare("INSERT INTO tenants (id, name, slug, is_active) VALUES (?, ?, ?, 1)")
-      .bind(tenantId, data.clinic_name.trim(), slug || tenantId)
-      .run();
-
-    await db
-      .prepare("INSERT INTO branches (id, tenant_id, name, address) VALUES (?, ?, ?, ?)")
-      .bind(branchId, tenantId, (data.branch_name || "Chi nhánh chính").trim(), "")
-      .run();
-
-    await db
-      .prepare("INSERT INTO roles (id, tenant_id, name, permissions) VALUES (?, ?, ?, ?)")
-      .bind(roleId, tenantId, "admin", JSON.stringify(["all"]))
-      .run();
-
-    await db
-      .prepare(
-        `INSERT INTO users (id, tenant_id, branch_id, role_id, email, name, password_hash, is_active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
-      )
-      .bind(
-        userId, tenantId, branchId, roleId,
-        data.email.toLowerCase().trim(), data.name.trim(), password_hash,
-      )
-      .run();
-
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-    await db
-      .prepare(
-        `INSERT INTO email_verification_tokens (id, token, user_id, tenant_id, email, expires_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(tokenId, verifyToken, userId, tenantId, data.email.toLowerCase().trim(), expiresAt)
-      .run();
+    const email = data.email.toLowerCase().trim();
+
+    // D1 batch is executed as one transaction. This prevents a concurrent
+    // registration with the same email from leaving tenant/branch/role rows
+    // behind when the unique users.email insert loses the race.
+    try {
+      await db.batch([
+        db
+          .prepare("INSERT INTO tenants (id, name, slug, is_active) VALUES (?, ?, ?, 1)")
+          .bind(tenantId, data.clinic_name.trim(), slug || tenantId),
+        db
+          .prepare("INSERT INTO branches (id, tenant_id, name, address) VALUES (?, ?, ?, ?)")
+          .bind(branchId, tenantId, (data.branch_name || "Chi nhánh chính").trim(), ""),
+        db
+          .prepare("INSERT INTO roles (id, tenant_id, name, permissions) VALUES (?, ?, ?, ?)")
+          .bind(roleId, tenantId, "admin", JSON.stringify(["all"])),
+        db
+          .prepare(
+            `INSERT INTO users (id, tenant_id, branch_id, role_id, email, name, password_hash, is_active)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
+          )
+          .bind(userId, tenantId, branchId, roleId, email, data.name.trim(), password_hash),
+        db
+          .prepare(
+            `INSERT INTO email_verification_tokens (id, token, user_id, tenant_id, email, expires_at)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+          )
+          .bind(tokenId, verifyToken, userId, tenantId, email, expiresAt),
+      ]);
+    } catch (err) {
+      if (isUniqueConstraintError(err)) {
+        throw new ConflictError("Email đã được sử dụng");
+      }
+      throw err;
+    }
 
     return {
       message: "Đăng ký thành công. Vui lòng xác thực email để kích hoạt tài khoản.",
@@ -131,7 +134,16 @@ export const registerService = {
     const r = row as Record<string, unknown>;
     if (r.user_is_active === 1) throw new ConflictError("Tài khoản đã được kích hoạt trước đó");
 
-    await db.prepare("UPDATE users SET is_active = 1 WHERE id = ?").bind(r.user_id as string).run();
+    // A concurrent request can read the token immediately before another
+    // request consumes it. Compare-and-set the account state first: only one
+    // caller can move is_active from 0 to 1 and therefore receive a session.
+    const activated = await db
+      .prepare("UPDATE users SET is_active = 1 WHERE id = ? AND is_active = 0")
+      .bind(r.user_id as string)
+      .run();
+    if (activated.meta.changes !== 1) {
+      throw new ConflictError("Token đã được sử dụng");
+    }
     await db.prepare("DELETE FROM email_verification_tokens WHERE token = ?").bind(data.token).run();
 
     const permissions = JSON.parse((r.role_permissions as string) || "[]");
@@ -207,8 +219,9 @@ export const registerService = {
          JOIN branches b ON b.id = it.branch_id
          WHERE it.token = ? AND it.expires_at > datetime('now') AND it.accepted_at IS NULL
          LIMIT 1`,
-      )
-      .first();
+       )
+       .bind(data.token)
+       .first();
 
     if (!row) throw new NotFoundError("Link mời không hợp lệ hoặc đã hết hạn");
 
@@ -224,15 +237,45 @@ export const registerService = {
     const userId = newId();
     const password_hash = await hashPassword(data.password);
 
-    await db
-      .prepare(
-        `INSERT INTO users (id, tenant_id, branch_id, role_id, email, name, password_hash, is_active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
-      )
-      .bind(userId, r.tenant_id as string, r.branch_id as string, r.role_id as string, inviteEmail, data.name.trim(), password_hash)
-      .run();
-
-    await db.prepare("UPDATE invite_tokens SET accepted_at = datetime('now') WHERE token = ?").bind(data.token).run();
+    const acceptedAt = new Date().toISOString();
+    try {
+      const acceptResults = await db.batch([
+        db
+          .prepare(
+            `UPDATE invite_tokens
+             SET accepted_at = ?
+             WHERE token = ? AND accepted_at IS NULL AND expires_at > datetime('now')`,
+          )
+          .bind(acceptedAt, data.token),
+        db
+          .prepare(
+            `INSERT INTO users (id, tenant_id, branch_id, role_id, email, name, password_hash, is_active)
+             SELECT ?, ?, ?, ?, ?, ?, ?, 1
+             WHERE EXISTS (
+               SELECT 1 FROM invite_tokens WHERE token = ? AND accepted_at = ?
+             )`,
+          )
+          .bind(
+            userId,
+            r.tenant_id as string,
+            r.branch_id as string,
+            r.role_id as string,
+            inviteEmail,
+            data.name.trim(),
+            password_hash,
+            data.token,
+            acceptedAt,
+          ),
+      ]);
+      if (acceptResults[0].meta.changes !== 1 || acceptResults[1].meta.changes !== 1) {
+        throw new ConflictError("Link mời đã được sử dụng hoặc đã hết hạn");
+      }
+    } catch (err) {
+      if (isUniqueConstraintError(err)) {
+        throw new ConflictError("Email đã được sử dụng");
+      }
+      throw err;
+    }
 
     const permissions = JSON.parse((r.role_permissions as string) || "[]");
     const { token, expires_at } = await signJwt(

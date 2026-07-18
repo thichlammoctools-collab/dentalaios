@@ -16,14 +16,15 @@ router.post(
   rateLimit({ windowSeconds: 60, maxRequests: 5 }),
   zValidator("json", loginSchema),
   async (c) => {
-  const { email, password } = c.req.valid("json");
-  const session = await authService.login(
-    { db: c.env.DB, jwtSecret: c.env.JWT_SECRET },
-    email,
-    password,
-  );
-  return c.json({ session }, 200);
-});
+    const { email, password } = c.req.valid("json");
+    const session = await authService.login(
+      { db: c.env.DB, jwtSecret: c.env.JWT_SECRET },
+      email,
+      password,
+    );
+    return c.json({ session }, 200);
+  },
+);
 
 // All routes below require auth
 router.use("*", requireAuth());

@@ -30,12 +30,14 @@ import treatmentPlansRoutes from "./routes/treatment-plans";
 import treatmentPlansExtras from "./routes/treatment-plans-extras";
 import paymentsRoutes from "./routes/payments";
 import medicalAlertsRoutes from "./routes/medical-alerts";
+import patientNotesRoutes from "./routes/patient-notes";
 import auditRoutes from "./routes/audit";
 import usersRoutes from "./routes/users";
 import rolesRoutes from "./routes/roles";
 import filesRoutes from "./routes/files";
 import clinicRoutes from "./routes/clinic";
 import patientImagesRoutes from "./routes/patient-images";
+import avatarRoutes from "./routes/avatars";
 import appointmentsRoutes from "./routes/appointments";
 import schedulesRoutes from "./routes/schedules";
 
@@ -103,7 +105,7 @@ app.use(
       return "";
     },
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Avatar-Filename", "X-Image-Filename"],
     credentials: true,
     maxAge: 86400,
   }),
@@ -134,6 +136,7 @@ app.route("/api/ai", aiRoutes);
 // Clinical — patients (also handles /:id/alerts via sub-router)
 app.route("/api/patients", patientsRoutes);
 app.route("/api/patients", medicalAlertsRoutes);
+app.route("/api/patients", patientNotesRoutes);
 
 // Visits
 app.route("/api/visits", visitsRoutes);
@@ -155,9 +158,9 @@ app.route("/api/roles", rolesRoutes);
 app.route("/api/files", filesRoutes);
 app.route("/api/clinic", clinicRoutes);
 app.route("/api/patient-images", patientImagesRoutes);
+app.route("/api/avatars", avatarRoutes);
 
-// Appointments + Schedules
-app.route("/api/appointments", appointmentsRoutes);
+// Schedules
 app.route("/api/schedules", schedulesRoutes);
 
 // 404
@@ -176,7 +179,7 @@ app.onError((err, c) => {
     );
   }
   console.error("Unhandled error:", err.message, err.stack);
-  return c.json({ error: "Internal server error", code: "internal_error", detail: err.message }, 500);
+  return c.json({ error: "Internal server error", code: "internal_error" }, 500);
 });
 
 // Queue consumer handler

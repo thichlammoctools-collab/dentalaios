@@ -5,7 +5,10 @@
 import { describe, it, expect } from "vitest";
 import patientsRoutes from "../../src/routes/patients";
 import medicalAlertsRoutes from "../../src/routes/medical-alerts";
+import patientNotesRoutes from "../../src/routes/patient-notes";
+import { createPatientsRepository } from "../../src/repositories/patients.repo";
 import { mountRoute, authedRequestWithDB, authedRequest } from "../helpers/api";
+import { createMockD1 } from "../helpers/mock-db";
 
 const patientRow = (overrides: Record<string, unknown> = {}) => ({
   id: "patient-1",
@@ -18,6 +21,7 @@ const patientRow = (overrides: Record<string, unknown> = {}) => ({
   email: null,
   notes: null,
   created_at: "2026-01-01",
+  cccd: null,
   ...overrides,
 });
 
@@ -65,12 +69,15 @@ describe("GET /api/patients", () => {
 describe("POST /api/patients", () => {
   it("returns 201 + patient for valid data", async () => {
     const app = mountRoute("/api/patients", patientsRoutes);
-    const createdRow = patientRow({ name: "Test Patient" });
+    const createdRow = patientRow({ name: "Test Patient", cccd: "012345678912" });
     const res = await authedRequestWithDB(
       app,
       "POST",
       "/api/patients",
-      new Map([["FROM patients", [createdRow]]]),
+      new Map([
+        ["FROM branches", [{ id: "test-branch", tenant_id: "test-tenant" }]],
+        ["FROM patients", [createdRow]],
+      ]),
       {
         body: {
           branch_id: "test-branch",
@@ -78,13 +85,15 @@ describe("POST /api/patients", () => {
           date_of_birth: "1990-01-01",
           gender: "M",
           phone: "0901234567",
+          cccd: "012345678912",
         },
       },
     );
     expect(res.status).toBe(201);
-    const body = (await res.json()) as { id: string; name: string };
+    const body = (await res.json()) as { id: string; name: string; cccd?: string };
     expect(body.id).toBe("patient-1");
     expect(body.name).toBe("Test Patient");
+    expect(body.cccd).toBe("012345678912");
   });
 
   it("returns 400 for missing required field", async () => {
@@ -124,6 +133,27 @@ describe("POST /api/patients", () => {
           date_of_birth: "1990-13-45",
           gender: "M",
           phone: "0901234567",
+        },
+      },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for CCCD that is not 12 digits", async () => {
+    const app = mountRoute("/api/patients", patientsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/patients",
+      new Map(),
+      {
+        body: {
+          branch_id: "test-branch",
+          name: "Test",
+          date_of_birth: "1990-01-01",
+          gender: "M",
+          phone: "0901234567",
+          cccd: "0123456789",
         },
       },
     );
@@ -230,6 +260,71 @@ describe("GET /api/patients/:id/alerts", () => {
   });
 });
 
+describe("patient note history", () => {
+  it("lists notes with their author", async () => {
+    const app = mountRoute("/api/patients", patientNotesRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "GET",
+      "/api/patients/patient-1/notes",
+      new Map([
+        ["FROM patients", [patientRow()]],
+        ["FROM patient_notes", [{
+          id: "note-1",
+          tenant_id: "test-tenant",
+          patient_id: "patient-1",
+          user_id: "user-1",
+          user_name: "Dr. Nguyen",
+          content: "Theo dõi sau điều trị.",
+          created_at: "2026-01-01T08:00:00Z",
+        }]],
+      ]),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { items: { content: string; user_name: string }[] };
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0]).toMatchObject({
+      content: "Theo dõi sau điều trị.",
+      user_name: "Dr. Nguyen",
+    });
+  });
+
+  it("creates a note using the authenticated user as its author", async () => {
+    const app = mountRoute("/api/patients", patientNotesRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/patients/patient-1/notes",
+      new Map([
+        ["FROM patients", [patientRow()]],
+        ["FROM patient_notes", [{
+          id: "note-1",
+          tenant_id: "test-tenant",
+          patient_id: "patient-1",
+          user_id: "test-user",
+          user_name: "Test User",
+          content: "Da hen tai kham.",
+          created_at: "2026-01-01T08:00:00Z",
+        }]],
+      ]),
+      { body: { content: "Da hen tai kham." } },
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { user_id: string; content: string };
+    expect(body.user_id).toBe("test-user");
+    expect(body.content).toBe("Da hen tai kham.");
+  });
+
+  it("rejects note creation without write_patients permission", async () => {
+    const app = mountRoute("/api/patients", patientNotesRoutes);
+    const res = await authedRequest(app, "POST", "/api/patients/patient-1/notes", {
+      permissions: ["read_patients"],
+      body: { content: "Khong duoc phep" },
+    });
+    expect(res.status).toBe(403);
+  });
+});
+
 describe("DELETE /api/patients/:id", () => {
   it("returns 200 for successful delete", async () => {
     const app = mountRoute("/api/patients", patientsRoutes);
@@ -242,5 +337,25 @@ describe("DELETE /api/patients/:id", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { ok: boolean };
     expect(body.ok).toBe(true);
+  });
+
+  it("deletes clinical records before deleting the patient", async () => {
+    const db = createMockD1();
+    const ok = await createPatientsRepository(db as unknown as D1Database).delete("test-tenant", "patient-1");
+
+    expect(ok).toBe(true);
+    expect(db.__calls.map((call) => call.sql)).toEqual([
+      "DELETE FROM appointments WHERE tenant_id = ? AND patient_id = ?",
+      "DELETE FROM payments WHERE tenant_id = ? AND patient_id = ?",
+      "DELETE FROM treatment_plan_items WHERE tenant_id = ? AND treatment_plan_id IN (SELECT id FROM treatment_plans WHERE tenant_id = ? AND patient_id = ?)",
+      "DELETE FROM treatment_plans WHERE tenant_id = ? AND patient_id = ?",
+       "DELETE FROM patient_images WHERE tenant_id = ? AND patient_id = ?",
+       "DELETE FROM medical_alerts WHERE tenant_id = ? AND patient_id = ?",
+       "DELETE FROM patient_notes WHERE tenant_id = ? AND patient_id = ?",
+       "DELETE FROM clinical_findings WHERE tenant_id = ? AND visit_id IN (SELECT id FROM visits WHERE tenant_id = ? AND patient_id = ?)",
+      "DELETE FROM visits WHERE tenant_id = ? AND patient_id = ?",
+      "DELETE FROM patients WHERE tenant_id = ? AND id = ?",
+    ]);
+    expect(db.__calls.at(-1)?.binds).toEqual(["test-tenant", "patient-1"]);
   });
 });

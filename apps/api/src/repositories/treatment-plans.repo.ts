@@ -75,20 +75,26 @@ export function createTreatmentPlansRepository(db: D1Database): TreatmentPlansRe
     },
 
     async recomputeTotal(tenantId, id) {
-      const row = (await db
-        .prepare(
-          `SELECT COALESCE(SUM(unit_cost), 0) AS total
-           FROM treatment_plan_items
-           WHERE tenant_id = ? AND treatment_plan_id = ?`,
-        )
-        .bind(tenantId, id)
-        .first()) as { total: number } | null;
-      const total = Number(row?.total ?? 0);
+      // Keep SUM and UPDATE in one SQL statement. The former read-then-write
+      // implementation allowed a slower concurrent mutation to overwrite a
+      // newer total with a stale value.
       await db
-        .prepare("UPDATE treatment_plans SET total_cost = ? WHERE tenant_id = ? AND id = ?")
-        .bind(total, tenantId, id)
+        .prepare(
+          `UPDATE treatment_plans
+           SET total_cost = (
+             SELECT COALESCE(SUM(unit_cost), 0)
+             FROM treatment_plan_items
+             WHERE tenant_id = ? AND treatment_plan_id = ?
+           )
+           WHERE tenant_id = ? AND id = ?`,
+        )
+        .bind(tenantId, id, tenantId, id)
         .run();
-      return total;
+      const row = await db
+        .prepare("SELECT total_cost FROM treatment_plans WHERE tenant_id = ? AND id = ?")
+        .bind(tenantId, id)
+        .first<{ total_cost: number }>();
+      return Number(row?.total_cost ?? 0);
     },
 
     async delete(tenantId, id) {

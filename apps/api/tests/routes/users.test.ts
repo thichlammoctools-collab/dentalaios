@@ -54,7 +54,11 @@ describe("POST /api/users", () => {
       app,
       "POST",
       "/api/users",
-      new Map([["FROM users", [createdRow]]]),
+      new Map([
+        ["FROM roles", [{ id: "role-1", tenant_id: "test-tenant" }]],
+        ["FROM branches", [{ id: "branch-1", tenant_id: "test-tenant" }]],
+        ["FROM users", [createdRow]],
+      ]),
       {
         permissions: ["manage_users"],
         body: {
@@ -117,7 +121,10 @@ describe("POST /api/users", () => {
       app,
       "POST",
       "/api/users",
-      new Map(), // empty mock — UNIQUE violation will be simulated by... hmm
+      new Map([
+        ["FROM roles", [{ id: "role-1", tenant_id: "test-tenant" }]],
+        ["FROM branches", [{ id: "branch-1", tenant_id: "test-tenant" }]],
+      ]), // empty mock — UNIQUE violation will be simulated by... hmm
       {
         permissions: ["manage_users"],
         body: {

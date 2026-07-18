@@ -41,7 +41,11 @@ describe("POST /api/treatment-plans", () => {
       app,
       "POST",
       "/api/treatment-plans",
-      new Map([["FROM treatment_plans", [planRow()]]]),
+      new Map([
+        ["FROM visits", [{ id: "visit-1", tenant_id: "test-tenant", patient_id: "patient-1" }]],
+        ["FROM patients", [{ id: "patient-1", tenant_id: "test-tenant" }]],
+        ["FROM treatment_plans", [planRow()]],
+      ]),
       {
         body: {
           visit_id: "visit-1",
@@ -193,8 +197,6 @@ describe("POST /api/treatment-plans/:id/items", () => {
         body: {
           tooth_number: 11,
           procedure: "filling",
-          description: "test",
-          unit_cost: 100,
           description: "test",
           unit_cost: 100,
         },

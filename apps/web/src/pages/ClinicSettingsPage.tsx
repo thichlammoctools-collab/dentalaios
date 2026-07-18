@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiGet, apiPost, apiPatch, apiDelete, ApiError } from "@/lib/api";
+import { apiGet, apiPost, apiPatch, apiPut, apiDelete, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import { BranchForm } from "@/components/BranchForm";
@@ -43,6 +43,10 @@ export function ClinicSettingsPage() {
   const [testingLark, setTestingLark] = useState(false);
   const [deletingLark, setDeletingLark] = useState(false);
 
+  // Payment code prefix
+  const [paymentPrefix, setPaymentPrefix] = useState("TT");
+  const [savingPrefix, setSavingPrefix] = useState(false);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -50,13 +54,15 @@ export function ClinicSettingsPage() {
   async function loadData() {
     setLoading(true);
     try {
-      const [clinicRes, larkRes] = await Promise.all([
+      const [clinicRes, larkRes, prefixRes] = await Promise.all([
         apiGet<ClinicData>("/api/clinic"),
         apiGet<{ config: LarkConfig | null }>(`/api/clinic/lark`),
+        apiGet<{ prefix: string }>(`/api/clinic/payment-prefix`),
       ]);
       setData(clinicRes);
       setClinicName(clinicRes.tenant.name);
       setLarkConfig(larkRes.config);
+      setPaymentPrefix(prefixRes.prefix);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi tải dữ liệu");
     } finally {
@@ -183,6 +189,24 @@ export function ClinicSettingsPage() {
     }
   }
 
+  async function savePaymentPrefix() {
+    const trimmed = paymentPrefix.trim().toUpperCase();
+    if (!/^[A-Z0-9]{2,8}$/.test(trimmed)) {
+      toast.error("Prefix phải gồm 2–8 ký tự chữ in hoa hoặc số, không dấu");
+      return;
+    }
+    setSavingPrefix(true);
+    try {
+      const res = await apiPut<{ prefix: string }>("/api/clinic/payment-prefix", { prefix: trimmed });
+      setPaymentPrefix(res.prefix);
+      toast.success(`Đã lưu prefix: ${res.prefix}`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi lưu prefix");
+    } finally {
+      setSavingPrefix(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48">
@@ -196,7 +220,7 @@ export function ClinicSettingsPage() {
   const isAdmin = session?.role?.name === "admin";
 
   return (
-    <div className="space-y-8 px-6 py-6 max-w-2xl">
+    <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Cài đặt phòng khám</h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -332,6 +356,44 @@ export function ClinicSettingsPage() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Payment code prefix */}
+      <section className="space-y-4">
+        <h2 className="text-base font-semibold">Mã thanh toán</h2>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-sm text-muted-foreground mb-3">
+            Prefix phía trước mã thanh toán. Mỗi thanh toán sẽ được hệ thống tự động cấp mã dạng{" "}
+            <code className="bg-muted px-1 rounded font-mono">{paymentPrefix}-YYYYMMDD-0001</code>.
+          </p>
+          <div className="flex items-center gap-2">
+            <label htmlFor="payment-prefix" className="text-sm font-medium shrink-0">
+              Prefix
+            </label>
+            <input
+              id="payment-prefix"
+              type="text"
+              value={paymentPrefix}
+              onChange={(e) => setPaymentPrefix(e.target.value.toUpperCase())}
+              disabled={!isAdmin}
+              maxLength={8}
+              className="flex-1 min-w-0 rounded-md border border-input bg-background px-3 py-1.5 font-mono text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/40 disabled:opacity-60"
+              placeholder="VD: TT, PK1, ABC"
+            />
+            {isAdmin && (
+              <button
+                onClick={savePaymentPrefix}
+                disabled={savingPrefix || !/^[A-Z0-9]{2,8}$/.test(paymentPrefix.trim())}
+                className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 shrink-0"
+              >
+                {savingPrefix ? "..." : "Lưu"}
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Chỉ chữ in hoa và số, 2–8 ký tự. Mã đã phát hành giữ nguyên khi đổi prefix.
+          </p>
         </div>
       </section>
 

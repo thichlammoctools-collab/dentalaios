@@ -44,6 +44,7 @@ export const PERMISSIONS = {
   MANAGE_USERS: "manage_users",
   MANAGE_ROLES: "manage_roles",
   MANAGE_PATIENTS: "manage_patients",
+  MANAGE_SCHEDULE: "manage_schedule",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -86,9 +87,37 @@ export const ERROR_CODES = {
   CONFLICT: "conflict",
   RATE_LIMITED: "rate_limited",
   INTERNAL_ERROR: "internal_error",
+  INVALID_REFERENCE: "invalid_reference",
 } as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];
+
+/** Marketing channel options — "Biết phòng khám qua kênh nào?" */
+export const MARKETING_SOURCES = [
+  "bang_hieu",
+  "facebook",
+  "youtube",
+  "tiktok",
+  "zalo",
+  "website",
+  "google_map",
+  "gioi_thieu",
+  "khac",
+] as const;
+
+export type MarketingSource = (typeof MARKETING_SOURCES)[number];
+
+export const MARKETING_SOURCE_LABELS: Record<MarketingSource, string> = {
+  bang_hieu: "Bảng hiệu",
+  facebook: "Facebook",
+  youtube: "Youtube",
+  tiktok: "Tiktok",
+  zalo: "Zalo",
+  website: "Website",
+  google_map: "Google Map",
+  gioi_thieu: "Giới thiệu",
+  khac: "Khác",
+};
 
 /** Valid FDI tooth numbers — permanent (11–48) and primary (51–85). */
 export function isValidFdiTooth(n: number): boolean {

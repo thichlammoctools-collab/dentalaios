@@ -51,7 +51,8 @@ export function TodayPage() {
     return () => { mounted = false; };
   }, []);
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   const todayVisits = visits.filter((v) => v.date?.slice(0, 10) === todayStr);
   const pendingPlans = plans.filter((p) => p.status === "draft");
 

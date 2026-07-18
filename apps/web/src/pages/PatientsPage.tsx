@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { PatientForm } from "@/components/PatientForm";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { apiDelete, apiGet, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
@@ -160,14 +161,12 @@ export function PatientsPage() {
                     patients.map((p) => (
                       <TableRow key={p.id} className="group">
                         <TableCell>
-                          <Link
-                            to={`/patients/${p.id}`}
-                            className="flex flex-col gap-0.5"
-                          >
-                            <span className="font-medium text-primary hover:underline">
-                              {p.name}
+                          <Link to={`/patients/${p.id}`} className="flex items-center gap-2.5">
+                            <ProfileAvatar subject="patients" entityId={p.id} name={p.name} avatarFileId={p.avatar_file_id} size="sm" />
+                            <span className="flex flex-col gap-0.5">
+                              <span className="font-medium text-primary hover:underline">{p.name}</span>
+                              <span className="text-xs text-muted-foreground sm:hidden">{p.phone}</span>
                             </span>
-                            <span className="text-xs text-muted-foreground sm:hidden">{p.phone}</span>
                           </Link>
                         </TableCell>
                         <TableCell className="hidden sm:table-cell font-mono text-sm">{p.phone}</TableCell>

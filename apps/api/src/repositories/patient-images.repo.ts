@@ -10,7 +10,7 @@ export interface PatientImagesRepository {
   listByPatient(tenantId: string, patientId: string, opts?: Pagination): Promise<PatientImage[]>;
   listByVisit(tenantId: string, visitId: string, opts?: Pagination): Promise<PatientImage[]>;
   getById(tenantId: string, id: string): Promise<PatientImage | null>;
-  create(tenantId: string, data: Omit<PatientImage, "created_at">): Promise<PatientImage>;
+  create(tenantId: string, data: Omit<PatientImage, "id" | "tenant_id" | "created_at">): Promise<PatientImage>;
   delete(tenantId: string, id: string): Promise<boolean>;
 }
 

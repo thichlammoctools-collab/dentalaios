@@ -2,16 +2,19 @@
  * Patient images routes:
  *   GET  /api/patient-images?patient_id=xxx          — list by patient
  *   GET  /api/patient-images/visit/:visitId          — list by visit
- *   POST /api/patient-images/presign                 — get presigned upload URL
- *   POST /api/patient-images                         — record upload metadata
- *   GET  /api/patient-images/:id/url                 — get download URL for an image
+ *   POST /api/patient-images/file                    — upload image through Worker
+ *   GET  /api/patient-images/:id/file                — stream an image through Worker
  *   DELETE /api/patient-images/:id                    — delete image + R2 file
  */
 
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { patientImageCreateSchema } from "@shared/validation";
+import { z } from "zod";
 import { PERMISSIONS } from "@shared/constants";
+import {
+  patientImagePresignSchema,
+  patientImageCreateSchema,
+} from "@shared/validation";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
 import { requirePermission } from "../middleware/rbac";
@@ -19,6 +22,7 @@ import { auditLog } from "../middleware/audit";
 import type { AuthContext } from "../middleware/auth";
 import { patientImagesService } from "../services/patient-images.service";
 import { filesService } from "../services/files.service";
+import { buildPrivateFileHeaders } from "../lib/file-response";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -48,77 +52,107 @@ router.get(
   },
 );
 
-// POST /api/patient-images/presign
+const imageUploadQuerySchema = z.object({
+  patient_id: z.string().min(1),
+  visit_id: z.string().min(1).optional(),
+  image_type: z.enum(["cbct", "scan_3d", "dicom", "photo_before", "photo_after", "xray", "intraoral", "other"]),
+  description: z.string().max(500).optional(),
+  original_size: z.coerce.number().int().positive(),
+});
+
+// POST /api/patient-images/presign — get presigned upload URLs (main + thumb)
 router.post(
   "/presign",
   requireAuth(),
-  requirePermission(PERMISSIONS.READ_PATIENTS),
-  zValidator("json", patientImageCreateSchema.pick({
-    filename: true,
-    content_type: true,
-    size: true,
-  })),
+  requirePermission(PERMISSIONS.WRITE_PATIENTS),
+  zValidator(
+    "json",
+    patientImagePresignSchema.extend({
+      // Thumb is generated client-side at fixed dimensions — small upper bound.
+      thumb_size: z.number().int().positive().max(2 * 1024 * 1024).optional(),
+    }),
+  ),
   async (c) => {
     const jwt = getJwt(c);
-    const body = c.req.valid("json");
-
-    const main = await patientImagesService.presignUpload(c.env, jwt.tenant_id, {
-      filename: body.filename,
-      content_type: body.content_type,
-      size: body.size,
-      isThumb: false,
-    });
-
-    // Also presign thumbnail version (smaller, same content_type)
-    const thumb = await patientImagesService.presignUpload(c.env, jwt.tenant_id, {
-      filename: `thumb_${body.filename}`,
-      content_type: body.content_type,
-      size: Math.min(body.size, 500_000), // max 500KB for thumb
-      isThumb: true,
-    });
-
+    const input = c.req.valid("json");
+    const thumbSize = input.thumb_size ?? 100 * 1024;
+    const [main, thumb] = await Promise.all([
+      patientImagesService.presignUpload(
+        c.env,
+        jwt.tenant_id,
+        { filename: input.filename, content_type: input.content_type, size: input.size, isThumb: false },
+        { userId: jwt.sub },
+      ),
+      patientImagesService.presignUpload(
+        c.env,
+        jwt.tenant_id,
+        { filename: `thumb-${input.filename}`, content_type: input.content_type, size: thumbSize, isThumb: true },
+        { userId: jwt.sub },
+      ),
+    ]);
     return c.json({
       file_id: main.fileId,
       r2_key: main.r2_key,
       upload_url: main.uploadUrl,
       expires_in: main.expiresIn,
-      thumb_key: thumb.r2_key,
+      thumb_key: thumb.fileId,
       thumb_upload_url: thumb.uploadUrl,
     });
   },
 );
 
-// POST /api/patient-images
+// POST /api/patient-images — record metadata after client uploaded to R2
 router.post(
   "/",
   requireAuth(),
-  requirePermission(PERMISSIONS.READ_PATIENTS),
+  requirePermission(PERMISSIONS.WRITE_PATIENTS),
   auditLog("create", "patient_image"),
   zValidator("json", patientImageCreateSchema),
   async (c) => {
     const jwt = getJwt(c);
-    const body = c.req.valid("json");
-    const created = await patientImagesService.create(
-      c.env.DB,
-      c.env,
-      jwt.tenant_id,
-      jwt.user_id,
-      body,
-    );
+    const input = c.req.valid("json");
+    const created = await patientImagesService.create(c.env.DB, c.env, jwt.tenant_id, jwt.sub, input);
     return c.json(created, 201);
   },
 );
 
-// GET /api/patient-images/:id/url — get presigned download URL
+// POST /api/patient-images/file — upload directly through the Worker R2 binding
+router.post(
+  "/file",
+  requireAuth(),
+  requirePermission(PERMISSIONS.WRITE_PATIENTS),
+  auditLog("create", "patient_image"),
+  zValidator("query", imageUploadQuerySchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const input = c.req.valid("query");
+    const contentType = c.req.header("content-type")?.split(";", 1)[0] ?? "application/octet-stream";
+    const filename = c.req.header("x-image-filename") ?? "image";
+    const created = await patientImagesService.upload(c.env.DB, c.env, jwt.tenant_id, jwt.sub, {
+      ...input,
+      filename,
+      content_type: contentType,
+      body: await c.req.raw.arrayBuffer(),
+    });
+    return c.json(created, 201);
+  },
+);
+
+// GET /api/patient-images/:id/file — stream private R2 object through Worker
 router.get(
-  "/:id/url",
+  "/:id/file",
   requireAuth(),
   requirePermission(PERMISSIONS.READ_PATIENTS),
   async (c) => {
     const jwt = getJwt(c);
     const img = await patientImagesService.getById(c.env.DB, jwt.tenant_id, c.req.param("id"));
-    const url = await filesService.getPresignedUrl(c.env, jwt.tenant_id, img.file_id);
-    return c.json({ url });
+    const fileObj = await filesService.getById(c.env.DB, jwt.tenant_id, img.file_id);
+    if (!fileObj) return c.json({ error: "File not found", code: "not_found" }, 404);
+    const object = await filesService.download(c.env, fileObj.r2_key);
+    if (!object) return c.json({ error: "File missing in storage", code: "not_found" }, 404);
+    return new Response(object.body, {
+      headers: buildPrivateFileHeaders(fileObj.filename, fileObj.content_type, object.size, object.httpEtag),
+    });
   },
 );
 

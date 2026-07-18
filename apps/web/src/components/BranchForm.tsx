@@ -2,11 +2,12 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { apiPost, apiPatch, ApiError } from "@/lib/api";
+import { apiGet, apiPost, apiPatch, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
-import type { Branch } from "@shared/types";
+import type { Branch, UserWithDetails } from "@shared/types";
 import { branchCreateSchema, branchUpdateSchema } from "@shared/validation";
 
 interface BranchFormProps {
@@ -25,6 +26,7 @@ export function BranchForm({ open, onOpenChange, branch, onSaved }: BranchFormPr
   const [email, setEmail] = useState("");
   const [managerName, setManagerName] = useState("");
   const [openingDate, setOpeningDate] = useState("");
+  const [staff, setStaff] = useState<UserWithDetails[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -35,6 +37,10 @@ export function BranchForm({ open, onOpenChange, branch, onSaved }: BranchFormPr
       setEmail(branch?.email ?? "");
       setManagerName(branch?.manager_name ?? "");
       setOpeningDate(branch?.opening_date ?? "");
+      // Load staff list for manager dropdown
+      apiGet<{ items: UserWithDetails[] }>("/api/users?limit=200")
+        .then((res) => setStaff(res.items))
+        .catch(() => setStaff([]));
     }
   }, [open, branch]);
 
@@ -145,12 +151,21 @@ export function BranchForm({ open, onOpenChange, branch, onSaved }: BranchFormPr
 
           <div className="grid gap-1.5">
             <Label htmlFor="bf-manager">Người phụ trách</Label>
-            <Input
+            <Select
               id="bf-manager"
               value={managerName}
               onChange={(e) => setManagerName(e.target.value)}
-              placeholder="VD: Nguyễn Văn A"
-            />
+            >
+              <option value="">— Chọn nhân viên —</option>
+              {staff.map((u) => (
+                <option key={u.id} value={u.name}>
+                  {u.name} {u.role_name ? `(${u.role_name})` : ""}
+                </option>
+              ))}
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Chọn từ danh sách nhân viên. Tự động sync khi nhân viên đổi tên.
+            </p>
           </div>
 
           <div className="grid gap-1.5">

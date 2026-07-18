@@ -53,7 +53,7 @@ export const appointmentService = {
       throw new ConflictError("Bác sĩ đã có lịch hẹn trong khung giờ này");
     }
 
-    return repo.create(tenantId, {
+    const created = await repo.create(tenantId, {
       branch_id: branchId,
       clinician_id: data.clinician_id,
       patient_id: data.patient_id,
@@ -66,6 +66,10 @@ export const appointmentService = {
       source: data.source ?? "manual",
       created_by: createdByUserId,
     });
+    if (!created) {
+      throw new ConflictError("Bác sĩ đã có lịch hẹn trong khung giờ này");
+    }
+    return created;
   },
 
   async update(
@@ -105,7 +109,16 @@ export const appointmentService = {
     }
 
     const repo = createAppointmentsRepository(db);
-    const updated = await repo.update(tenantId, id, data);
+    const updated = await repo.update(tenantId, id, {
+      scheduled_at: data.scheduled_at,
+      duration_min: data.duration_min,
+      clinician_id: data.clinician_id,
+      assistant_id: data.assistant_id ?? undefined,
+      status: data.status,
+      procedure: data.procedure,
+      notes: data.notes,
+      cancelled_reason: data.cancelled_reason,
+    });
     if (!updated) throw new NotFoundError("Appointment not found");
     return updated;
   },

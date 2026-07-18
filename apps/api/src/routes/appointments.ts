@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { appointmentCreateSchema, appointmentUpdateSchema } from "@shared/validation";
+import { appointmentCreateSchema, appointmentUpdateSchema, appointmentSlotQuerySchema } from "@shared/validation";
 import { PERMISSIONS } from "@shared/constants";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
@@ -51,6 +51,24 @@ router.post(
   },
 );
 
+// GET /api/appointments/slots — busy slots for a doctor on a date
+router.get(
+  "/slots",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  zValidator("query", appointmentSlotQuerySchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const { doctor_id, date } = c.req.valid("query");
+    const items = await appointmentsService.getBusySlots(
+      c.env.DB,
+      jwt.tenant_id,
+      doctor_id,
+      date,
+    );
+    return c.json({ items, total: items.length });
+  },
+);
+
 // GET /api/appointments/:id
 router.get(
   "/:id",
@@ -84,7 +102,12 @@ router.delete(
   auditLog("cancel", "appointment"),
   async (c) => {
     const jwt = getJwt(c);
-    await appointmentsService.cancel(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    let reason: string | undefined;
+    try {
+      const body = await c.req.json<{ reason?: string }>();
+      reason = body.reason || undefined;
+    } catch { /* body is optional */ }
+    await appointmentsService.cancel(c.env.DB, jwt.tenant_id, c.req.param("id"), reason);
     return c.json({ ok: true }, 200);
   },
 );

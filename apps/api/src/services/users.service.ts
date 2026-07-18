@@ -3,8 +3,10 @@ import type { User } from "@shared/types";
 import type { UserWithDetails } from "../repositories/users.repo";
 import { createUsersRepository } from "../repositories/users.repo";
 import { hashPassword } from "../lib/password";
-import { ConflictError } from "../lib/errors";
-import { isUniqueConstraintError } from "../lib/db-errors";
+import { AppError, ConflictError } from "../lib/errors";
+import { isUniqueConstraintError, isForeignKeyError } from "../lib/db-errors";
+import { ERROR_CODES } from "@shared/constants";
+import { assertAllInTenant } from "../lib/tenant-scope";
 
 export const usersService = {
   list(db: D1Database, tenantId: string): Promise<User[]> {
@@ -22,6 +24,12 @@ export const usersService = {
       branch_id: string;
     },
   ): Promise<User> {
+    // FK constraints only validate existence. Explicit tenant checks prevent a
+    // manager in tenant A from assigning a role or branch from tenant B.
+    await assertAllInTenant(db, tenantId, [
+      { table: "roles", id: data.role_id },
+      { table: "branches", id: data.branch_id },
+    ]);
     const password_hash = await hashPassword(data.password);
     try {
       return await createUsersRepository(db).create(tenantId, {
@@ -36,6 +44,9 @@ export const usersService = {
       if (isUniqueConstraintError(err)) {
         throw new ConflictError("Email đã tồn tại");
       }
+      if (isForeignKeyError(err)) {
+        throw new AppError("Role hoặc chi nhánh không hợp lệ", 400, ERROR_CODES.INVALID_REFERENCE);
+      }
       throw err;
     }
   },
@@ -46,6 +57,10 @@ export const usersService = {
     id: string,
     data: { name?: string; role_id?: string; branch_id?: string; password?: string; is_active?: boolean },
   ): Promise<User | null> {
+    await assertAllInTenant(db, tenantId, [
+      { table: "roles", id: data.role_id ?? undefined },
+      { table: "branches", id: data.branch_id ?? undefined },
+    ]);
     const repo = createUsersRepository(db);
     const patch: Parameters<typeof repo.update>[2] = {};
     if (data.name !== undefined) patch.name = data.name;
@@ -58,6 +73,9 @@ export const usersService = {
     } catch (err) {
       if (isUniqueConstraintError(err)) {
         throw new ConflictError("Email đã tồn tại");
+      }
+      if (isForeignKeyError(err)) {
+        throw new AppError("Role hoặc chi nhánh không hợp lệ", 400, ERROR_CODES.INVALID_REFERENCE);
       }
       throw err;
     }

@@ -21,7 +21,7 @@ import { createTreatmentItemsRepository } from "../../src/repositories/treatment
 import { createPaymentsRepository } from "../../src/repositories/payments.repo";
 import { createMedicalAlertsRepository } from "../../src/repositories/medical-alerts.repo";
 
-const SQL_WITH_TENANT = /WHERE.*tenant_id\s*=\s*\?/i;
+const SQL_WITH_TENANT = /WHERE\s+(?:[\w]+\.)?tenant_id\s*=\s*\?/i;
 
 describe("Tenant isolation: patients.repo", () => {
   let db: MockD1;
@@ -53,7 +53,7 @@ describe("Tenant isolation: patients.repo", () => {
   it("getById() scopes by tenant_id", async () => {
     await createPatientsRepository(db as any).getById(TENANT_A, PATIENT_A1);
     const calls = db.__sqlContaining("FROM patients");
-    expect(calls[0].sql).toMatch(/WHERE\s+tenant_id\s+=\s+\?\s+AND\s+id\s+=\s+\?/i);
+    expect(calls[0].sql).toMatch(/WHERE\s+(?:[\w]+\.)?tenant_id\s*=\s*\?\s+AND\s+(?:[\w]+\.)?id\s*=\s*\?/is);
     expect(calls[0].binds[0]).toBe(TENANT_A);
     expect(calls[0].binds[1]).toBe(PATIENT_A1);
   });
@@ -130,7 +130,7 @@ describe("Tenant isolation: visits.repo", () => {
   it("list(patientId) maintains tenant scope", async () => {
     await createVisitsRepository(db as any).list(TENANT_A, { patientId: PATIENT_A1 });
     const calls = db.__sqlContaining("FROM visits");
-    expect(calls[0].sql).toMatch(/tenant_id = \? AND patient_id = \?/);
+    expect(calls[0].sql).toMatch(/(?:[\w]+\.)?tenant_id\s*=\s*\?\s+AND\s+(?:[\w]+\.)?patient_id\s*=\s*\?/is);
     expect(calls[0].binds[0]).toBe(TENANT_A);
     expect(calls[0].binds[1]).toBe(PATIENT_A1);
   });
@@ -150,7 +150,7 @@ describe("Tenant isolation: visits.repo", () => {
 
   it("getById() scopes by tenant_id", async () => {
     await createVisitsRepository(db as any).getById(TENANT_A, "visit-1");
-    expect(db.__sqlContaining("FROM visits")[0].sql).toMatch(/tenant_id = \? AND id = \?/);
+    expect(db.__sqlContaining("FROM visits")[0].sql).toMatch(/(?:[\w]+\.)?tenant_id\s*=\s*\?\s+AND\s+(?:[\w]+\.)?id\s*=\s*\?/is);
   });
 
   it("update() scopes by tenant_id", async () => {

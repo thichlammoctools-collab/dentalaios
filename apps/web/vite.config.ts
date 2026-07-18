@@ -3,9 +3,8 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
-// Vite dev server proxies /api → Worker dev (wrangler dev runs on :8788
-// because port 8787 is held by another instance on this machine).
-// so the browser sees everything as same-origin while we code.
+// Vite dev server proxies /api to this workspace's Worker. Port 8787 belongs
+// to another local Worker on this machine.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {

@@ -55,12 +55,18 @@ function addDays(date: Date, n: number) {
 }
 
 function isoDate(date: Date) {
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function isoDatetime(dateStr: string, hour: number, min: number): string {
-  const d = new Date(dateStr + "T00:00:00Z");
-  d.setUTCHours(hour, min, 0, 0);
+  // Form values represent clinic-local wall time. Constructing with a `Z`
+  // suffix treats 09:00 as UTC (16:00 in Vietnam), so use local components
+  // and serialize the resulting instant instead.
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const d = new Date(year, month - 1, day, hour, min, 0, 0);
   return d.toISOString();
 }
 
@@ -209,7 +215,7 @@ export function CalendarPage() {
       patient_id: appt.patient_id,
       clinician_id: appt.clinician_id,
       scheduled_date: isoDate(d),
-      scheduled_time: `${String(d.getUTCHours()).padStart(2,"0")}:${String(d.getUTCMinutes()).padStart(2,"0")}`,
+      scheduled_time: `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`,
       duration_min: appt.duration_min,
       procedure: appt.procedure ?? "",
       notes: appt.notes ?? "",

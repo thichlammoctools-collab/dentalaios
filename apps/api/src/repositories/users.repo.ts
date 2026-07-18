@@ -26,6 +26,7 @@ export interface UserWithDetails {
   role_id: string;
   email: string;
   name: string;
+  avatar_file_id?: string;
   is_active: boolean;
   created_at: string;
   role_name: string;
@@ -43,7 +44,7 @@ export interface UsersRepository {
     data: Omit<User, "id" | "tenant_id" | "created_at"> & { password_hash: string },
     isActive?: boolean,
   ): Promise<User>;
-  update(tenantId: string, id: string, data: Partial<Pick<User, "name" | "role_id" | "branch_id" | "is_active">> & { password_hash?: string }): Promise<User | null>;
+  update(tenantId: string, id: string, data: Partial<Pick<User, "name" | "role_id" | "branch_id" | "is_active">> & { avatar_file_id?: string | null; password_hash?: string }): Promise<User | null>;
   deactivate(tenantId: string, id: string): Promise<boolean>;
 }
 
@@ -57,7 +58,7 @@ export function createUsersRepository(db: D1Database): UsersRepository {
         .prepare(
           `SELECT
              u.id AS u_id, u.tenant_id AS u_tenant_id, u.branch_id AS u_branch_id,
-             u.role_id AS u_role_id, u.email AS u_email, u.name AS u_name,
+             u.role_id AS u_role_id, u.email AS u_email, u.name AS u_name, u.avatar_file_id AS u_avatar_file_id,
              u.is_active AS u_is_active, u.password_hash AS u_password_hash, u.created_at AS u_created_at,
              r.id AS r_id, r.tenant_id AS r_tenant_id, r.name AS r_name,
              r.permissions AS r_permissions, r.created_at AS r_created_at,
@@ -83,7 +84,7 @@ export function createUsersRepository(db: D1Database): UsersRepository {
         .prepare(
           `SELECT
              u.id AS u_id, u.tenant_id AS u_tenant_id, u.branch_id AS u_branch_id,
-             u.role_id AS u_role_id, u.email AS u_email, u.name AS u_name,
+             u.role_id AS u_role_id, u.email AS u_email, u.name AS u_name, u.avatar_file_id AS u_avatar_file_id,
              u.is_active AS u_is_active, u.password_hash AS u_password_hash, u.created_at AS u_created_at,
              r.id AS r_id, r.tenant_id AS r_tenant_id, r.name AS r_name,
              r.permissions AS r_permissions, r.created_at AS r_created_at,
@@ -125,7 +126,7 @@ export function createUsersRepository(db: D1Database): UsersRepository {
     async listByBranch(tenantId, branchId) {
       const result = await db
         .prepare(
-          `SELECT u.id, u.tenant_id, u.branch_id, u.role_id, u.email, u.name,
+          `SELECT u.id, u.tenant_id, u.branch_id, u.role_id, u.email, u.name, u.avatar_file_id,
                   u.is_active, u.created_at,
                   r.name AS role_name, b.name AS branch_name
            FROM users u
@@ -143,6 +144,7 @@ export function createUsersRepository(db: D1Database): UsersRepository {
         role_id: row.role_id as string,
         email: row.email as string,
         name: row.name as string,
+        avatar_file_id: (row.avatar_file_id as string | null) ?? undefined,
         is_active: (row.is_active as number) === 1,
         created_at: row.created_at as string,
         role_name: row.role_name as string,
@@ -192,6 +194,10 @@ export function createUsersRepository(db: D1Database): UsersRepository {
         fields.push("branch_id = ?");
         binds.push(data.branch_id);
       }
+      if (data.avatar_file_id !== undefined) {
+        fields.push("avatar_file_id = ?");
+        binds.push(data.avatar_file_id);
+      }
       if (data.is_active !== undefined) {
         fields.push("is_active = ?");
         binds.push(data.is_active ? 1 : 0);
@@ -227,6 +233,7 @@ function mapUser(row: D1Row): User {
     role_id: row.role_id as string,
     email: row.email as string,
     name: row.name as string,
+    avatar_file_id: (row.avatar_file_id as string | null) ?? undefined,
     is_active: (row.is_active as number) === 1,
     created_at: row.created_at as string,
   };
@@ -240,6 +247,7 @@ function mapUserWithContext(row: D1Row): UserWithContext {
     role_id: row.u_role_id as string,
     email: row.u_email as string,
     name: row.u_name as string,
+    avatar_file_id: (row.u_avatar_file_id as string | null) ?? undefined,
     is_active: (row.u_is_active as number) === 1,
     created_at: row.u_created_at as string,
   };

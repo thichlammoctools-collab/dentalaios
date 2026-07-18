@@ -12,7 +12,7 @@
  */
 
 import { z } from "zod";
-import { isValidFdiTooth } from "../constants";
+import { isValidFdiTooth, PERMISSIONS } from "../constants";
 
 /** Non-empty string (after trim) with reasonable max length */
 const nonEmpty = (max: number) =>
@@ -114,7 +114,7 @@ export const patientCreateSchema = z.object({
   family_phone: z.string().max(20).transform((s) => (s === "" ? undefined : s)).optional(),
   family_relation: optionalText(50),
   // Marketing source
-  marketing_source: optionalText(200),
+  marketing_source: z.enum(["bang_hieu","facebook","youtube","tiktok","zalo","website","google_map","gioi_thieu","khac"]).optional(),
   // Referral tracking
   referral_type: z.enum(["doctor", "staff", "other", "ad", "none"]).optional(),
   referral_user_id: z.string().min(1).nullable().optional(),
@@ -122,12 +122,19 @@ export const patientCreateSchema = z.object({
   // Body metrics
   height_cm: z.number().positive().max(300).optional(),
   weight_kg: z.number().positive().max(500).optional(),
+  cccd: z.string().regex(/^[0-9]{12}$/, "CCCD phải có đúng 12 chữ số").optional(),
 });
 
 export const patientUpdateSchema = patientCreateSchema.partial();
 
 export type PatientCreateInput = z.infer<typeof patientCreateSchema>;
 export type PatientUpdateInput = z.infer<typeof patientUpdateSchema>;
+
+export const patientNoteCreateSchema = z.object({
+  content: nonEmpty(2000),
+});
+
+export type PatientNoteCreateInput = z.infer<typeof patientNoteCreateSchema>;
 
 // ──────────────── Visit ────────────────
 
@@ -230,6 +237,37 @@ export const paymentCreateSchema = z.object({
 
 export type PaymentCreateInput = z.infer<typeof paymentCreateSchema>;
 
+/**
+ * Patch schema for editing an existing payment.
+ *
+ * `.strict()` is critical: it rejects any field other than these four
+ * (status, code, patient_id, treatment_plan_id). Status changes go through
+ * the dedicated /confirm and /fail endpoints, not PATCH.
+ */
+export const paymentUpdateSchema = z
+  .object({
+    amount: z.number().positive("Số tiền phải > 0").optional(),
+    method: z.enum(["cash", "transfer", "card", "other"]).optional(),
+    reference: optionalText(200),
+    notes: optionalText(500),
+  })
+  .strict();
+
+export type PaymentUpdateInput = z.infer<typeof paymentUpdateSchema>;
+
+/** Tenant-configurable payment code prefix (e.g. "TT", "PK1"). */
+export const paymentPrefixSchema = z.object({
+  prefix: z
+    .string()
+    .trim()
+    .min(2, "Tối thiểu 2 ký tự")
+    .max(8, "Tối đa 8 ký tự")
+    .regex(/^[A-Z0-9]+$/, "Chỉ gồm chữ in hoa và số, không dấu")
+    .transform((v) => v.toUpperCase()),
+});
+
+export type PaymentPrefixInput = z.infer<typeof paymentPrefixSchema>;
+
 // ──────────────── Medical alerts ────────────────
 
 export const medicalAlertCreateSchema = z.object({
@@ -258,6 +296,18 @@ export const userUpdateSchema = z.object({
   is_active: z.boolean().optional(),
 });
 
+// ──────────────── Avatars ────────────────
+
+export const avatarPresignSchema = z.object({
+  filename: z.string().min(1).max(200),
+  content_type: z.enum(["image/jpeg", "image/png", "image/webp"]),
+  size: z.number().int().positive().max(5 * 1024 * 1024),
+});
+
+export const avatarFileSchema = z.object({
+  file_id: z.string().min(1),
+});
+
 // ──────────────── Patient Images ────────────────
 
 export const patientImageCreateSchema = z.object({
@@ -272,6 +322,13 @@ export const patientImageCreateSchema = z.object({
 });
 export type PatientImageCreateInput = z.infer<typeof patientImageCreateSchema>;
 
+export const patientImagePresignSchema = z.object({
+  filename: z.string().min(1).max(200),
+  content_type: z.string().min(1).max(100),
+  size: z.number().int().positive(),
+});
+export type PatientImagePresignInput = z.infer<typeof patientImagePresignSchema>;
+
 export const aiAnalyzeImageSchema = z.object({
   file_id: z.string().min(1),
   visit_id: z.string().min(1).optional(),
@@ -285,16 +342,35 @@ export type UserUpdateInput = z.infer<typeof userUpdateSchema>;
 
 // ──────────────── Roles ────────────────
 
+// `all` is intentionally excluded. It is a bootstrap/system-admin capability
+// seeded by migrations, never a permission that role-management CRUD may grant.
+const assignablePermissions = [
+  PERMISSIONS.READ_PATIENTS,
+  PERMISSIONS.WRITE_PATIENTS,
+  PERMISSIONS.WRITE_VISITS,
+  PERMISSIONS.WRITE_FINDINGS,
+  PERMISSIONS.WRITE_PLANS,
+  PERMISSIONS.APPROVE_PLANS,
+  PERMISSIONS.WRITE_PAYMENTS,
+  PERMISSIONS.WRITE_APPOINTMENTS,
+  PERMISSIONS.MANAGE_USERS,
+  PERMISSIONS.MANAGE_ROLES,
+  PERMISSIONS.MANAGE_PATIENTS,
+  PERMISSIONS.MANAGE_SCHEDULE,
+] as const;
+
+const permissionsSchema = z.array(z.enum(assignablePermissions)).max(assignablePermissions.length);
+
 export const roleCreateSchema = z.object({
   name: nonEmpty(50),
   description: optionalText(200),
-  permissions: z.array(z.string()).default([]),
+  permissions: permissionsSchema.default([]),
 });
 
 export const roleUpdateSchema = z.object({
   name: nonEmpty(50).optional(),
   description: optionalText(200).optional(),
-  permissions: z.array(z.string()).optional(),
+  permissions: permissionsSchema.optional(),
 });
 
 export type RoleCreateInput = z.infer<typeof roleCreateSchema>;
@@ -305,6 +381,7 @@ export type RoleUpdateInput = z.infer<typeof roleUpdateSchema>;
 export const appointmentCreateSchema = z.object({
   patient_id: z.string().min(1),
   clinician_id: z.string().min(1),
+  assistant_id: z.string().min(1).optional(),
   scheduled_at: z.string().datetime({ offset: true }),
   duration_min: z.number().int().min(15).max(480).default(30),
   procedure: optionalText(100),
@@ -316,6 +393,8 @@ export const appointmentCreateSchema = z.object({
 export const appointmentUpdateSchema = z.object({
   scheduled_at: z.string().datetime({ offset: true }).optional(),
   duration_min: z.number().int().min(15).max(480).optional(),
+  clinician_id: z.string().min(1).optional(),
+  assistant_id: z.string().min(1).nullable().optional(),
   status: z.enum(["booked", "confirmed", "arrived", "completed", "cancelled", "no_show"]).optional(),
   procedure: optionalText(100).optional(),
   notes: optionalText(2000).optional(),

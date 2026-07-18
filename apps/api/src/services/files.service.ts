@@ -5,7 +5,7 @@
  * Rule #6: file access is always checked by Worker.
  */
 
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
 import type { FileObject } from "@shared/types";
@@ -35,6 +35,7 @@ export const filesService = {
     env: { FILES: R2Bucket; R2_ACCOUNT_ID?: string; R2_ACCESS_KEY_ID?: string; R2_SECRET_ACCESS_KEY?: string },
     tenantId: string,
     input: PresignInput,
+    opts?: { db?: D1Database; userId?: string },
   ): Promise<PresignResult> {
     if (input.size > MAX_FILE_SIZE) {
       throw new Error(`File too large: max ${MAX_FILE_SIZE / 1024 / 1024} MB`);
@@ -70,39 +71,53 @@ export const filesService = {
 
     const uploadUrl = await getSignedUrl(client, command, { expiresIn: PRESIGN_EXPIRES });
 
+    // Persist the server-generated object identity only after presigning
+    // succeeds. The client is never allowed to choose r2_key: accepting an
+    // arbitrary key here would allow one tenant to create metadata pointing at
+    // another tenant's private R2 object.
+    if (opts?.db && opts.userId) {
+      await opts.db
+        .prepare(
+          `INSERT INTO file_objects (id, tenant_id, r2_key, filename, content_type, size, uploaded_by)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .bind(fileId, tenantId, r2_key, input.filename, input.content_type, input.size, opts.userId)
+        .run();
+    }
+
     return { fileId, r2_key, uploadUrl, expiresIn: PRESIGN_EXPIRES };
   },
 
-  async recordUpload(
-    db: D1Database,
-    _env: { FILES: R2Bucket },
-    tenantId: string,
-    userId: string,
-    input: { fileId: string; r2_key: string; filename: string; content_type: string; size: number },
-  ): Promise<FileObject> {
-    await db
-      .prepare(
-        `INSERT INTO file_objects
-           (id, tenant_id, r2_key, filename, content_type, size, uploaded_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .bind(
-        input.fileId,
-        tenantId,
-        input.r2_key,
-        input.filename,
-        input.content_type,
-        input.size,
-        userId,
-      )
-      .run();
+  async getDownloadUrl(
+    env: { R2_ACCOUNT_ID?: string; R2_ACCESS_KEY_ID?: string; R2_SECRET_ACCESS_KEY?: string },
+    r2_key: string,
+  ): Promise<string> {
+    if (!env.R2_ACCESS_KEY_ID || !env.R2_SECRET_ACCESS_KEY || !env.R2_ACCOUNT_ID) {
+      throw new Error("R2 S3 credentials not configured");
+    }
+    const client = new S3Client({
+      region: "auto",
+      endpoint: `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: env.R2_ACCESS_KEY_ID,
+        secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+      },
+    });
+    const command = new GetObjectCommand({ Bucket: "dentalaios-files", Key: r2_key });
+    return await getSignedUrl(client, command, { expiresIn: PRESIGN_EXPIRES });
+  },
 
-    const row = (await db
-      .prepare("SELECT * FROM file_objects WHERE tenant_id = ? AND id = ? LIMIT 1")
-      .bind(tenantId, input.fileId)
-      .first()) as D1Row | null;
-    if (!row) throw new Error("Insert succeeded but read failed");
-    return mapFile(row);
+  /**
+   * Return a server-created upload record after direct-to-R2 upload.  The
+   * endpoint intentionally receives only `fileId`; r2_key and metadata come
+   * exclusively from the record made during `presign()`.
+   */
+  async finalizeUpload(
+    db: D1Database,
+    tenantId: string,
+    fileId: string,
+  ): Promise<FileObject | null> {
+    return this.getById(db, tenantId, fileId);
   },
 
   async getById(db: D1Database, tenantId: string, id: string): Promise<FileObject | null> {
@@ -118,6 +133,21 @@ export const filesService = {
     r2_key: string,
   ): Promise<R2ObjectBody | null> {
     return env.FILES.get(r2_key);
+  },
+
+  async remove(
+    db: D1Database,
+    env: { FILES: R2Bucket },
+    tenantId: string,
+    id: string,
+  ): Promise<void> {
+    const file = await this.getById(db, tenantId, id);
+    if (!file) return;
+    try { await env.FILES.delete(file.r2_key); } catch { /* best-effort storage cleanup */ }
+    await db
+      .prepare("DELETE FROM file_objects WHERE tenant_id = ? AND id = ?")
+      .bind(tenantId, id)
+      .run();
   },
 };
 

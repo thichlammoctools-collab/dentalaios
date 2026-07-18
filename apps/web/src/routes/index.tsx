@@ -10,6 +10,7 @@ import { PatientsPage } from "@/pages/PatientsPage";
 import { PatientDetailPage } from "@/pages/PatientDetailPage";
 import { VisitDetailPage } from "@/pages/VisitDetailPage";
 import { TreatmentPlanDetailPage } from "@/pages/TreatmentPlanDetailPage";
+import { AppointmentDetailPage } from "@/pages/AppointmentDetailPage";
 import { CalendarPage } from "@/pages/CalendarPage";
 import { UsersSettingsPage } from "@/pages/UsersSettingsPage";
 import { MembersSettingsPage } from "@/pages/MembersSettingsPage";
@@ -26,6 +27,7 @@ const PATTERNS = {
   PATIENT_DETAIL: "/patients/:id",
   VISIT_DETAIL: "/visits/:id",
   TREATMENT_PLAN: "/treatment-plans/:id",
+  APPOINTMENT_DETAIL: "/appointments/:id",
 } as const;
 
 function Protected({ children }: { children: ReactNode }) {
@@ -108,6 +110,14 @@ export function AppRoutes() {
         element={
           <Protected>
             <TreatmentPlanDetailPage />
+          </Protected>
+        }
+      />
+      <Route
+        path={PATTERNS.APPOINTMENT_DETAIL}
+        element={
+          <Protected>
+            <AppointmentDetailPage />
           </Protected>
         }
       />

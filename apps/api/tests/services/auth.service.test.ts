@@ -23,6 +23,8 @@ const baseUserRow = (overrides: Record<string, unknown> = {}) => ({
   u_email: "admin@demo.clinic",
   u_name: "Demo Admin",
   u_password_hash: VALID_HASH,
+  u_is_active: 1,
+  u_email_verified_at: "2026-01-01",
   u_created_at: "2026-01-01",
   r_id: "role-1",
   r_tenant_id: TENANT_A,

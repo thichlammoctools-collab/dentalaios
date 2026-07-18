@@ -49,6 +49,7 @@ export interface User {
   role_id: string;
   email: string;
   name: string;
+  avatar_file_id?: string;
   is_active: boolean;
   // password_hash lives in DB but is NEVER returned to clients — repos strip it.
   created_at: string;
@@ -71,6 +72,7 @@ export interface Patient {
   email?: string;
   address?: string;
   notes?: string;
+  avatar_file_id?: string;
   created_at: string;
   // Family contact
   family_name?: string;
@@ -86,6 +88,7 @@ export interface Patient {
   // Body metrics
   height_cm?: number;
   weight_kg?: number;
+  cccd?: string;
 }
 
 export type AlertSeverity = "low" | "medium" | "high";
@@ -97,6 +100,17 @@ export interface MedicalAlert {
   type: string; // e.g. "allergy", "chronic", "medication"
   description: string;
   severity: AlertSeverity;
+  created_at: string;
+}
+
+/** Immutable note entry on a patient's record, including its author. */
+export interface PatientNote {
+  id: string;
+  tenant_id: string;
+  patient_id: string;
+  user_id: string;
+  user_name: string;
+  content: string;
   created_at: string;
 }
 
@@ -210,6 +224,7 @@ export interface Payment {
   status: PaymentStatus;
   reference?: string; // bank txn ref / receipt number
   notes?: string;
+  code: string;       // immutable human-readable code, e.g. "TT-20260713-0001"
   created_at: string;
 }
 
@@ -378,6 +393,7 @@ export interface Appointment {
   branch_id: string;
   clinician_id: string;
   patient_id: string;
+  assistant_id?: string;
   source_visit_id?: string;
   scheduled_at: string;  // ISO datetime
   duration_min: number;

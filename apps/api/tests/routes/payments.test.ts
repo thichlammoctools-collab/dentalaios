@@ -100,6 +100,10 @@ describe("POST /api/payments", () => {
           approved_at: null,
           created_at: "2026-01-01",
         }]],
+        // Code generator: prefix lookup + counter upsert + uniqueness check
+        ["FROM tenant_settings", []], // no prefix configured → fallback to "TT"
+        ["INSERT INTO payment_code_counters", [{ last_seq: 1 }]],
+        ["FROM payments WHERE code =", []], // no clash — must precede generic "FROM payments"
         ["FROM payments", [paymentRow({ amount: 500000 })]],
       ]),
       {

@@ -61,7 +61,7 @@ describe("PUT /api/roles/:id", () => {
         ["FROM roles", [updated]],
       ]),
       {
-        permissions: ["manage_roles"],
+        permissions: ["all"],
         body: {
           name: "doctor",
           permissions: ["read_patients", "write_findings"],

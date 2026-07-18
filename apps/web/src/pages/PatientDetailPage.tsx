@@ -15,18 +15,32 @@ import {
 } from "@/components/ui/table";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { PatientForm } from "@/components/PatientForm";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { VisitForm } from "@/components/VisitForm";
 import { MedicalAlertsList } from "@/components/MedicalAlertsList";
+import { PatientNotesTimeline } from "@/components/PatientNotesTimeline";
 import { PaymentForm } from "@/components/PaymentForm";
-import { apiGet, ApiError } from "@/lib/api";
+import { PaymentDetailDialog } from "@/components/PaymentDetailDialog";
+import { AppointmentCard } from "@/components/schedule/AppointmentCard";
+import {
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { apiGet, apiDelete, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
+import { MARKETING_SOURCE_LABELS, type MarketingSource } from "@shared/constants";
 import type {
   Patient,
   MedicalAlert,
   Visit,
   TreatmentPlan,
   Payment,
+  Appointment,
+  PatientNote,
 } from "@shared/types";
 
 interface ListResponse<T> {
@@ -42,27 +56,36 @@ export function PatientDetailPage() {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [plans, setPlans] = useState<TreatmentPlan[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [notes, setNotes] = useState<PatientNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [openEdit, setOpenEdit] = useState(false);
   const [openVisit, setOpenVisit] = useState(false);
   const [openPayment, setOpenPayment] = useState(false);
+  const [viewingPaymentId, setViewingPaymentId] = useState<string | null>(null);
+  const [planToDelete, setPlanToDelete] = useState<TreatmentPlan | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function load() {
     if (!id) return;
     setLoading(true);
     try {
       const p = await apiGet<Patient>(`/api/patients/${id}`);
-      const [a, v, tp, pay] = await Promise.all([
+      const [a, v, tp, pay, apt, pn] = await Promise.all([
         apiGet<ListResponse<MedicalAlert>>(`/api/patients/${id}/alerts`),
         apiGet<ListResponse<Visit>>(`/api/visits?patient_id=${id}`),
         apiGet<ListResponse<TreatmentPlan>>(`/api/treatment-plans?patient_id=${id}`),
         apiGet<ListResponse<Payment>>(`/api/payments?patient_id=${id}`),
+        apiGet<ListResponse<Appointment>>(`/api/appointments?patient_id=${id}`),
+        apiGet<ListResponse<PatientNote>>(`/api/patients/${id}/notes`),
       ]);
       setPatient(p);
       setAlerts(a.items);
       setVisits(v.items);
       setPlans(tp.items);
       setPayments(pay.items);
+      setAppointments(apt.items);
+      setNotes(pn.items);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi tải");
     } finally {
@@ -74,6 +97,21 @@ export function PatientDetailPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  async function confirmDeletePlan() {
+    if (!planToDelete) return;
+    setDeleting(true);
+    try {
+      await apiDelete(`/api/treatment-plans/${planToDelete.id}`);
+      setPlans((prev) => prev.filter((x) => x.id !== planToDelete.id));
+      toast.success("Đã xóa kế hoạch");
+      setPlanToDelete(null);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi xóa");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   if (loading || !patient) {
     return <p className="px-6 py-6 text-sm text-muted-foreground">Đang tải…</p>;
@@ -91,16 +129,27 @@ export function PatientDetailPage() {
           { label: patient.name },
         ]}
       />
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">{patient.name}</h1>
-          <p className="text-sm text-muted-foreground">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-4">
+            <ProfileAvatar
+              subject="patients"
+              entityId={patient.id}
+              name={patient.name}
+              avatarFileId={patient.avatar_file_id}
+              size="lg"
+              editable
+              onChanged={load}
+            />
+            <div>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">{patient.name}</h1>
+            <p className="text-sm text-muted-foreground">
             {formatDate(patient.date_of_birth)} ·{" "}
             {patient.gender === "M" ? "Nam" : patient.gender === "F" ? "Nữ" : "Khác"} ·{" "}
             {patient.phone}
             {patient.email && ` · ${patient.email}`}
-          </p>
-        </div>
+            </p>
+            </div>
+          </div>
         <Button variant="outline" onClick={() => setOpenEdit(true)}>
           Sửa
         </Button>
@@ -113,6 +162,7 @@ export function PatientDetailPage() {
           <TabsTrigger value="visits">Lượt khám ({visits.length})</TabsTrigger>
           <TabsTrigger value="plans">Kế hoạch ({plans.length})</TabsTrigger>
           <TabsTrigger value="payments">Thanh toán ({payments.length})</TabsTrigger>
+          <TabsTrigger value="appointments">Lịch hẹn ({appointments.length})</TabsTrigger>
           <TabsTrigger value="images">Hình ảnh</TabsTrigger>
         </TabsList>
 
@@ -151,6 +201,10 @@ export function PatientDetailPage() {
                     <div className="col-span-2">
                       <p className="text-muted-foreground text-xs">Địa chỉ</p>
                       <p className="font-medium">{patient.address || "—"}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-muted-foreground text-xs">Số CCCD</p>
+                      <p className="font-medium">{patient.cccd || "—"}</p>
                     </div>
                     <div className="col-span-2">
                       <p className="text-muted-foreground text-xs">Ngày tạo</p>
@@ -215,7 +269,11 @@ export function PatientDetailPage() {
                   <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                     <div>
                       <p className="text-muted-foreground text-xs">Nguồn bệnh nhân</p>
-                      <p className="font-medium">{patient.marketing_source || "—"}</p>
+                      <p className="font-medium">
+                        {patient.marketing_source
+                          ? MARKETING_SOURCE_LABELS[patient.marketing_source as MarketingSource] ?? patient.marketing_source
+                          : "—"}
+                      </p>
                     </div>
                     <div>
                       <p className="text-muted-foreground text-xs">Loại giới thiệu</p>
@@ -243,7 +301,11 @@ export function PatientDetailPage() {
               <div>
                 <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-2">Ghi chú</p>
                 <div className="rounded-lg border border-border bg-muted/20 p-4">
-                  <p className="font-medium whitespace-pre-wrap">{patient.notes || "—"}</p>
+                  <PatientNotesTimeline
+                    patientId={patient.id}
+                    notes={notes}
+                    onCreated={(note) => setNotes((current) => [note, ...current])}
+                  />
                 </div>
               </div>
 
@@ -333,6 +395,7 @@ export function PatientDetailPage() {
                       <TableHead>Ngày tạo</TableHead>
                       <TableHead>Trạng thái</TableHead>
                       <TableHead className="text-right">Tổng</TableHead>
+                      <TableHead className="w-24"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -358,6 +421,15 @@ export function PatientDetailPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           {formatCurrency(p.total_cost, p.currency)}
+                        </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setPlanToDelete(p)}
+                          >
+                            Xóa
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -391,6 +463,7 @@ export function PatientDetailPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Mã thanh toán</TableHead>
                       <TableHead>Ngày</TableHead>
                       <TableHead>Số tiền</TableHead>
                       <TableHead>Phương thức</TableHead>
@@ -400,7 +473,12 @@ export function PatientDetailPage() {
                   </TableHeader>
                   <TableBody>
                     {payments.map((p) => (
-                      <TableRow key={p.id}>
+                      <TableRow
+                        key={p.id}
+                        className="cursor-pointer"
+                        onClick={() => setViewingPaymentId(p.id)}
+                      >
+                        <TableCell className="font-mono">{p.code}</TableCell>
                         <TableCell>{formatDateTime(p.created_at)}</TableCell>
                         <TableCell>{formatCurrency(p.amount, p.currency)}</TableCell>
                         <TableCell>{p.method}</TableCell>
@@ -424,6 +502,30 @@ export function PatientDetailPage() {
                     ))}
                   </TableBody>
                 </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="appointments">
+          <Card>
+            <CardHeader>
+              <CardTitle>Lịch hẹn</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {appointments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Chưa có lịch hẹn nào.</p>
+              ) : (
+                <div className="space-y-2">
+                  {appointments.map((apt) => (
+                    <AppointmentCard
+                      key={apt.id}
+                      appointment={apt}
+                      patientName={patient.name}
+                      onClick={() => navigate(`/appointments/${apt.id}`)}
+                    />
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>
@@ -460,6 +562,53 @@ export function PatientDetailPage() {
         plans={plans.filter((p) => p.status === "approved" || p.status === "completed")}
         onCreated={(pay) => setPayments((prev) => [pay, ...prev])}
       />
+      <PaymentDetailDialog
+        paymentId={viewingPaymentId}
+        onClose={() => setViewingPaymentId(null)}
+        onSaved={(pay) =>
+          setPayments((prev) => prev.map((x) => (x.id === pay.id ? pay : x)))
+        }
+      />
+      <Dialog open={planToDelete !== null} onOpenChange={(o) => !o && setPlanToDelete(null)}>
+        <DialogHeader>
+          <DialogTitle>Xóa kế hoạch điều trị?</DialogTitle>
+        </DialogHeader>
+        <DialogBody>
+          <p className="text-sm text-muted-foreground">
+            Kế hoạch tạo ngày{" "}
+            <strong className="text-foreground">
+              {planToDelete ? formatDateTime(planToDelete.created_at) : ""}
+            </strong>{" "}
+            sẽ bị xóa vĩnh viễn cùng toàn bộ hạng mục bên trong. Hành động này không thể hoàn tác.
+          </p>
+          {planToDelete && planToDelete.total_cost > 0 && (
+            <p className="mt-3 text-sm">
+              Tổng giá trị kế hoạch:{" "}
+              <strong>
+                {formatCurrency(planToDelete.total_cost, planToDelete.currency)}
+              </strong>
+            </p>
+          )}
+        </DialogBody>
+        <DialogFooter className="mt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setPlanToDelete(null)}
+            disabled={deleting}
+          >
+            Hủy
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={confirmDeletePlan}
+            disabled={deleting}
+          >
+            {deleting ? "Đang xóa…" : "Xóa"}
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }
