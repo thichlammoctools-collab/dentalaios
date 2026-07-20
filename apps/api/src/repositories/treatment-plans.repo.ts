@@ -18,7 +18,13 @@ export function createTreatmentPlansRepository(db: D1Database): TreatmentPlansRe
   return {
     async getById(tenantId, id) {
       const row = (await db
-        .prepare("SELECT * FROM treatment_plans WHERE tenant_id = ? AND id = ? LIMIT 1")
+        .prepare(`SELECT treatment_plans.*, CASE
+          WHEN status <> 'completed'
+            AND NOT EXISTS(SELECT 1 FROM treatment_plan_items WHERE tenant_id = treatment_plans.tenant_id AND treatment_plan_id = treatment_plans.id AND status = 'completed')
+            AND NOT EXISTS(SELECT 1 FROM treatment_cases WHERE tenant_id = treatment_plans.tenant_id AND treatment_plan_id = treatment_plans.id)
+            AND NOT EXISTS(SELECT 1 FROM payments WHERE tenant_id = treatment_plans.tenant_id AND treatment_plan_id = treatment_plans.id)
+          THEN 1 ELSE 0 END AS can_delete
+          FROM treatment_plans WHERE tenant_id = ? AND id = ? LIMIT 1`)
         .bind(tenantId, id)
         .first()) as D1Row | null;
       return row ? mapPlan(row) : null;
@@ -40,7 +46,13 @@ export function createTreatmentPlansRepository(db: D1Database): TreatmentPlansRe
         binds.push(opts.visitId);
       }
       const result = await db
-        .prepare(`SELECT * FROM treatment_plans WHERE ${conditions.join(" AND ")} ORDER BY created_at DESC`)
+        .prepare(`SELECT treatment_plans.*, CASE
+          WHEN status <> 'completed'
+            AND NOT EXISTS(SELECT 1 FROM treatment_plan_items WHERE tenant_id = treatment_plans.tenant_id AND treatment_plan_id = treatment_plans.id AND status = 'completed')
+            AND NOT EXISTS(SELECT 1 FROM treatment_cases WHERE tenant_id = treatment_plans.tenant_id AND treatment_plan_id = treatment_plans.id)
+            AND NOT EXISTS(SELECT 1 FROM payments WHERE tenant_id = treatment_plans.tenant_id AND treatment_plan_id = treatment_plans.id)
+          THEN 1 ELSE 0 END AS can_delete
+          FROM treatment_plans WHERE ${conditions.join(" AND ")} ORDER BY created_at DESC`)
         .bind(...binds)
         .all();
       return (result.results as D1Row[]).map(mapPlan);
@@ -119,5 +131,6 @@ function mapPlan(row: D1Row): TreatmentPlan {
     notes: (row.notes as string | null) ?? undefined,
     approved_at: (row.approved_at as string | null) ?? undefined,
     created_at: row.created_at as string,
+    can_delete: Number(row.can_delete ?? 0) === 1,
   };
 }

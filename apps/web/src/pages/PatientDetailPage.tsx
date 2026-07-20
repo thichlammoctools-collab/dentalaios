@@ -478,13 +478,15 @@ export function PatientDetailPage() {
                           {formatCurrency(p.total_cost, p.currency)}
                         </TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setPlanToDelete(p)}
-                          >
-                            Xóa
-                          </Button>
+                          {p.can_delete && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setPlanToDelete(p)}
+                            >
+                              Xóa
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}

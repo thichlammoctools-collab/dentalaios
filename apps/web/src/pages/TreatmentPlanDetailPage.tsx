@@ -281,7 +281,7 @@ export function TreatmentPlanDetailPage() {
   }
 
   const canEdit = plan.status === "draft";
-  const canDelete = plan.status !== "completed";
+  const canDelete = plan.can_delete === true;
   const canApprove = plan.status === "draft" && items.length > 0;
   const canHandOver = plan.status === "approved";
 

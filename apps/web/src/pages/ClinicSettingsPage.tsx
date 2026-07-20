@@ -346,20 +346,15 @@ export function ClinicSettingsPage() {
                     >
                       Sửa
                     </button>
-                    <button
-                      onClick={() => deleteBranch(branch.id)}
-                      disabled={data.branches.length <= 1 || branch.id === session?.branch?.id}
-                      title={
-                        branch.id === session?.branch?.id
-                          ? "Không thể xóa chi nhánh hiện tại"
-                          : data.branches.length <= 1
-                            ? "Phòng khám phải luôn có ít nhất một chi nhánh"
-                            : "Chỉ có thể xóa khi không còn dữ liệu liên quan"
-                      }
-                      className="rounded border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Xóa
-                    </button>
+                    {data.branches.length > 1 && branch.id !== session?.branch?.id && (
+                      <button
+                        onClick={() => deleteBranch(branch.id)}
+                        title="Chỉ có thể xóa khi không còn dữ liệu liên quan"
+                        className="rounded border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
+                      >
+                        Xóa
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

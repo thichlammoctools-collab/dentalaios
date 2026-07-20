@@ -217,6 +217,7 @@ export interface TreatmentPlan {
   notes?: string;
   approved_at?: string;
   created_at: string;
+  can_delete?: boolean;
 }
 
 export type TreatmentItemStatus = "planned" | "in_progress" | "completed";
