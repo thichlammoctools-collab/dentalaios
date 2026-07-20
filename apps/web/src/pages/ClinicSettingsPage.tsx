@@ -107,7 +107,7 @@ export function ClinicSettingsPage() {
   }
 
   async function deleteBranch(id: string) {
-    if (!confirm("Xóa chi nhánh này? Hành động này không thể hoàn tác.")) return;
+    if (!confirm("Xóa chi nhánh này? Chỉ có thể xóa khi chi nhánh không còn dữ liệu liên quan. Hành động này không thể hoàn tác.")) return;
     try {
       await apiDelete(`/api/clinic/branches/${id}`);
       setData((prev) => prev ? { ...prev, branches: prev.branches.filter((b) => b.id !== id) } : prev);
@@ -346,14 +346,20 @@ export function ClinicSettingsPage() {
                     >
                       Sửa
                     </button>
-                    {data.branches.length > 1 && (
-                      <button
-                        onClick={() => deleteBranch(branch.id)}
-                        className="rounded border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
-                      >
-                        Xóa
-                      </button>
-                    )}
+                    <button
+                      onClick={() => deleteBranch(branch.id)}
+                      disabled={data.branches.length <= 1 || branch.id === session?.branch?.id}
+                      title={
+                        branch.id === session?.branch?.id
+                          ? "Không thể xóa chi nhánh hiện tại"
+                          : data.branches.length <= 1
+                            ? "Phòng khám phải luôn có ít nhất một chi nhánh"
+                            : "Chỉ có thể xóa khi không còn dữ liệu liên quan"
+                      }
+                      className="rounded border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Xóa
+                    </button>
                   </div>
                 )}
               </div>

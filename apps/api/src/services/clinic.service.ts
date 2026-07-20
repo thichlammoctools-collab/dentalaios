@@ -8,6 +8,7 @@ import type {
 import { createTenantRepository } from "../repositories/tenant.repo";
 import { createBranchRepository } from "../repositories/branch.repo";
 import { createLarkConfigRepository } from "../repositories/lark-config.repo";
+import { ConflictError } from "../lib/errors";
 
 export const clinicService = {
   async getTenant(db: D1Database, tenantId: string): Promise<Tenant | null> {
@@ -65,8 +66,61 @@ export const clinicService = {
     db: D1Database,
     tenantId: string,
     branchId: string,
+    currentBranchId: string,
   ): Promise<boolean> {
-    return createBranchRepository(db).delete(tenantId, branchId);
+    const branchRepo = createBranchRepository(db);
+    const branch = await branchRepo.getById(tenantId, branchId);
+    if (!branch) return false;
+
+    if (branchId === currentBranchId) {
+      throw new ConflictError("Không thể xóa chi nhánh hiện tại. Hãy chuyển sang chi nhánh khác trước.");
+    }
+
+    const branches = await branchRepo.list(tenantId);
+    if (branches.length <= 1) {
+      throw new ConflictError("Phòng khám phải luôn có ít nhất một chi nhánh.");
+    }
+
+    const references = await db.prepare(
+      `SELECT
+         EXISTS(SELECT 1 FROM users WHERE tenant_id = ? AND branch_id = ?) AS has_users,
+         EXISTS(SELECT 1 FROM patients WHERE tenant_id = ? AND branch_id = ?) AS has_patients,
+         EXISTS(SELECT 1 FROM visits WHERE tenant_id = ? AND branch_id = ?) AS has_visits,
+         EXISTS(SELECT 1 FROM appointments WHERE tenant_id = ? AND branch_id = ?) AS has_appointments,
+         EXISTS(SELECT 1 FROM clinic_schedules WHERE tenant_id = ? AND branch_id = ?) AS has_clinic_schedules,
+         EXISTS(SELECT 1 FROM doctor_schedules WHERE tenant_id = ? AND branch_id = ?) AS has_doctor_schedules,
+         EXISTS(SELECT 1 FROM dental_chairs WHERE tenant_id = ? AND branch_id = ?) AS has_chairs,
+         EXISTS(SELECT 1 FROM dental_rooms WHERE tenant_id = ? AND branch_id = ?) AS has_rooms,
+         EXISTS(SELECT 1 FROM treatment_cases WHERE tenant_id = ? AND primary_branch_id = ?) AS has_treatment_cases`,
+    )
+      .bind(
+        tenantId, branchId,
+        tenantId, branchId,
+        tenantId, branchId,
+        tenantId, branchId,
+        tenantId, branchId,
+        tenantId, branchId,
+        tenantId, branchId,
+        tenantId, branchId,
+        tenantId, branchId,
+      )
+      .first<BranchReferences>();
+
+    const dependencies = [
+      references?.has_users ? "người dùng" : null,
+      references?.has_patients ? "bệnh nhân" : null,
+      references?.has_visits ? "lượt khám" : null,
+      references?.has_appointments ? "lịch hẹn" : null,
+      references?.has_clinic_schedules || references?.has_doctor_schedules ? "lịch làm việc" : null,
+      references?.has_chairs || references?.has_rooms ? "ghế hoặc phòng nha" : null,
+      references?.has_treatment_cases ? "ca điều trị" : null,
+    ].filter((dependency): dependency is string => dependency !== null);
+
+    if (dependencies.length > 0) {
+      throw new ConflictError(`Không thể xóa chi nhánh vì còn ${dependencies.join(", ")}. Hãy chuyển hoặc xóa dữ liệu liên quan trước.`);
+    }
+
+    return branchRepo.delete(tenantId, branchId);
   },
 
   /**
@@ -130,3 +184,15 @@ export const clinicService = {
     return createLarkConfigRepository(db).deleteByTenant(tenantId);
   },
 };
+
+interface BranchReferences {
+  has_users: number;
+  has_patients: number;
+  has_visits: number;
+  has_appointments: number;
+  has_clinic_schedules: number;
+  has_doctor_schedules: number;
+  has_chairs: number;
+  has_rooms: number;
+  has_treatment_cases: number;
+}

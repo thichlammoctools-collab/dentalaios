@@ -111,7 +111,7 @@ router.delete(
   auditLog("delete", "branch"),
   async (c) => {
     const jwt = getJwt(c);
-    const deleted = await clinicService.deleteBranch(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    const deleted = await clinicService.deleteBranch(c.env.DB, jwt.tenant_id, c.req.param("id"), jwt.branch_id);
     if (!deleted) throw new NotFoundError("Branch not found");
     return c.json({ ok: true });
   },
