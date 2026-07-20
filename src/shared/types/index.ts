@@ -482,12 +482,24 @@ export type AppointmentSource = "manual" | "ai_chat" | "ai_next_visit" | "resche
 export type DentalChairType = "general" | "surgery" | "orthodontic" | "pediatric" | "hygiene";
 export type ChairOperationalStatus = "available" | "cleaning" | "maintenance" | "out_of_service";
 
+export interface DentalRoom {
+  id: string;
+  tenant_id: string;
+  branch_id: string;
+  name: string;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DentalChair {
   id: string;
   tenant_id: string;
   branch_id: string;
   code: string;
   name: string;
+  room_id?: string;
   room_name?: string;
   chair_type: DentalChairType;
   operational_status: ChairOperationalStatus;

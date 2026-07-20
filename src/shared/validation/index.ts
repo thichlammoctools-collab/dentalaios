@@ -405,7 +405,7 @@ export const chairCreateSchema = z.object({
   code: z.string().trim().min(1, "Không được để trống").max(50)
     .regex(/^[A-Za-z0-9_-]+$/, "Mã ghế chỉ gồm chữ, số, gạch ngang hoặc gạch dưới"),
   name: nonEmpty(100),
-  room_name: optionalText(100),
+  room_id: z.string().min(1).nullable().optional(),
   chair_type: chairTypeSchema.default("general"),
   operational_status: chairOperationalStatusSchema.default("available"),
   default_doctor_id: z.string().min(1).nullable().optional(),
@@ -442,6 +442,14 @@ export const chairBoardQuerySchema = z.object({
 export type ChairCreateInput = z.infer<typeof chairCreateSchema>;
 export type ChairUpdateInput = z.infer<typeof chairUpdateSchema>;
 export type ChairStatusUpdateInput = z.infer<typeof chairStatusUpdateSchema>;
+
+export const roomCreateSchema = z.object({
+  branch_id: z.string().min(1),
+  name: nonEmpty(100),
+  sort_order: z.number().int().min(0).max(10000).default(0),
+});
+
+export type RoomCreateInput = z.infer<typeof roomCreateSchema>;
 
 // ──────────────── Doctor Schedule ────────────────
 

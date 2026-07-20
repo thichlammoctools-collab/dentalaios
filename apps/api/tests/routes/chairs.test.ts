@@ -23,6 +23,18 @@ const chairRow = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+const roomRow = (overrides: Record<string, unknown> = {}) => ({
+  id: "room-1",
+  tenant_id: "test-tenant",
+  branch_id: "test-branch",
+  name: "Phòng A",
+  sort_order: 0,
+  is_active: 1,
+  created_at: "2026-07-20T00:00:00.000Z",
+  updated_at: "2026-07-20T00:00:00.000Z",
+  ...overrides,
+});
+
 describe("GET /api/chairs", () => {
   it("lists chairs within the current tenant", async () => {
     const app = mountRoute("/api/chairs", chairsRoutes);
@@ -37,6 +49,32 @@ describe("GET /api/chairs", () => {
     const body = await res.json() as { items: Array<{ code: string; is_active: boolean }> };
     expect(body.items).toHaveLength(1);
     expect(body.items[0]).toMatchObject({ code: "CHAIR-01", is_active: true });
+  });
+});
+
+describe("GET /api/chairs/rooms", () => {
+  it("lists rooms for the requested branch", async () => {
+    const app = mountRoute("/api/chairs", chairsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "GET",
+      "/api/chairs/rooms?branch_id=test-branch",
+      new Map([
+        ["FROM branches", [{ id: "test-branch" }]],
+        ["FROM dental_rooms", [roomRow()]],
+      ]),
+      { permissions: ["read_patients"] },
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as { items: Array<{ id: string; name: string }> };
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0]).toMatchObject({ id: "room-1", name: "Phòng A", branch_id: "test-branch" });
+  });
+
+  it("requires a branch id", async () => {
+    const app = mountRoute("/api/chairs", chairsRoutes);
+    const res = await authedRequestWithDB(app, "GET", "/api/chairs/rooms", new Map(), { permissions: ["read_patients"] });
+    expect(res.status).toBe(400);
   });
 });
 

@@ -7,17 +7,22 @@ import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "@/lib/toast";
 import { PERMISSIONS, ROUTES } from "@shared/constants";
-import type { ChairOperationalStatus, DentalChair, DentalChairType } from "@shared/types";
+import type { ChairOperationalStatus, DentalChair, DentalChairType, DentalRoom } from "@shared/types";
 
 interface ChairsResponse {
   items: DentalChair[];
   total: number;
 }
 
+interface RoomsResponse {
+  items: DentalRoom[];
+  total: number;
+}
+
 type ChairForm = {
   code: string;
   name: string;
-  room_name: string;
+  room_id: string;
   chair_type: DentalChairType;
   operational_status: ChairOperationalStatus;
   turnover_min: string;
@@ -47,7 +52,7 @@ function emptyForm(): ChairForm {
   return {
     code: "",
     name: "",
-    room_name: "",
+    room_id: "",
     chair_type: "general",
     operational_status: "available",
     turnover_min: "10",
@@ -61,7 +66,7 @@ function formFromChair(chair: DentalChair): ChairForm {
   return {
     code: chair.code,
     name: chair.name,
-    room_name: chair.room_name ?? "",
+    room_id: chair.room_id ?? "",
     chair_type: chair.chair_type,
     operational_status: chair.operational_status,
     turnover_min: String(chair.turnover_min),
@@ -74,11 +79,15 @@ function formFromChair(chair: DentalChair): ChairForm {
 export function ChairSettingsPage() {
   const { session } = useAuth();
   const [chairs, setChairs] = useState<DentalChair[]>([]);
+  const [rooms, setRooms] = useState<DentalRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingChair, setEditingChair] = useState<DentalChair | null>(null);
   const [form, setForm] = useState<ChairForm>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [roomDialogOpen, setRoomDialogOpen] = useState(false);
+  const [roomName, setRoomName] = useState("");
+  const [savingRoom, setSavingRoom] = useState(false);
   const canManage = Boolean(
     session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.MANAGE_USERS),
   );
@@ -94,8 +103,12 @@ export function ChairSettingsPage() {
     if (!branchId) return;
     setLoading(true);
     try {
-      const response = await apiGet<ChairsResponse>(`/api/chairs?branch_id=${encodeURIComponent(branchId)}`);
-      setChairs(response.items);
+      const [chairsResponse, roomsResponse] = await Promise.all([
+        apiGet<ChairsResponse>(`/api/chairs?branch_id=${encodeURIComponent(branchId)}`),
+        apiGet<RoomsResponse>(`/api/chairs/rooms?branch_id=${encodeURIComponent(branchId)}`),
+      ]);
+      setChairs(chairsResponse.items);
+      setRooms(roomsResponse.items);
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Không thể tải danh sách ghế nha");
     } finally {
@@ -119,6 +132,32 @@ export function ChairSettingsPage() {
     setForm((current) => ({ ...current, [field]: value }));
   }
 
+  function openCreateRoom() {
+    setRoomName("");
+    setRoomDialogOpen(true);
+  }
+
+  async function createRoom() {
+    if (!branchId) return;
+    const name = roomName.trim();
+    if (!name) {
+      toast.error("Vui lòng nhập tên phòng");
+      return;
+    }
+    setSavingRoom(true);
+    try {
+      const room = await apiPost<DentalRoom>("/api/chairs/rooms", { branch_id: branchId, name });
+      setRooms((current) => [...current, room].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)));
+      setField("room_id", room.id);
+      setRoomDialogOpen(false);
+      toast.success("Đã tạo phòng");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Không thể tạo phòng");
+    } finally {
+      setSavingRoom(false);
+    }
+  }
+
   async function saveChair() {
     if (!branchId) return;
     const code = form.code.trim().toUpperCase();
@@ -135,7 +174,7 @@ export function ChairSettingsPage() {
 
     const payload = {
       name,
-      room_name: form.room_name.trim() || undefined,
+      room_id: form.room_id || null,
       chair_type: form.chair_type,
       operational_status: form.operational_status,
       turnover_min: turnover,
@@ -178,10 +217,11 @@ export function ChairSettingsPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Cấu hình ghế nha</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Thiết lập ghế tại chi nhánh hiện tại trước khi gán vào lịch hẹn.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Thiết lập phòng và ghế tại chi nhánh hiện tại trước khi gán vào lịch hẹn.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" asChild><Link to={ROUTES.CHAIRS}>Điều hành ghế</Link></Button>
+          {canManage && <Button variant="outline" onClick={openCreateRoom}>Thêm phòng</Button>}
           {canManage && <Button onClick={openCreate}>Thêm ghế</Button>}
         </div>
       </div>
@@ -223,7 +263,7 @@ export function ChairSettingsPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Mã ghế" required><input value={form.code} disabled={Boolean(editingChair)} onChange={(event) => setField("code", event.target.value)} placeholder="GHE-01" className={INPUT_CLASS} /></Field>
             <Field label="Tên ghế" required><input value={form.name} onChange={(event) => setField("name", event.target.value)} placeholder="Ghế số 1" className={INPUT_CLASS} /></Field>
-            <Field label="Phòng"><input value={form.room_name} onChange={(event) => setField("room_name", event.target.value)} placeholder="Phòng 01" className={INPUT_CLASS} /></Field>
+            <Field label="Phòng"><div className="flex gap-2"><select value={form.room_id} onChange={(event) => setField("room_id", event.target.value)} className={INPUT_CLASS}><option value="">Chưa gán phòng</option>{rooms.filter((room) => room.is_active).map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}</select>{canManage && <Button variant="outline" className="shrink-0" onClick={openCreateRoom}>Tạo phòng</Button>}</div></Field>
             <Field label="Loại ghế"><select value={form.chair_type} onChange={(event) => setField("chair_type", event.target.value as DentalChairType)} className={INPUT_CLASS}>{CHAIR_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select></Field>
             <Field label="Trạng thái vận hành"><select value={form.operational_status} onChange={(event) => setField("operational_status", event.target.value as ChairOperationalStatus)} className={INPUT_CLASS}>{Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
             <Field label="Thời gian chuẩn bị (phút)"><input type="number" min="0" max="120" value={form.turnover_min} onChange={(event) => setField("turnover_min", event.target.value)} className={INPUT_CLASS} /></Field>
@@ -233,6 +273,12 @@ export function ChairSettingsPage() {
           </div>
         </DialogBody>
         <DialogFooter><Button variant="outline" onClick={() => setDialogOpen(false)}>Hủy</Button><Button disabled={saving} onClick={() => void saveChair()}>{saving ? "Đang lưu..." : editingChair ? "Lưu thay đổi" : "Tạo ghế"}</Button></DialogFooter>
+      </Dialog>
+
+      <Dialog open={roomDialogOpen} onOpenChange={setRoomDialogOpen}>
+        <DialogHeader><DialogTitle>Tạo phòng</DialogTitle><DialogDescription>Phòng sẽ được dùng chung cho các ghế của chi nhánh hiện tại.</DialogDescription></DialogHeader>
+        <DialogBody><Field label="Tên phòng" required><input value={roomName} onChange={(event) => setRoomName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void createRoom(); }} placeholder="Phòng 01" autoFocus className={INPUT_CLASS} /></Field></DialogBody>
+        <DialogFooter><Button variant="outline" onClick={() => setRoomDialogOpen(false)}>Hủy</Button><Button disabled={savingRoom} onClick={() => void createRoom()}>{savingRoom ? "Đang tạo..." : "Tạo phòng"}</Button></DialogFooter>
       </Dialog>
     </div>
   );

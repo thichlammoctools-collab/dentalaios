@@ -4,6 +4,7 @@ import {
   chairAvailabilityQuerySchema,
   chairBoardQuerySchema,
   chairCreateSchema,
+  roomCreateSchema,
   chairStatusUpdateSchema,
   chairUpdateSchema,
 } from "@shared/validation";
@@ -40,6 +41,19 @@ router.get("/", requirePermission(PERMISSIONS.READ_PATIENTS), async (c) => {
   const branchId = new URL(c.req.url).searchParams.get("branch_id") ?? undefined;
   const items = await chairsService.list(c.env.DB, jwt.tenant_id, branchId);
   return c.json({ items, total: items.length });
+});
+
+router.get("/rooms", requirePermission(PERMISSIONS.READ_PATIENTS), async (c) => {
+  const jwt = getJwt(c);
+  const branchId = new URL(c.req.url).searchParams.get("branch_id");
+  if (!branchId) return c.json({ error: "branch_id là bắt buộc" }, 400);
+  const items = await chairsService.listRooms(c.env.DB, jwt.tenant_id, branchId);
+  return c.json({ items, total: items.length });
+});
+
+router.post("/rooms", requirePermission(PERMISSIONS.MANAGE_USERS), auditLog("create", "dental_room"), zValidator("json", roomCreateSchema), async (c) => {
+  const jwt = getJwt(c);
+  return c.json(await chairsService.createRoom(c.env.DB, jwt.tenant_id, c.req.valid("json")), 201);
 });
 
 router.post("/", requirePermission(PERMISSIONS.MANAGE_USERS), auditLog("create", "dental_chair"), zValidator("json", chairCreateSchema), async (c) => {

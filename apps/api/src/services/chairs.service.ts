@@ -1,6 +1,6 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import type { Appointment, DentalChair } from "@shared/types";
-import type { ChairCreateInput, ChairStatusUpdateInput, ChairUpdateInput } from "@shared/validation";
+import type { ChairCreateInput, ChairStatusUpdateInput, ChairUpdateInput, RoomCreateInput } from "@shared/validation";
 import { createAppointmentsRepository } from "../repositories/appointments.repo";
 import { createChairsRepository } from "../repositories/chairs.repo";
 import { ConflictError, NotFoundError, ValidationError } from "../lib/errors";
@@ -49,6 +49,7 @@ export const chairsService = {
       { table: "users", id: input.default_doctor_id },
       { table: "users", id: input.default_assistant_id },
     ]);
+    await assertRoomInBranch(db, tenantId, input.branch_id, input.room_id);
     return createChairsRepository(db).create(tenantId, input);
   },
 
@@ -57,9 +58,23 @@ export const chairsService = {
       { table: "users", id: input.default_doctor_id },
       { table: "users", id: input.default_assistant_id },
     ]);
+    if (input.room_id !== undefined) {
+      const chair = await this.get(db, tenantId, id);
+      await assertRoomInBranch(db, tenantId, chair.branch_id, input.room_id);
+    }
     const chair = await createChairsRepository(db).update(tenantId, id, input);
     if (!chair) throw new NotFoundError("Ghế nha không tồn tại");
     return chair;
+  },
+
+  async listRooms(db: D1Database, tenantId: string, branchId: string) {
+    await assertAllInTenant(db, tenantId, [{ table: "branches", id: branchId }]);
+    return createChairsRepository(db).listRooms(tenantId, branchId);
+  },
+
+  async createRoom(db: D1Database, tenantId: string, input: RoomCreateInput) {
+    await assertAllInTenant(db, tenantId, [{ table: "branches", id: input.branch_id }]);
+    return createChairsRepository(db).createRoom(tenantId, input);
   },
 
   async updateStatus(
@@ -152,3 +167,11 @@ export const chairsService = {
     });
   },
 };
+
+async function assertRoomInBranch(db: D1Database, tenantId: string, branchId: string, roomId?: string | null): Promise<void> {
+  if (!roomId) return;
+  const room = await createChairsRepository(db).getRoomById(tenantId, roomId);
+  if (!room || room.branch_id !== branchId || !room.is_active) {
+    throw new ValidationError("Phòng không hợp lệ hoặc không thuộc chi nhánh này");
+  }
+}
