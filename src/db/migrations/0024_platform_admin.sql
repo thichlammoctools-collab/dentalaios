@@ -76,3 +76,32 @@ CREATE TABLE IF NOT EXISTS platform_audit_logs (
 CREATE INDEX IF NOT EXISTS idx_platform_audit_created ON platform_audit_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_platform_audit_user ON platform_audit_logs(platform_user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_platform_audit_tenant ON platform_audit_logs(tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_platform_audit_action ON platform_audit_logs(action, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS platform_feature_flags (
+  key TEXT PRIMARY KEY,
+  description TEXT NOT NULL,
+  default_enabled INTEGER NOT NULL DEFAULT 0 CHECK (default_enabled IN (0, 1)),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS platform_tenant_feature_overrides (
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  flag_key TEXT NOT NULL REFERENCES platform_feature_flags(key),
+  enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+  updated_by TEXT NOT NULL REFERENCES platform_users(id),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (tenant_id, flag_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_platform_flag_overrides_tenant ON platform_tenant_feature_overrides(tenant_id);
+
+CREATE TABLE IF NOT EXISTS platform_tenant_limits (
+  tenant_id TEXT PRIMARY KEY REFERENCES tenants(id),
+  max_users INTEGER NOT NULL DEFAULT 25 CHECK (max_users >= 0),
+  max_branches INTEGER NOT NULL DEFAULT 3 CHECK (max_branches >= 0),
+  storage_quota_bytes INTEGER NOT NULL DEFAULT 0 CHECK (storage_quota_bytes >= 0),
+  updated_by TEXT NOT NULL REFERENCES platform_users(id),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
