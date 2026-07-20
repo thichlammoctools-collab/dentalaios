@@ -6,11 +6,10 @@ export function cn(...inputs: ClassValue[]): string {
 }
 
 export function formatCurrency(amount: number, currency = "VND"): string {
-  return new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency,
+  const formatted = new Intl.NumberFormat("vi-VN", {
     maximumFractionDigits: 0,
   }).format(amount);
+  return `${formatted} vnđ`;
 }
 
 export function formatDate(iso: string | undefined): string {
