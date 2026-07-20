@@ -105,3 +105,35 @@ CREATE TABLE IF NOT EXISTS platform_tenant_limits (
   updated_by TEXT NOT NULL REFERENCES platform_users(id),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS platform_content (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL CHECK (kind IN ('announcement', 'help_article')),
+  title TEXT NOT NULL,
+  body_markdown TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('draft', 'scheduled', 'published', 'archived')),
+  audience TEXT NOT NULL CHECK (audience IN ('global', 'tenant')),
+  tenant_id TEXT REFERENCES tenants(id),
+  publish_at TEXT,
+  expire_at TEXT,
+  created_by TEXT NOT NULL REFERENCES platform_users(id),
+  updated_by TEXT NOT NULL REFERENCES platform_users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  CHECK ((audience = 'global' AND tenant_id IS NULL) OR (audience = 'tenant' AND tenant_id IS NOT NULL))
+);
+
+CREATE INDEX IF NOT EXISTS idx_platform_content_publication ON platform_content(status, audience, tenant_id, publish_at);
+
+CREATE TABLE IF NOT EXISTS platform_integration_status (
+  provider TEXT NOT NULL,
+  tenant_id TEXT REFERENCES tenants(id),
+  enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+  health_status TEXT NOT NULL DEFAULT 'unknown' CHECK (health_status IN ('healthy', 'degraded', 'down', 'unknown')),
+  last_checked_at TEXT,
+  last_success_at TEXT,
+  last_error_code TEXT,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (provider, tenant_id)
+);
+

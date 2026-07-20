@@ -1,300 +1,341 @@
 # S3 Governance With LarkSuite
 
-## Objective
+## Goal
 
-Provide an opt-in, multi-tenant S3 (Sociocracy 3.0) governance capability for DentalAIOS. Each clinic connects its own internal Lark app. Lark Base becomes the operational source of truth for circles, S3 roles, accountabilities, tensions, proposals, objections, consent decisions, and operational actions. DentalAIOS remains the source of truth for accounts, fixed clinical RBAC, patient/clinical/financial data, and security audit trails.
+Deliver an opt-in, multi-tenant S3 (Sociocracy 3.0) governance feature for DentalAIOS, with each clinic using its own Lark internal app.
 
-## Confirmed Decisions
+- Lark Base is the source of truth for S3 circles, S3 roles, accountabilities, tensions, proposals, objections, decisions, actions, and meetings.
+- DentalAIOS remains the source of truth for tenants, branches, user accounts, system RBAC, patient/clinical/payment data, integration secrets, delivery state, and audit.
+- This is a governance layer. It must not make Lark a second clinical system or allow S3 role assignments to grant access to DentalAIOS.
 
-- Launch as a multi-tenant feature, gated per tenant with `s3_lark_enabled`.
-- Each tenant supplies credentials for its own Lark internal app; do not introduce a shared multi-tenant OAuth app in this release.
-- Onboarding creates a dedicated S3 governance Base from a controlled template. Attaching an existing Base is out of scope.
-- DentalAIOS owns user accounts and all fixed RBAC. Map a DentalAIOS user to a verified Lark person ID/email for assignment only.
-- S3 role assignments are governance/accountability assignments. They never grant DentalAIOS `system_key` roles or permissions automatically.
-- Lark Base/Docs implement S3 consent; Lark Task manages actions; Calendar manages governance/tactical meetings.
-- Lark Approval is only a mandatory guardrail, not the normal consent mechanism.
-- Mandatory guardrails: patient-data access, security/retention/integration changes, and clinical-safety exceptions. Tenants configure finance thresholds, approvers, and additional guardrails.
-- Webhooks update S3 mappings and audit metadata only. They must never update appointments, treatment plans, clinical data, or DentalAIOS RBAC.
-- Lark S3 Base, Docs, Tasks, Calendar events, logs, and payloads contain no PII or clinical data: no patient names, phone numbers, patient record IDs, diagnoses, treatment details, detailed appointments, or payment details. Use a generic work classification and a DentalAIOS deep link protected by API RBAC when needed.
-- Initial automation: create Base template, map Lark users, create actions as Tasks, create meetings in Calendar, reminders, and receive Task/Approval webhook events. Chat bot creation and Directory synchronization are out of scope.
+## Fixed Decisions
 
-## Current-System Constraints
+- Release S3 as tenant opt-in behind `s3_lark_enabled`; do not enable it by default.
+- Each tenant configures credentials for its own Lark internal app. Shared multi-tenant OAuth is out of scope.
+- Onboarding creates one dedicated governance Base from a controlled template. Importing or attaching an existing Base is out of scope.
+- DentalAIOS user accounts remain authoritative. A user self-links to Lark through OAuth only to verify their `open_id` for assignment; Lark is not a DentalAIOS login provider and Directory sync is out of scope.
+- Lark Base access is granted manually by the tenant Lark administrator. DentalAIOS shows mapping/access-health warnings but does not automatically change Base membership or advanced permissions.
+- S3 roles are distinct from existing system roles in `roles.system_key`; no automatic S3-to-RBAC mapping is permitted.
+- S3 consent is recorded in Base and meeting minutes. Lark Approval is a guardrail only, never the normal consent mechanism.
+- Mandatory Approval categories: patient-data access, clinical-safety exceptions, and security/retention/integration changes. Tenants may configure finance thresholds, approvers, and stricter extra guardrails; they cannot disable the mandatory categories.
+- An S3 decision marked `active` means consent plus all mandatory guardrails are verified. It does not automatically change DentalAIOS configuration, records, or permissions. It must have execution actions.
+- Lark webhook events update integration metadata only. They must never alter patient records, appointments, treatment plans, payment records, or permissions.
+- S3 Lark artifacts contain no PII or clinical data: no patient name, phone, email, record ID, diagnosis, treatment detail, detailed appointment, payment detail, or clinical file. Do not create clinical deep links. Staff find clinical context from DentalAIOS under normal RBAC.
+- Apply three-layer data protection: mandatory policy/training, payload validation for Console writes, and periodic audit/remediation. Do not claim complete DLP for direct edits in Lark Base/Docs.
+- Initial automation is limited to Base provisioning, identity linking, Task creation/synchronization from S3 Console, Calendar event creation, reminders, and Task/Approval webhooks. No polling Base, chat bot, Directory sync, automatic Base permission changes, automatic Calendar invitations, or automatic Doc provisioning.
 
-- `src/db/migrations/0001_init.sql` defines tenant isolation, `roles`, a single `users.role_id`, audit logs, and `lark_sync_logs`.
-- `src/db/migrations/0018_system_roles.sql` and `src/shared/constants/index.ts` make system roles platform-defined. `apps/api/src/services/users.service.ts` only assigns those system roles. Do not overload these records for S3 roles.
-- `apps/api/src/lib/lark-client.ts` currently supports tenant access token, Task, and Calendar calls only.
-- `apps/api/src/services/lark.service.ts` and `apps/api/src/jobs/lark-retry.ts` provide queue-based Lark work but no generic event webhook or outbox.
-- `apps/api/src/routes/clinic.ts` and `lark_configs` already hold encrypted tenant-specific app credentials. Extend this configuration rather than storing unencrypted Lark credentials elsewhere.
-- Architecture rule 7 in `apps/api/src/index.ts` says Lark receives operational fields only. This plan narrows it further for S3 governance: no PII or clinical fields.
+## Existing Boundaries To Preserve
 
-## Target Responsibilities
+- `src/db/migrations/0001_init.sql` defines tenant isolation, users, a single `users.role_id`, roles, audit logs, and `lark_sync_logs`.
+- `src/db/migrations/0018_system_roles.sql`, `src/shared/constants/index.ts`, and `apps/api/src/services/users.service.ts` enforce platform-owned system roles. Do not reuse these tables for dynamic S3 roles.
+- `apps/api/src/lib/lark-client.ts` currently supports tenant access token, Task creation, and Calendar events only.
+- `apps/api/src/services/lark.service.ts` and `apps/api/src/jobs/lark-retry.ts` are legacy handover/notification flows. Keep S3 clients, payload builders, mapping, and retries separate.
+- Existing treatment-plan Lark handover currently contains patient name and phone. It is legacy functionality outside this S3 scope; create a follow-up security decision to migrate it to metadata-only. Do not silently change this production behavior during the S3 delivery.
+- Current `manager` has `all` permissions. This conflicts with least-privilege S3 integration controls and requires a separate RBAC hardening release before S3 rollout.
+- Current branch deletion is hard delete. This conflicts with retained S3 branch scope and requires branch archival before branch-scoped S3 rollout.
 
-| System | Owns | Must not own |
+## Workstream 0: Platform Hardening Release
+
+Deliver and stabilize this work independently from S3; it affects every tenant whether or not it enables Lark.
+
+### 0.1 Make manager permissions explicit
+
+1. Add the permissions:
+   - `view_governance`
+   - `manage_governance`
+   - `manage_governance_integration`
+   - split existing user administration into non-sensitive user administration and RBAC/access administration as required by route changes.
+2. Change the system-role catalog so only `admin` has `all`.
+3. Replace `manager`'s current `['all']` with an explicit least-privilege set.
+4. Preserve routine manager operations: management dashboard, patient read access, appointments/schedules, payments, chairs/rooms, and governance console operations.
+5. Do not grant managers by default: integration secrets, webhook/guardrail configuration, clinical write/plan approval, or direct permission escalation.
+6. Refactor existing `MANAGE_USERS` route behavior so creating a user or expanding a user's patient-data access cannot bypass access-request guardrails. Retaining/deactivating users and permitted branch administration may use the non-sensitive administration permission.
+7. Add `auth_version` or `permissions_version` to users/role assignments. Include it in JWTs and compare it in middleware against D1 or a safe bounded cache. Increment it whenever permissions/role assignment are changed so existing tokens lose old privileges on the next request.
+8. Add migration/backfill and regression coverage for every affected system role and route. Publish release notes before enabling the new model.
+
+### 0.2 Archive branches instead of hard deleting them
+
+1. Add `is_active`/archival metadata to `branches`; preserve historical records.
+2. Replace destructive branch deletion with archive/deactivation behavior.
+3. Block archival or require explicit resolution when a branch still has active users, patients, appointments, or active S3 decisions/actions.
+4. Preserve historic branch scope in Lark Base; archived branches remain linkable for historical decisions but are unavailable for new scope selection.
+5. Add tests for scope preservation, tenant isolation, blocked archival, and existing branch APIs.
+
+Use a separate feature flag such as `branch_archival_enabled` during migration. Do not couple the rollout to tenant S3 activation.
+
+## Workstream 1: S3 Data Contract And Tenant Configuration
+
+### 1.1 Add tenant-scoped integration data
+
+Create additive migrations and repositories. Do not alter `users.role_id`, `roles.system_key`, or clinical tables for S3 purposes.
+
+1. `tenant_governance_lark_configs`:
+   - unique `tenant_id`, `enabled`, `s3_lark_enabled`/feature state.
+   - onboarding state: `not_configured`, `credentials_valid`, `webhook_verified`, `base_created`, `ready`, `degraded`, `disabled`, `error`.
+   - Base token/URL, template version, Base table IDs, governance Calendar ID, Task list/section ID if used.
+   - random `webhook_endpoint_id`; do not put actual tenant ID in callback URLs.
+   - encrypted webhook verification token and encrypt key, using the existing AES-GCM secret utility and `ENCRYPTION_KEY`.
+   - configured Lark Approval definition IDs for each mandatory category.
+   - mandatory policy version plus tenant finance thresholds, approver routes, and extra guardrail policy.
+   - health-check status/timestamps and redacted error category.
+2. `lark_user_mappings`:
+   - `tenant_id`, DentalAIOS user ID, verified Lark `open_id`, mapping status, OAuth verification method, linked/revoked timestamps.
+   - unique active mapping for `(tenant_id, dentalaios_user_id)` and `(tenant_id, lark_open_id)`.
+3. `lark_governance_mappings`:
+   - tenant, Base record type/ID, local S3 object key, external Task/Calendar/Approval IDs, source version, idempotency key, sync state, retry/error metadata.
+4. `lark_governance_events`:
+   - tenant, source, Lark event ID, object type/ID, received/processed timestamp, normalized outcome, retry count, redacted error category.
+   - unique `(tenant_id, lark_event_id)` for replay protection.
+5. `access_requests`:
+   - immutable request code, requester, target user, requested old/new system role/permissions, branch scope, rationale classification, state, expiry, linked Approval definition/instance, verified decision timestamp, applied-by user/timestamp, cancellation reason.
+   - request expires in 7 days, may link to only one Approval instance, and may be applied once.
+   - invalidate the request if target user, requested role/permissions, or branch scope changes.
+6. Add indexes for tenant/state, external IDs, event ID, request expiry, and retry work.
+
+### 1.2 Integrate with the existing Lark config safely
+
+- Keep app credentials in existing encrypted `lark_configs`; S3 config references that tenant configuration rather than duplicating app secrets.
+- Extend public configuration responses only with redacted status and resource metadata. Never return secrets, webhook tokens, encrypt keys, raw event data, or unneeded `open_id` values.
+- Credential rotation resets S3 state to revalidation required; only a successful full health check can return it to `ready`.
+- Disabling S3 stops new outbound writes and reminders, preserves Base, mappings, and audit data, and never hard-deletes Lark artifacts.
+
+## Workstream 2: Lark Base Template And Governance Process
+
+### 2.1 Provision one private Base per tenant
+
+The app provisions only the Base and Base schema after capability validation. The tenant Lark administrator assigns Base membership/advanced permissions manually. The app must not grant broader Base access automatically.
+
+Seed these circles:
+
+| Circle | Scope | Purpose |
 |---|---|---|
-| DentalAIOS | tenant, user account, system role/RBAC, patient and clinical data, payments, protected deep links, integration configuration, webhook receipt, mapping IDs, delivery state, audit | Circle/role governance content as an editable duplicate of Base |
-| Lark Base | Circle topology, S3 roles, accountabilities, assignments, tensions, proposals, objections, decision log, action metadata | DentalAIOS permissions, patient/clinical/financial records |
-| Lark Docs | Governance agenda, meeting minutes, decision rationale, linked evidence without patient data | Clinical notes or attachments |
-| Lark Task | Assigned follow-up actions, generic title, due date, status, link to governance decision | Clinical workflow state |
-| Lark Calendar | Governance/tactical meeting times and participants | Patient schedules |
-| Lark Approval | Required guardrail approval instances and their final state | General S3 consent voting |
+| General Circle | tenant | Integrate strategy, cross-circle constraints, and organization governance |
+| Clinical Care | tenant or selected branches | Improve safe clinical service and quality without placing clinical records in Lark |
+| Patient Experience | tenant or selected branches | Improve communication and service flow without patient data in Lark |
+| Business Operations | tenant or selected branches | Coordinate finance, people, facilities, and non-clinical operations |
+| Digital & Compliance | tenant | Own digital workflow, security, compliance, and integrations |
 
-## Base Template
+### 2.2 Define the Base schema
 
-Create one private Base per tenant. The app service account and tenant S3 administrators receive the minimum necessary Base access. Do not place it in a shared public folder. Use Base advanced permissions so role holders can access operational tables/views but only tenant S3 administrators can edit schema, workflow, or sensitive configuration.
-
-### Seeded Circles
-
-Create these records at onboarding. Tenant members may change the structure only through the Governance Proposal process.
-
-| Circle | Parent | Purpose |
-|---|---|---|
-| General Circle | none | Integrate strategy, cross-circle constraints, and organization-wide governance |
-| Clinical Care | General Circle | Deliver safe, effective clinical service and quality improvement |
-| Patient Experience | General Circle | Improve patient communication and operational service flow without carrying patient records in Lark |
-| Business Operations | General Circle | Coordinate finance, people, facilities, and non-clinical operations |
-| Digital & Compliance | General Circle | Maintain digital workflows, information security, compliance, and integrations |
-
-### Base Tables
-
-Use a single Base with the following tables. Field names are stable API contracts; user-visible Vietnamese labels may be localized without changing stored identifiers or mapping records.
+Store Lark table/field IDs after creation. Use link fields for relationships and controlled choices for statuses/categories; do not rely on editable text names as API keys.
 
 | Table | Required fields |
 |---|---|
-| `Circles` | Circle Key (unique), Name, Parent Circle link, Purpose, Domain summary, Status, Lead Link person, Rep Link person, Facilitator person, Secretary person, Review date, Constraints |
-| `S3 Roles` | Role Key (unique), Circle link, Name, Purpose, Domain, Accountabilities long text, Decision boundaries, Status, Review date |
-| `Role Assignments` | Assignment Key (unique), S3 Role link, DentalAIOS User ID (read-only mapping text), Lark person, Assignment type, Effective from/to, Status |
-| `Tensions` | Tension Key, Circle link, Raised by, Type, Description, Priority, Owner role, Status, Related DentalAIOS deep link, Created/closed dates |
-| `Governance Proposals` | Proposal Key, Circle link, Source tension, Title, Proposal text, Classification, Guardrail type, Proposer, Status, Meeting link, Effective date, Review date, Decision link |
-| `Objections` | Objection Key, Proposal link, Raised by, Harm/risk statement, Evidence, Integration proposal, Status, Resolved by, Resolved date |
-| `Decisions` | Decision Key, Proposal link, Circle link, Decision type, Consent result, Decision text, Owner role, Effective/review dates, Lark Doc link, Guardrail approval ID/status, Status |
-| `Actions` | Action Key, Decision link, Circle link, Title, Owner role, Assignee, Due date, Status, Lark Task ID/URL, DentalAIOS deep link, Last sync date |
-| `Meetings` | Meeting Key, Circle link, Meeting type (governance/tactical/retrospective), Agenda Doc link, Calendar event ID/URL, Facilitator, Secretary, Start/end, Status |
-| `Integration Events` | Event Key, Source, External event ID, Object type, Object ID, Received date, Processing status, Error summary, Retry count |
+| `Branches` | DentalAIOS Branch Key, Display Name, Active/Archived, Last Synced At. DentalAIOS-managed and read-only to normal Base users. |
+| `Circles` | Circle Key, Name, Parent Circle link, Purpose, Domain summary, Scope (`tenant`/`selected_branches`), Applicable Branches link, Status, Lead Link, Rep Link, Facilitator, Secretary, Review Date, Constraints. |
+| `S3 Roles` | Role Key, Circle link, Name, Purpose, Domain, Accountabilities, Decision Boundaries, Status, Review Date. |
+| `Role Assignments` | Assignment Key, S3 Role link, DentalAIOS User Mapping reference, Lark Person, Assignment Type, Effective From/To, Status. |
+| `Tensions` | Tension Key, Circle link, Scope, Applicable Branches, Raised By, Type, Description, Priority, Owner Role, Status, Created/Closed dates. |
+| `Governance Proposals` | Proposal Key, Circle link, Source Tension, Scope, Applicable Branches, Title, Proposal, Classification, Guardrail Category, Proposer, Status, Meeting link, Effective/Review Date, Decision link. |
+| `Objections` | Objection Key, Proposal link, Raised By, concrete Harm/Risk, Evidence, Integration proposal, Status, Resolution and date. |
+| `Decisions` | Decision Key, Proposal link, Circle link, Scope, Applicable Branches, Consent Result, Decision Text, Owner Role, Effective/Review dates, Minutes Doc URL, Guardrail request code/Approval status, Status. |
+| `Actions` | Action Key, Decision link, Circle link, Scope, Applicable Branches, Title, Owner Role, Assignee mapping, Due Date, Status, Task ID/URL, Sync State, Last Synced At. |
+| `Meetings` | Meeting Key, Circle link, Meeting Type, Agenda/Minutes Doc URL, Calendar Event ID/URL, Facilitator, Secretary, Start/End, Status. |
 
-Implementation details:
+Create the views: `My Actions`, `Open Tensions`, `Governance Queue`, `Awaiting Objection Resolution`, `Guardrail Pending`, `Circle Health`, and `Overdue Reviews`.
 
-- Use `link` fields instead of duplicated labels for all Circle, proposal, decision, and action relationships.
-- Use person fields only after a DentalAIOS-to-Lark identity mapping exists. Until then, use an onboarding exception queue instead of free-text names.
-- `Related DentalAIOS deep link` is optional and contains only a signed/resource-scoped URL, never an identifier or summary in adjacent text. The API validates current JWT and RBAC on every request.
-- Lark Base automation may notify assignees and create views, but it may not call DentalAIOS clinical endpoints.
-- Create views: `My Actions`, `Open Tensions`, `Governance Queue`, `Awaiting Objection Resolution`, `Guardrail Pending`, `Circle Health`, and `Overdue Reviews`.
+Rules:
 
-## Consent and Guardrail Workflow
+- General Circle is tenant-wide. A tenant-wide Circle/Proposal/Decision/Action must explicitly declare that scope; a branch-scoped record must use links to the synchronized `Branches` table.
+- When DentalAIOS creates, renames, archives, or restores a branch, S3 Console updates the Base `Branches` reference table. It never deletes a historical branch record from Base.
+- Only a Circle Secretary and tenant S3 administrator can update `Consent Result`, `Decision Status`, `Effective/Review Date`, and `Guardrail Status`. The Facilitator confirms the process in meeting minutes. Role holders can create tensions/proposals/objections but cannot mark their own proposal as consented.
+- Base history and minutes Doc are the required evidence of consent. Secretary creates/copies agenda/minutes Docs from a tenant-managed Lark template and links the URL; auto-provisioning Docs is out of scope.
+- Base edits must never contain hidden DentalAIOS record IDs or clinical deep links.
 
-### Standard S3 governance change
+### 2.3 Standard consent procedure
 
-1. A role holder records a tension in `Tensions`.
-2. The relevant Circle owner triages it as operational, governance, cross-circle, or guardrail.
-3. A governance change becomes a `Governance Proposal` with a linked Circle, source tension, bounded proposal, effective date, and review date.
-4. During the governance meeting, the facilitator runs: presentation, clarifying questions, reaction round, amendment, objection round, integration, and consent confirmation.
-5. An objection is valid only when it identifies concrete harm to the Circle purpose or a role's ability to fulfil its accountability. Preference or disagreement is not an objection.
-6. Secretary records each objection and its integration in `Objections`; then records the final consent decision in `Decisions` and links the minutes Doc.
-7. Decision actions are created in `Actions`; DentalAIOS creates linked Lark Tasks through the Queue. Task status is mirrored only to the action metadata.
-8. At review date, the Circle either renews, amends, or retires the decision.
+1. Role holder records a tension.
+2. Circle triages it as operational, governance, cross-circle, or guardrail.
+3. Secretary/role holder creates a bounded proposal with scope, review date, and necessary evidence.
+4. Facilitator runs presentation, clarification, reaction, amendment, objection, integration, and consent rounds.
+5. An objection is valid only if it identifies concrete harm to Circle purpose or ability to fulfil an accountability; preference alone is not valid.
+6. Secretary records objections and integrations, records the decision, links minutes, and creates execution actions.
+7. At review date, Circle renews, changes, or retires the decision.
 
-### Guardrail path
+## Workstream 3: Approval Guardrails And Access Requests
 
-1. Classify a proposal with one or more guardrail categories.
-2. The platform always requires Lark Approval before activation for: access to patient data, security/retention/integration changes, and clinical-safety exceptions.
-3. Tenant configuration adds finance threshold rules, approver routes, and optional guardrails. A tenant cannot disable mandatory categories.
-4. `Decision.Status` remains `awaiting_guardrail` after S3 consent until the Approval instance reports approved.
-5. A rejected, canceled, expired, or unverifiable Approval leaves the decision inactive and creates an escalation Action; no automatic fallback approval is allowed.
-6. Approval webhook delivery records the external instance/task IDs, verified final status, timestamp, and event ID. It never changes DentalAIOS permissions or operational clinical records.
+### 3.1 Manual Approval creation with verified linkage
 
-## Tenant Onboarding and Configuration
+Do not assume tenant internal apps can create Lark Approval definitions or instances through API.
 
-### Configuration extensions
+1. Each tenant Lark administrator creates the mandatory Approval definitions using supplied templates and configures the definition IDs in onboarding.
+2. Every template includes mandatory `DentalAIOS Request Code`, guardrail category, and requested scope fields.
+3. When an S3 decision needs a guardrail, S3 Console creates a one-time, opaque guardrail request code and action. Secretary initiates the correct Approval instance manually in Lark and enters that code.
+4. Secretary links the Approval instance code/URL in S3 Console.
+5. Webhook/API verification accepts an Approval only when all of these match: tenant, configured definition ID, required request code, guardrail category, and final state.
+6. A rejected, canceled, expired, duplicated, unverifiable, or mismatched Approval keeps the decision inactive and creates an escalation action. There is no manual override.
+7. If tenant Approval capability/webhook verification is unavailable, tenant is `degraded`; no new guarded decisions can activate.
 
-Add an S3-specific configuration record, separate from the basic `lark_configs` credentials record. It must contain at least:
+### 3.2 Enforce patient-data access guardrails in DentalAIOS
 
-- `tenant_id` unique key and `enabled` state.
-- onboarding state: `not_configured`, `credentials_valid`, `webhook_verified`, `base_created`, `ready`, `disabled`, `error`.
-- Base token, Base URL, table IDs, default Calendar ID, Task list/section IDs when created.
-- Lark webhook verification token and encrypt key, encrypted at rest using the same secret utility as `lark_configs`.
-- mandatory guardrail policy version and tenant-configured finance/additional guardrail JSON.
-- template version, created/updated timestamps, last health-check timestamp, last error code/category.
+1. Any creation or expansion of system permissions that can read/write patient data must create an `access_request`; this includes current Users screens and APIs, not only S3 proposals.
+2. Granting a new user a patient-data role, switching a user to a broader role, or adding a broader permission must remain `awaiting_approval` until the request has a verified Approval.
+3. Once verified, an authorized DentalAIOS administrator performs a final explicit apply action. Webhook approval never automatically changes RBAC.
+4. Removing/reducing access is immediate, fully audited, and does not require Approval.
+5. Permit only the narrow tenant-registration bootstrap admin exception; log it and do not reuse it for subsequent user changes.
+6. A tenant that cannot verify its Lark Approval integration may not use the new S3 guarded access-expansion path. Do not accept an administrator attestation as a replacement for verified Approval.
 
-Create a separate identity mapping table:
+### 3.3 Other guarded changes
 
-- one row per `tenant_id + dentalaios_user_id + lark_open_id`.
-- verified Lark person identifier, verified work email hash/display metadata as needed, mapping status, verification method, timestamps, revocation fields.
-- unique constraints preventing one active Lark person mapping to multiple active DentalAIOS users in the same tenant without explicit administrator resolution.
+- Security, retention, and integration decisions require verified Approval plus an implementation action/change ticket. Approval does not directly modify Worker config, credentials, retention jobs, or deployment state.
+- Finance guardrails apply when configured tenant threshold/rules match. Tenant may add stricter rules but cannot weaken mandatory rules.
 
-Create a mapping/event table instead of extending `lark_sync_logs` beyond its simple existing purpose:
+## Workstream 4: Identity, S3 Console, Task, and Calendar
 
-- external object type: Base record, Task, Calendar event, Approval instance/task.
-- local S3 object key and Lark object ID.
-- source version/update timestamp, last synchronization status, idempotency key, retry/error metadata.
-- inbound event id plus unique `(tenant_id, lark_event_id)` deduplication.
+### 4.1 Self-service Lark identity link
 
-### Onboarding API and UI
+1. Add authenticated start/callback routes for Lark OAuth linked to the current DentalAIOS user and tenant.
+2. Generate a one-time, short-lived `state` that binds DentalAIOS user ID, tenant ID, nonce, callback intent, and expiry. Validate it before token exchange.
+3. Verify the OAuth identity belongs to the configured tenant Lark app/workspace. Store only the verified `open_id` and minimal metadata required for the mapping; discard user OAuth tokens after verification unless a documented future feature requires them.
+4. Allow self-unlink/revoke. Revoke must stop automatic assignment but leave historical action evidence intact.
+5. When an S3 role holder lacks a valid mapping or Base access, show a health warning. Do not infer identity from a typed name/email.
 
-Extend `ClinicSettingsPage.tsx` or add a dedicated organization-governance settings page visible only to `MANAGE_USERS` plus a new narrowly scoped `MANAGE_GOVERNANCE_INTEGRATION` permission. Do not use `all` as a default access boundary for this feature.
+### 4.2 S3 Console
 
-The onboarding wizard must:
+Add a dedicated `S3 Console` page under settings/operations. It is a command surface, not a second editable governance database.
 
-1. Explain the strict data policy and require administrator acknowledgment.
-2. Accept tenant internal-app credentials and Base/Task/Calendar/webhook configuration only over authenticated API; never expose secrets after submission.
-3. Test Lark authentication and required API scopes before saving ready state.
-4. Register and verify the webhook endpoint/challenge using a tenant-specific configuration. Validate verification token/signature and decrypt payloads before any event handling.
-5. Display missing scopes/configuration requirements without logging credentials or raw payloads.
-6. Create the dedicated Base from the versioned template and store returned Base/table IDs.
-7. Seed the five circles, default roles (Lead Link, Rep Link, Facilitator, Secretary) as S3 definitions, views, and governance templates.
-8. Invite/map initial S3 administrators and verify Lark identity mappings before creating person-based assignments.
-9. Configure the minimum guardrail policies and require tenant finance threshold/approvers if finance guardrails are enabled.
-10. Run a health check: create one synthetic governance action/task and one test calendar event, verify callback/mapping, then remove or close the test artifacts.
-11. Enable the tenant only after all required steps pass. Failed onboarding remains resumable and idempotent.
+- `view_governance`: read tenant integration health and Base/Calendar links.
+- `manage_governance`: read approved Base records through server-side Lark API, create/synchronize Tasks and Calendar events, link Approval instances, and update mapping/audit metadata.
+- `manage_governance_integration`: credential configuration, onboarding, webhook/key rotation, Approval policy/definition configuration, and disable operation.
+- All reads/writes are tenant-scoped and backed by API permission checks; frontend hiding is not authorization.
+- Console loads the current source record from Base, validates allowed fields/status/schema/version/no-PII, queues idempotent operations, then writes Task/Event mapping metadata back to the matching Base record.
+- Do not poll Base. If a direct Base edit needs a Task or Calendar event, Secretary invokes Console against that Base record.
 
-Disable behavior:
+### 4.3 Task behavior
 
-- Set `s3_lark_enabled` false, stop new outbound writes and scheduled reminders, reject new S3 automation calls, preserve audit/mapping/config metadata, and leave Lark Base unchanged.
-- Do not hard-delete a tenant Base or Lark artifacts from an in-product disable operation.
-- Credential rotation must revalidate scopes and webhook settings before returning to `ready`.
+1. Console creates a generic Task in the tenant-configured task list/section from a selected `Actions` record.
+2. Use linked `open_id` to assign only after identity mapping exists and capability preflight proves the tenant app can create/assign Tasks.
+3. If mapping or capability is absent, create the Task with `needs_manual_assignment` metadata and require Secretary to assign it in Lark. Do not substitute name/email text.
+4. Lark Task completion/assignment webhooks update only the Base Action mapping/status and D1 integration metadata. They never affect clinical workflow state.
+5. Queue operations use deterministic idempotency keys `(tenant, action record, source version, operation)` and retry only transient failures.
 
-## API, Worker, and Data Design
+### 4.4 Calendar behavior
 
-### New database migrations
+1. Console creates governance/tactical events in the tenant-configured shared governance Calendar from a `Meetings` record.
+2. Event payload has only generic meeting title, times, Circle context, and non-sensitive agenda/minutes URL.
+3. Secretary/Facilitator adds participants manually in Lark. Do not automatically invite via `open_id` until Calendar attendee capability and permissions are separately validated.
+4. Calendar webhook processing is limited to mapping/audit metadata; it cannot alter patient appointments.
 
-Create new, additive D1 migrations for:
+## Workstream 5: Lark Client, Webhooks, Queue, and Reliability
 
-- `tenant_governance_lark_configs` as described above.
-- `lark_user_mappings`.
-- `lark_governance_mappings` / `lark_governance_events` with per-tenant event deduplication.
-- `tenant_governance_settings` only if generic `tenant_settings` is not appropriate for the structured policy data.
-- indexes on tenant/status, Lark object IDs, external event IDs, due/retry fields.
+### 5.1 Capability validation before provisioning
 
-Do not change existing `users.role_id`, `roles.system_key`, or clinical table schemas to represent S3 roles.
+Before allowing a tenant `ready`, validate documented Lark capability and scopes for the tenant internal app:
 
-### Backend modules
+- tenant access token;
+- Base create/read/write plus required schema/views/permissions API support;
+- Task create/read/update and subscribed Task events;
+- Calendar event create/update/delete;
+- OAuth identity link;
+- Approval instance status read/event subscription for configured definitions;
+- webhook verification and event encryption/decryption.
 
-Add focused modules rather than expanding the existing handover service:
+If an API cannot be used by tenant internal apps, use an explicit verified manual prerequisite where viable. Do not silently substitute another Lark product or report readiness without the capability.
 
-- `services/lark-governance-onboarding.service.ts`: state machine, capability checks, Base template provisioning, seeding, health check.
-- `services/lark-governance-sync.service.ts`: idempotent outbound Base/Task/Calendar operations and mapping updates.
-- `services/lark-governance-webhook.service.ts`: challenge, request signature/token verification, decrypt payload, dedupe, allowlisted event dispatch.
-- `services/lark-identity-link.service.ts`: map and revoke user-to-Lark identities.
-- `repositories/lark-governance*.repo.ts`: tenant-scoped configuration, mapping, and event persistence.
-- `lib/lark-governance-client.ts`: Base, Task, Calendar, Approval APIs with token retrieval shared safely from `lark-client.ts` or a dedicated tenant-auth module.
-- `routes/governance-lark.ts`: settings, onboarding progress/retry, identity link, guardrail policy, and read-only integration health endpoints.
-- `routes/lark-webhooks.ts`: public, unauthenticated only at transport level; it must perform Lark verification before route dispatch and must never accept user JWT authorization as a substitute.
-- extend `jobs/lark-retry.ts` or replace it with a typed integration queue dispatcher for governance provisioning, outbound task/calendar sync, reminder work, and retry. Preserve existing message behavior.
+### 5.2 Per-tenant webhook endpoints
 
-### Required Lark app capabilities
+1. Generate an opaque, random `webhook_endpoint_id` per tenant and configure Lark with `/api/integrations/lark/events/{endpoint_id}`.
+2. Worker looks up tenant config using this opaque ID, then verifies event token/signature and decrypts payload with that tenant's encrypted event key before parsing it.
+3. Do not expose actual tenant ID in URL and do not route a common endpoint based on untrusted/decrypted fields.
+4. Persist normalized event receipt with event ID before side effects; deduplicate by `(tenant_id, lark_event_id)`.
+5. Allowlist only Task metadata events, final Approval events, and configured Calendar metadata events. Ignore unsupported events with a redacted audit entry.
+6. Never persist raw webhook payloads, authorization headers, secrets, PII, or clinical references.
 
-Document exact current Lark scopes and event subscriptions from official API schema before implementation. At minimum validate capability for:
+### 5.3 Queue, mapping, and health state
 
-- tenant access token.
-- Base create/configure/read/write and advanced permission setup, subject to APIs actually available to the tenant internal app.
-- Task create/update/read and task event subscription.
-- Calendar create/update/delete and calendar event handling for governance meetings.
-- Approval status event subscription and read access for guardrail instances. Approval definition creation/launch must use the tenant's supported Lark configuration path; do not assume all internal apps can programmatically create definitions.
-- user identity resolution required for mapping. If internal app APIs cannot safely resolve user by email, use an admin-mediated account-link flow.
-- event webhook verification, encryption/decryption, and tenant routing.
+- Keep S3-specific queue message types/services separate from `lark_retry` and `branch_lark_sync`; preserve existing behavior.
+- Persist operation intent/mapping before enqueueing. Workers update mapping state after each idempotent attempt.
+- Retry transient transport/rate-limit failures with bounded retries and DLQ monitoring. Mark scope/schema/permission failures as permanent, show admin remediation, and do not loop.
+- `ready` means full health check passed. `degraded` means credentials/scopes/webhook/Base/Approval checks fail after onboarding.
+- In `degraded`, preserve current clinical system behavior and existing access. Fail closed for new guarded decisions and patient-data permission expansion, and stop new Task/Calendar synchronization. Queue only safe retries. Admin must pass health check before returning to `ready`.
 
-If a required Lark resource cannot be provisioned by API for tenant internal apps, make it an explicit onboarding manual step with an admin-provided resource ID and a health check; do not silently substitute another resource type.
+## Onboarding Sequence
 
-### Queue and webhook reliability
+1. Admin opens S3 Lark integration settings and accepts the no-PII policy.
+2. Admin saves internal-app credentials through authenticated API; server encrypts secrets and tests authentication.
+3. Admin configures opaque webhook URL, verification token, and encryption key in Lark; Console completes challenge and event verification.
+4. Admin supplies/validates shared governance Calendar, Task list/section, and the three mandatory Approval definition IDs.
+5. Service validates capabilities/scopes and displays specific missing prerequisites without exposing secrets or raw payloads.
+6. Service provisions Base template, stores resource IDs/schema version, seeds Circles and `Branches` reference records.
+7. Tenant Lark administrator grants Base access/advanced permissions manually and creates/copies the governance minutes Doc template.
+8. Users self-link their Lark identities; Console highlights missing mapping/Base-access prerequisites for proposed role holders.
+9. Service runs health check using synthetic non-sensitive artifacts where supported, closes/removes test artifacts, and verifies mapping/webhook behavior.
+10. Admin enables S3 only after every mandatory check passes. Onboarding is resumable and idempotent.
 
-- Every outbound command uses an idempotency/mapping key derived from tenant, local S3 object, operation, and source version.
-- Persist intent/mapping before queueing; workers update success/failure transactionally where D1 allows.
-- Queue retry only transient errors, with a bounded retry count and dead-letter monitoring. Permanent scope/validation errors mark onboarding or operation `error` and surface remediation to the tenant administrator.
-- Verify webhook signature/token and decrypt payload before parsing event data.
-- Deduplicate events by Lark event ID per tenant. Persist first receipt before side effects.
-- Make handlers replay-safe and restrict dispatch to Task completion/assignment, Approval final state, and configured Calendar events. Ignore unsupported events with an audit entry.
-- Never log Authorization headers, secrets, decrypted webhook payloads, PII, or clinical references.
+## Rollout
 
-### Frontend changes
+1. Release Workstream 0 independently with migration, route regression tests, permission-version invalidation, and branch archival monitoring.
+2. Implement S3 behind feature flag without exposing it to regular tenants.
+3. Validate one sandbox tenant with a separate Lark workspace/internal app, including approved and rejected guardrails, OAuth mapping, Console Task/Calendar operations, webhook replay, and degraded recovery.
+4. Run an opt-in pilot with non-clinical governance work first.
+5. Review template usability, guardrail routing, delivery failures, data-policy findings, and access behavior.
+6. Enable tenant-by-tenant only after successful onboarding health checks. Keep existing Base import, chat bot, Directory sync, Doc auto-provisioning, Calendar auto-invites, and automatic S3-to-RBAC mapping out of scope.
 
-- Add a Governance/Lark integration settings screen, onboarding wizard, integration health/status, identity-link management, guardrail policy configuration, and read-only Base/Calendar links.
-- Use clear separation in wording: `Quyền hệ thống DentalAIOS` versus `Vai trò S3`. The UI must state that assigning an S3 role does not grant patient-data access.
-- Add an S3 deep-link panel to relevant non-clinical operating screens only after explicit tenant enablement. Links open the tenant's Base views or governance Docs; never embed a Base with patient context.
-- Do not expose Lark app secrets, webhook verification values, raw Approval payloads, or Lark user IDs unnecessarily in the browser.
+## Training and Operating Model
 
-## Delivery Sequence
-
-1. Define the S3 operating constitution, mandatory guardrail policy, Base field contract, event allowlist, data classification, and template versioning. Get security/compliance sign-off on the no-PII policy.
-2. Validate the tenant internal Lark app API surface and scopes against Lark documentation/sandbox before coding assumptions about Base provisioning, Approval launch, person mapping, or event subscription.
-3. Implement additive schema/repositories and server-side encrypted governance configuration. Add tenant feature flag and onboarding state machine.
-4. Build the Lark governance client and template provisioner. Make creation retryable/idempotent; record all generated resource IDs.
-5. Build protected configuration/onboarding/identity APIs and the web settings wizard. Enforce tenant scope and distinct governance-integration permission.
-6. Build outbound Task/Calendar synchronization and action mapping via Cloudflare Queue. Use generic action labels and protected deep links only.
-7. Build verified webhook ingestion, event deduplication, Task/Approval metadata handlers, and integration health diagnostics.
-8. Configure/validate mandatory guardrail Approval routes. Provide tenant controls only for finance thresholds, approvers, and additional policies.
-9. Add end-to-end audit coverage and dashboards for onboarding health, failed delivery, stale mappings, overdue decision reviews, and pending guardrails.
-10. Run an opt-in pilot with non-clinical governance work. Review Base schema/template, guardrail rules, meeting facilitation, and error telemetry before tenant-wide enablement.
-11. Expand availability by allowing each tenant administrator to opt in after passing onboarding health checks. Keep chat bot, Directory sync, existing Base import, and automatic S3-to-RBAC mapping out of scope.
-
-## Training and Operating Adoption
-
-### Roles to train
-
-| Audience | Required training |
+| Audience | Required content |
 |---|---|
-| Tenant administrators | Internal Lark app setup, scope/webhook requirements, Base access, onboarding recovery, credential rotation, disabling integration |
-| General Circle and Lead Links | S3 purpose/domain/accountability design, delegation boundaries, cross-circle agreements, guardrail escalation |
-| Facilitators and Secretaries | Governance meeting flow, valid objection test, integration, decision logging, review cadence, Base maintenance without schema drift |
-| Role holders | Tension capture, operational versus governance distinction, action ownership, consent behavior, no-PII policy |
-| Clinical/compliance/security owners | Mandatory guardrails, Approval routes, exceptions, audit review, prohibited automatic RBAC/clinical updates |
-| Technical support | Tenant isolation, secret handling, queue/webhook failure recovery, audit and incident response |
+| Tenant Lark administrators | Internal app configuration, required scopes/events, webhook setup, Base permissions, Approval definition template, credential rotation, degraded recovery. |
+| DentalAIOS administrators | RBAC hardening, access-request procedure, final apply step, no manual guardrail bypass, S3 Console permissions. |
+| Lead/Rep Links | Circle purpose/domain/accountability, scope by branch, cross-circle agreements, escalation. |
+| Facilitators/Secretaries | Consent process, valid objection test, minutes/record integrity, Base status controls, review cadence, Console Task/Calendar flow. |
+| S3 role holders | Tension/proposal/action process, no-PII policy, difference between S3 roles and system permissions. |
+| Clinical/compliance/security owners | Mandatory guardrails, approval verification, implementation actions, incident response. |
 
-### Learning path
+Use a live simulation covering: a valid/invalid objection, branch-scoped decision, guardrail request code linkage, rejected Approval, approved access request requiring final apply, Task fallback to manual assignment, and a Lark degraded incident.
 
-1. Orientation: distinction between S3 governance and DentalAIOS clinical RBAC; explain the data boundary.
-2. Workshop: map actual work into the four seeded circles; create/assign the first S3 roles and accountabilities.
-3. Simulation: run tension-to-consent, including an invalid preference objection and a valid risk objection.
-4. Guardrail simulation: consent a data-access or clinical-safety proposal, then follow its Approval branch while proving it cannot self-activate.
-5. Tactical practice: create actions, assign Lark Tasks, complete tasks, and review webhook metadata without changing clinical state.
-6. Facilitated live governance sessions: operate with a coach until Circles reliably record decisions and review dates.
-7. Monthly review: examine Circle health, action cycle time, decision review compliance, rejected guardrails, data-policy incidents, and integration errors.
+## Validation
 
-## Validation Plan
+### Automated
 
-### Automated tests
+- D1 migration/backfill tests for explicit manager permissions, branch archive behavior, tenant isolation, governance config, user mapping uniqueness, event dedupe, and access-request lifecycle.
+- JWT/version tests proving permission reduction or revocation invalidates existing tokens.
+- RBAC route regression tests proving manager retains intended operational access but cannot configure integration or directly expand patient-data access.
+- Service/repository tests for secret encryption, onboarding state transitions, template/resource mapping, request expiry/one-time use, policy validation, and no-PHI payload builders.
+- Console route tests for permission boundaries, tenant scope, Base schema/status validation, no-PHI validation, replay-safe Task/Calendar operations, and secret redaction.
+- OAuth tests for state binding/expiry, tenant mismatch rejection, identity uniqueness, unlink, and token disposal.
+- Webhook tests for challenge, invalid token/signature/decryption, per-tenant endpoint lookup, duplicate/out-of-order events, allowlist behavior, and proof that events cannot mutate clinical/RBAC records.
+- Approval tests proving definition/request code/category/tenant mismatch cannot activate a decision or access request.
+- Queue tests for idempotency, transient retry, permanent failures, DLQ behavior, degraded transition, and recovery.
 
-- Migration tests: unique tenant config, mapping constraints, tenant isolation, disabled behavior, and no modifications to existing RBAC semantics.
-- Repository/service tests: encryption/decryption, state-machine transitions, template mapping persistence, source version idempotency, retry classification, and policy validation.
-- Route tests: auth/permission checks, tenant boundaries, secret redaction, onboarding resume/disable, identity-link revocation, policy restrictions, and integration health responses.
-- Lark client tests: tenant token cache isolation, scope/error normalization, outgoing payload data classification, and no PII fields in Base/Task/Calendar payloads.
-- Webhook tests: challenge response, invalid signature/token/encryption rejection, duplicate event handling, unknown-event ignore, Task metadata update, Approval final-state update, and proof that webhook code cannot mutate appointment/treatment/RBAC data.
-- Queue tests: exactly-once effect under duplicate delivery, transient retry, permanent failure escalation, DLQ behavior, and resource mapping updates.
-- Frontend tests: S3 versus system-role labeling, onboarding failure/resume, restricted controls, and secret fields never rendered after save.
+### Acceptance
 
-### Integration and acceptance checks
+- Provision Base in a sandbox tenant; inspect schema, IDs, advanced permissions, and seeded branch/circle scope.
+- Complete tension-to-consent with minutes evidence; create action Task and governance Calendar event through Console.
+- Verify Task completion only changes action metadata.
+- Test every mandatory guardrail with approved, rejected, expired, duplicated, and mismatched Approval instances.
+- Test patient-data access request: pending does not change role, verified approval still requires final admin apply, reduced access applies immediately, and existing JWT is invalidated.
+- Test branch archive prevents active-scope loss and preserves historic Base links.
+- Test self-service OAuth identity mapping and manual Base access grant; verify fallback manual Task assignment when scope/capability is absent.
+- Test tampered/duplicate webhook, revoked credential, missing scope, Base schema drift, unavailable Approval webhook, and recovery from `degraded`.
+- Inspect all captured outbound data/logs to prove no PII, patient IDs, clinical data, payment detail, or raw payload persists in S3 artifacts.
 
-- Use a dedicated sandbox tenant and separate Lark workspace/internal app.
-- Provision Base, inspect all table IDs/schema/permissions, and confirm only expected users and app identity can access it.
-- Create a tension through a full consent cycle; verify decision log, minutes Doc link, Task creation, Calendar event, webhook event, and mapping/audit records.
-- Exercise every mandatory guardrail: consent does not activate a decision until valid Lark Approval arrives; rejection keeps it inactive.
-- Attempt cross-tenant mapping, tampered webhook, duplicate webhook, expired credential, missing Lark scope, task completion replay, and a deep-link request without RBAC. All must fail safely and be auditable.
-- Verify Base/Task/Calendar/Approval payload capture contains no PII, patient IDs, clinical data, detailed appointment information, or payment details.
-- Verify disabling a tenant stops new automation without deleting Base or historical audit/mapping data.
+## Retention, Monitoring, and Risks
 
-## Operational Metrics
-
-- Onboarding completion/failure rate by Lark capability.
-- Integration health: expired credentials, missing scope, webhook failures, queue retries/DLQ, stale mappings.
-- S3 adoption: open tensions, time to decision, decisions past review date, actions overdue, active circle/role coverage.
-- Guardrail outcomes: pending duration, approval/rejection/error rates by category, blocked activations.
-- Security: invalid/duplicate webhook count, cross-tenant access attempts, data-policy violation count, sensitive-data payload scan results.
-
-## Risks and Mitigations
+- Keep normalized/redacted webhook event logs for 90 days. Never retain raw payloads.
+- Keep Task/Calendar/Approval mappings and access-request audit evidence for 24 months after close/revocation.
+- Base history and minutes retention follow tenant Lark retention policy.
+- Monitor onboarding success by capability, missing scopes, health/degraded transitions, queue/DLQ failures, stale mappings, pending guardrails, decision review overdue, data-policy violations, invalid/duplicate webhooks, and cross-tenant access attempts.
 
 | Risk | Mitigation |
 |---|---|
-| Lark tenant internal app cannot provision a required resource or launch Approval by API | Validate capability before implementation; make the resource a verified manual onboarding prerequisite instead of silently degrading behavior |
-| Base schema is edited manually and breaks mappings | Store template/schema version and table/field IDs; validate health regularly; restrict schema permissions; require controlled migration steps |
-| S3 role assignment is mistaken for clinical access | Separate tables, names, UI, APIs, and audit; prohibit any direct role-to-permission synchronization |
-| Lark receives sensitive patient data | Centralize payload builders, schema allowlists, tests and observability scans; no free-form clinical text accepted in governance sync |
-| Duplicate/out-of-order webhooks create inconsistent state | Event ID dedupe, idempotent operation keys, source timestamps, replay-safe handlers |
-| Tenant disables mandatory approvals | Enforce platform policy server-side; permit only financial parameters and additional restrictions |
-| Existing Lark integration leaks secrets/logs or lacks capabilities | Preserve encrypted secret storage; redact logs; separate governance client/config from current handover integration |
-| Adoption fails because governance becomes overhead | Start with the seeded circles, concise templates, facilitated sessions, decision review dates, and operational dashboards |
+| Tenant app lacks a required Lark API | Verify capability before `ready`; make supported manual prerequisites explicit; fail closed for guardrails. |
+| Base schema drift | Store schema/template IDs/version, limit schema editors, health-check before Console commands, and add controlled template migrations. |
+| S3 assignment mistaken for RBAC | Separate data/UI/permissions; prohibit mapping to `system_key`; test every access route. |
+| PII manually typed in Base/Docs | Policy/training, Console validation, audit/remediation; clearly document residual direct-edit risk. |
+| Approval reused/mismatched | One-time 7-day request code plus tenant/definition/category/instance verification. |
+| Webhook replay or wrong tenant decryption | Opaque per-tenant endpoint, signature/decryption verification, receipt-before-side-effect, unique event dedupe. |
+| Lark outage weakens security | `degraded` mode blocks new guarded changes and access expansion but does not disrupt existing clinical care. |
+| RBAC migration breaks manager operations | Separate rollout, explicit permission matrix, exhaustive route tests, JWT permission versioning. |
 
-## Out of Scope
+## Out Of Scope
 
-- Replacing DentalAIOS authentication, clinical RBAC, patient records, appointments, treatment plans, payment workflows, or audit logging with Lark.
-- Syncing Lark Directory into DentalAIOS users.
-- Automatically granting DentalAIOS permissions from a Base role assignment.
-- Importing/merging an arbitrary existing Base.
-- Chat bot-based governance, full workflow automation beyond baseline reminders, or provisioning Lark Approval definitions where Lark does not expose a supported API.
-- Storing any PII or clinical data in Lark governance artifacts.
+- Replacing DentalAIOS account management, system RBAC, patient/clinical/payment systems, or audit logging with Lark.
+- Storing patient or clinical identifiers/details in governance Base, Docs, Tasks, Calendar, Approval, payloads, or logs.
+- Directory synchronization or Lark SSO for DentalAIOS.
+- Automatic Base membership/advanced-permission changes.
+- Automatic creation of Lark Docs, automatic Calendar invitations, Base polling, or chat-bot governance.
+- Existing Base import/merge.
+- Automatic Approval instance creation unless tenant-internal-app capability is separately verified and approved in a later phase.
+- Automatic execution of system/clinical/security changes from an S3 decision or Lark webhook.
+- Changing legacy clinical handover payloads in this workstream; track that remediation separately.
