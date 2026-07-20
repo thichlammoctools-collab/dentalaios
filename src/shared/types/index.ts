@@ -129,6 +129,11 @@ export interface Visit {
   status: VisitStatus;
   notes?: string;
   created_at: string;
+  // Operational chair snapshot, retained to attribute confirmed payments.
+  chair_id?: string;
+  chair_name?: string;
+  chair_room_name?: string;
+  source_appointment_id?: string;
   // Vitals
   blood_pressure_systolic?: number;
   blood_pressure_diastolic?: number;
@@ -512,6 +517,13 @@ export interface DentalChair {
   notes?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface ChairRevenueMetrics {
+  confirmed_revenue: number;
+  payment_count: number;
+  completed_minutes: number;
+  revenue_per_completed_hour: number | null;
 }
 
 export interface Appointment {

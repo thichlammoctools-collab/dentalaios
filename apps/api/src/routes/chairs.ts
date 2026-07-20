@@ -32,8 +32,16 @@ router.get("/availability", requirePermission(PERMISSIONS.READ_PATIENTS), zValid
 router.get("/board", requirePermission(PERMISSIONS.READ_PATIENTS), zValidator("query", chairBoardQuerySchema), async (c) => {
   const jwt = getJwt(c);
   const query = c.req.valid("query");
-  const chairs = await chairsService.board(c.env.DB, jwt.tenant_id, query.branch_id, query.date);
-  return c.json({ branch_id: query.branch_id, date: query.date, generated_at: new Date().toISOString(), chairs });
+  const canViewRevenue = jwt.permissions.includes(PERMISSIONS.ALL)
+    || jwt.permissions.includes(PERMISSIONS.VIEW_MANAGEMENT_DASHBOARD);
+  const board = await chairsService.board(c.env.DB, jwt.tenant_id, query.branch_id, query.date, canViewRevenue);
+  return c.json({
+    branch_id: query.branch_id,
+    date: query.date,
+    generated_at: new Date().toISOString(),
+    chairs: board.chairs,
+    ...(canViewRevenue ? { unallocated_revenue: board.unallocated_revenue ?? 0 } : {}),
+  });
 });
 
 router.get("/", requirePermission(PERMISSIONS.READ_PATIENTS), async (c) => {

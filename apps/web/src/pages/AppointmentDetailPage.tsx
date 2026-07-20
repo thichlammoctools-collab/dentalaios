@@ -16,11 +16,11 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
-import { apiGet, apiPatch, apiDelete, ApiError } from "@/lib/api";
+import { apiGet, apiPatch, apiPost, apiDelete, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import { APPOINTMENT_STATUS_LABELS, isAssistantRole, isDoctorRole } from "@shared/constants";
-import type { Appointment, DentalChair, Patient, UserWithDetails } from "@shared/types";
+import type { Appointment, DentalChair, Patient, UserWithDetails, Visit } from "@shared/types";
 import { formatDateTime, formatTime, ymd, combineDateTime, isoToYmd, isoToTime } from "@/lib/utils";
 
 interface PatientsResponse { items: Patient[]; total: number }
@@ -54,6 +54,7 @@ export function AppointmentDetailPage() {
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [startingVisit, setStartingVisit] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -106,6 +107,25 @@ export function AppointmentDetailPage() {
     }
   }
 
+  async function startVisit() {
+    if (!session?.user?.id || !appt) return;
+    setStartingVisit(true);
+    try {
+      const visit = await apiPost<Visit>("/api/visits", {
+        patient_id: appt.patient_id,
+        branch_id: appt.branch_id,
+        clinician_id: session.user.id,
+        source_appointment_id: appt.id,
+      });
+      toast.success("Đã bắt đầu lượt khám");
+      navigate(`/visits/${visit.id}`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Không thể bắt đầu lượt khám");
+    } finally {
+      setStartingVisit(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-6 py-6">
       <Breadcrumbs
@@ -127,7 +147,10 @@ export function AppointmentDetailPage() {
           <Badge variant={STATUS_VARIANT[appt.status] ?? "outline"}>
             {APPOINTMENT_STATUS_LABELS[appt.status]}
           </Badge>
-          <Button variant="outline" onClick={() => setEditOpen(true)}>Sửa</Button>
+           <Button variant="outline" onClick={() => setEditOpen(true)}>Sửa</Button>
+           {appt.status !== "cancelled" && appt.status !== "no_show" && appt.status !== "completed" && appt.chair_id && (
+             <Button onClick={() => void startVisit()} disabled={startingVisit}>{startingVisit ? "Đang bắt đầu…" : "Bắt đầu khám"}</Button>
+           )}
           {appt.status !== "cancelled" && appt.status !== "completed" && (
             <Button variant="destructive" onClick={() => setCancelOpen(true)}>Hủy lịch</Button>
           )}

@@ -1,5 +1,6 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import type { Appointment, DentalChair } from "@shared/types";
+import type { Appointment, ChairRevenueMetrics, DentalChair } from "@shared/types";
+import type { D1Row } from "../repositories/base";
 import type { ChairCreateInput, ChairStatusUpdateInput, ChairUpdateInput, RoomCreateInput } from "@shared/validation";
 import { createAppointmentsRepository } from "../repositories/appointments.repo";
 import { createChairsRepository } from "../repositories/chairs.repo";
@@ -20,6 +21,12 @@ export interface ChairBoardItem {
   current_appointment?: Appointment;
   next_appointment?: Appointment;
   appointments: Appointment[];
+  revenue?: ChairRevenueMetrics;
+}
+
+export interface ChairBoardResult {
+  chairs: ChairBoardItem[];
+  unallocated_revenue?: number;
 }
 
 function endOf(start: string, durationMin: number): string {
@@ -30,6 +37,15 @@ function endOf(start: string, durationMin: number): string {
 
 function active(appointment: Appointment): boolean {
   return appointment.status !== "cancelled" && appointment.status !== "no_show";
+}
+
+function localDayBounds(date: string): { start: string; end: string } {
+  const [year, month, day] = date.split("-").map(Number);
+  const hcmOffsetMs = 7 * 60 * 60 * 1000;
+  return {
+    start: new Date(Date.UTC(year, month - 1, day) - hcmOffsetMs).toISOString(),
+    end: new Date(Date.UTC(year, month - 1, day + 1) - hcmOffsetMs).toISOString(),
+  };
 }
 
 export const chairsService = {
@@ -135,18 +151,28 @@ export const chairsService = {
     }
   },
 
-  async board(db: D1Database, tenantId: string, branchId: string, date: string): Promise<ChairBoardItem[]> {
+  async board(
+    db: D1Database,
+    tenantId: string,
+    branchId: string,
+    date: string,
+    includeRevenue = false,
+  ): Promise<ChairBoardResult> {
     await assertAllInTenant(db, tenantId, [{ table: "branches", id: branchId }]);
+    const bounds = localDayBounds(date);
     const [chairs, appointments] = await Promise.all([
       createChairsRepository(db).list(tenantId, { branchId }),
       createAppointmentsRepository(db).list(tenantId, {
         branchId,
-        from: `${date}T00:00:00.000Z`,
-        to: `${date}T23:59:59.999Z`,
+        from: bounds.start,
+        to: bounds.end,
       }),
     ]);
+    const revenue = includeRevenue
+      ? await chairRevenue(db, tenantId, branchId, bounds.start, bounds.end, appointments)
+      : undefined;
     const now = new Date();
-    return chairs.map((chair) => {
+    const items = chairs.map((chair) => {
       const chairAppointments = appointments.filter((appointment) => appointment.chair_id === chair.id && active(appointment));
       const current = chairAppointments.find((appointment) => {
         const start = new Date(appointment.scheduled_at);
@@ -157,16 +183,84 @@ export const chairsService = {
       if (chair.is_active && chair.operational_status === "available") {
         currentStatus = current?.status === "arrived" ? "occupied" : current ? "reserved" : "available";
       }
+      const metrics = revenue?.byChair.get(chair.id);
       return {
         chair,
         current_status: currentStatus,
         current_appointment: current,
         next_appointment: next,
         appointments: chairAppointments,
+        revenue: metrics ?? (includeRevenue ? {
+          confirmed_revenue: 0,
+          payment_count: 0,
+          completed_minutes: completedMinutes(appointments, chair.id),
+          revenue_per_completed_hour: null,
+        } : undefined),
       };
     });
+    if (includeRevenue) {
+      for (const item of items) {
+        const metrics = item.revenue!;
+        metrics.revenue_per_completed_hour = metrics.completed_minutes > 0
+          ? metrics.confirmed_revenue / (metrics.completed_minutes / 60)
+          : null;
+      }
+    }
+    return { chairs: items, unallocated_revenue: revenue?.unallocatedRevenue };
   },
 };
+
+function completedMinutes(appointments: Appointment[], chairId: string): number {
+  return appointments
+    .filter((appointment) => appointment.chair_id === chairId && appointment.status === "completed")
+    .reduce((total, appointment) => total + appointment.duration_min, 0);
+}
+
+async function chairRevenue(
+  db: D1Database,
+  tenantId: string,
+  branchId: string,
+  start: string,
+  end: string,
+  appointments: Appointment[],
+): Promise<{ byChair: Map<string, ChairRevenueMetrics>; unallocatedRevenue: number }> {
+  const unsupportedCurrency = await db.prepare(`SELECT 1 FROM payments p
+    JOIN treatment_plans tp ON tp.id = p.treatment_plan_id AND tp.tenant_id = p.tenant_id
+    JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = p.tenant_id
+    WHERE p.tenant_id = ? AND v.branch_id = ? AND p.status = 'confirmed'
+      AND datetime(p.created_at) >= datetime(?) AND datetime(p.created_at) < datetime(?)
+      AND p.currency <> 'VND' LIMIT 1`)
+    .bind(tenantId, branchId, start, end)
+    .first();
+  if (unsupportedCurrency) throw new ValidationError("Báo cáo doanh thu ghế hiện chỉ hỗ trợ VND");
+
+  const result = await db.prepare(`SELECT v.chair_id, COALESCE(SUM(p.amount), 0) AS confirmed_revenue, COUNT(*) AS payment_count
+    FROM payments p
+    JOIN treatment_plans tp ON tp.id = p.treatment_plan_id AND tp.tenant_id = p.tenant_id
+    JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = p.tenant_id
+    WHERE p.tenant_id = ? AND v.branch_id = ? AND p.status = 'confirmed' AND p.currency = 'VND'
+      AND datetime(p.created_at) >= datetime(?) AND datetime(p.created_at) < datetime(?)
+    GROUP BY v.chair_id`)
+    .bind(tenantId, branchId, start, end)
+    .all<D1Row>();
+  const byChair = new Map<string, ChairRevenueMetrics>();
+  let unallocatedRevenue = 0;
+  for (const row of result.results ?? []) {
+    const amount = Number(row.confirmed_revenue ?? 0);
+    const chairId = row.chair_id as string | null;
+    if (!chairId) {
+      unallocatedRevenue += amount;
+      continue;
+    }
+    byChair.set(chairId, {
+      confirmed_revenue: amount,
+      payment_count: Number(row.payment_count ?? 0),
+      completed_minutes: completedMinutes(appointments, chairId),
+      revenue_per_completed_hour: null,
+    });
+  }
+  return { byChair, unallocatedRevenue };
+}
 
 async function assertRoomInBranch(db: D1Database, tenantId: string, branchId: string, roomId?: string | null): Promise<void> {
   if (!roomId) return;

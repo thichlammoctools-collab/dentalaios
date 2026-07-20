@@ -521,6 +521,12 @@ export function VisitDetailPage() {
             )}
           </div>
         )}
+        {visit.chair_id && (
+          <div className="mt-2 flex items-center gap-1.5 text-sm">
+            <span className="text-xs text-muted-foreground">Ghế ghi nhận:</span>
+            <span className="font-medium">{visit.chair_name ?? visit.chair_id.slice(0, 8)}{visit.chair_room_name ? ` · ${visit.chair_room_name}` : ""}</span>
+          </div>
+        )}
       </div>
 
       {/* Vitals */}

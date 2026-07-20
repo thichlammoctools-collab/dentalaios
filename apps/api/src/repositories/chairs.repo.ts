@@ -38,13 +38,13 @@ export interface ChairsRepository {
 export function createChairsRepository(db: D1Database): ChairsRepository {
   return {
     async list(tenantId, options = {}) {
-      const conditions = ["tenant_id = ?"];
+      const conditions = ["dental_chairs.tenant_id = ?"];
       const binds: unknown[] = [tenantId];
       if (options.branchId) {
-        conditions.push("branch_id = ?");
+        conditions.push("dental_chairs.branch_id = ?");
         binds.push(options.branchId);
       }
-      if (options.activeOnly) conditions.push("is_active = 1");
+      if (options.activeOnly) conditions.push("dental_chairs.is_active = 1");
       const result = await db
         .prepare(`SELECT dental_chairs.*, dental_rooms.name AS room_name FROM dental_chairs LEFT JOIN dental_rooms ON dental_rooms.id = dental_chairs.room_id AND dental_rooms.tenant_id = dental_chairs.tenant_id WHERE ${conditions.join(" AND ")} ORDER BY dental_chairs.sort_order ASC, dental_chairs.name ASC`)
         .bind(...binds)

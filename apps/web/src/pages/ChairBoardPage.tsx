@@ -7,7 +7,9 @@ import { apiGet, apiPatch, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import { formatTime, ymd } from "@/lib/utils";
-import type { Appointment, DentalChair, Patient, UserWithDetails } from "@shared/types";
+import { formatCurrency } from "@/lib/utils";
+import { createDashboardStream } from "@/lib/dashboard-stream";
+import type { Appointment, ChairRevenueMetrics, DentalChair, Patient, UserWithDetails } from "@shared/types";
 import { PERMISSIONS, ROUTES } from "@shared/constants";
 
 interface ChairBoardItem {
@@ -16,12 +18,14 @@ interface ChairBoardItem {
   current_appointment?: Appointment;
   next_appointment?: Appointment;
   appointments: Appointment[];
+  revenue?: ChairRevenueMetrics;
 }
 
 interface ChairBoardResponse {
   branch_id: string;
   date: string;
   chairs: ChairBoardItem[];
+  unallocated_revenue?: number;
 }
 
 interface PatientsResponse { items: Patient[]; total: number }
@@ -52,8 +56,12 @@ export function ChairBoardPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [users, setUsers] = useState<UserWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
   const canManage = Boolean(
     session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.MANAGE_USERS),
+  );
+  const canViewRevenue = Boolean(
+    session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.VIEW_MANAGEMENT_DASHBOARD),
   );
 
   useEffect(() => {
@@ -80,7 +88,13 @@ export function ChairBoardPage() {
     void load();
     const refresh = window.setInterval(load, 60_000);
     return () => { mounted = false; window.clearInterval(refresh); };
-  }, [session?.branch?.id, date]);
+  }, [session?.branch?.id, date, refreshKey]);
+
+  useEffect(() => {
+    if (!canViewRevenue) return;
+    const stream = createDashboardStream({ onInvalidate: () => setRefreshKey((value) => value + 1) });
+    return () => stream.stop();
+  }, [canViewRevenue, date, session?.branch?.id]);
 
   const patientsById = useMemo(() => new Map(patients.map((patient) => [patient.id, patient])), [patients]);
   const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
@@ -127,6 +141,12 @@ export function ChairBoardPage() {
         <Summary label="Vệ sinh" value={statusCount("cleaning")} />
         <Summary label="Bảo trì" value={statusCount("maintenance") + statusCount("out_of_service")} />
       </div>
+      {canViewRevenue && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <MoneySummary label="Doanh thu ghế" value={board?.chairs.reduce((total, item) => total + (item.revenue?.confirmed_revenue ?? 0), 0) ?? 0} />
+          <MoneySummary label="Chưa phân bổ" value={board?.unallocated_revenue ?? 0} />
+        </div>
+      )}
 
       {loading ? (
         <div className="flex h-40 items-center justify-center"><div className="h-6 w-6 animate-spin rounded-full border-3 border-muted border-t-primary" /></div>
@@ -154,6 +174,13 @@ export function ChairBoardPage() {
                   {item.next_appointment && item.next_appointment.id !== item.current_appointment?.id && (
                     <AppointmentSummary title="Lịch tiếp theo" appointment={item.next_appointment} patients={patientsById} users={usersById} compact />
                   )}
+                  {canViewRevenue && item.revenue && (
+                    <div className="grid grid-cols-3 gap-2 rounded-lg bg-emerald-50 p-3 text-xs dark:bg-emerald-950/30">
+                      <Metric label="Doanh thu" value={formatCurrency(item.revenue.confirmed_revenue)} />
+                      <Metric label="Payment" value={String(item.revenue.payment_count)} />
+                      <Metric label="DT/giờ" value={item.revenue.revenue_per_completed_hour === null ? "--" : formatCurrency(item.revenue.revenue_per_completed_hour)} />
+                    </div>
+                  )}
                   <div className="flex flex-wrap gap-2 border-t pt-3">
                     <Button size="sm" variant="outline" onClick={() => changeStatus(chair.id, "available")}>Trống</Button>
                     <Button size="sm" variant="outline" onClick={() => changeStatus(chair.id, "cleaning")}>Vệ sinh</Button>
@@ -171,6 +198,14 @@ export function ChairBoardPage() {
 
 function Summary({ label, value }: { label: string; value: number }) {
   return <Card><CardContent className="p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p></CardContent></Card>;
+}
+
+function MoneySummary({ label, value }: { label: string; value: number }) {
+  return <Card><CardContent className="p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-xl font-semibold tabular-nums">{formatCurrency(value)}</p></CardContent></Card>;
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return <div><p className="text-[11px] text-muted-foreground">{label}</p><p className="mt-0.5 font-semibold tabular-nums">{value}</p></div>;
 }
 
 function AppointmentSummary({ title, appointment, patients, users, compact = false }: {

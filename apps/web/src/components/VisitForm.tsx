@@ -8,12 +8,17 @@ import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/c
 import { apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
-import type { Visit } from "@shared/types";
+import type { DentalChair, Visit } from "@shared/types";
 import type { UserWithDetails } from "@shared/types";
 import { isAssistantRole, isDoctorRole } from "@shared/constants";
 
 interface UserWithDetailsResponse {
   items: UserWithDetails[];
+  total: number;
+}
+
+interface ChairsResponse {
+  items: DentalChair[];
   total: number;
 }
 
@@ -27,6 +32,8 @@ interface VisitFormProps {
 export function VisitForm({ open, onOpenChange, patientId, onCreated }: VisitFormProps) {
   const { session } = useAuth();
   const [users, setUsers] = useState<UserWithDetails[]>([]);
+  const [chairs, setChairs] = useState<DentalChair[]>([]);
+  const [chairId, setChairId] = useState("");
   const [notes, setNotes] = useState("");
   const [bpSystolic, setBpSystolic] = useState("");
   const [bpDiastolic, setBpDiastolic] = useState("");
@@ -37,9 +44,16 @@ export function VisitForm({ open, onOpenChange, patientId, onCreated }: VisitFor
 
   useEffect(() => {
     if (!open || !session?.branch?.id) return;
-    apiGet<UserWithDetailsResponse>(`/api/users/branch/${session.branch.id}`)
-      .then((res) => setUsers(res.items))
-      .catch(() => setUsers([]));
+    void Promise.all([
+      apiGet<UserWithDetailsResponse>(`/api/users/branch/${session.branch.id}`),
+      apiGet<ChairsResponse>(`/api/chairs?branch_id=${session.branch.id}`),
+    ]).then(([usersResponse, chairsResponse]) => {
+      setUsers(usersResponse.items);
+      setChairs(chairsResponse.items.filter((chair) => chair.is_active && chair.operational_status !== "maintenance" && chair.operational_status !== "out_of_service"));
+    }).catch(() => {
+      setUsers([]);
+      setChairs([]);
+    });
   }, [open, session]);
 
   async function onSubmit(e: FormEvent) {
@@ -52,12 +66,17 @@ export function VisitForm({ open, onOpenChange, patientId, onCreated }: VisitFor
       toast.error("Không tìm thấy người dùng — vui lòng đăng nhập lại");
       return;
     }
+    if (!chairId) {
+      toast.error("Vui lòng chọn ghế nha");
+      return;
+    }
     setSaving(true);
     try {
       const created = await apiPost<Visit>("/api/visits", {
         patient_id: patientId,
         branch_id: session.branch.id,
         clinician_id: session.user.id,
+        chair_id: chairId,
         notes: notes || undefined,
         blood_pressure_systolic: bpSystolic ? Number(bpSystolic) : undefined,
         blood_pressure_diastolic: bpDiastolic ? Number(bpDiastolic) : undefined,
@@ -75,6 +94,7 @@ export function VisitForm({ open, onOpenChange, patientId, onCreated }: VisitFor
       setBloodSugar("");
       setTreatingClinicianId("");
       setAssistantId("");
+      setChairId("");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi tạo lượt khám");
     } finally {
@@ -94,6 +114,20 @@ export function VisitForm({ open, onOpenChange, patientId, onCreated }: VisitFor
         <DialogBody className="grid gap-3">
 
           <SectionDivider icon={<TeamIcon />}>Nhân sự</SectionDivider>
+
+          <div className="grid gap-1.5">
+            <Label htmlFor="chair">Ghế nha</Label>
+            {chairs.length > 0 ? (
+              <Select id="chair" value={chairId} onChange={(e) => setChairId(e.target.value)} required>
+                <option value="">— Chọn ghế nha —</option>
+                {chairs.map((chair) => (
+                  <option key={chair.id} value={chair.id}>{chair.name}{chair.room_name ? ` · ${chair.room_name}` : ""}</option>
+                ))}
+              </Select>
+            ) : (
+              <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">Chưa có ghế khả dụng. Vui lòng cấu hình ghế trước khi tạo lượt khám.</p>
+            )}
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
@@ -186,7 +220,7 @@ export function VisitForm({ open, onOpenChange, patientId, onCreated }: VisitFor
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Hủy
           </Button>
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={saving || chairs.length === 0}>
             {saving ? "Đang tạo…" : "Tạo lượt khám"}
           </Button>
         </DialogFooter>

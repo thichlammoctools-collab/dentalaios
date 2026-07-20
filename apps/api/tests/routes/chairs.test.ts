@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import chairsRoutes from "../../src/routes/chairs";
+import { createChairsRepository } from "../../src/repositories/chairs.repo";
 import { authedRequestWithDB, mountRoute } from "../helpers/api";
+import { createMockD1 } from "../helpers/mock-db";
 
 const chairRow = (overrides: Record<string, unknown> = {}) => ({
   id: "chair-1",
@@ -49,6 +51,17 @@ describe("GET /api/chairs", () => {
     const body = await res.json() as { items: Array<{ code: string; is_active: boolean }> };
     expect(body.items).toHaveLength(1);
     expect(body.items[0]).toMatchObject({ code: "CHAIR-01", is_active: true });
+  });
+
+  it("qualifies chair filters after joining rooms", async () => {
+    const db = createMockD1({ rowsByFragment: new Map([["FROM dental_chairs", [chairRow()]]]) });
+
+    await createChairsRepository(db as never).list("test-tenant", { branchId: "test-branch", activeOnly: true });
+
+    const query = db.__sqlContaining("FROM dental_chairs")[0];
+    expect(query.sql).toContain("dental_chairs.tenant_id = ?");
+    expect(query.sql).toContain("dental_chairs.branch_id = ?");
+    expect(query.sql).toContain("dental_chairs.is_active = 1");
   });
 });
 

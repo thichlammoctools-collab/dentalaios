@@ -142,6 +142,8 @@ export const visitCreateSchema = z.object({
   patient_id: z.string().min(1),
   branch_id: z.string().min(1),
   clinician_id: z.string().min(1),
+  chair_id: z.string().min(1).optional(),
+  source_appointment_id: z.string().min(1).optional(),
   date: z.string().datetime({ offset: true }).optional(),
   notes: optionalText(2000),
   // Personnel
@@ -151,11 +153,16 @@ export const visitCreateSchema = z.object({
   blood_pressure_systolic:  z.number().int().min(50).max(300).optional(),
   blood_pressure_diastolic: z.number().int().min(30).max(200).optional(),
   blood_sugar_mgdl:        z.number().min(20).max(600).optional(),
+}).superRefine((data, ctx) => {
+  if (!data.source_appointment_id && !data.chair_id) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["chair_id"], message: "Vui lòng chọn ghế nha" });
+  }
 });
 
 export const visitUpdateSchema = z.object({
   status: z.enum(["in_progress", "completed", "cancelled"]).optional(),
   notes: optionalText(2000).optional(),
+  chair_id: z.string().min(1).nullable().optional(),
   // Personnel
   treating_clinician_id: z.string().min(1).nullable().optional(),
   assistant_id: z.string().min(1).nullable().optional(),

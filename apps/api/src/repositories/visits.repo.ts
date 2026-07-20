@@ -5,8 +5,13 @@ import type { D1Row, Pagination } from "./base";
 export interface VisitsRepository {
   list(tenantId: string, opts?: Pagination & { patientId?: string; branchId?: string; status?: Visit["status"] }): Promise<Visit[]>;
   getById(tenantId: string, id: string): Promise<Visit | null>;
+  getBySourceAppointmentId(tenantId: string, sourceAppointmentId: string): Promise<Visit | null>;
   create(tenantId: string, data: Omit<Visit, "id" | "tenant_id" | "created_at" | "status">): Promise<Visit>;
-  update(tenantId: string, id: string, data: Partial<Visit>): Promise<Visit | null>;
+  update(
+    tenantId: string,
+    id: string,
+    data: Partial<Omit<Visit, "chair_id">> & { chair_id?: string | null },
+  ): Promise<Visit | null>;
 }
 
 export function createVisitsRepository(db: D1Database): VisitsRepository {
@@ -31,10 +36,14 @@ export function createVisitsRepository(db: D1Database): VisitsRepository {
       binds.push(limit, offset);
       const sql = `SELECT v.*,
                     tc.name AS treating_clinician_name,
-                    a.name AS assistant_name
+                    a.name AS assistant_name,
+                    dc.name AS chair_name,
+                    dr.name AS chair_room_name
                    FROM visits v
                    LEFT JOIN users tc ON tc.id = v.treating_clinician_id
                    LEFT JOIN users a ON a.id = v.assistant_id
+                   LEFT JOIN dental_chairs dc ON dc.id = v.chair_id AND dc.tenant_id = v.tenant_id
+                   LEFT JOIN dental_rooms dr ON dr.id = dc.room_id AND dr.tenant_id = v.tenant_id
                    WHERE ${conditions.join(" AND ")}
                    ORDER BY v.date DESC LIMIT ? OFFSET ?`;
       const result = await db.prepare(sql).bind(...binds).all();
@@ -45,12 +54,31 @@ export function createVisitsRepository(db: D1Database): VisitsRepository {
       const row = (await db
         .prepare(`SELECT v.*,
                     tc.name AS treating_clinician_name,
-                    a.name AS assistant_name
+                    a.name AS assistant_name,
+                    dc.name AS chair_name,
+                    dr.name AS chair_room_name
                    FROM visits v
                    LEFT JOIN users tc ON tc.id = v.treating_clinician_id
                    LEFT JOIN users a ON a.id = v.assistant_id
+                   LEFT JOIN dental_chairs dc ON dc.id = v.chair_id AND dc.tenant_id = v.tenant_id
+                   LEFT JOIN dental_rooms dr ON dr.id = dc.room_id AND dr.tenant_id = v.tenant_id
                    WHERE v.tenant_id = ? AND v.id = ? LIMIT 1`)
         .bind(tenantId, id)
+        .first()) as D1Row | null;
+      return row ? mapVisit(row) : null;
+    },
+
+    async getBySourceAppointmentId(tenantId, sourceAppointmentId) {
+      const row = (await db
+        .prepare(`SELECT v.*, tc.name AS treating_clinician_name, a.name AS assistant_name,
+                    dc.name AS chair_name, dr.name AS chair_room_name
+                  FROM visits v
+                  LEFT JOIN users tc ON tc.id = v.treating_clinician_id
+                  LEFT JOIN users a ON a.id = v.assistant_id
+                  LEFT JOIN dental_chairs dc ON dc.id = v.chair_id AND dc.tenant_id = v.tenant_id
+                  LEFT JOIN dental_rooms dr ON dr.id = dc.room_id AND dr.tenant_id = v.tenant_id
+                  WHERE v.tenant_id = ? AND v.source_appointment_id = ? LIMIT 1`)
+        .bind(tenantId, sourceAppointmentId)
         .first()) as D1Row | null;
       return row ? mapVisit(row) : null;
     },
@@ -62,15 +90,17 @@ export function createVisitsRepository(db: D1Database): VisitsRepository {
         .prepare(
           `INSERT INTO visits
              (id, tenant_id, patient_id, branch_id, clinician_id, date, notes,
-              treating_clinician_id, assistant_id,
-              blood_pressure_systolic, blood_pressure_diastolic, blood_sugar_mgdl, vitals_recorded_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               treating_clinician_id, assistant_id, chair_id, source_appointment_id,
+               blood_pressure_systolic, blood_pressure_diastolic, blood_sugar_mgdl, vitals_recorded_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id, tenantId, data.patient_id, data.branch_id, data.clinician_id, date,
           data.notes ?? null,
           data.treating_clinician_id ?? null,
-          data.assistant_id ?? null,
+           data.assistant_id ?? null,
+           data.chair_id ?? null,
+           data.source_appointment_id ?? null,
           data.blood_pressure_systolic ?? null,
           data.blood_pressure_diastolic ?? null,
           data.blood_sugar_mgdl ?? null,
@@ -90,6 +120,7 @@ export function createVisitsRepository(db: D1Database): VisitsRepository {
         "notes",
         "treating_clinician_id",
         "assistant_id",
+        "chair_id",
         "blood_pressure_systolic",
         "blood_pressure_diastolic",
         "blood_sugar_mgdl",
@@ -131,5 +162,9 @@ function mapVisit(row: D1Row): Visit {
     treating_clinician_name: (row.treating_clinician_name as string | null) ?? undefined,
     assistant_id: (row.assistant_id as string | null) ?? undefined,
     assistant_name: (row.assistant_name as string | null) ?? undefined,
+    chair_id: (row.chair_id as string | null) ?? undefined,
+    chair_name: (row.chair_name as string | null) ?? undefined,
+    chair_room_name: (row.chair_room_name as string | null) ?? undefined,
+    source_appointment_id: (row.source_appointment_id as string | null) ?? undefined,
   };
 }
