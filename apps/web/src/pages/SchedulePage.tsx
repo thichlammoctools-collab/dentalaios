@@ -355,15 +355,13 @@ export function SchedulePage() {
                             </div>
                             <div className="mt-2 space-y-1.5 text-[11px] text-muted-foreground">
                               <div className="flex items-center gap-1.5">
-                                <span className="w-9 shrink-0 text-[10px] uppercase opacity-70">BS</span>
                                 {doctor && <ProfileAvatar subject="users" entityId={doctor.id} name={doctor.name} avatarFileId={doctor.avatar_file_id} size="sm" />}
-                                <span className="truncate font-medium text-foreground">{doctor?.name ?? "—"}</span>
+                                <span className="truncate font-medium text-foreground">{doctor?.name ?? "—"} (Dr)</span>
                               </div>
                               {assistant && (
                                 <div className="flex items-center gap-1.5">
-                                  <span className="w-9 shrink-0 text-[10px] uppercase opacity-70">Phụ tá</span>
                                   <ProfileAvatar subject="users" entityId={assistant.id} name={assistant.name} avatarFileId={assistant.avatar_file_id} size="sm" />
-                                  <span className="truncate font-medium text-foreground">{assistant.name}</span>
+                                  <span className="truncate font-medium text-foreground">{assistant.name} (As)</span>
                                 </div>
                               )}
                             </div>
