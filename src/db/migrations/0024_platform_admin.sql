@@ -15,3 +15,64 @@ INSERT OR IGNORE INTO platform_roles (id, key, name, permissions) VALUES
   ('platform-role-operator', 'platform_operator', 'Platform operator', '["platform_dashboard.read","platform_tenants.read","platform_tenants.write","platform_content.read","platform_content.write","platform_config.read","platform_config.write","platform_audit.read"]'),
   ('platform-role-auditor', 'platform_auditor', 'Platform auditor', '["platform_dashboard.read","platform_tenants.read","platform_content.read","platform_config.read","platform_admins.read","platform_audit.read"]');
 
+CREATE TABLE IF NOT EXISTS platform_users (
+  id TEXT PRIMARY KEY,
+  role_id TEXT NOT NULL REFERENCES platform_roles(id),
+  email TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+  mfa_secret_encrypted TEXT,
+  mfa_enabled_at TEXT,
+  last_login_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_platform_users_email ON platform_users(email);
+CREATE INDEX IF NOT EXISTS idx_platform_users_role ON platform_users(role_id, is_active);
+
+CREATE TABLE IF NOT EXISTS platform_sessions (
+  id TEXT PRIMARY KEY,
+  platform_user_id TEXT NOT NULL REFERENCES platform_users(id),
+  issued_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  revoked_at TEXT,
+  mfa_verified_at TEXT NOT NULL,
+  ip_hash TEXT NOT NULL DEFAULT '',
+  user_agent_hash TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_platform_sessions_active ON platform_sessions(platform_user_id, revoked_at, expires_at);
+
+CREATE TABLE IF NOT EXISTS platform_mfa_recovery_codes (
+  id TEXT PRIMARY KEY,
+  platform_user_id TEXT NOT NULL REFERENCES platform_users(id),
+  code_hash TEXT NOT NULL,
+  used_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(platform_user_id, code_hash)
+);
+
+CREATE INDEX IF NOT EXISTS idx_platform_recovery_codes_active ON platform_mfa_recovery_codes(platform_user_id, used_at);
+
+CREATE TABLE IF NOT EXISTS platform_audit_logs (
+  id TEXT PRIMARY KEY,
+  platform_user_id TEXT REFERENCES platform_users(id),
+  action TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  entity_id TEXT NOT NULL,
+  tenant_id TEXT REFERENCES tenants(id),
+  result TEXT NOT NULL CHECK (result IN ('success', 'failure')),
+  reason TEXT,
+  request_id TEXT NOT NULL DEFAULT '',
+  ip_hash TEXT NOT NULL DEFAULT '',
+  user_agent_hash TEXT NOT NULL DEFAULT '',
+  details TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_platform_audit_created ON platform_audit_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_platform_audit_user ON platform_audit_logs(platform_user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_platform_audit_tenant ON platform_audit_logs(tenant_id, created_at DESC);
