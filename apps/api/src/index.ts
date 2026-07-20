@@ -21,7 +21,6 @@ import { AppError } from "./lib/errors";
 
 import authRoutes from "./routes/auth";
 import registerRoutes from "./routes/register";
-import inviteRoutes from "./routes/invite";
 import dashboardRoutes from "./routes/dashboard";
 import aiRoutes from "./routes/ai";
 import patientsRoutes from "./routes/patients";
@@ -40,6 +39,7 @@ import patientImagesRoutes from "./routes/patient-images";
 import avatarRoutes from "./routes/avatars";
 import appointmentsRoutes from "./routes/appointments";
 import schedulesRoutes from "./routes/schedules";
+import chairsRoutes from "./routes/chairs";
 
 export type Env = {
   DB: D1Database;
@@ -125,7 +125,6 @@ app.route("/api/auth", authRoutes);
 
 // Registration (public)
 app.route("/api/register", registerRoutes);
-app.route("/api/invites", inviteRoutes);
 
 // Dashboard
 app.route("/api/dashboard", dashboardRoutes);
@@ -150,6 +149,7 @@ app.route("/api/payments", paymentsRoutes);
 
 // Appointments
 app.route("/api/appointments", appointmentsRoutes);
+app.route("/api/chairs", chairsRoutes);
 
 // Operations
 app.route("/api/audit-logs", auditRoutes);

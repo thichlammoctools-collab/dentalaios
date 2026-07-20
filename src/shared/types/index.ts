@@ -254,6 +254,97 @@ export interface AuditLog {
   created_at: string;
 }
 
+// ───────────────────────── Tenant management dashboard ─────────────────────────
+
+export type ManagementDashboardRange = 7 | 30 | 90;
+
+export interface ManagementDashboardFilter {
+  range: ManagementDashboardRange;
+  branch_id?: string;
+}
+
+export interface ManagementDashboardBranch {
+  id: string;
+  name: string;
+}
+
+export interface ManagementDashboardToday {
+  scheduled: number;
+  arrived: number;
+  completed: number;
+  in_progress_visits: number;
+  confirmed_revenue: number;
+  cancellations: number;
+  no_shows: number;
+}
+
+export interface ManagementDashboardRangeKpis {
+  confirmed_revenue: number;
+  previous_revenue: number;
+  visits: number;
+  previous_visits: number;
+  appointments: number;
+  completion_rate: number | null;
+  new_patients: number;
+  pending_plans: number;
+  cancellations: number;
+  no_shows: number;
+}
+
+export interface ManagementDashboardDailyPoint {
+  date: string;
+  visits: number;
+  revenue: number;
+}
+
+export interface ManagementDashboardBranchPerformance {
+  branch_id: string;
+  branch_name: string;
+  confirmed_revenue: number;
+  previous_revenue: number;
+  visits: number;
+  previous_visits: number;
+  appointments: number;
+  completion_rate: number | null;
+  new_patients: number;
+  pending_plans: number;
+  cancellations: number;
+  no_shows: number;
+}
+
+export type ManagementDashboardExceptionKind = "overdue_appointment" | "appointment_outcome" | "pending_plan";
+
+export interface ManagementDashboardException {
+  kind: ManagementDashboardExceptionKind;
+  branch_id: string;
+  branch_name: string;
+  count: number;
+}
+
+export interface ManagementDashboardSnapshot {
+  generated_at: string;
+  timezone: "Asia/Ho_Chi_Minh";
+  today_start: string;
+  today_end: string;
+  range: ManagementDashboardRange;
+  range_start: string;
+  range_end: string;
+  branch_id?: string;
+  branches: ManagementDashboardBranch[];
+  today: ManagementDashboardToday;
+  kpis: ManagementDashboardRangeKpis;
+  daily: ManagementDashboardDailyPoint[];
+  branch_performance: ManagementDashboardBranchPerformance[];
+  exceptions: ManagementDashboardException[];
+}
+
+/** A data-free signal that tells an authenticated dashboard client to refetch. */
+export interface DashboardInvalidation {
+  type: "dashboard:invalidate";
+  entity_type: string;
+  occurred_at: string;
+}
+
 // ───────────────────────── Lark sync ─────────────────────────
 
 export type LarkSyncStatus = "pending" | "synced" | "failed";
@@ -388,6 +479,29 @@ export type AppointmentStatus =
 
 export type AppointmentSource = "manual" | "ai_chat" | "ai_next_visit" | "reschedule";
 
+export type DentalChairType = "general" | "surgery" | "orthodontic" | "pediatric" | "hygiene";
+export type ChairOperationalStatus = "available" | "cleaning" | "maintenance" | "out_of_service";
+
+export interface DentalChair {
+  id: string;
+  tenant_id: string;
+  branch_id: string;
+  code: string;
+  name: string;
+  room_name?: string;
+  chair_type: DentalChairType;
+  operational_status: ChairOperationalStatus;
+  default_doctor_id?: string;
+  default_assistant_id?: string;
+  turnover_min: number;
+  sort_order: number;
+  color?: string;
+  is_active: boolean;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Appointment {
   id: string;
   tenant_id: string;
@@ -395,6 +509,7 @@ export interface Appointment {
   clinician_id: string;
   patient_id: string;
   assistant_id?: string;
+  chair_id?: string;
   source_visit_id?: string;
   scheduled_at: string;  // ISO datetime
   duration_min: number;

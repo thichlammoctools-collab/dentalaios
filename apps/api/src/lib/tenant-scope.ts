@@ -32,7 +32,8 @@ type ScopedTable =
   | "roles"
   | "file_objects"
   | "patient_images"
-  | "clinical_findings";
+  | "clinical_findings"
+  | "dental_chairs";
 
 const ENTITY_LABEL: Record<ScopedTable, string> = {
   patients: "Bệnh nhân",
@@ -47,6 +48,7 @@ const ENTITY_LABEL: Record<ScopedTable, string> = {
   file_objects: "Tệp",
   patient_images: "Hình ảnh bệnh nhân",
   clinical_findings: "Chẩn đoán",
+  dental_chairs: "Ghế nha",
 };
 
 /**

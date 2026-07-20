@@ -13,6 +13,8 @@ export const ROUTES = {
   TREATMENT_PLAN: "/treatment-plans/:id",
   SCHEDULE: "/schedule",
   SCHEDULE_NEW: "/schedule/new",
+  MANAGEMENT_DASHBOARD: "/management-dashboard",
+  CHAIRS: "/chairs",
   SETTINGS_USERS: "/settings/users",
   SETTINGS_ROLES: "/settings/roles",
   SETTINGS_AUDIT_LOGS: "/settings/audit-logs",
@@ -94,6 +96,9 @@ export const PERMISSIONS = {
   MANAGE_ROLES: "manage_roles",
   MANAGE_PATIENTS: "manage_patients",
   MANAGE_SCHEDULE: "manage_schedule",
+  VIEW_MANAGEMENT_DASHBOARD: "view_management_dashboard",
+  READ_CHAIRS: "read_chairs",
+  WRITE_CHAIRS: "write_chairs",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

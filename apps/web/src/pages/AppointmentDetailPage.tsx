@@ -20,11 +20,12 @@ import { apiGet, apiPatch, apiDelete, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import { APPOINTMENT_STATUS_LABELS, isAssistantRole, isDoctorRole } from "@shared/constants";
-import type { Appointment, Patient, UserWithDetails } from "@shared/types";
+import type { Appointment, DentalChair, Patient, UserWithDetails } from "@shared/types";
 import { formatDateTime, formatTime, ymd, combineDateTime, isoToYmd, isoToTime } from "@/lib/utils";
 
 interface PatientsResponse { items: Patient[]; total: number }
 interface UsersResponse { items: UserWithDetails[]; total: number }
+interface ChairsResponse { items: DentalChair[]; total: number }
 
 const STATUS_VARIANT: Record<string, "default" | "success" | "warning" | "destructive" | "secondary" | "outline"> = {
   booked: "outline",
@@ -49,6 +50,7 @@ export function AppointmentDetailPage() {
   const [appt, setAppt] = useState<Appointment | null>(null);
   const [patient, setPatient] = useState<Patient | null>(null);
   const [users, setUsers] = useState<UserWithDetails[]>([]);
+  const [chairs, setChairs] = useState<DentalChair[]>([]);
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -62,15 +64,19 @@ export function AppointmentDetailPage() {
         const a = await apiGet<Appointment>(`/api/appointments/${id}`);
         if (!mounted) return;
         setAppt(a);
-        const [p, u] = await Promise.all([
+        const [p, u, chairsResponse] = await Promise.all([
           apiGet<Patient>(`/api/patients/${a.patient_id}`).catch(() => null),
           session?.branch?.id
             ? apiGet<UsersResponse>(`/api/users/branch/${session.branch.id}`).catch(() => ({ items: [] as UserWithDetails[] }))
             : Promise.resolve({ items: [] as UserWithDetails[] }),
+          session?.branch?.id
+            ? apiGet<ChairsResponse>(`/api/chairs?branch_id=${session.branch.id}`).catch(() => ({ items: [] as DentalChair[], total: 0 }))
+            : Promise.resolve({ items: [] as DentalChair[], total: 0 }),
         ]);
         if (!mounted) return;
         setPatient(p);
         setUsers(u.items);
+        setChairs(chairsResponse.items);
       } catch (err) {
         toast.error(err instanceof ApiError ? err.message : "Lỗi tải lịch hẹn");
       } finally {
@@ -86,6 +92,7 @@ export function AppointmentDetailPage() {
 
   const doctor = users.find((u) => u.id === appt.clinician_id);
   const assistant = appt.assistant_id ? users.find((u) => u.id === appt.assistant_id) : null;
+  const chair = appt.chair_id ? chairs.find((item) => item.id === appt.chair_id) : null;
   const endTime = new Date(new Date(appt.scheduled_at).getTime() + appt.duration_min * 60 * 1000);
 
   async function handleCancel(reason: string) {
@@ -138,6 +145,7 @@ export function AppointmentDetailPage() {
           ) : <span className="font-mono text-xs">{appt.patient_id.slice(0, 8)}…</span>} />
           <Field label="Bác sĩ" value={doctor?.name ?? "—"} />
           <Field label="Phụ tá chính" value={assistant?.name ?? "—"} />
+          <Field label="Ghế nha" value={chair ? `${chair.name}${chair.room_name ? ` · ${chair.room_name}` : ""}` : "—"} />
           <Field label="Thời lượng" value={`${appt.duration_min} phút`} />
           <Field label="Thủ thuật" value={appt.procedure ?? "—"} />
           <Field label="Nguồn" value={SOURCE_LABEL[appt.source] ?? appt.source} />
@@ -168,6 +176,7 @@ export function AppointmentDetailPage() {
         <EditAppointmentDialog
           appointment={appt}
           doctors={users}
+          chairs={chairs}
           onClose={() => setEditOpen(false)}
           onSaved={(updated) => {
             setAppt(updated);
@@ -240,11 +249,13 @@ function CancelForm({
 function EditAppointmentDialog({
   appointment,
   doctors,
+  chairs,
   onClose,
   onSaved,
 }: {
   appointment: Appointment;
   doctors: UserWithDetails[];
+  chairs: DentalChair[];
   onClose: () => void;
   onSaved: (a: Appointment) => void;
 }) {
@@ -257,6 +268,7 @@ function EditAppointmentDialog({
   const [status, setStatus] = useState(appointment.status);
   const [clinicianId, setClinicianId] = useState(appointment.clinician_id);
   const [assistantId, setAssistantId] = useState(appointment.assistant_id ?? "");
+  const [chairId, setChairId] = useState(appointment.chair_id ?? "");
   const [saving, setSaving] = useState(false);
 
   const doctorsOnly = doctors.filter((u) => isDoctorRole(u.role_key, u.role_id, u.role_name));
@@ -277,6 +289,7 @@ function EditAppointmentDialog({
         status,
         clinician_id: clinicianId,
         assistant_id: assistantId || null,
+        chair_id: chairId || null,
         procedure: procedure || undefined,
         notes: notes || undefined,
       });
@@ -317,6 +330,20 @@ function EditAppointmentDialog({
                 <option value="">— Không chọn —</option>
                 {assistantsOnly.map((a) => (
                   <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </Select>
+            </div>
+          )}
+
+          {chairs.length > 0 && (
+            <div className="grid gap-1.5">
+              <Label>Ghế nha</Label>
+              <Select value={chairId} onChange={(e) => setChairId(e.target.value)}>
+                <option value="">— Chưa gán ghế —</option>
+                {chairs.filter((chair) => chair.is_active || chair.id === appointment.chair_id).map((chair) => (
+                  <option key={chair.id} value={chair.id}>
+                    {chair.name}{chair.room_name ? ` · ${chair.room_name}` : ""}
+                  </option>
                 ))}
               </Select>
             </div>

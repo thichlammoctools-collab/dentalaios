@@ -21,6 +21,7 @@ import {
 } from "../lib/lark-client";
 import { ConflictError, NotFoundError } from "../lib/errors";
 import { assertAllInTenant } from "../lib/tenant-scope";
+import { chairsService } from "./chairs.service";
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -87,17 +88,24 @@ export const appointmentsService = {
       { table: "patients", id: input.patient_id },
       { table: "users", id: input.clinician_id },
       input.assistant_id ? { table: "users", id: input.assistant_id } : null,
+      input.chair_id ? { table: "dental_chairs", id: input.chair_id } : null,
       input.source_visit_id ? { table: "visits", id: input.source_visit_id } : null,
     ]);
 
     // Conflict check: same clinician, overlapping [start, end)
     await assertNoConflict(db, tenantId, input.clinician_id, start, end);
+    if (input.chair_id) {
+      await chairsService.assertAvailable(
+        db, tenantId, branchId, input.chair_id, input.scheduled_at, duration,
+      );
+    }
 
     const appt = await repo.create(tenantId, {
       branch_id: branchId,
       clinician_id: input.clinician_id,
       patient_id: input.patient_id,
       assistant_id: input.assistant_id,
+      chair_id: input.chair_id,
       source_visit_id: input.source_visit_id,
       scheduled_at: input.scheduled_at,
       duration_min: duration,
@@ -131,12 +139,14 @@ export const appointmentsService = {
     await assertAllInTenant(db, tenantId, [
       { table: "users", id: input.clinician_id ?? undefined },
       { table: "users", id: input.assistant_id ?? undefined },
+      { table: "dental_chairs", id: input.chair_id ?? undefined },
     ]);
 
     // Re-check conflicts only if anything affecting time/doctor changed
     const newClinician = input.clinician_id ?? existing.clinician_id;
     const newDuration = input.duration_min ?? existing.duration_min;
     const newScheduledAt = input.scheduled_at ?? existing.scheduled_at;
+    const newChairId = input.chair_id === undefined ? existing.chair_id : input.chair_id ?? undefined;
     const rescheduling =
       input.scheduled_at !== undefined ||
       input.duration_min !== undefined ||
@@ -157,11 +167,18 @@ export const appointmentsService = {
       );
     }
 
+    if (newChairId && (input.chair_id !== undefined || rescheduling)) {
+      await chairsService.assertAvailable(
+        db, tenantId, existing.branch_id, newChairId, newScheduledAt, newDuration, id,
+      );
+    }
+
     const updated = await repo.update(tenantId, id, {
       scheduled_at: input.scheduled_at,
       duration_min: input.duration_min,
       clinician_id: input.clinician_id,
       assistant_id: input.assistant_id,
+      chair_id: input.chair_id,
       status: input.status,
       procedure: input.procedure,
       notes: input.notes,

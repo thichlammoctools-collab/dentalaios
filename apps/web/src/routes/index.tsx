@@ -4,7 +4,6 @@ import { ROUTES } from "@shared/constants";
 import { LoginPage } from "@/pages/LoginPage";
 import { RegisterPage } from "@/pages/RegisterPage";
 import { VerifyEmailPage } from "@/pages/VerifyEmailPage";
-import { InviteAcceptPage } from "@/pages/InviteAcceptPage";
 import { TodayPage } from "@/pages/TodayPage";
 import { PatientsPage } from "@/pages/PatientsPage";
 import { PatientDetailPage } from "@/pages/PatientDetailPage";
@@ -20,6 +19,7 @@ import { AuditLogsPage } from "@/pages/AuditLogsPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { SchedulePage } from "@/pages/SchedulePage";
 import { ScheduleNewPage } from "@/pages/ScheduleNewPage";
+import { ChairBoardPage } from "@/pages/ChairBoardPage";
 import { RequireAuth } from "@/components/RequireAuth";
 import { AppShell } from "@/components/AppShell";
 
@@ -47,7 +47,6 @@ export function AppRoutes() {
       <Route path={ROUTES.LOGIN} element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
-      <Route path="/invite/:token" element={<InviteAcceptPage />} />
 
       {/* Protected */}
       <Route
@@ -81,6 +80,10 @@ export function AppRoutes() {
             <ScheduleNewPage />
           </Protected>
         }
+      />
+      <Route
+        path={ROUTES.CHAIRS}
+        element={<Protected><ChairBoardPage /></Protected>}
       />
       <Route
         path={ROUTES.PATIENTS}

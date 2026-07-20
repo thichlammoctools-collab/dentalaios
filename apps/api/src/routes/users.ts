@@ -9,6 +9,7 @@ import { auditLog } from "../middleware/audit";
 import type { AuthContext } from "../middleware/auth";
 import { usersService } from "../services/users.service";
 import { createUsersRepository } from "../repositories/users.repo";
+import { ForbiddenError } from "../lib/errors";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -44,6 +45,13 @@ router.post(
   zValidator("json", userCreateSchema),
   async (c) => {
     const jwt = getJwt(c);
+    const ownerRole = await c.env.DB
+      .prepare("SELECT id FROM roles WHERE id = ? AND tenant_id = ? AND system_key = 'admin'")
+      .bind(jwt.role_id, jwt.tenant_id)
+      .first<{ id: string }>();
+    if (!ownerRole) {
+      throw new ForbiddenError("Chỉ chủ phòng khám mới có thể tạo người dùng");
+    }
     const data = c.req.valid("json");
     const created = await usersService.create(c.env.DB, jwt.tenant_id, data);
     return c.json(created, 201);

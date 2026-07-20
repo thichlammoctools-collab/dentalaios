@@ -21,7 +21,10 @@ export interface AppointmentsRepository {
   update(
     tenantId: string,
     id: string,
-    data: Partial<Omit<Appointment, "assistant_id">> & { assistant_id?: string | null },
+    data: Partial<Omit<Appointment, "assistant_id" | "chair_id">> & {
+      assistant_id?: string | null;
+      chair_id?: string | null;
+    },
   ): Promise<Appointment | null>;
   /**
    * Find appointments that overlap with [startISO, endISO) for a clinician.
@@ -31,6 +34,13 @@ export interface AppointmentsRepository {
   findConflicts(
     tenantId: string,
     clinicianId: string,
+    startISO: string,
+    endISO: string,
+    excludeId?: string,
+  ): Promise<Appointment[]>;
+  findChairConflicts(
+    tenantId: string,
+    chairId: string,
     startISO: string,
     endISO: string,
     excludeId?: string,
@@ -98,10 +108,10 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
       const result = await db
         .prepare(
           `INSERT INTO appointments
-              (id, tenant_id, branch_id, clinician_id, patient_id, assistant_id,
+              (id, tenant_id, branch_id, clinician_id, patient_id, assistant_id, chair_id,
                source_visit_id, scheduled_at, duration_min, status, procedure, notes,
                source, lark_event_id, reminder_sent_at, reminder_method, cancelled_reason, created_by)
-           SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+           SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
            WHERE NOT EXISTS (
              SELECT 1 FROM appointments
              WHERE tenant_id = ?
@@ -109,7 +119,16 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
                AND status NOT IN ('cancelled', 'no_show')
                AND scheduled_at < ?
                AND datetime(scheduled_at, '+' || duration_min || ' minutes') > ?
-           )`,
+            ) AND (
+              ? IS NULL OR NOT EXISTS (
+                SELECT 1 FROM appointments
+                WHERE tenant_id = ?
+                  AND chair_id = ?
+                  AND status NOT IN ('cancelled', 'no_show')
+                  AND scheduled_at < ?
+                  AND datetime(scheduled_at, '+' || duration_min || ' minutes') > ?
+              )
+            )`,
         )
         .bind(
           id,
@@ -118,6 +137,7 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
           data.clinician_id,
           data.patient_id,
           data.assistant_id ?? null,
+          data.chair_id ?? null,
           data.source_visit_id ?? null,
           data.scheduled_at,
           data.duration_min,
@@ -132,6 +152,11 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
           data.created_by,
           tenantId,
           data.clinician_id,
+          end.toISOString(),
+          start,
+          data.chair_id ?? null,
+          tenantId,
+          data.chair_id ?? null,
           end.toISOString(),
           start,
         )
@@ -151,6 +176,7 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
         "duration_min",
         "clinician_id",
         "assistant_id",
+        "chair_id",
         "procedure",
         "notes",
         "cancelled_reason",
@@ -194,6 +220,26 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
       const result = await db.prepare(sql).bind(...binds).all();
       return (result.results as D1Row[]).map(mapAppointment);
     },
+
+    async findChairConflicts(tenantId, chairId, startISO, endISO, excludeId) {
+      const conditions = [
+        "tenant_id = ?",
+        "chair_id = ?",
+        "status NOT IN ('cancelled', 'no_show')",
+        "scheduled_at < ?",
+        `datetime(scheduled_at, '+' || duration_min || ' minutes') > ?`,
+      ];
+      const binds: unknown[] = [tenantId, chairId, endISO, startISO];
+      if (excludeId) {
+        conditions.push("id != ?");
+        binds.push(excludeId);
+      }
+      const result = await db
+        .prepare(`SELECT * FROM appointments WHERE ${conditions.join(" AND ")} LIMIT 5`)
+        .bind(...binds)
+        .all();
+      return (result.results as D1Row[]).map(mapAppointment);
+    },
   };
 }
 
@@ -205,6 +251,7 @@ function mapAppointment(row: D1Row): Appointment {
     clinician_id: row.clinician_id as string,
     patient_id: row.patient_id as string,
     assistant_id: (row.assistant_id as string | null) ?? undefined,
+    chair_id: (row.chair_id as string | null) ?? undefined,
     source_visit_id: (row.source_visit_id as string | null) ?? undefined,
     scheduled_at: row.scheduled_at as string,
     duration_min: row.duration_min as number,

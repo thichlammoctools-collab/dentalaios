@@ -15,19 +15,21 @@ import { AppointmentForm } from "@/components/schedule/AppointmentForm";
 import { apiDelete, apiGet, apiPatch, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
-import type { Appointment, Patient, UserWithDetails } from "@shared/types";
+import type { Appointment, DentalChair, Patient, UserWithDetails } from "@shared/types";
 import { isAssistantRole, isDoctorRole, ROUTES } from "@shared/constants";
 import { formatDate, formatTime, getWeekDays, isoToYmd, weekdayLabel, ymd, combineDateTime } from "@/lib/utils";
 
 interface AppointmentsResponse { items: Appointment[]; total: number }
 interface PatientsResponse { items: Patient[]; total: number }
 interface UsersResponse { items: UserWithDetails[]; total: number }
+interface ChairsResponse { items: DentalChair[]; total: number }
 
 export function SchedulePage() {
   const { session } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [users, setUsers] = useState<UserWithDetails[]>([]);
+  const [chairs, setChairs] = useState<DentalChair[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -57,11 +59,15 @@ export function SchedulePage() {
       session?.branch?.id
         ? apiGet<UsersResponse>(`/api/users/branch/${session.branch.id}`)
         : Promise.resolve({ items: [] as UserWithDetails[] }),
-    ]).then(([appts, pats, us]) => {
+      session?.branch?.id
+        ? apiGet<ChairsResponse>(`/api/chairs?branch_id=${session.branch.id}`)
+        : Promise.resolve({ items: [] as DentalChair[], total: 0 }),
+    ]).then(([appts, pats, us, chairResponse]) => {
       if (!mounted) return;
       setAppointments(appts.items);
       setPatients(pats.items);
       setUsers(us.items);
+      setChairs(chairResponse.items);
     }).catch((err) => console.error(err))
       .finally(() => mounted && setLoading(false));
 
@@ -79,6 +85,8 @@ export function SchedulePage() {
     users.forEach((u) => m.set(u.id, u));
     return m;
   }, [users]);
+
+  const chairsById = useMemo(() => new Map(chairs.map((chair) => [chair.id, chair])), [chairs]);
 
   const filteredAppointments = appointments
     .filter((a) => filterStatuses.size === 0 || filterStatuses.has(a.status))
@@ -287,6 +295,7 @@ export function SchedulePage() {
                     const patient = patientsById.get(a.patient_id);
                     const doctor = usersById.get(a.clinician_id);
                     const assistant = a.assistant_id ? usersById.get(a.assistant_id) : null;
+                    const chair = a.chair_id ? chairsById.get(a.chair_id) : null;
                     const endTime = new Date(new Date(a.scheduled_at).getTime() + a.duration_min * 60 * 1000);
                     return (
                       <div
@@ -327,6 +336,12 @@ export function SchedulePage() {
                                 <span className="flex items-center gap-1">
                                   <span className="text-[10px] uppercase opacity-70">Phụ tá</span>
                                   <span className="font-medium text-foreground">{assistant.name}</span>
+                                </span>
+                              )}
+                              {chair && (
+                                <span className="flex items-center gap-1">
+                                  <span className="text-[10px] uppercase opacity-70">Ghế</span>
+                                  <span className="font-medium text-foreground">{chair.name}</span>
                                 </span>
                               )}
                               {a.procedure && (

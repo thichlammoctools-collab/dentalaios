@@ -355,6 +355,7 @@ export const appointmentCreateSchema = z.object({
   patient_id: z.string().min(1),
   clinician_id: z.string().min(1),
   assistant_id: z.string().min(1).optional(),
+  chair_id: z.string().min(1).optional(),
   scheduled_at: z.string().datetime({ offset: true }),
   duration_min: z.number().int().min(15).max(480).default(30),
   procedure: optionalText(100),
@@ -368,6 +369,7 @@ export const appointmentUpdateSchema = z.object({
   duration_min: z.number().int().min(15).max(480).optional(),
   clinician_id: z.string().min(1).optional(),
   assistant_id: z.string().min(1).nullable().optional(),
+  chair_id: z.string().min(1).nullable().optional(),
   status: z.enum(["booked", "confirmed", "arrived", "completed", "cancelled", "no_show"]).optional(),
   procedure: optionalText(100).optional(),
   notes: optionalText(2000).optional(),
@@ -381,6 +383,65 @@ export const appointmentSlotQuerySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 export type AppointmentSlotQuery = z.infer<typeof appointmentSlotQuerySchema>;
+
+// ──────────────── Tenant management dashboard ────────────────
+
+export const managementDashboardQuerySchema = z.object({
+  range: z.coerce.number().int().refine((value): value is 7 | 30 | 90 => [7, 30, 90].includes(value), {
+    message: "Khoảng thời gian phải là 7, 30 hoặc 90 ngày",
+  }).default(30),
+  branch_id: z.string().trim().min(1).optional(),
+});
+
+export type ManagementDashboardQuery = z.infer<typeof managementDashboardQuerySchema>;
+
+// ──────────────── Dental chairs ────────────────
+
+const chairTypeSchema = z.enum(["general", "surgery", "orthodontic", "pediatric", "hygiene"]);
+const chairOperationalStatusSchema = z.enum(["available", "cleaning", "maintenance", "out_of_service"]);
+
+export const chairCreateSchema = z.object({
+  branch_id: z.string().min(1),
+  code: z.string().trim().min(1, "Không được để trống").max(50)
+    .regex(/^[A-Za-z0-9_-]+$/, "Mã ghế chỉ gồm chữ, số, gạch ngang hoặc gạch dưới"),
+  name: nonEmpty(100),
+  room_name: optionalText(100),
+  chair_type: chairTypeSchema.default("general"),
+  operational_status: chairOperationalStatusSchema.default("available"),
+  default_doctor_id: z.string().min(1).nullable().optional(),
+  default_assistant_id: z.string().min(1).nullable().optional(),
+  turnover_min: z.number().int().min(0).max(120).default(10),
+  sort_order: z.number().int().min(0).max(10000).default(0),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Màu phải ở dạng #RRGGBB").optional(),
+  is_active: z.boolean().default(true),
+  notes: optionalText(1000),
+});
+
+export const chairUpdateSchema = chairCreateSchema
+  .omit({ branch_id: true, code: true })
+  .partial()
+  .strict()
+  .refine((data) => Object.keys(data).length > 0, { message: "Cần ít nhất một trường để cập nhật" });
+
+export const chairStatusUpdateSchema = z.object({
+  operational_status: chairOperationalStatusSchema,
+}).strict();
+
+export const chairAvailabilityQuerySchema = z.object({
+  branch_id: z.string().min(1),
+  start_at: z.string().datetime({ offset: true }),
+  duration_min: z.coerce.number().int().min(15).max(480),
+  exclude_appointment_id: z.string().min(1).optional(),
+});
+
+export const chairBoardQuerySchema = z.object({
+  branch_id: z.string().min(1),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+export type ChairCreateInput = z.infer<typeof chairCreateSchema>;
+export type ChairUpdateInput = z.infer<typeof chairUpdateSchema>;
+export type ChairStatusUpdateInput = z.infer<typeof chairStatusUpdateSchema>;
 
 // ──────────────── Doctor Schedule ────────────────
 

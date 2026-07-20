@@ -9,7 +9,7 @@ import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/c
 import { apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
-import type { Appointment, UserWithDetails } from "@shared/types";
+import type { Appointment, DentalChair, UserWithDetails } from "@shared/types";
 import { isAssistantRole, isDoctorRole } from "@shared/constants";
 import { combineDateTime, ymd } from "@/lib/utils";
 import { PatientCombobox } from "./PatientCombobox";
@@ -23,6 +23,9 @@ interface AppointmentFormProps {
 }
 
 interface UsersResponse { items: UserWithDetails[]; total: number }
+interface ChairAvailabilityResponse {
+  items: Array<{ chair: DentalChair; available: boolean; reason?: string }>;
+}
 
 export function AppointmentForm({
   open,
@@ -36,6 +39,8 @@ export function AppointmentForm({
   const [patientId, setPatientId] = useState("");
   const [clinicianId, setClinicianId] = useState("");
   const [assistantId, setAssistantId] = useState("");
+  const [chairId, setChairId] = useState("");
+  const [chairAvailability, setChairAvailability] = useState<ChairAvailabilityResponse["items"]>([]);
   const [date, setDate] = useState(initialDate ?? ymd(new Date()));
   const [time, setTime] = useState(
     initialHour != null ? `${String(initialHour).padStart(2, "0")}:00` : "09:00",
@@ -52,6 +57,19 @@ export function AppointmentForm({
       .catch(() => setUsers([]));
   }, [open, session]);
 
+  useEffect(() => {
+    if (!open || !session?.branch?.id) return;
+    const startAt = combineDateTime(date, time);
+    const params = new URLSearchParams({
+      branch_id: session.branch.id,
+      start_at: startAt,
+      duration_min: String(durationMin),
+    });
+    apiGet<ChairAvailabilityResponse>(`/api/chairs/availability?${params}`)
+      .then((response) => setChairAvailability(response.items))
+      .catch(() => setChairAvailability([]));
+  }, [open, session?.branch?.id, date, time, durationMin]);
+
   // Default clinician = currently logged-in user if doctor, else first doctor in branch
   useEffect(() => {
     if (!open || clinicianId || users.length === 0) return;
@@ -67,6 +85,7 @@ export function AppointmentForm({
   function resetForm() {
     setPatientId("");
     setAssistantId("");
+    setChairId("");
     setProcedure("");
     setNotes("");
   }
@@ -84,6 +103,7 @@ export function AppointmentForm({
         patient_id: patientId,
         clinician_id: clinicianId,
         assistant_id: assistantId || undefined,
+        chair_id: chairId || undefined,
         scheduled_at,
         duration_min: durationMin,
         procedure: procedure || undefined,
@@ -195,6 +215,24 @@ export function AppointmentForm({
             </Select>
           </div>
 
+          {chairAvailability.length > 0 && (
+            <div className="grid gap-1.5">
+              <Label htmlFor="chair">Ghế nha</Label>
+              <Select id="chair" value={chairId} onChange={(e) => setChairId(e.target.value)}>
+                <option value="">— Chưa gán ghế —</option>
+                {chairAvailability.map(({ chair, available, reason }) => (
+                  <option key={chair.id} value={chair.id} disabled={!available}>
+                    {chair.name}{chair.room_name ? ` · ${chair.room_name}` : ""}
+                    {available ? " · Trống" : ` · ${chairReasonLabel(reason)}`}
+                  </option>
+                ))}
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Ghế không khả dụng được hiển thị để tham khảo và không thể chọn.
+              </p>
+            </div>
+          )}
+
           {/* Procedure */}
           <div className="grid gap-1.5">
             <Label htmlFor="procedure">Thủ thuật (tuỳ chọn)</Label>
@@ -229,4 +267,14 @@ export function AppointmentForm({
       </form>
     </Dialog>
   );
+}
+
+function chairReasonLabel(reason?: string): string {
+  switch (reason) {
+    case "reserved": return "Đã có lịch";
+    case "cleaning": return "Đang vệ sinh";
+    case "maintenance": return "Bảo trì";
+    case "out_of_service": return "Ngưng hoạt động";
+    default: return "Không khả dụng";
+  }
 }
