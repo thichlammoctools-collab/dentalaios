@@ -205,10 +205,11 @@ describe("treatment case lifecycle", () => {
       new Map([
         ["FROM treatment_cases", [activeCase]],
         ["AND m.id = ? LIMIT 1", [milestone, milestone, secondMilestone]],
-        ["FROM appointments WHERE", []],
+        ["FROM appointments WHERE", [appointment]],
         ["FROM dental_chairs", []],
         ["FROM users", [{ id: "test-user", tenant_id: "test-tenant" }]],
         ["FROM patients", [{ id: "patient-1", tenant_id: "test-tenant" }]],
+        ["FROM branches", [{ id: "test-branch", tenant_id: "test-tenant" }]],
       ]),
       {
         permissions: ["write_appointments"],
@@ -220,7 +221,7 @@ describe("treatment case lifecycle", () => {
         },
       },
     );
-    expect(res.status).toBe(201);
+    if (res.status !== 201) throw new Error(await res.text());
   });
 
   it("summarizes confirmed, pending, and failed payments for a case plan", async () => {

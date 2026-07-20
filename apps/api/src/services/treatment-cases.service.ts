@@ -176,7 +176,7 @@ export const treatmentCasesService = {
     actorUserId: string,
     data: MilestoneAppointmentLinkInput,
   ): Promise<TreatmentMilestoneAppointment[]> {
-    const { treatmentCase } = await requireOpenMilestone(db, tenantId, planId, milestoneId);
+    const { treatmentCase, milestone } = await requireOpenMilestone(db, tenantId, planId, milestoneId);
     const appointment = await appointmentsService.get(db, tenantId, data.appointment_id);
     assertCompatibleAppointment(treatmentCase, milestone, appointment);
     try {

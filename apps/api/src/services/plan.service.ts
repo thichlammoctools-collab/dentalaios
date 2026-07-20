@@ -168,13 +168,35 @@ export const planService = {
     if (plan.status === "completed") {
       throw new ValidationError("Không thể xóa kế hoạch đã hoàn thành");
     }
-    const treatmentCase = await db
-      .prepare("SELECT 1 FROM treatment_cases WHERE tenant_id = ? AND treatment_plan_id = ? LIMIT 1")
+    const completedItem = await db
+      .prepare(
+        "SELECT 1 FROM treatment_plan_items WHERE tenant_id = ? AND treatment_plan_id = ? AND status = 'completed' LIMIT 1",
+      )
       .bind(tenantId, planId)
       .first();
+    if (completedItem) {
+      throw new ValidationError("Không thể xóa kế hoạch đã có hạng mục điều trị hoàn thành");
+    }
+
+    const treatmentCase = await db
+      .prepare("SELECT status FROM treatment_cases WHERE tenant_id = ? AND treatment_plan_id = ? LIMIT 1")
+      .bind(tenantId, planId)
+      .first<{ status: string }>();
+    if (treatmentCase?.status === "completed") {
+      throw new ValidationError("Không thể xóa kế hoạch có ca điều trị đã hoàn thành");
+    }
     if (treatmentCase) {
       throw new ValidationError("Không thể xóa kế hoạch đã có ca điều trị");
     }
+
+    const payment = await db
+      .prepare("SELECT 1 FROM payments WHERE tenant_id = ? AND treatment_plan_id = ? LIMIT 1")
+      .bind(tenantId, planId)
+      .first();
+    if (payment) {
+      throw new ValidationError("Không thể xóa kế hoạch đã phát sinh phiếu thanh toán");
+    }
+
     return createTreatmentPlansRepository(db).delete(tenantId, planId);
   },
 };

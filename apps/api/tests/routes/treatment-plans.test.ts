@@ -346,6 +346,24 @@ describe("DELETE /api/treatment-plans/:id", () => {
     expect(res.status).toBe(422);
     expect((await res.json() as { error: string }).error).toContain("ca điều trị");
   });
+
+  it("reports a completed treatment case explicitly", async () => {
+    const app = mountRoute("/api/treatment-plans", treatmentPlansRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "DELETE",
+      "/api/treatment-plans/plan-1",
+      new Map([
+        ["FROM treatment_plans", [planRow({ status: "approved" })]],
+        ["FROM treatment_plan_items", []],
+        ["FROM treatment_cases", [{ id: "case-1", status: "completed" }]],
+      ]),
+      { permissions: ["write_plans"] },
+    );
+
+    expect(res.status).toBe(422);
+    expect((await res.json() as { error: string }).error).toContain("ca điều trị đã hoàn thành");
+  });
 });
 
 describe("GET /api/treatment-plans/:id", () => {
@@ -478,6 +496,42 @@ describe("GET /api/treatment-plans/:id/pdf", () => {
     );
 
     expect(res.status).toBe(403);
+  });
+
+  it("rejects deletion when a treatment item has been completed", async () => {
+    const app = mountRoute("/api/treatment-plans", treatmentPlansRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "DELETE",
+      "/api/treatment-plans/plan-1",
+      new Map([
+        ["FROM treatment_plans", [planRow({ status: "approved" })]],
+        ["FROM treatment_plan_items", [itemRow({ status: "completed" })]],
+      ]),
+      { permissions: ["write_plans"] },
+    );
+
+    expect(res.status).toBe(422);
+    expect((await res.json() as { error: string }).error).toContain("hạng mục điều trị hoàn thành");
+  });
+
+  it("rejects deletion when any payment has been issued for the plan", async () => {
+    const app = mountRoute("/api/treatment-plans", treatmentPlansRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "DELETE",
+      "/api/treatment-plans/plan-1",
+      new Map([
+        ["FROM treatment_plans", [planRow({ status: "approved" })]],
+        ["FROM treatment_plan_items", []],
+        ["FROM treatment_cases", []],
+        ["FROM payments", [{ id: "payment-1" }]],
+      ]),
+      { permissions: ["write_plans"] },
+    );
+
+    expect(res.status).toBe(422);
+    expect((await res.json() as { error: string }).error).toContain("phiếu thanh toán");
   });
 });
 

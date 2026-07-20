@@ -138,41 +138,43 @@ export function PatientDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-6 py-6">
-      <Breadcrumbs
-        items={[
-          { label: "Bệnh nhân", href: "/patients" },
-          { label: patient.name },
-        ]}
-      />
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-4">
-            <ProfileAvatar
-              subject="patients"
-              entityId={patient.id}
-              name={patient.name}
-              avatarFileId={patient.avatar_file_id}
-              size="lg"
-              editable
-              onChanged={load}
-            />
-            <div>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight">{patient.name}</h1>
-            <p className="text-sm text-muted-foreground">
-            {formatDate(patient.date_of_birth)} ·{" "}
-            {patient.gender === "M" ? "Nam" : patient.gender === "F" ? "Nữ" : "Khác"} ·{" "}
-            {patient.phone}
-            {patient.email && ` · ${patient.email}`}
-            </p>
-            </div>
-          </div>
-        <Button variant="outline" onClick={() => setOpenEdit(true)}>
-          Sửa
-        </Button>
-      </div>
-
+    <div className="mx-auto max-w-6xl px-6 py-6">
       <Tabs defaultValue="info">
-        <TabsList>
+        <div className="sticky top-0 z-10 -mx-6 border-b border-border bg-background px-6 pb-4 pt-6 shadow-sm">
+          <div className="mx-auto max-w-6xl space-y-6">
+            <Breadcrumbs
+              items={[
+                { label: "Bệnh nhân", href: "/patients" },
+                { label: patient.name },
+              ]}
+            />
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex min-w-0 items-center gap-4">
+                <ProfileAvatar
+                  subject="patients"
+                  entityId={patient.id}
+                  name={patient.name}
+                  avatarFileId={patient.avatar_file_id}
+                  size="lg"
+                  editable
+                  onChanged={load}
+                />
+                <div className="min-w-0">
+                  <h1 className="mt-1 truncate text-2xl font-semibold tracking-tight">{patient.name}</h1>
+                  <p className="truncate text-sm text-muted-foreground">
+                    {formatDate(patient.date_of_birth)} ·{" "}
+                    {patient.gender === "M" ? "Nam" : patient.gender === "F" ? "Nữ" : "Khác"} ·{" "}
+                    {patient.phone}
+                    {patient.email && ` · ${patient.email}`}
+                  </p>
+                </div>
+              </div>
+              <Button className="shrink-0" variant="outline" onClick={() => setOpenEdit(true)}>
+                Sửa
+              </Button>
+            </div>
+            <div className="overflow-x-auto pb-1">
+              <TabsList className="min-w-max">
           <TabsTrigger value="info">Thông tin</TabsTrigger>
           <TabsTrigger value="alerts">Cảnh báo ({alerts.length})</TabsTrigger>
           <TabsTrigger value="visits">Lượt khám ({visits.length})</TabsTrigger>
@@ -180,9 +182,12 @@ export function PatientDetailPage() {
           <TabsTrigger value="payments">Thanh toán ({payments.length})</TabsTrigger>
           <TabsTrigger value="appointments">Lịch hẹn ({appointments.length})</TabsTrigger>
           <TabsTrigger value="images">Hình ảnh</TabsTrigger>
-        </TabsList>
+              </TabsList>
+            </div>
+          </div>
+        </div>
 
-        <TabsContent value="info">
+        <TabsContent className="mt-6" value="info">
           <Card>
             <CardHeader>
               <CardTitle>Thông tin chi tiết</CardTitle>
