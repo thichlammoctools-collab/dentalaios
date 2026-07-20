@@ -58,7 +58,9 @@ export const platformAuthService = {
       new Date(Date.now() + 300000).toISOString(),
     );
     if (!user.user.mfa_enabled) {
-      const enrollment = await this.provisionMfa(deps, user.user);
+      const enrollment = user.mfa_secret_encrypted
+        ? await this.pendingMfaEnrollment(deps, user.user, user.mfa_secret_encrypted)
+        : await this.provisionMfa(deps, user.user);
       return {
         challenge_id,
         mfa_enrollment_required: true,
@@ -74,13 +76,13 @@ export const platformAuthService = {
     metadata: RequestMetadata,
   ): Promise<PlatformSession> {
     const sessions = createPlatformSessionsRepository(deps.db);
-    const userId = await sessions.consumeChallenge(challengeId);
+    const userId = await sessions.findActiveChallenge(challengeId);
     if (!userId)
-      throw new UnauthorizedError("Mã xác thực không hợp lệ hoặc đã hết hạn");
+      throw new UnauthorizedError("Phiên xác thực đã hết hạn hoặc đã được sử dụng");
     const users = createPlatformUsersRepository(deps.db);
     const context = await users.findById(userId);
     if (!context || !context.user.is_active || !context.mfa_secret_encrypted)
-      throw new UnauthorizedError("Mã xác thực không hợp lệ hoặc đã hết hạn");
+      throw new UnauthorizedError("Phiên xác thực đã hết hạn hoặc đã được sử dụng");
     const [ciphertext, iv] = context.mfa_secret_encrypted.split(".");
     const secret = await decryptSecret(
       ciphertext,
@@ -88,7 +90,9 @@ export const platformAuthService = {
       required(deps.mfaEncryptionKey, "PLATFORM_MFA_ENCRYPTION_KEY"),
     );
     if (!(await verifyTotp(secret, input)))
-      throw new UnauthorizedError("Mã xác thực không hợp lệ hoặc đã hết hạn");
+      throw new UnauthorizedError("Mã xác thực không hợp lệ");
+    if (!(await sessions.consumeChallenge(challengeId)))
+      throw new UnauthorizedError("Phiên xác thực đã hết hạn hoặc đã được sử dụng");
     if (!context.user.mfa_enabled) {
       await users.update(context.user.id, {
         mfa_enabled_at: new Date().toISOString(),
@@ -136,9 +140,25 @@ export const platformAuthService = {
       mfa_secret_encrypted: `${encrypted.ciphertext}.${encrypted.iv}`,
       mfa_enabled_at: null,
     });
+    return this.mfaEnrollment(secret, user.id);
+  },
+  async pendingMfaEnrollment(
+    deps: PlatformAuthDeps,
+    user: PlatformUser,
+    encryptedSecret: string,
+  ): Promise<{ secret: string; otpauth_uri: string }> {
+    const [ciphertext, iv] = encryptedSecret.split(".");
+    const secret = await decryptSecret(
+      ciphertext,
+      iv,
+      required(deps.mfaEncryptionKey, "PLATFORM_MFA_ENCRYPTION_KEY"),
+    );
+    return this.mfaEnrollment(secret, user.id);
+  },
+  mfaEnrollment(secret: string, userId: string): { secret: string; otpauth_uri: string } {
     return {
       secret,
-      otpauth_uri: `otpauth://totp/DentalAIOS%20Platform:${encodeURIComponent(user.id)}?secret=${secret}&issuer=DentalAIOS%20Platform&algorithm=SHA1&digits=6&period=30`,
+      otpauth_uri: `otpauth://totp/DentalAIOS%20Platform:${encodeURIComponent(userId)}?secret=${secret}&issuer=DentalAIOS%20Platform&algorithm=SHA1&digits=6&period=30`,
     };
   },
   async confirmMfa(

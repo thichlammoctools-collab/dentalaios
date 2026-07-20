@@ -15,6 +15,7 @@ export function createPlatformSessionsRepository(db: D1Database) {
     async revoke(id: string): Promise<void> { await db.prepare("UPDATE platform_sessions SET revoked_at = datetime('now') WHERE id = ? AND revoked_at IS NULL").bind(id).run(); },
     async reauth(id: string, at: string): Promise<void> { await db.prepare("UPDATE platform_sessions SET mfa_verified_at = ?, last_seen_at = ? WHERE id = ?").bind(at, at, id).run(); },
     async createChallenge(id: string, userId: string, expiresAt: string): Promise<void> { await db.prepare("INSERT INTO platform_login_challenges (id, platform_user_id, expires_at) VALUES (?, ?, ?)").bind(id, userId, expiresAt).run(); },
-    async consumeChallenge(id: string): Promise<string | null> { const row = await db.prepare("UPDATE platform_login_challenges SET consumed_at = datetime('now') WHERE id = ? AND consumed_at IS NULL AND datetime(expires_at) > datetime('now') RETURNING platform_user_id").bind(id).first<{ platform_user_id: string }>(); return row?.platform_user_id ?? null; },
+    async findActiveChallenge(id: string): Promise<string | null> { const row = await db.prepare("SELECT platform_user_id FROM platform_login_challenges WHERE id = ? AND consumed_at IS NULL AND datetime(expires_at) > datetime('now') LIMIT 1").bind(id).first<{ platform_user_id: string }>(); return row?.platform_user_id ?? null; },
+    async consumeChallenge(id: string): Promise<boolean> { const result = await db.prepare("UPDATE platform_login_challenges SET consumed_at = datetime('now') WHERE id = ? AND consumed_at IS NULL AND datetime(expires_at) > datetime('now')").bind(id).run(); return result.meta.changes === 1; },
   };
 }
