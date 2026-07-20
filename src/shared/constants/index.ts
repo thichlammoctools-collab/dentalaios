@@ -15,6 +15,7 @@ export const ROUTES = {
   SCHEDULE_NEW: "/schedule/new",
   MANAGEMENT_DASHBOARD: "/management-dashboard",
   CHAIRS: "/chairs",
+  CHAIRS_SETTINGS: "/chairs/settings",
   SETTINGS_USERS: "/settings/users",
   SETTINGS_ROLES: "/settings/roles",
   SETTINGS_AUDIT_LOGS: "/settings/audit-logs",

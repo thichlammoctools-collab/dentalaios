@@ -1,7 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
-import { ROUTES } from "@shared/constants";
+import { PERMISSIONS, ROUTES } from "@shared/constants";
 
 interface NavItem {
   label: string;
@@ -78,7 +78,7 @@ const ICONS: Record<NavItem["icon"], React.ReactNode> = {
 const NAV: NavItem[] = [
   { label: "Hôm nay", href: ROUTES.TODAY, match: (p) => p === ROUTES.TODAY, icon: "calendar" },
   { label: "Lịch hẹn", href: ROUTES.SCHEDULE, match: (p) => p.startsWith("/schedule"), icon: "schedule" },
-  { label: "Ghế nha", href: ROUTES.CHAIRS, match: (p) => p === ROUTES.CHAIRS, icon: "chair" },
+  { label: "Ghế nha", href: ROUTES.CHAIRS, match: (p) => p.startsWith(ROUTES.CHAIRS), icon: "chair" },
   { label: "Bệnh nhân", href: ROUTES.PATIENTS, match: (p) => p.startsWith("/patients"), icon: "patients" },
   {
     label: "Cài đặt",
@@ -102,9 +102,9 @@ interface SidebarProps {
 export function Sidebar({ onNavigate }: SidebarProps) {
   const { pathname } = useLocation();
   const { session } = useAuth();
-  const dashboardRoute = (ROUTES as Record<string, string>).MANAGEMENT_DASHBOARD ?? "/management-dashboard";
+  const dashboardRoute = ROUTES.MANAGEMENT_DASHBOARD;
   const canViewDashboard = Boolean(
-    session?.role.permissions.includes("all") || session?.role.permissions.includes("view_management_dashboard"),
+    session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.VIEW_MANAGEMENT_DASHBOARD),
   );
   const navigation: NavItem[] = canViewDashboard
     ? [{ label: "Quản trị tổng quan", href: dashboardRoute, match: (p) => p === dashboardRoute, icon: "dashboard" }, ...NAV]

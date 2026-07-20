@@ -21,6 +21,7 @@ import { SchedulePage } from "@/pages/SchedulePage";
 import { ScheduleNewPage } from "@/pages/ScheduleNewPage";
 import { ManagementDashboardPage } from "@/pages/ManagementDashboardPage";
 import { ChairBoardPage } from "@/pages/ChairBoardPage";
+import { ChairSettingsPage } from "@/pages/ChairSettingsPage";
 import { RequireAuth } from "@/components/RequireAuth";
 import { AppShell } from "@/components/AppShell";
 
@@ -41,7 +42,7 @@ function Protected({ children }: { children: ReactNode }) {
 }
 
 export function AppRoutes() {
-  const dashboardRoute = (ROUTES as Record<string, string>).MANAGEMENT_DASHBOARD ?? "/management-dashboard";
+  const dashboardRoute = ROUTES.MANAGEMENT_DASHBOARD;
 
   return (
     <Routes>
@@ -95,6 +96,10 @@ export function AppRoutes() {
       <Route
         path={ROUTES.CHAIRS}
         element={<Protected><ChairBoardPage /></Protected>}
+      />
+      <Route
+        path={ROUTES.CHAIRS_SETTINGS}
+        element={<Protected><ChairSettingsPage /></Protected>}
       />
       <Route
         path={ROUTES.PATIENTS}

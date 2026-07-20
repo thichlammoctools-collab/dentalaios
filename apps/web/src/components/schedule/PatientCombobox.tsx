@@ -133,19 +133,19 @@ export function PatientCombobox({ value, onChange, required }: PatientComboboxPr
       {showDropdown && patients.length > 0 && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg max-h-60 overflow-auto"
+          className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
         >
           {patients.map((patient, idx) => (
             <button
               key={patient.id}
               type="button"
               onClick={() => selectPatient(patient)}
-              className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
-                idx === highlightIndex ? "bg-gray-50" : ""
+              className={`w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground ${
+                idx === highlightIndex ? "bg-accent text-accent-foreground" : ""
               }`}
             >
               <div className="font-medium">{patient.name}</div>
-              <div className="text-gray-500">{patient.phone}</div>
+              <div className="text-muted-foreground">{patient.phone}</div>
             </button>
           ))}
         </div>

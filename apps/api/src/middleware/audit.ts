@@ -36,8 +36,9 @@ export function auditLog(
     // Run the downstream handler first
     await next();
 
-    // Wrap the audit decision + write in try/catch so an audit failure never
-    // breaks the user-facing response. The audit row is best-effort.
+    // Audit and dashboard invalidation are both best-effort. Keep them
+    // independent so an audit storage failure cannot leave a live dashboard
+    // stale after an otherwise successful mutation.
     try {
       const res = c.res;
       // Only audit successful (2xx) mutations
@@ -75,24 +76,26 @@ export function auditLog(
         .bind(newId(), jwt.tenant_id, jwt.sub, action, entityType, entityId, ip)
         .run();
 
-      // Dashboard clients receive only a data-free invalidation and then make
-      // their own authorized aggregate request. A failed broadcast is non-fatal.
-      if (c.env.DASHBOARD_HUB) {
-        try {
-          const hub = c.env.DASHBOARD_HUB.get(c.env.DASHBOARD_HUB.idFromName(jwt.tenant_id));
-          await hub.fetch("https://dashboard-hub/publish", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ entity_type: entityType }),
-          });
-        } catch (broadcastError) {
-          console.error("[dashboard] failed to publish invalidation:", broadcastError instanceof Error ? broadcastError.message : String(broadcastError));
-        }
-      }
     } catch (err) {
       console.error(
         `[audit] failed to write log action=${action} entity=${entityType}:`,
         err instanceof Error ? err.message : String(err),
+      );
+    }
+
+    try {
+      const jwt = getJwt(c);
+      if (!c.env.DASHBOARD_HUB) return;
+      const hub = c.env.DASHBOARD_HUB.get(c.env.DASHBOARD_HUB.idFromName(jwt.tenant_id));
+      await hub.fetch("https://dashboard-hub/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entity_type: entityType }),
+      });
+    } catch (broadcastError) {
+      console.error(
+        "[dashboard] failed to publish invalidation:",
+        broadcastError instanceof Error ? broadcastError.message : String(broadcastError),
       );
     }
   };

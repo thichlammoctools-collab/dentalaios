@@ -1,6 +1,7 @@
 /**
  * Dashboard stats route:
- *   GET /api/dashboard/stats — aggregate KPIs
+ *   GET /api/dashboard/stats — branch workflow KPIs
+ *   GET /api/dashboard/management — tenant operational snapshot
  */
 
 import { Hono } from "hono";
@@ -13,6 +14,25 @@ import type { AuthContext } from "../middleware/auth";
 import { dashboardService } from "../services/dashboard.service";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
+
+// Browser WebSockets cannot attach an Authorization header. The opaque,
+// short-lived ticket minted below is the authorization factor for this single
+// upgrade and is atomically consumed by the tenant-specific Durable Object.
+router.get("/stream/:tenantId", async (c) => {
+  const ticket = new URL(c.req.url).searchParams.get("ticket");
+  if (!ticket) return c.json({ error: "Missing stream ticket", code: "validation_error" }, 400);
+  const namespace = c.env.DASHBOARD_HUB;
+  if (!namespace) return c.json({ error: "Dashboard live updates are unavailable", code: "internal_error" }, 503);
+
+  const request = new Request(`https://dashboard-hub/connect?ticket=${encodeURIComponent(ticket)}`, {
+    headers: c.req.raw.headers,
+  });
+  // Altering the routing segment only selects another object; it cannot make
+  // a ticket valid there because tickets are persisted in their origin tenant
+  // object and atomically consumed before the socket is accepted.
+  const hub = namespace.get(namespace.idFromName(c.req.param("tenantId")));
+  return hub.fetch(request);
+});
 
 router.use("*", requireAuth());
 
@@ -45,21 +65,7 @@ router.post("/stream-ticket", requirePermission(PERMISSIONS.VIEW_MANAGEMENT_DASH
   });
   if (!response.ok) return c.json({ error: "Could not create dashboard stream", code: "internal_error" }, 500);
   const ticket = await response.json<{ ticket: string; expires_at: string }>();
-  return c.json({ ...ticket, path: `/api/dashboard/stream?ticket=${encodeURIComponent(ticket.ticket)}` });
-});
-
-// GET /api/dashboard/stream?ticket=<opaque-one-use-ticket>
-router.get("/stream", requirePermission(PERMISSIONS.VIEW_MANAGEMENT_DASHBOARD), async (c) => {
-  const jwt = getJwt(c);
-  const ticket = new URL(c.req.url).searchParams.get("ticket");
-  if (!ticket) return c.json({ error: "Missing stream ticket", code: "validation_error" }, 400);
-  const namespace = c.env.DASHBOARD_HUB;
-  if (!namespace) return c.json({ error: "Dashboard live updates are unavailable", code: "internal_error" }, 503);
-  const hub = namespace.get(namespace.idFromName(jwt.tenant_id));
-  const request = new Request(`https://dashboard-hub/connect?ticket=${encodeURIComponent(ticket)}`, {
-    headers: c.req.raw.headers,
-  });
-  return hub.fetch(request);
+  return c.json({ ...ticket, path: `/api/dashboard/stream/${encodeURIComponent(jwt.tenant_id)}?ticket=${encodeURIComponent(ticket.ticket)}` });
 });
 
 export default router;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,8 @@ interface ChairsResponse { items: DentalChair[]; total: number }
 
 export function SchedulePage() {
   const { session } = useAuth();
+  const [searchParams] = useSearchParams();
+  const selectedBranchId = searchParams.get("branch_id") ?? "";
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [users, setUsers] = useState<UserWithDetails[]>([]);
@@ -53,8 +55,14 @@ export function SchedulePage() {
     const to = new Date(weekDays[6]);
     to.setHours(23, 59, 59, 999);
 
+    const appointmentQuery = new URLSearchParams({
+      from: from.toISOString(),
+      to: to.toISOString(),
+      ...(selectedBranchId ? { branch_id: selectedBranchId } : {}),
+    });
+
     Promise.all([
-      apiGet<AppointmentsResponse>(`/api/appointments?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`),
+      apiGet<AppointmentsResponse>(`/api/appointments?${appointmentQuery}`),
       apiGet<PatientsResponse>(`/api/patients?limit=200`),
       session?.branch?.id
         ? apiGet<UsersResponse>(`/api/users/branch/${session.branch.id}`)
@@ -72,7 +80,7 @@ export function SchedulePage() {
       .finally(() => mounted && setLoading(false));
 
     return () => { mounted = false; };
-  }, [weekDays, refreshTick, session?.branch?.id]);
+  }, [weekDays, refreshTick, selectedBranchId, session?.branch?.id]);
 
   const patientsById = useMemo(() => {
     const m = new Map<string, Patient>();
@@ -159,6 +167,11 @@ export function SchedulePage() {
         <p className="mt-1 text-sm text-blue-100 sm:text-base">
           {selectedDate.toLocaleDateString("vi-VN", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
         </p>
+        {selectedBranchId && (
+          <p className="mt-1 text-xs text-blue-100">
+            Đang lọc theo chi nhánh được chọn từ tổng quan quản trị.
+          </p>
+        )}
         <div className="mt-4 flex flex-wrap gap-2 sm:mt-6 sm:gap-3">
           <Button
             className="bg-white text-blue-700 hover:bg-blue-50"

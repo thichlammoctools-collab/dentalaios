@@ -52,6 +52,9 @@ export function createDashboardStream({ onInvalidate, onStatusChange }: Dashboar
       const apiBase = (import.meta.env.VITE_API_URL as string | undefined) || window.location.origin;
       const url = new URL(path, apiBase);
       url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+      // WebSocket constructors cannot set Authorization headers. The returned
+      // path identifies the tenant hub, while the opaque ticket is consumed
+      // once by that hub before the socket is accepted.
       socket = new WebSocket(url.toString());
       socket.onopen = () => {
         attempts = 0;

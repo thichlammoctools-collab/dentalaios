@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DateInput } from "@/components/ui/date-input";
@@ -7,6 +8,7 @@ import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import { formatTime, ymd } from "@/lib/utils";
 import type { Appointment, DentalChair, Patient, UserWithDetails } from "@shared/types";
+import { PERMISSIONS, ROUTES } from "@shared/constants";
 
 interface ChairBoardItem {
   chair: DentalChair;
@@ -50,6 +52,9 @@ export function ChairBoardPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [users, setUsers] = useState<UserWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
+  const canManage = Boolean(
+    session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.MANAGE_USERS),
+  );
 
   useEffect(() => {
     if (!session?.branch?.id) return;
@@ -110,6 +115,7 @@ export function ChairBoardPage() {
           <Button variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20" onClick={() => setDate(ymd(new Date()))}>
             Hôm nay
           </Button>
+          {canManage && <Button className="bg-white text-blue-700 hover:bg-blue-50" asChild><Link to={ROUTES.CHAIRS_SETTINGS}>Quản lý ghế</Link></Button>}
         </div>
       </div>
 
@@ -125,7 +131,7 @@ export function ChairBoardPage() {
       {loading ? (
         <div className="flex h-40 items-center justify-center"><div className="h-6 w-6 animate-spin rounded-full border-3 border-muted border-t-primary" /></div>
       ) : !board || board.chairs.length === 0 ? (
-        <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">Chưa có ghế nha nào tại chi nhánh này. Quản trị viên có thể thêm ghế qua API quản trị.</CardContent></Card>
+        <Card><CardContent className="py-12 text-center text-sm text-muted-foreground"><p>Chưa có ghế nha nào tại chi nhánh này.</p>{canManage && <Button className="mt-4" asChild><Link to={ROUTES.CHAIRS_SETTINGS}>Tạo ghế đầu tiên</Link></Button>}</CardContent></Card>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {board.chairs.map((item) => {

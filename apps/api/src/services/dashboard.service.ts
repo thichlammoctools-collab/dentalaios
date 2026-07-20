@@ -98,7 +98,7 @@ export const dashboardService = {
     }
 
     const allBranches = await branchRepo.list(tenantId);
-    const branches = filter.branch_id
+    const scopedBranches = filter.branch_id
       ? allBranches.filter((branch) => branch.id === filter.branch_id)
       : allBranches;
     const bounds = getDashboardBounds(filter.range, now);
@@ -148,8 +148,8 @@ export const dashboardService = {
       [tenantId, bounds.rangeStart, bounds.rangeEnd, ...patientBranch.binds]),
       first(db, `SELECT COUNT(*) AS pending_plans FROM treatment_plans tp
         JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = tp.tenant_id
-        WHERE tp.tenant_id = ? AND tp.status = 'draft' AND datetime(tp.created_at) >= datetime(?) AND datetime(tp.created_at) < datetime(?)${planBranch.sql}`,
-      [tenantId, bounds.rangeStart, bounds.rangeEnd, ...planBranch.binds]),
+        WHERE tp.tenant_id = ? AND tp.status = 'draft'${planBranch.sql}`,
+      [tenantId, ...planBranch.binds]),
       first(db, `SELECT COALESCE(SUM(p.amount), 0) AS confirmed_revenue FROM payments p
         JOIN treatment_plans tp ON tp.id = p.treatment_plan_id AND tp.tenant_id = p.tenant_id
         JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = p.tenant_id
@@ -177,8 +177,8 @@ export const dashboardService = {
       rows(db, `SELECT p.branch_id, COUNT(*) AS new_patients FROM patients p WHERE p.tenant_id = ? AND datetime(p.created_at) >= datetime(?) AND datetime(p.created_at) < datetime(?)${patientBranch.sql} GROUP BY p.branch_id`,
       [tenantId, bounds.rangeStart, bounds.rangeEnd, ...patientBranch.binds]),
       rows(db, `SELECT v.branch_id, COUNT(*) AS pending_plans FROM treatment_plans tp JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = tp.tenant_id
-        WHERE tp.tenant_id = ? AND tp.status = 'draft' AND datetime(tp.created_at) >= datetime(?) AND datetime(tp.created_at) < datetime(?)${planBranch.sql} GROUP BY v.branch_id`,
-      [tenantId, bounds.rangeStart, bounds.rangeEnd, ...planBranch.binds]),
+        WHERE tp.tenant_id = ? AND tp.status = 'draft'${planBranch.sql} GROUP BY v.branch_id`,
+      [tenantId, ...planBranch.binds]),
       rows(db, `SELECT v.branch_id, COALESCE(SUM(p.amount), 0) AS confirmed_revenue FROM payments p JOIN treatment_plans tp ON tp.id = p.treatment_plan_id AND tp.tenant_id = p.tenant_id JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = p.tenant_id
         WHERE p.tenant_id = ? AND p.status = 'confirmed' AND datetime(p.created_at) >= datetime(?) AND datetime(p.created_at) < datetime(?)${paymentBranch.sql} GROUP BY v.branch_id`,
       [tenantId, bounds.rangeStart, bounds.rangeEnd, ...paymentBranch.binds]),
@@ -206,7 +206,7 @@ export const dashboardService = {
     const byRevenue = keyed(branchRevenue);
     const byPreviousRevenue = keyed(branchPreviousRevenue);
     const byPreviousVisits = keyed(branchPreviousVisits);
-    const performance: ManagementDashboardBranchPerformance[] = branches.map((branch) => {
+    const performance: ManagementDashboardBranchPerformance[] = scopedBranches.map((branch) => {
       const appointment = byAppointments.get(branch.id);
       const completed = number(appointment, "completed");
       const terminal = completed + number(appointment, "cancellations") + number(appointment, "no_shows");
@@ -234,7 +234,7 @@ export const dashboardService = {
       revenue: dailyRevenueMap.get(date) ?? 0,
     }));
     const terminal = number(rangeAppointments, "completed") + number(rangeAppointments, "cancellations") + number(rangeAppointments, "no_shows");
-    const branchNames = new Map(branches.map((branch) => [branch.id, branch.name]));
+    const branchNames = new Map(allBranches.map((branch) => [branch.id, branch.name]));
     const exceptionRows = (source: D1Row[], kind: ManagementDashboardSnapshot["exceptions"][number]["kind"]) => source.map((row) => ({
       kind,
       branch_id: row.branch_id as string,
@@ -251,7 +251,9 @@ export const dashboardService = {
       range_start: bounds.rangeStart,
       range_end: bounds.rangeEnd,
       ...(filter.branch_id ? { branch_id: filter.branch_id } : {}),
-      branches: branches.map((branch) => ({ id: branch.id, name: branch.name })),
+      // Keep the full tenant branch catalog so a filtered client can switch
+      // back to another branch or the combined view without an extra request.
+      branches: allBranches.map((branch) => ({ id: branch.id, name: branch.name })),
       today: {
         scheduled: number(todayAppointments, "scheduled"),
         arrived: number(todayAppointments, "arrived"),
@@ -284,21 +286,32 @@ export const dashboardService = {
   },
 
   async getStats(db: D1Database, tenantId: string): Promise<DashboardStats> {
-    const snapshot = await this.getManagementSnapshot(db, tenantId, { range: 30 });
+    const bounds = getDashboardBounds(7);
+    const [todayVisits, inProgress, completed, patients, visits, approvedPlans, revenue, monthlyVisits, monthlyRevenue] = await Promise.all([
+      first(db, "SELECT COUNT(*) AS count FROM visits WHERE tenant_id = ? AND datetime(date) >= datetime(?) AND datetime(date) < datetime(?)", [tenantId, bounds.todayStart, bounds.todayEnd]),
+      first(db, "SELECT COUNT(*) AS count FROM visits WHERE tenant_id = ? AND status = 'in_progress'", [tenantId]),
+      first(db, "SELECT COUNT(*) AS count FROM visits WHERE tenant_id = ? AND status = 'completed' AND datetime(date) >= datetime(?) AND datetime(date) < datetime(?)", [tenantId, bounds.todayStart, bounds.todayEnd]),
+      first(db, "SELECT COUNT(*) AS count FROM patients WHERE tenant_id = ?", [tenantId]),
+      first(db, "SELECT COUNT(*) AS count FROM visits WHERE tenant_id = ?", [tenantId]),
+      first(db, "SELECT COUNT(*) AS count FROM treatment_plans WHERE tenant_id = ? AND status = 'approved'", [tenantId]),
+      first(db, "SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE tenant_id = ? AND status = 'confirmed'", [tenantId]),
+      rows(db, "SELECT strftime('%Y-%m', datetime(date, '+7 hours')) AS month, COUNT(*) AS count FROM visits WHERE tenant_id = ? AND datetime(date) >= datetime('now', '-6 months') GROUP BY month ORDER BY month ASC", [tenantId]),
+      rows(db, "SELECT strftime('%Y-%m', datetime(created_at, '+7 hours')) AS month, COALESCE(SUM(amount), 0) AS amount FROM payments WHERE tenant_id = ? AND status = 'confirmed' AND datetime(created_at) >= datetime('now', '-6 months') GROUP BY month ORDER BY month ASC", [tenantId]),
+    ]);
     return {
       today: {
-        visits: snapshot.today.scheduled,
-        inProgress: snapshot.today.in_progress_visits,
-        completed: snapshot.today.completed,
+        visits: number(todayVisits, "count"),
+        inProgress: number(inProgress, "count"),
+        completed: number(completed, "count"),
       },
       totals: {
-        patients: snapshot.kpis.new_patients,
-        visits: snapshot.kpis.visits,
-        approvedPlans: 0,
-        revenue: snapshot.kpis.confirmed_revenue,
+        patients: number(patients, "count"),
+        visits: number(visits, "count"),
+        approvedPlans: number(approvedPlans, "count"),
+        revenue: number(revenue, "total"),
       },
-      monthlyVisits: snapshot.daily.map((point) => ({ month: point.date, count: point.visits })),
-      monthlyRevenue: snapshot.daily.map((point) => ({ month: point.date, amount: point.revenue })),
+      monthlyVisits: monthlyVisits.map((row) => ({ month: row.month as string, count: number(row, "count") })),
+      monthlyRevenue: monthlyRevenue.map((row) => ({ month: row.month as string, amount: number(row, "amount") })),
       recentActivity: [],
     };
   },

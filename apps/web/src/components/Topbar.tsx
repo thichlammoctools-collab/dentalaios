@@ -22,7 +22,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
 
   if (!session) return null;
 
-  const dashboardRoute = (ROUTES as Record<string, string>).MANAGEMENT_DASHBOARD ?? "/management-dashboard";
+  const dashboardRoute = ROUTES.MANAGEMENT_DASHBOARD;
   const isManagementDashboard = location.pathname === dashboardRoute;
   const dashboardContext = new URLSearchParams(location.search).get("branch_id")
     ? "Chi nhánh đã chọn"
