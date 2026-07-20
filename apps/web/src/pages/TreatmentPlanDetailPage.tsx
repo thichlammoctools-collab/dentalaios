@@ -6,15 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { TreatmentPlanItemForm } from "@/components/TreatmentPlanItemForm";
+import { AppointmentForm } from "@/components/schedule/AppointmentForm";
 import { Select } from "@/components/ui/select";
-import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { apiDelete, apiGet, apiPatch, apiPost, getToken, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
-import type { TreatmentCase, TreatmentCaseFinancialSummary, TreatmentCaseMilestone, TreatmentCaseMilestoneStatus, TreatmentCaseType, TreatmentMilestoneAppointment, TreatmentPlan, TreatmentPlanItem, UserWithDetails } from "@shared/types";
+import type { TreatmentCase, TreatmentCaseFinancialSummary, TreatmentCaseMilestone, TreatmentCaseMilestoneStatus, TreatmentCaseType, TreatmentMilestoneAppointment, TreatmentPlan, TreatmentPlanItem } from "@shared/types";
 
 const CASE_TYPE_LABELS: Record<TreatmentCaseType, string> = {
   general: "Điều trị tổng quát",
@@ -55,7 +53,6 @@ export function TreatmentPlanDetailPage() {
   const [milestones, setMilestones] = useState<TreatmentCaseMilestone[]>([]);
   const [milestoneAppointments, setMilestoneAppointments] = useState<Record<string, TreatmentMilestoneAppointment[]>>({});
   const [financials, setFinancials] = useState<TreatmentCaseFinancialSummary | null>(null);
-  const [caseUsers, setCaseUsers] = useState<UserWithDetails[]>([]);
   const [scheduleMilestone, setScheduleMilestone] = useState<TreatmentCaseMilestone | null>(null);
   const [caseType, setCaseType] = useState<TreatmentCaseType>("general");
   const [caseSaving, setCaseSaving] = useState(false);
@@ -79,14 +76,12 @@ export function TreatmentPlanDetailPage() {
       setItems(its.items);
       setTreatmentCase(caseResult.case);
       if (caseResult.case) {
-        const [milestoneResult, financialResult, usersResult] = await Promise.all([
+        const [milestoneResult, financialResult] = await Promise.all([
           apiGet<{ items: TreatmentCaseMilestone[] }>(`/api/treatment-plans/${id}/case/milestones`),
           apiGet<TreatmentCaseFinancialSummary>(`/api/treatment-plans/${id}/case/financial-summary`),
-          apiGet<{ items: UserWithDetails[] }>(`/api/users/branch/${caseResult.case.primary_branch_id}`),
         ]);
         setMilestones(milestoneResult.items);
         setFinancials(financialResult);
-        setCaseUsers(usersResult.items);
         const links = await Promise.all(milestoneResult.items.map(async (milestone) => [
           milestone.id,
           await apiGet<{ items: TreatmentMilestoneAppointment[] }>(`/api/treatment-plans/${id}/case/milestones/${milestone.id}/appointments`),
@@ -540,46 +535,18 @@ export function TreatmentPlanDetailPage() {
           void load();
         }}
       />
-      {scheduleMilestone && treatmentCase && <ScheduleMilestoneDialog
-        milestone={scheduleMilestone}
-        clinicians={caseUsers}
-        onClose={() => setScheduleMilestone(null)}
+      {scheduleMilestone && treatmentCase && <AppointmentForm
+        open
+        onOpenChange={(open) => { if (!open) setScheduleMilestone(null); }}
+        milestone={{
+          planId: plan.id,
+          milestoneId: scheduleMilestone.id,
+          patientId: treatmentCase.patient_id,
+          procedure: scheduleMilestone.item.service_name ?? scheduleMilestone.item.procedure,
+          label: `${scheduleMilestone.item.service_name ?? scheduleMilestone.item.procedure}${scheduleMilestone.item.tooth_number != null ? ` · Răng #${scheduleMilestone.item.tooth_number}` : " · Toàn hàm"}`,
+        }}
         onCreated={() => { setScheduleMilestone(null); void load(); }}
-        planId={plan.id}
       />}
     </div>
   );
-}
-
-function ScheduleMilestoneDialog({ milestone, clinicians, planId, onClose, onCreated }: {
-  milestone: TreatmentCaseMilestone;
-  clinicians: UserWithDetails[];
-  planId: string;
-  onClose: () => void;
-  onCreated: () => void;
-}) {
-  const [clinicianId, setClinicianId] = useState("");
-  const [scheduledAt, setScheduledAt] = useState(() => new Date().toISOString().slice(0, 16));
-  const [durationMin, setDurationMin] = useState(30);
-  const [notes, setNotes] = useState("");
-  const [saving, setSaving] = useState(false);
-  const activeClinicians = clinicians.filter((user) => user.is_active);
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    if (!clinicianId) return;
-    setSaving(true);
-    try {
-      await apiPost(`/api/treatment-plans/${planId}/case/milestones/${milestone.id}/appointments`, {
-        clinician_id: clinicianId,
-        scheduled_at: new Date(scheduledAt).toISOString(),
-        duration_min: durationMin,
-        notes: notes || undefined,
-      });
-      toast.success("Đã tạo lịch hẹn từ milestone");
-      onCreated();
-    } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : "Không thể tạo lịch hẹn");
-    } finally { setSaving(false); }
-  }
-  return <Dialog open onOpenChange={(open) => !open && onClose()}><DialogHeader><DialogTitle>Đặt lịch từ milestone</DialogTitle></DialogHeader><form onSubmit={submit}><DialogBody className="space-y-4"><p className="rounded-md bg-muted p-3 text-sm">{milestone.item.service_name ?? milestone.item.procedure}{milestone.item.tooth_number != null ? ` · Răng #${milestone.item.tooth_number}` : " · Toàn hàm"}</p><div className="space-y-1.5"><Label>Bác sĩ</Label><Select value={clinicianId} onChange={(event) => setClinicianId(event.target.value)} required><option value="">Chọn bác sĩ</option>{activeClinicians.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</Select></div><div className="space-y-1.5"><Label>Thời gian</Label><Input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} required /></div><div className="space-y-1.5"><Label>Thời lượng</Label><Select value={String(durationMin)} onChange={(event) => setDurationMin(Number(event.target.value))}><option value="30">30 phút</option><option value="45">45 phút</option><option value="60">60 phút</option><option value="90">90 phút</option><option value="120">120 phút</option></Select></div><div className="space-y-1.5"><Label>Ghi chú</Label><Input value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Ghi chú vận hành cho lịch hẹn" /></div></DialogBody><DialogFooter><Button type="button" variant="outline" onClick={onClose}>Hủy</Button><Button type="submit" disabled={saving || !clinicianId}>{saving ? "Đang tạo..." : "Tạo lịch hẹn"}</Button></DialogFooter></form></Dialog>;
 }

@@ -9,7 +9,7 @@ import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/c
 import { apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
-import type { Appointment, DentalChair, UserWithDetails } from "@shared/types";
+import type { Appointment, DentalChair, Patient, UserWithDetails } from "@shared/types";
 import { isAssistantRole, isDoctorRole } from "@shared/constants";
 import { combineDateTime, ymd } from "@/lib/utils";
 import { PatientCombobox } from "./PatientCombobox";
@@ -19,7 +19,14 @@ interface AppointmentFormProps {
   onOpenChange: (open: boolean) => void;
   initialDate?: string;   // YYYY-MM-DD, defaults to today
   initialHour?: number;   // 0-23
-  onCreated?: (appt: Appointment) => void;
+  onCreated?: () => void;
+  milestone?: {
+    planId: string;
+    milestoneId: string;
+    patientId: string;
+    procedure: string;
+    label: string;
+  };
 }
 
 interface UsersResponse { items: UserWithDetails[]; total: number }
@@ -33,10 +40,12 @@ export function AppointmentForm({
   initialDate,
   initialHour,
   onCreated,
+  milestone,
 }: AppointmentFormProps) {
   const { session } = useAuth();
   const [users, setUsers] = useState<UserWithDetails[]>([]);
-  const [patientId, setPatientId] = useState("");
+  const [patientId, setPatientId] = useState(milestone?.patientId ?? "");
+  const [milestonePatient, setMilestonePatient] = useState<Patient | null>(null);
   const [clinicianId, setClinicianId] = useState("");
   const [assistantId, setAssistantId] = useState("");
   const [chairId, setChairId] = useState("");
@@ -46,7 +55,7 @@ export function AppointmentForm({
     initialHour != null ? `${String(initialHour).padStart(2, "0")}:00` : "09:00",
   );
   const [durationMin, setDurationMin] = useState(30);
-  const [procedure, setProcedure] = useState("");
+  const [procedure, setProcedure] = useState(milestone?.procedure ?? "");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -56,6 +65,15 @@ export function AppointmentForm({
       .then((res) => setUsers(res.items))
       .catch(() => setUsers([]));
   }, [open, session]);
+
+  useEffect(() => {
+    if (!open || !milestone) return;
+    setPatientId(milestone.patientId);
+    setProcedure(milestone.procedure);
+    apiGet<Patient>(`/api/patients/${milestone.patientId}`)
+      .then(setMilestonePatient)
+      .catch(() => setMilestonePatient(null));
+  }, [open, milestone]);
 
   useEffect(() => {
     if (!open || !session?.branch?.id) return;
@@ -83,10 +101,10 @@ export function AppointmentForm({
   }, [open, users, clinicianId, session]);
 
   function resetForm() {
-    setPatientId("");
+    setPatientId(milestone?.patientId ?? "");
     setAssistantId("");
     setChairId("");
-    setProcedure("");
+    setProcedure(milestone?.procedure ?? "");
     setNotes("");
   }
 
@@ -99,8 +117,7 @@ export function AppointmentForm({
     setSaving(true);
     try {
       const scheduled_at = combineDateTime(date, time);
-      const created = await apiPost<Appointment>("/api/appointments", {
-        patient_id: patientId,
+      const payload = {
         clinician_id: clinicianId,
         assistant_id: assistantId || undefined,
         chair_id: chairId || undefined,
@@ -109,9 +126,14 @@ export function AppointmentForm({
         procedure: procedure || undefined,
         notes: notes || undefined,
         source: "manual",
-      });
+      };
+      if (milestone) {
+        await apiPost(`/api/treatment-plans/${milestone.planId}/case/milestones/${milestone.milestoneId}/appointments`, payload);
+      } else {
+        await apiPost<Appointment>("/api/appointments", { patient_id: patientId, ...payload });
+      }
       toast.success("Đã tạo lịch hẹn");
-      onCreated?.(created);
+      onCreated?.();
       onOpenChange(false);
       resetForm();
     } catch (err) {
@@ -128,18 +150,14 @@ export function AppointmentForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <form onSubmit={onSubmit}>
         <DialogHeader>
-          <DialogTitle>Tạo lịch hẹn mới</DialogTitle>
+           <DialogTitle>{milestone ? "Đặt lịch từ milestone" : "Tạo lịch hẹn mới"}</DialogTitle>
         </DialogHeader>
         <DialogBody className="grid gap-3">
 
           {/* Bệnh nhân */}
           <div className="grid gap-1.5">
             <Label htmlFor="patient">Bệnh nhân</Label>
-            <PatientCombobox
-              value={patientId}
-              onChange={setPatientId}
-              required
-            />
+            {milestone ? <Input id="patient" value={milestonePatient ? `${milestonePatient.name} · ${milestonePatient.phone}` : milestone.patientId} readOnly className="bg-muted" /> : <PatientCombobox value={patientId} onChange={setPatientId} required />}
           </div>
 
           {/* Bác sĩ */}
@@ -241,7 +259,10 @@ export function AppointmentForm({
               value={procedure}
               onChange={(e) => setProcedure(e.target.value)}
               placeholder="VD: scaling, filling, root_canal…"
+              readOnly={Boolean(milestone)}
+              className={milestone ? "bg-muted" : undefined}
             />
+            {milestone && <p className="text-xs text-muted-foreground">Được lấy từ hạng mục kế hoạch: {milestone.label}</p>}
           </div>
 
           {/* Notes */}
