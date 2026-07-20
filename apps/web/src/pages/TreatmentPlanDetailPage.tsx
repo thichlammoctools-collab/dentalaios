@@ -544,6 +544,7 @@ export function TreatmentPlanDetailPage() {
           patientId: treatmentCase.patient_id,
           procedure: scheduleMilestone.item.service_name ?? scheduleMilestone.item.procedure,
           label: `${scheduleMilestone.item.service_name ?? scheduleMilestone.item.procedure}${scheduleMilestone.item.tooth_number != null ? ` · Răng #${scheduleMilestone.item.tooth_number}` : " · Toàn hàm"}`,
+          availableMilestones: milestones.filter((milestone) => !["completed", "skipped"].includes(milestone.status)),
         }}
         onCreated={() => { setScheduleMilestone(null); void load(); }}
       />}

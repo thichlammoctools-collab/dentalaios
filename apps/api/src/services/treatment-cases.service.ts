@@ -176,7 +176,7 @@ export const treatmentCasesService = {
     actorUserId: string,
     data: MilestoneAppointmentLinkInput,
   ): Promise<TreatmentMilestoneAppointment[]> {
-    const { treatmentCase, milestone } = await requireOpenMilestone(db, tenantId, planId, milestoneId);
+    const { treatmentCase } = await requireOpenMilestone(db, tenantId, planId, milestoneId);
     const appointment = await appointmentsService.get(db, tenantId, data.appointment_id);
     assertCompatibleAppointment(treatmentCase, milestone, appointment);
     try {
@@ -203,10 +203,20 @@ export const treatmentCasesService = {
     data: MilestoneAppointmentCreateInput,
     encryptionKey?: string,
   ): Promise<TreatmentMilestoneAppointment[]> {
-    const { treatmentCase, milestone } = await requireOpenMilestone(db, tenantId, planId, milestoneId);
+    const { treatmentCase } = await requireOpenMilestone(db, tenantId, planId, milestoneId);
     if (treatmentCase.primary_branch_id !== actor.branchId) {
       throw new ConflictError("Chỉ có thể tạo lịch từ chi nhánh phụ trách ca điều trị");
     }
+    const milestoneIds = [...new Set([milestoneId, ...(data.milestone_ids ?? [])])];
+    const milestones = await Promise.all(milestoneIds.map(async (id) => {
+      const value = await createTreatmentCasesRepository(db).getMilestone(tenantId, treatmentCase.id, id);
+      if (!value) throw new NotFoundError("Milestone không tồn tại trong ca điều trị");
+      if (["completed", "skipped"].includes(value.status)) {
+        throw new ConflictError("Không thể thêm milestone đã kết thúc vào lịch hẹn");
+      }
+      return value;
+    }));
+    const procedures = [...new Set(milestones.map((value) => value.item.service_name ?? value.item.procedure))];
     const appointment = await appointmentsService.create(db, tenantId, actor.userId, treatmentCase.primary_branch_id, {
       patient_id: treatmentCase.patient_id,
       clinician_id: data.clinician_id,
@@ -214,13 +224,13 @@ export const treatmentCasesService = {
       chair_id: data.chair_id,
       scheduled_at: data.scheduled_at,
       duration_min: data.duration_min,
-      procedure: milestone.item.service_name ?? milestone.item.procedure,
+      procedure: procedures.join("; "),
       notes: data.notes,
       source: "manual",
     }, encryptionKey);
-    await createTreatmentMilestoneAppointmentsRepository(db).link({
+    await createTreatmentMilestoneAppointmentsRepository(db).linkMany({
       tenantId,
-      milestoneId,
+      milestoneIds,
       appointmentId: appointment.id,
       linkType: data.link_type,
       linkedBy: actor.userId,

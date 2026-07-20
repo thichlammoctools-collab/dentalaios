@@ -281,6 +281,7 @@ export const milestoneAppointmentLinkSchema = z.object({
 export type MilestoneAppointmentLinkInput = z.infer<typeof milestoneAppointmentLinkSchema>;
 
 export const milestoneAppointmentCreateSchema = z.object({
+  milestone_ids: z.array(z.string().min(1)).max(20).optional(),
   clinician_id: z.string().min(1),
   chair_id: z.string().min(1).optional(),
   assistant_id: z.string().min(1).optional(),
@@ -630,6 +631,8 @@ export const platformTenantListQuerySchema = z.object({
 export const platformTenantCreateSchema = z.object({
   name: nonEmpty(200),
   slug: z.string().trim().min(2).max(80).regex(/^[a-z0-9-]+$/).optional(),
+  admin_email: z.string().trim().email("Email quản trị không hợp lệ"),
+  admin_password: platformPassword,
 }).strict();
 
 export const platformTenantUpdateSchema = z.object({

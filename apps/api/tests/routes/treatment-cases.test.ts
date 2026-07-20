@@ -190,6 +190,39 @@ describe("treatment case lifecycle", () => {
     expect(res.status).toBe(422);
   });
 
+  it("accepts multiple milestone IDs when creating one appointment", async () => {
+    const app = mountRoute("/api/treatment-plans", treatmentPlansRoutes);
+    const secondMilestone = {
+      ...milestone,
+      id: "milestone-2",
+      treatment_plan_item_id: "plan-item-2",
+      description: "Trám răng 37",
+    };
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/treatment-plans/plan-1/case/milestones/milestone-1/appointments",
+      new Map([
+        ["FROM treatment_cases", [activeCase]],
+        ["AND m.id = ? LIMIT 1", [milestone, milestone, secondMilestone]],
+        ["FROM appointments WHERE", []],
+        ["FROM dental_chairs", []],
+        ["FROM users", [{ id: "test-user", tenant_id: "test-tenant" }]],
+        ["FROM patients", [{ id: "patient-1", tenant_id: "test-tenant" }]],
+      ]),
+      {
+        permissions: ["write_appointments"],
+        body: {
+          milestone_ids: ["milestone-1", "milestone-2"],
+          clinician_id: "test-user",
+          scheduled_at: "2026-07-22T09:00:00.000Z",
+          duration_min: 60,
+        },
+      },
+    );
+    expect(res.status).toBe(201);
+  });
+
   it("summarizes confirmed, pending, and failed payments for a case plan", async () => {
     const app = mountRoute("/api/treatment-plans", treatmentPlansRoutes);
     const res = await authedRequestWithDB(

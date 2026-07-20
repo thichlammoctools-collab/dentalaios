@@ -57,6 +57,23 @@ export function createTreatmentMilestoneAppointmentsRepository(db: D1Database) {
       ).run();
     },
 
+    async linkMany(data: {
+      tenantId: string;
+      milestoneIds: string[];
+      appointmentId: string;
+      linkType: TreatmentMilestoneAppointmentLinkType;
+      linkedBy: string;
+    }): Promise<void> {
+      await db.batch(data.milestoneIds.map((milestoneId) => db.prepare(
+        `INSERT INTO treatment_milestone_appointments
+           (id, tenant_id, treatment_case_milestone_id, appointment_id, link_type, linked_by)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        crypto.randomUUID(), data.tenantId, milestoneId, data.appointmentId,
+        data.linkType, data.linkedBy,
+      )));
+    },
+
     async unlink(tenantId: string, milestoneId: string, appointmentId: string): Promise<boolean> {
       const result = await db.prepare(
         `DELETE FROM treatment_milestone_appointments

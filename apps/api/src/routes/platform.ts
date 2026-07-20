@@ -33,6 +33,7 @@ import { createPlatformContentRepository } from "../repositories/platform-conten
 import { createPlatformTenantsRepository } from "../repositories/platform-tenants.repo";
 import { createPlatformUsersRepository } from "../repositories/platform-users.repo";
 import { platformService } from "../services/platform.service";
+import { platformTenantProvisionService } from "../services/platform-tenant-provision.service";
 const router = new Hono<{ Bindings: Env; Variables: PlatformAuthContext }>();
 const actor = (c: any) => ({
   user_id: getPlatformJwt(c).sub,
@@ -96,12 +97,7 @@ router.post(
   zValidator("json", platformTenantCreateSchema),
   async (c) => {
     const data = c.req.valid("json");
-    const id = newId();
-    await createPlatformTenantsRepository(c.env.DB).create(
-      id,
-      data.name,
-      data.slug,
-    );
+    const id = await platformTenantProvisionService.provision(c.env.DB, data);
     await platformAudit(c.env.DB, {
       ...actor(c),
       action: "tenant.created",

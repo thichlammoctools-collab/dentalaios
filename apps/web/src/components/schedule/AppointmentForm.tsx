@@ -9,7 +9,7 @@ import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/c
 import { apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
-import type { Appointment, DentalChair, Patient, UserWithDetails } from "@shared/types";
+import type { Appointment, DentalChair, Patient, TreatmentCaseMilestone, UserWithDetails } from "@shared/types";
 import { isAssistantRole, isDoctorRole } from "@shared/constants";
 import { combineDateTime, ymd } from "@/lib/utils";
 import { PatientCombobox } from "./PatientCombobox";
@@ -26,6 +26,7 @@ interface AppointmentFormProps {
     patientId: string;
     procedure: string;
     label: string;
+    availableMilestones?: TreatmentCaseMilestone[];
   };
 }
 
@@ -56,6 +57,9 @@ export function AppointmentForm({
   );
   const [durationMin, setDurationMin] = useState(30);
   const [procedure, setProcedure] = useState(milestone?.procedure ?? "");
+  const [selectedMilestoneIds, setSelectedMilestoneIds] = useState<string[]>(
+    milestone ? [milestone.milestoneId] : [],
+  );
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -70,6 +74,7 @@ export function AppointmentForm({
     if (!open || !milestone) return;
     setPatientId(milestone.patientId);
     setProcedure(milestone.procedure);
+    setSelectedMilestoneIds([milestone.milestoneId]);
     apiGet<Patient>(`/api/patients/${milestone.patientId}`)
       .then(setMilestonePatient)
       .catch(() => setMilestonePatient(null));
@@ -117,7 +122,7 @@ export function AppointmentForm({
     setSaving(true);
     try {
       const scheduled_at = combineDateTime(date, time);
-      const payload = {
+      const appointmentPayload = {
         clinician_id: clinicianId,
         assistant_id: assistantId || undefined,
         chair_id: chairId || undefined,
@@ -128,9 +133,17 @@ export function AppointmentForm({
         source: "manual",
       };
       if (milestone) {
-        await apiPost(`/api/treatment-plans/${milestone.planId}/case/milestones/${milestone.milestoneId}/appointments`, payload);
+        await apiPost(`/api/treatment-plans/${milestone.planId}/case/milestones/${milestone.milestoneId}/appointments`, {
+          milestone_ids: selectedMilestoneIds,
+          clinician_id: clinicianId,
+          assistant_id: assistantId || undefined,
+          chair_id: chairId || undefined,
+          scheduled_at,
+          duration_min: durationMin,
+          notes: notes || undefined,
+        });
       } else {
-        await apiPost<Appointment>("/api/appointments", { patient_id: patientId, ...payload });
+        await apiPost<Appointment>("/api/appointments", { patient_id: patientId, ...appointmentPayload });
       }
       toast.success("Đã tạo lịch hẹn");
       onCreated?.();
@@ -145,6 +158,21 @@ export function AppointmentForm({
 
   const doctors = users.filter((u) => isDoctorRole(u.role_key, u.role_id, u.role_name));
   const assistants = users.filter((u) => isAssistantRole(u.role_key, u.role_id, u.role_name));
+  const milestoneOptions = milestone?.availableMilestones ?? [];
+
+  function toggleMilestone(option: TreatmentCaseMilestone) {
+    if (!milestone) return;
+    const isSelected = selectedMilestoneIds.includes(option.id);
+    const next = isSelected
+      ? selectedMilestoneIds.filter((id) => id !== option.id)
+      : [...selectedMilestoneIds, option.id];
+    if (next.length === 0) return;
+    setSelectedMilestoneIds(next);
+    const names = milestoneOptions
+      .filter((candidate) => next.includes(candidate.id))
+      .map((candidate) => candidate.item.service_name ?? candidate.item.procedure);
+    setProcedure([...new Set(names)].join("; "));
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -159,6 +187,20 @@ export function AppointmentForm({
             <Label htmlFor="patient">Bệnh nhân</Label>
             {milestone ? <Input id="patient" value={milestonePatient ? `${milestonePatient.name} · ${milestonePatient.phone}` : milestone.patientId} readOnly className="bg-muted" /> : <PatientCombobox value={patientId} onChange={setPatientId} required />}
           </div>
+
+          {milestone && milestoneOptions.length > 1 && (
+            <div className="grid gap-1.5">
+              <Label>Milestone thực hiện trong buổi hẹn</Label>
+              <div className="max-h-44 space-y-2 overflow-y-auto rounded-md border p-2">
+                {milestoneOptions.map((option) => {
+                  const checked = selectedMilestoneIds.includes(option.id);
+                  const label = `${option.item.service_name ?? option.item.procedure}${option.item.tooth_number != null ? ` · Răng #${option.item.tooth_number}` : " · Toàn hàm"}`;
+                  return <label key={option.id} className="flex cursor-pointer items-start gap-2 rounded px-1 py-1 text-sm hover:bg-muted/60"><input type="checkbox" checked={checked} onChange={() => toggleMilestone(option)} className="mt-0.5" /><span><span className="font-medium">{label}</span><span className="block text-xs text-muted-foreground">{option.item.description}</span></span></label>;
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground">Một lịch hẹn có thể liên kết với nhiều milestone của cùng ca.</p>
+            </div>
+          )}
 
           {/* Bác sĩ */}
           <div className="grid gap-1.5">
@@ -281,7 +323,7 @@ export function AppointmentForm({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Hủy
           </Button>
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={saving || Boolean(milestone && selectedMilestoneIds.length === 0)}>
             {saving ? "Đang tạo…" : "Tạo lịch hẹn"}
           </Button>
         </DialogFooter>
