@@ -109,9 +109,6 @@ export function LoginForm() {
         </Link>
       </p>
 
-      <p className="text-xs text-muted-foreground">
-        Demo: <code>admin@demo.clinic</code> / <code>password123</code>
-      </p>
     </form>
   );
 }
