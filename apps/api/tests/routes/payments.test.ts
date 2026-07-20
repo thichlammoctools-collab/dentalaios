@@ -220,7 +220,7 @@ describe("POST /api/payments/:id/confirm", () => {
       "POST",
       "/api/payments/payment-1/confirm",
       new Map<string, unknown[]>([
-        ["FROM payments", [confirmed]],
+        ["FROM payments", (_sql, callIndex) => callIndex === 0 ? [confirmed] : [paymentRow({ status: "confirmed" })]],
       ]),
       { permissions: ["write_payments"] },
     );

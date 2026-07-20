@@ -4,6 +4,8 @@ const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
 
 let token: string | null = null;
 
+export const PLATFORM_SESSION_EXPIRED_EVENT = "platform-session-expired";
+
 export class PlatformApiError extends Error {
   constructor(
     message: string,
@@ -46,6 +48,10 @@ export async function platformApi<T = unknown>(
       code = body.code;
     } catch {
       // Retain the generic message when the Worker did not return JSON.
+    }
+    if (response.status === 401) {
+      window.dispatchEvent(new Event(PLATFORM_SESSION_EXPIRED_EVENT));
+      message = "Phiên quản trị đã hết hạn. Vui lòng đăng nhập lại.";
     }
     throw new PlatformApiError(message, response.status, code);
   }

@@ -10,6 +10,7 @@ import type { PlatformRole, PlatformSession, PlatformUser } from "@shared/types"
 import {
   platformPost,
   platformGet,
+  PLATFORM_SESSION_EXPIRED_EVENT,
   setPlatformToken,
   type PlatformLoginChallenge,
   type PlatformMfaResponse,
@@ -98,6 +99,19 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
       });
 
     return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    const clearExpiredSession = () => {
+      setPlatformToken(null);
+      clearRememberedSession();
+      setSession(null);
+      setPendingChallenge(null);
+      setMfaEnrollment(null);
+      setRememberLogin(false);
+    };
+    window.addEventListener(PLATFORM_SESSION_EXPIRED_EVENT, clearExpiredSession);
+    return () => window.removeEventListener(PLATFORM_SESSION_EXPIRED_EVENT, clearExpiredSession);
   }, []);
 
   useEffect(() => {
