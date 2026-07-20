@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { PatientForm } from "@/components/PatientForm";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/pagination";
 import { apiDelete, apiGet, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
@@ -34,16 +35,18 @@ export function PatientsPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [openForm, setOpenForm] = useState(false);
   const [editPatient, setEditPatient] = useState<Patient | undefined>(undefined);
 
-  const load = useCallback(async (q: string) => {
+  const load = useCallback(async (q: string, currentPage: number) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (q) params.set("search", q);
-      params.set("limit", "100");
+      params.set("limit", String(DEFAULT_PAGE_SIZE));
+      params.set("offset", String((currentPage - 1) * DEFAULT_PAGE_SIZE));
       const res = await apiGet<PatientsResponse>(`/api/patients?${params}`);
       setPatients(res.items);
       setTotal(res.total);
@@ -55,24 +58,29 @@ export function PatientsPage() {
   }, []);
 
   useEffect(() => {
-    load("");
+    load("", 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Debounced search: auto-load after 400ms of no typing
   useEffect(() => {
     const timer = setTimeout(() => {
-      load(search);
+      load(search, 1);
+      setPage(1);
     }, 400);
     return () => clearTimeout(timer);
   }, [search, load]);
+
+  useEffect(() => {
+    if (page > 1) void load(search, page);
+  }, [page, search, load]);
 
   async function onDelete(p: Patient) {
     if (!confirm(`Xóa bệnh nhân "${p.name}"?`)) return;
     try {
       await apiDelete(`/api/patients/${p.id}`);
       toast.success("Đã xóa bệnh nhân");
-      load(search);
+      load(search, page);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi xóa");
     }
@@ -221,11 +229,12 @@ export function PatientsPage() {
                 </TableBody>
               </Table>
             </div>
+            <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={total} disabled={loading} onPageChange={setPage} />
           )}
         </CardContent>
       </Card>
 
-      <PatientForm open={openForm} onOpenChange={(v) => { if (!v) setEditPatient(undefined); setOpenForm(v); }} patient={editPatient} onSaved={() => load(search)} />
+      <PatientForm open={openForm} onOpenChange={(v) => { if (!v) setEditPatient(undefined); setOpenForm(v); }} patient={editPatient} onSaved={() => load(search, page)} />
     </div>
   );
 }

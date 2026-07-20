@@ -24,13 +24,15 @@ router.get(
     const search = url.searchParams.get("search") ?? undefined;
     const limit = Number(url.searchParams.get("limit") ?? 100);
     const offset = Number(url.searchParams.get("offset") ?? 0);
-    const items = await patientService.list(c.env.DB, jwt.tenant_id, {
+    const pagination = {
       branchId,
       search,
-      limit,
-      offset,
-    });
-    return c.json({ items, total: items.length });
+    };
+    const [items, total] = await Promise.all([
+      patientService.list(c.env.DB, jwt.tenant_id, { ...pagination, limit, offset }),
+      patientService.count(c.env.DB, jwt.tenant_id, pagination),
+    ]);
+    return c.json({ items, total, limit, offset });
   },
 );
 

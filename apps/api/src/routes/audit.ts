@@ -17,14 +17,18 @@ router.get(
   async (c) => {
     const jwt = getJwt(c);
     const url = new URL(c.req.url);
-    const items = await auditService.list(c.env.DB, jwt.tenant_id, {
+    const filters = {
       userId: url.searchParams.get("user_id") ?? undefined,
       action: url.searchParams.get("action") ?? undefined,
       entityType: url.searchParams.get("entity_type") ?? undefined,
-      limit: Number(url.searchParams.get("limit") ?? 100),
-      offset: Number(url.searchParams.get("offset") ?? 0),
-    });
-    return c.json({ items, total: items.length });
+    };
+    const limit = Number(url.searchParams.get("limit") ?? 100);
+    const offset = Number(url.searchParams.get("offset") ?? 0);
+    const [items, total] = await Promise.all([
+      auditService.list(c.env.DB, jwt.tenant_id, { ...filters, limit, offset }),
+      auditService.count(c.env.DB, jwt.tenant_id, filters),
+    ]);
+    return c.json({ items, total, limit, offset });
   },
 );
 

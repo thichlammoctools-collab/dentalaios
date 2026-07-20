@@ -13,6 +13,7 @@ export interface AuditLogsRepository {
       offset?: number;
     },
   ): Promise<AuditLog[]>;
+  count(tenantId: string, opts?: { userId?: string; action?: string; entityType?: string }): Promise<number>;
 }
 
 export function createAuditLogsRepository(db: D1Database): AuditLogsRepository {
@@ -38,6 +39,16 @@ export function createAuditLogsRepository(db: D1Database): AuditLogsRepository {
                    ORDER BY created_at DESC LIMIT ? OFFSET ?`;
       const result = await db.prepare(sql).bind(...binds).all();
       return (result.results as D1Row[]).map(mapLog);
+    },
+
+    async count(tenantId, opts = {}) {
+      const conditions = ["tenant_id = ?"];
+      const binds: unknown[] = [tenantId];
+      if (opts.userId) { conditions.push("user_id = ?"); binds.push(opts.userId); }
+      if (opts.action) { conditions.push("action = ?"); binds.push(opts.action); }
+      if (opts.entityType) { conditions.push("entity_type = ?"); binds.push(opts.entityType); }
+      const row = await db.prepare(`SELECT COUNT(*) AS total FROM audit_logs WHERE ${conditions.join(" AND ")}`).bind(...binds).first<D1Row>();
+      return Number(row?.total ?? 0);
     },
   };
 }

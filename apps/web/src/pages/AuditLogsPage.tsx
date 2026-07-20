@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Pagination, DEFAULT_PAGE_SIZE } from "@/components/ui/pagination";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -22,12 +23,16 @@ interface AuditResponse {
 export function AuditLogsPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
 
-  async function load() {
+  async function load(currentPage = page) {
     setLoading(true);
     try {
-      const res = await apiGet<AuditResponse>("/api/audit-logs?limit=200");
+      const offset = (currentPage - 1) * DEFAULT_PAGE_SIZE;
+      const res = await apiGet<AuditResponse>(`/api/audit-logs?limit=${DEFAULT_PAGE_SIZE}&offset=${offset}`);
       setLogs(res.items);
+      setTotal(res.total);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi tải audit");
     } finally {
@@ -36,8 +41,12 @@ export function AuditLogsPage() {
   }
 
   useEffect(() => {
-    load();
+    void load(1);
   }, []);
+
+  useEffect(() => {
+    if (page > 1) void load(page);
+  }, [page]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-4 px-6 py-6">
@@ -49,7 +58,7 @@ export function AuditLogsPage() {
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Lịch sử ({logs.length})</CardTitle>
+          <CardTitle>Lịch sử ({total})</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -94,6 +103,7 @@ export function AuditLogsPage() {
               </TableBody>
             </Table>
           )}
+          <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={total} disabled={loading} onPageChange={setPage} />
         </CardContent>
       </Card>
     </div>

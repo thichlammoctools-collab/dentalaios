@@ -10,4 +10,12 @@ export const auditService = {
   ): Promise<AuditLog[]> {
     return createAuditLogsRepository(db).list(tenantId, opts);
   },
+
+  count(
+    db: D1Database,
+    tenantId: string,
+    opts: Parameters<ReturnType<typeof createAuditLogsRepository>["count"]>[1],
+  ): Promise<number> {
+    return createAuditLogsRepository(db).count(tenantId, opts);
+  },
 };
