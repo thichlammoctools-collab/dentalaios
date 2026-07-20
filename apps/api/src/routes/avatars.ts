@@ -15,14 +15,6 @@ function isAvatarSubject(subject: string): subject is AvatarSubject {
   return subject === "users" || subject === "patients";
 }
 
-function permissionFor(subject: AvatarSubject) {
-  return subject === "users" ? PERMISSIONS.MANAGE_USERS : PERMISSIONS.READ_PATIENTS;
-}
-
-function writePermissionFor(subject: AvatarSubject) {
-  return subject === "users" ? PERMISSIONS.MANAGE_USERS : PERMISSIONS.WRITE_PATIENTS;
-}
-
 function decodeFilename(value: string | undefined, fallback: string): string {
   if (!value) return fallback;
   try {
@@ -37,7 +29,9 @@ router.on(["POST", "PUT"],
   async (c, next) => {
     const subject = c.req.param("subject");
     if (!isAvatarSubject(subject)) return c.json({ error: "Invalid profile type", code: "bad_request" }, 400);
-    return requirePermission(writePermissionFor(subject))(c, next);
+    // A user may manage only their own avatar; staff managers retain access to all user avatars.
+    if (subject === "users" && c.req.param("id") === getJwt(c).sub) return next();
+    return requirePermission(subject === "users" ? PERMISSIONS.MANAGE_USERS : PERMISSIONS.WRITE_PATIENTS)(c, next);
   },
   auditLog("update", "avatar"),
   async (c) => {
@@ -59,7 +53,9 @@ router.get(
   async (c, next) => {
     const subject = c.req.param("subject");
     if (!isAvatarSubject(subject)) return c.json({ error: "Invalid profile type", code: "bad_request" }, 400);
-    return requirePermission(permissionFor(subject))(c, next);
+    // Personnel avatars are part of the authenticated clinic directory.
+    if (subject === "users") return next();
+    return requirePermission(PERMISSIONS.READ_PATIENTS)(c, next);
   },
   async (c) => {
     const jwt = getJwt(c);
@@ -82,7 +78,8 @@ router.delete(
   async (c, next) => {
     const subject = c.req.param("subject");
     if (!isAvatarSubject(subject)) return c.json({ error: "Invalid profile type", code: "bad_request" }, 400);
-    return requirePermission(writePermissionFor(subject))(c, next);
+    if (subject === "users" && c.req.param("id") === getJwt(c).sub) return next();
+    return requirePermission(subject === "users" ? PERMISSIONS.MANAGE_USERS : PERMISSIONS.WRITE_PATIENTS)(c, next);
   },
   auditLog("delete", "avatar"),
   async (c) => {

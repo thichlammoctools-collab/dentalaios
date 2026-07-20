@@ -111,6 +111,7 @@ export interface PatientNote {
   patient_id: string;
   user_id: string;
   user_name: string;
+  user_avatar_file_id?: string;
   content: string;
   created_at: string;
 }
@@ -142,8 +143,10 @@ export interface Visit {
   // Personnel
   treating_clinician_id?: string; // FK to User — bác sĩ điều trị
   treating_clinician_name?: string;
+  treating_clinician_avatar_file_id?: string;
   assistant_id?: string; // FK to User — phụ tá
   assistant_name?: string;
+  assistant_avatar_file_id?: string;
 }
 
 /** Tooth numbering system — only FDI supported in V1 per user decision. */
@@ -685,4 +688,117 @@ export interface AnalyzeImageResult {
   findings: ImageAnalysisFinding[];
   ai_model: string;
   generated_at: string;
+}
+
+// ---------------- Platform administration ----------------
+
+export type PlatformRoleKey = "platform_owner" | "platform_operator" | "platform_auditor";
+export type PlatformPermission =
+  | "platform_dashboard.read"
+  | "platform_tenants.read"
+  | "platform_tenants.write"
+  | "platform_content.read"
+  | "platform_content.write"
+  | "platform_config.read"
+  | "platform_config.write"
+  | "platform_admins.read"
+  | "platform_admins.write"
+  | "platform_audit.read";
+
+export interface PlatformRole {
+  id: string;
+  key: PlatformRoleKey;
+  name: string;
+  permissions: PlatformPermission[];
+  created_at: string;
+}
+
+/** Deliberately excludes email, password material, and MFA material. */
+export interface PlatformUser {
+  id: string;
+  role_id: string;
+  name: string;
+  is_active: boolean;
+  mfa_enabled: boolean;
+  last_login_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlatformJwtPayload {
+  sub: string;
+  sid: string;
+  scope: "platform";
+  role_key: PlatformRoleKey;
+  permissions: PlatformPermission[];
+  exp: number;
+  iat: number;
+}
+
+export interface PlatformSession {
+  token: string;
+  expires_at: string;
+  user: PlatformUser;
+  role: PlatformRole;
+}
+
+export interface PlatformTenantSummary {
+  id: string;
+  name: string;
+  slug?: string;
+  is_active: boolean;
+  created_at: string;
+  branch_count: number;
+  user_count: number;
+  integration_health: "healthy" | "degraded" | "down" | "unknown";
+}
+
+export interface PlatformTenantDetail extends PlatformTenantSummary {
+  limits?: { max_users: number; max_branches: number; storage_quota_bytes: number; updated_at: string };
+  flags: Array<{ key: string; description: string; default_enabled: boolean; enabled: boolean; overridden: boolean }>;
+  integrations: PlatformIntegrationStatus[];
+}
+
+export interface PlatformFeatureFlag {
+  key: string;
+  description: string;
+  default_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlatformIntegrationStatus {
+  provider: string;
+  tenant_id?: string;
+  enabled: boolean;
+  health_status: "healthy" | "degraded" | "down" | "unknown";
+  last_checked_at?: string;
+  last_success_at?: string;
+  last_error_code?: string;
+  updated_at: string;
+}
+
+export interface PlatformContent {
+  id: string;
+  kind: "announcement" | "help_article";
+  title: string;
+  body_markdown: string;
+  status: "draft" | "scheduled" | "published" | "archived";
+  audience: "global" | "tenant";
+  tenant_id?: string;
+  publish_at?: string;
+  expire_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlatformAuditLog {
+  id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  tenant_id?: string;
+  result: "success" | "failure";
+  reason?: string;
+  created_at: string;
 }

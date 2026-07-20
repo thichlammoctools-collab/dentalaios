@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { AppointmentCard } from "@/components/schedule/AppointmentCard";
 import { AppointmentForm } from "@/components/schedule/AppointmentForm";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { apiDelete, apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
@@ -353,10 +354,10 @@ export function SchedulePage() {
 
                           {/* Main content */}
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-baseline justify-between gap-2">
-                              <p className="truncate font-semibold">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex min-w-0 items-center gap-2"><ProfileAvatar subject="patients" entityId={patient?.id} name={patient?.name ?? a.patient_id} avatarFileId={patient?.avatar_file_id} size="sm" /><p className="truncate font-semibold">
                                 {patient?.name ?? <span className="font-mono text-xs text-muted-foreground">{a.patient_id.slice(0, 8)}</span>}
-                              </p>
+                              </p></div>
                               <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-medium ${statusBgClass(a.status)}`}>
                                 {statusLabelVi(a.status)}
                               </span>
@@ -364,11 +365,13 @@ export function SchedulePage() {
                             <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
                               <span className="flex items-center gap-1">
                                 <span className="text-[10px] uppercase opacity-70">BS</span>
+                                {doctor && <ProfileAvatar subject="users" entityId={doctor.id} name={doctor.name} avatarFileId={doctor.avatar_file_id} size="sm" />}
                                 <span className="font-medium text-foreground">{doctor?.name ?? "—"}</span>
                               </span>
                               {assistant && (
                                 <span className="flex items-center gap-1">
-                                  <span className="text-[10px] uppercase opacity-70">Phụ tá</span>
+                                <span className="text-[10px] uppercase opacity-70">Phụ tá</span>
+                                <ProfileAvatar subject="users" entityId={assistant.id} name={assistant.name} avatarFileId={assistant.avatar_file_id} size="sm" />
                                   <span className="font-medium text-foreground">{assistant.name}</span>
                                 </span>
                               )}
@@ -474,9 +477,7 @@ export function SchedulePage() {
                                       {statusLabelVi(a.status)}
                                     </span>
                                   </div>
-                                  <div className="mt-0.5 truncate font-medium">
-                                    {patient?.name ?? a.patient_id.slice(0, 8)}
-                                  </div>
+                                   <div className="mt-0.5 flex min-w-0 items-center gap-1.5"><ProfileAvatar subject="patients" entityId={patient?.id} name={patient?.name ?? a.patient_id} avatarFileId={patient?.avatar_file_id} size="sm" /><span className="truncate font-medium">{patient?.name ?? a.patient_id.slice(0, 8)}</span></div>
                                   {a.procedure && (
                                     <div className="truncate text-[10px] text-muted-foreground">
                                       {a.procedure}

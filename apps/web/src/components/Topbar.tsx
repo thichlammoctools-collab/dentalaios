@@ -4,13 +4,16 @@ import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
 import { getRoleLabel, ROUTES } from "@shared/constants";
 import { cn } from "@/lib/utils";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
+import { apiGet } from "@/lib/api";
+import type { AuthSession } from "@shared/types";
 
 interface TopbarProps {
   onMenuClick?: () => void;
 }
 
 export function Topbar({ onMenuClick }: TopbarProps) {
-  const { session, logout } = useAuth();
+  const { session, logout, updateSession } = useAuth();
   const { theme, toggle } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -18,6 +21,11 @@ export function Topbar({ onMenuClick }: TopbarProps) {
   function onLogout() {
     logout();
     navigate(ROUTES.LOGIN, { replace: true });
+  }
+
+  async function refreshProfile() {
+    const me = await apiGet<Omit<AuthSession, "token" | "expires_at">>("/api/auth/me");
+    updateSession({ ...session!, ...me });
   }
 
   if (!session) return null;
@@ -36,6 +44,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     if (location.pathname.startsWith("/visits/")) return "Lượt khám";
     if (location.pathname.startsWith("/treatment-plans/")) return "Kế hoạch điều trị";
     if (location.pathname === ROUTES.SETTINGS_USERS) return "Người dùng";
+    if (location.pathname === ROUTES.SETTINGS_TREATMENT_SERVICES) return "Dịch vụ điều trị";
     if (location.pathname === ROUTES.SETTINGS_ROLES) return "Vai trò";
     if (location.pathname === ROUTES.SETTINGS_AUDIT_LOGS) return "Audit logs";
     return "";
@@ -91,9 +100,15 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           <p className="text-sm font-medium text-foreground">{session.user.name}</p>
           <p className="text-xs text-muted-foreground">{getRoleLabel(session.role.name)}</p>
         </div>
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground">
-          {session.user.name.charAt(0).toUpperCase()}
-        </div>
+        <ProfileAvatar
+          subject="users"
+          entityId={session.user.id}
+          name={session.user.name}
+          avatarFileId={session.user.avatar_file_id}
+          size="md"
+          editable
+          onChanged={() => void refreshProfile()}
+        />
         <Button
           variant="outline"
           size="sm"

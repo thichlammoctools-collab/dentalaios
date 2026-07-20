@@ -9,6 +9,7 @@ import { Dialog, DialogHeader, DialogTitle, DialogBody, DialogFooter } from "@/c
 import type { Branch, Role, User } from "@shared/types";
 import { getRoleLabel } from "@shared/constants";
 import { cn } from "@/lib/utils";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 
 interface EditForm {
   name: string;
@@ -239,7 +240,7 @@ export function UsersSettingsPage() {
               <tbody className="divide-y divide-border">
                 {members.map((u) => (
                   <tr key={u.id} className="hover:bg-accent/50 transition-colors">
-                    <td className="px-4 py-3 text-sm font-medium text-foreground">{u.name}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-foreground"><div className="flex items-center gap-2"><ProfileAvatar subject="users" entityId={u.id} name={u.name} avatarFileId={u.avatar_file_id} size="sm" />{u.name}</div></td>
                     <td className="px-4 py-3 text-sm text-muted-foreground font-mono">{u.email}</td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
@@ -277,6 +278,7 @@ export function UsersSettingsPage() {
           <DialogTitle>Sửa người dùng</DialogTitle>
           </DialogHeader>
           <DialogBody className="space-y-4">
+            {editUser && <div className="flex justify-center"><ProfileAvatar subject="users" entityId={editUser.id} name={editUser.name} avatarFileId={editUser.avatar_file_id} size="xl" editable onChanged={() => void loadAll()} /></div>}
             <div className="space-y-1.5">
               <Label htmlFor="me-name">
                 Họ tên <span className="text-red-500">*</span>

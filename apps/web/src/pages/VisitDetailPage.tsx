@@ -13,6 +13,7 @@ import { Dialog, DialogBody, DialogHeader, DialogTitle, DialogFooter } from "@/c
 import { apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatDateTime } from "@/lib/utils";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 import type { Visit, ClinicalFinding, TreatmentPlan, GeneratePlanResult, GeneratePlanItemDraft } from "@shared/types";
 
 interface SummarizeResult {
@@ -510,12 +511,14 @@ export function VisitDetailPage() {
             {visit.treating_clinician_name && (
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-muted-foreground">Bs điều trị:</span>
+                <ProfileAvatar subject="users" entityId={visit.treating_clinician_id} name={visit.treating_clinician_name} avatarFileId={visit.treating_clinician_avatar_file_id} size="sm" />
                 <span className="font-medium">{visit.treating_clinician_name}</span>
               </div>
             )}
             {visit.assistant_name && (
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-muted-foreground">Phụ tá:</span>
+                <ProfileAvatar subject="users" entityId={visit.assistant_id} name={visit.assistant_name} avatarFileId={visit.assistant_avatar_file_id} size="sm" />
                 <span className="font-medium">{visit.assistant_name}</span>
               </div>
             )}

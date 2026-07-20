@@ -33,6 +33,11 @@ export function ProfileAvatar({
   const inputId = useId();
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [hasAvatar, setHasAvatar] = useState(Boolean(avatarFileId));
+
+  useEffect(() => {
+    setHasAvatar(Boolean(avatarFileId));
+  }, [avatarFileId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,6 +78,7 @@ export function ProfileAvatar({
         },
       });
       setUrl(URL.createObjectURL(image));
+      setHasAvatar(true);
       toast.success("Đã cập nhật ảnh đại diện");
       onChanged?.();
     } catch (error) {
@@ -88,6 +94,7 @@ export function ProfileAvatar({
     try {
       await apiDelete(`/api/avatars/${subject}/${entityId}`);
       setUrl(null);
+      setHasAvatar(false);
       toast.success("Đã xóa ảnh đại diện");
       onChanged?.();
     } catch (error) {
@@ -126,7 +133,7 @@ export function ProfileAvatar({
             />
             {loading ? <Spinner /> : <CameraIcon />}
           </label>
-          {avatarFileId && !loading && (
+          {hasAvatar && !loading && (
             <button type="button" onClick={() => void remove()} className="p-1.5 text-white" title="Xóa ảnh đại diện">
               <TrashIcon />
             </button>

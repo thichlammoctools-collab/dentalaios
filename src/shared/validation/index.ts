@@ -529,3 +529,110 @@ export const branchUpdateSchema = branchCreateSchema.partial();
 
 export type BranchCreateInput = z.infer<typeof branchCreateSchema>;
 export type BranchUpdateInput = z.infer<typeof branchUpdateSchema>;
+
+// ---------------- Platform administration ----------------
+
+const platformPassword = z.string().min(14, "Mật khẩu phải có ít nhất 14 ký tự");
+const platformPage = z.coerce.number().int().min(1).max(100).default(25);
+const platformCursor = z.string().datetime({ offset: true }).optional();
+const platformIsoDate = z.string().datetime({ offset: true });
+
+export const platformLoginSchema = z.object({
+  email: z.string().email("Email không hợp lệ"),
+  password: z.string().min(1, "Mật khẩu không được trống"),
+}).strict();
+
+export const platformMfaVerifySchema = z.object({
+  challenge_id: z.string().uuid(),
+  code: z.string().trim().min(6).max(32),
+}).strict();
+
+export const platformReauthSchema = z.object({
+  password: z.string().min(1),
+  code: z.string().trim().min(6).max(32),
+}).strict();
+
+export const platformTenantListQuerySchema = z.object({
+  limit: platformPage,
+  cursor: platformCursor,
+  status: z.enum(["active", "suspended"]).optional(),
+  q: z.string().trim().min(1).max(100).optional(),
+  sort: z.enum(["created_at", "name", "updated_at"]).default("created_at"),
+}).strict();
+
+export const platformTenantCreateSchema = z.object({
+  name: nonEmpty(200),
+  slug: z.string().trim().min(2).max(80).regex(/^[a-z0-9-]+$/).optional(),
+}).strict();
+
+export const platformTenantUpdateSchema = z.object({
+  name: nonEmpty(200).optional(),
+  slug: z.string().trim().min(2).max(80).regex(/^[a-z0-9-]+$/).nullable().optional(),
+  expected_updated_at: z.string().min(1).optional(),
+}).strict().refine((data) => Object.keys(data).some((key) => key !== "expected_updated_at"), "Cần ít nhất một trường để cập nhật");
+
+export const platformLifecycleSchema = z.object({
+  reason: nonEmpty(500),
+  expected_updated_at: z.string().min(1).optional(),
+}).strict();
+
+export const platformFlagSchema = z.object({
+  key: z.string().trim().min(2).max(100).regex(/^[a-z0-9._-]+$/),
+  description: nonEmpty(300),
+  default_enabled: z.boolean(),
+}).strict();
+
+export const platformFlagOverrideSchema = z.object({ enabled: z.boolean() }).strict();
+
+export const platformLimitsSchema = z.object({
+  max_users: z.number().int().min(0).max(100000),
+  max_branches: z.number().int().min(0).max(10000),
+  storage_quota_bytes: z.number().int().min(0).max(10_000_000_000_000),
+}).strict();
+
+export const platformContentCreateSchema = z.object({
+  kind: z.enum(["announcement", "help_article"]),
+  title: nonEmpty(200),
+  body_markdown: nonEmpty(50_000),
+  status: z.enum(["draft", "scheduled", "published", "archived"]).default("draft"),
+  audience: z.enum(["global", "tenant"]),
+  tenant_id: z.string().min(1).optional(),
+  publish_at: platformIsoDate.optional(),
+  expire_at: platformIsoDate.optional(),
+}).strict().superRefine((data, ctx) => {
+  if (data.audience === "tenant" && !data.tenant_id) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tenant_id"], message: "Tenant là bắt buộc" });
+  if (data.audience === "global" && data.tenant_id) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["tenant_id"], message: "Nội dung toàn cục không có tenant" });
+  if (data.status === "scheduled" && !data.publish_at) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["publish_at"], message: "Lịch phát hành là bắt buộc" });
+});
+
+export const platformContentUpdateSchema = platformContentCreateSchema.partial().strict();
+
+export const platformAdminCreateSchema = z.object({
+  email: z.string().email(),
+  name: nonEmpty(200),
+  password: platformPassword,
+  role_key: z.enum(["platform_owner", "platform_operator", "platform_auditor"]),
+}).strict();
+
+export const platformAdminUpdateSchema = z.object({
+  name: nonEmpty(200).optional(),
+  role_key: z.enum(["platform_owner", "platform_operator", "platform_auditor"]).optional(),
+  is_active: z.boolean().optional(),
+}).strict().refine((data) => Object.keys(data).length > 0, "Cần ít nhất một trường để cập nhật");
+
+export const platformAuditQuerySchema = z.object({
+  limit: platformPage,
+  cursor: platformCursor,
+  action: z.string().trim().min(1).max(100).optional(),
+  tenant_id: z.string().min(1).optional(),
+}).strict();
+
+export type PlatformLoginInput = z.infer<typeof platformLoginSchema>;
+export type PlatformMfaVerifyInput = z.infer<typeof platformMfaVerifySchema>;
+export type PlatformReauthInput = z.infer<typeof platformReauthSchema>;
+export type PlatformTenantCreateInput = z.infer<typeof platformTenantCreateSchema>;
+export type PlatformTenantUpdateInput = z.infer<typeof platformTenantUpdateSchema>;
+export type PlatformLifecycleInput = z.infer<typeof platformLifecycleSchema>;
+export type PlatformFlagInput = z.infer<typeof platformFlagSchema>;
+export type PlatformLimitsInput = z.infer<typeof platformLimitsSchema>;
+export type PlatformContentCreateInput = z.infer<typeof platformContentCreateSchema>;

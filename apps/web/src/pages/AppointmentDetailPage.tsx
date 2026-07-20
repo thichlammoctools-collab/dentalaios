@@ -22,6 +22,7 @@ import { useAuth } from "@/lib/auth-context";
 import { APPOINTMENT_STATUS_LABELS, isAssistantRole, isDoctorRole } from "@shared/constants";
 import type { Appointment, DentalChair, Patient, UserWithDetails, Visit } from "@shared/types";
 import { formatDateTime, formatTime, ymd, combineDateTime, isoToYmd, isoToTime } from "@/lib/utils";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 
 interface PatientsResponse { items: Patient[]; total: number }
 interface UsersResponse { items: UserWithDetails[]; total: number }
@@ -175,12 +176,10 @@ export function AppointmentDetailPage() {
         <CardHeader><CardTitle>Thông tin</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
           <Field label="Bệnh nhân" value={patient ? (
-            <Link to={`/patients/${patient.id}`} className="font-medium text-blue-600 hover:underline">
-              {patient.name}
-            </Link>
-          ) : <span className="font-mono text-xs">{appt.patient_id.slice(0, 8)}…</span>} />
-          <Field label="Bác sĩ" value={doctor?.name ?? "—"} />
-          <Field label="Phụ tá chính" value={assistant?.name ?? "—"} />
+             <Link to={`/patients/${patient.id}`} className="flex items-center gap-2 font-medium text-blue-600 hover:underline"><ProfileAvatar subject="patients" entityId={patient.id} name={patient.name} avatarFileId={patient.avatar_file_id} size="sm" />{patient.name}</Link>
+           ) : <span className="font-mono text-xs">{appt.patient_id.slice(0, 8)}…</span>} />
+           <Field label="Bác sĩ" value={doctor ? <div className="flex items-center gap-2"><ProfileAvatar subject="users" entityId={doctor.id} name={doctor.name} avatarFileId={doctor.avatar_file_id} size="sm" />{doctor.name}</div> : "—"} />
+           <Field label="Phụ tá chính" value={assistant ? <div className="flex items-center gap-2"><ProfileAvatar subject="users" entityId={assistant.id} name={assistant.name} avatarFileId={assistant.avatar_file_id} size="sm" />{assistant.name}</div> : "—"} />
           <Field label="Ghế nha" value={chair ? `${chair.name}${chair.room_name ? ` · ${chair.room_name}` : ""}` : "—"} />
           <Field label="Thời lượng" value={`${appt.duration_min} phút`} />
           <Field label="Thủ thuật" value={appt.procedure ?? "—"} />

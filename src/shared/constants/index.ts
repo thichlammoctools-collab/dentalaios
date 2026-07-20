@@ -21,6 +21,7 @@ export const ROUTES = {
   SETTINGS_ROLES: "/settings/roles",
   SETTINGS_AUDIT_LOGS: "/settings/audit-logs",
   SETTINGS_CLINIC: "/settings/clinic",
+  SETTINGS_TREATMENT_SERVICES: "/settings/treatment-services",
 } as const;
 
 /** Role name constants. The actual IDs are stored in D1 (seeded in 0001_roles.sql). */
@@ -186,3 +187,31 @@ export function isValidFdiTooth(n: number): boolean {
   if (q >= 5 && q <= 8 && p >= 1 && p <= 5) return true;
   return false;
 }
+export const PLATFORM_API_PREFIX = "/api/platform";
+
+export const PLATFORM_ROLES = {
+  OWNER: "platform_owner",
+  OPERATOR: "platform_operator",
+  AUDITOR: "platform_auditor",
+} as const;
+
+export type PlatformRoleKey = (typeof PLATFORM_ROLES)[keyof typeof PLATFORM_ROLES];
+
+export const PLATFORM_PERMISSIONS = {
+  DASHBOARD_READ: "platform_dashboard.read",
+  TENANTS_READ: "platform_tenants.read",
+  TENANTS_WRITE: "platform_tenants.write",
+  CONTENT_READ: "platform_content.read",
+  CONTENT_WRITE: "platform_content.write",
+  CONFIG_READ: "platform_config.read",
+  CONFIG_WRITE: "platform_config.write",
+  ADMINS_READ: "platform_admins.read",
+  ADMINS_WRITE: "platform_admins.write",
+  AUDIT_READ: "platform_audit.read",
+} as const;
+
+export type PlatformPermission = (typeof PLATFORM_PERMISSIONS)[keyof typeof PLATFORM_PERMISSIONS];
+
+export const PLATFORM_SESSION_MAX_AGE_SECONDS = 8 * 60 * 60;
+export const PLATFORM_SESSION_IDLE_SECONDS = 30 * 60;
+export const PLATFORM_MFA_STEP_UP_SECONDS = 15 * 60;

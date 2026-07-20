@@ -11,6 +11,7 @@ import { formatCurrency } from "@/lib/utils";
 import { createDashboardStream } from "@/lib/dashboard-stream";
 import type { Appointment, ChairRevenueMetrics, DentalChair, Patient, UserWithDetails, Visit } from "@shared/types";
 import { PERMISSIONS, ROUTES } from "@shared/constants";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 
 interface ChairBoardItem {
   chair: DentalChair;
@@ -247,11 +248,13 @@ function AppointmentSummary({ title, appointment, patients, users, compact = fal
   starting: boolean;
 }) {
   const end = new Date(new Date(appointment.scheduled_at).getTime() + appointment.duration_min * 60_000);
+  const patient = patients.get(appointment.patient_id);
+  const clinician = users.get(appointment.clinician_id);
   return (
     <div className="rounded-lg bg-muted/40 p-3">
       <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
-      <p className="mt-1 font-medium">{patients.get(appointment.patient_id)?.name ?? appointment.patient_id.slice(0, 8)}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{formatTime(appointment.scheduled_at)} - {formatTime(end.toISOString())} · {users.get(appointment.clinician_id)?.name ?? "Chưa rõ bác sĩ"}</p>
+       <div className="mt-1 flex items-center gap-2"><ProfileAvatar subject="patients" entityId={patient?.id} name={patient?.name ?? appointment.patient_id} avatarFileId={patient?.avatar_file_id} size="sm" /><p className="font-medium">{patient?.name ?? appointment.patient_id.slice(0, 8)}</p></div>
+       <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">{clinician && <ProfileAvatar subject="users" entityId={clinician.id} name={clinician.name} avatarFileId={clinician.avatar_file_id} size="sm" />}{formatTime(appointment.scheduled_at)} - {formatTime(end.toISOString())} · {clinician?.name ?? "Chưa rõ bác sĩ"}</p>
       {!compact && appointment.procedure && <p className="mt-1 text-xs text-muted-foreground">{appointment.procedure}</p>}
       {!compact && appointment.chair_id && !["cancelled", "no_show", "completed"].includes(appointment.status) && <Button size="sm" className="mt-3" onClick={() => onStart(appointment)} disabled={starting}>{starting ? "Đang bắt đầu..." : "Bắt đầu khám"}</Button>}
       {canEdit && <Button size="sm" variant="outline" className="mt-3" asChild><Link to={`/appointments/${appointment.id}?edit=1`}>Sửa lịch</Link></Button>}

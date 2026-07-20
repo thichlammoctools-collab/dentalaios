@@ -5,6 +5,7 @@ import { apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatDateTime } from "@/lib/utils";
 import type { PatientNote } from "@shared/types";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 
 interface PatientNotesTimelineProps {
   patientId: string;
@@ -60,7 +61,10 @@ export function PatientNotesTimeline({ patientId, notes, onCreated }: PatientNot
           {notes.map((note) => (
             <li key={note.id} className="rounded-lg border border-border bg-background p-3">
               <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                <span className="text-sm font-semibold">{note.user_name}</span>
+                <span className="flex items-center gap-2 text-sm font-semibold">
+                  <ProfileAvatar subject="users" entityId={note.user_id} name={note.user_name} avatarFileId={note.user_avatar_file_id} size="sm" />
+                  {note.user_name}
+                </span>
                 <time className="text-xs text-muted-foreground" dateTime={note.created_at}>
                   {formatDateTime(note.created_at)}
                 </time>

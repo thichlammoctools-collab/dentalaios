@@ -137,3 +137,13 @@ CREATE TABLE IF NOT EXISTS platform_integration_status (
   PRIMARY KEY (provider, tenant_id)
 );
 
+
+CREATE INDEX IF NOT EXISTS idx_platform_integrations_health ON platform_integration_status(health_status, tenant_id);
+
+CREATE TABLE IF NOT EXISTS platform_login_challenges (
+  id TEXT PRIMARY KEY,
+  platform_user_id TEXT NOT NULL REFERENCES platform_users(id),
+  expires_at TEXT NOT NULL,
+  consumed_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

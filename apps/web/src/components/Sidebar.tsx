@@ -91,6 +91,7 @@ const NAV: NavItem[] = [
 const SUB_NAV: NavItem[] = [
   { label: "Người dùng", href: ROUTES.SETTINGS_USERS, match: (p) => p === ROUTES.SETTINGS_USERS, icon: "users" },
   { label: "Phòng khám", href: ROUTES.SETTINGS_CLINIC, match: (p) => p === ROUTES.SETTINGS_CLINIC, icon: "clinic" },
+  { label: "Dịch vụ điều trị", href: ROUTES.SETTINGS_TREATMENT_SERVICES, match: (p) => p === ROUTES.SETTINGS_TREATMENT_SERVICES, icon: "clinic" },
   { label: "Vai trò", href: ROUTES.SETTINGS_ROLES, match: (p) => p === ROUTES.SETTINGS_ROLES, icon: "roles" },
   { label: "Audit logs", href: ROUTES.SETTINGS_AUDIT_LOGS, match: (p) => p === ROUTES.SETTINGS_AUDIT_LOGS, icon: "audit" },
 ];

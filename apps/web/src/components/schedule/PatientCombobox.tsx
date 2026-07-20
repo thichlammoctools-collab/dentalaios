@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, type ChangeEvent, type KeyboardEvent } fro
 import { Input } from "@/components/ui/input";
 import { apiGet } from "@/lib/api";
 import type { Patient } from "@shared/types";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 
 interface PatientComboboxProps {
   value: string; // patient_id
@@ -144,8 +145,7 @@ export function PatientCombobox({ value, onChange, required }: PatientComboboxPr
                 idx === highlightIndex ? "bg-accent text-accent-foreground" : ""
               }`}
             >
-              <div className="font-medium">{patient.name}</div>
-              <div className="text-muted-foreground">{patient.phone}</div>
+              <div className="flex items-center gap-2"><ProfileAvatar subject="patients" entityId={patient.id} name={patient.name} avatarFileId={patient.avatar_file_id} size="sm" /><div><div className="font-medium">{patient.name}</div><div className="text-muted-foreground">{patient.phone}</div></div></div>
             </button>
           ))}
         </div>

@@ -14,6 +14,7 @@ import { AppointmentDetailPage } from "@/pages/AppointmentDetailPage";
 import { CalendarPage } from "@/pages/CalendarPage";
 import { UsersSettingsPage } from "@/pages/UsersSettingsPage";
 import { ClinicSettingsPage } from "@/pages/ClinicSettingsPage";
+import { TreatmentServicesPage } from "@/pages/TreatmentServicesPage";
 import { RolesSettingsPage } from "@/pages/RolesSettingsPage";
 import { AuditLogsPage } from "@/pages/AuditLogsPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
@@ -167,6 +168,14 @@ export function AppRoutes() {
         element={
           <Protected>
             <ClinicSettingsPage />
+          </Protected>
+        }
+      />
+      <Route
+        path={ROUTES.SETTINGS_TREATMENT_SERVICES}
+        element={
+          <Protected>
+            <TreatmentServicesPage />
           </Protected>
         }
       />

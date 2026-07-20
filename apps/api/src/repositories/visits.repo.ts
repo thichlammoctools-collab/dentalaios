@@ -36,7 +36,9 @@ export function createVisitsRepository(db: D1Database): VisitsRepository {
       binds.push(limit, offset);
       const sql = `SELECT v.*,
                     tc.name AS treating_clinician_name,
+                    tc.avatar_file_id AS treating_clinician_avatar_file_id,
                     a.name AS assistant_name,
+                    a.avatar_file_id AS assistant_avatar_file_id,
                     dc.name AS chair_name,
                     dr.name AS chair_room_name
                    FROM visits v
@@ -54,7 +56,9 @@ export function createVisitsRepository(db: D1Database): VisitsRepository {
       const row = (await db
         .prepare(`SELECT v.*,
                     tc.name AS treating_clinician_name,
+                    tc.avatar_file_id AS treating_clinician_avatar_file_id,
                     a.name AS assistant_name,
+                    a.avatar_file_id AS assistant_avatar_file_id,
                     dc.name AS chair_name,
                     dr.name AS chair_room_name
                    FROM visits v
@@ -70,7 +74,8 @@ export function createVisitsRepository(db: D1Database): VisitsRepository {
 
     async getBySourceAppointmentId(tenantId, sourceAppointmentId) {
       const row = (await db
-        .prepare(`SELECT v.*, tc.name AS treating_clinician_name, a.name AS assistant_name,
+        .prepare(`SELECT v.*, tc.name AS treating_clinician_name, tc.avatar_file_id AS treating_clinician_avatar_file_id,
+                    a.name AS assistant_name, a.avatar_file_id AS assistant_avatar_file_id,
                     dc.name AS chair_name, dr.name AS chair_room_name
                   FROM visits v
                   LEFT JOIN users tc ON tc.id = v.treating_clinician_id
@@ -160,8 +165,10 @@ function mapVisit(row: D1Row): Visit {
     vitals_recorded_at: (row.vitals_recorded_at as string | null) ?? undefined,
     treating_clinician_id: (row.treating_clinician_id as string | null) ?? undefined,
     treating_clinician_name: (row.treating_clinician_name as string | null) ?? undefined,
+    treating_clinician_avatar_file_id: (row.treating_clinician_avatar_file_id as string | null) ?? undefined,
     assistant_id: (row.assistant_id as string | null) ?? undefined,
     assistant_name: (row.assistant_name as string | null) ?? undefined,
+    assistant_avatar_file_id: (row.assistant_avatar_file_id as string | null) ?? undefined,
     chair_id: (row.chair_id as string | null) ?? undefined,
     chair_name: (row.chair_name as string | null) ?? undefined,
     chair_room_name: (row.chair_room_name as string | null) ?? undefined,

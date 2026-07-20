@@ -12,7 +12,7 @@ export function createPatientNotesRepository(db: D1Database): PatientNotesReposi
     async listByPatient(tenantId, patientId) {
       const result = await db
         .prepare(
-          `SELECT n.*, u.name AS user_name
+          `SELECT n.*, u.name AS user_name, u.avatar_file_id AS user_avatar_file_id
            FROM patient_notes n
            JOIN users u ON u.id = n.user_id
            WHERE n.tenant_id = ? AND n.patient_id = ?
@@ -35,7 +35,7 @@ export function createPatientNotesRepository(db: D1Database): PatientNotesReposi
 
       const row = (await db
         .prepare(
-          `SELECT n.*, u.name AS user_name
+          `SELECT n.*, u.name AS user_name, u.avatar_file_id AS user_avatar_file_id
            FROM patient_notes n
            JOIN users u ON u.id = n.user_id
            WHERE n.tenant_id = ? AND n.id = ? LIMIT 1`,
@@ -55,6 +55,7 @@ function mapPatientNote(row: D1Row): PatientNote {
     patient_id: row.patient_id as string,
     user_id: row.user_id as string,
     user_name: row.user_name as string,
+    user_avatar_file_id: (row.user_avatar_file_id as string | null) ?? undefined,
     content: row.content as string,
     created_at: row.created_at as string,
   };

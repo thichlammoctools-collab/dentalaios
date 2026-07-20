@@ -25,6 +25,7 @@ interface AuthContextValue {
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
+  updateSession: (session: AuthSession) => void;
   logout: () => void;
 }
 
@@ -63,9 +64,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSessionState(null);
   }, []);
 
+  const updateSession = useCallback((nextSession: AuthSession) => {
+    setSession(nextSession);
+    setSessionState(nextSession);
+  }, []);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ session, loading, error, login, logout }),
-    [session, loading, error, login, logout],
+    () => ({ session, loading, error, login, updateSession, logout }),
+    [session, loading, error, login, updateSession, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
