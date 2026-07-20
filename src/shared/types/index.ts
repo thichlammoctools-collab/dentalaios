@@ -36,6 +36,7 @@ export interface Branch {
 export interface Role {
   id: string;
   tenant_id: string;
+  system_key?: string;
   name: string;
   description?: string;
   permissions: string[]; // JSON array stored as TEXT in D1
@@ -473,6 +474,7 @@ export interface InviteAcceptRequest {
 
 /** User enriched with role_name and branch_name — returned by listByBranch. */
 export interface UserWithDetails extends User {
+  role_key?: string;
   role_name: string;
   branch_name: string;
 }

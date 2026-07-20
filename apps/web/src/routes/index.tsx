@@ -14,7 +14,6 @@ import { TreatmentPlanAiPage } from "@/pages/TreatmentPlanAiPage";
 import { AppointmentDetailPage } from "@/pages/AppointmentDetailPage";
 import { CalendarPage } from "@/pages/CalendarPage";
 import { UsersSettingsPage } from "@/pages/UsersSettingsPage";
-import { MembersSettingsPage } from "@/pages/MembersSettingsPage";
 import { ClinicSettingsPage } from "@/pages/ClinicSettingsPage";
 import { RolesSettingsPage } from "@/pages/RolesSettingsPage";
 import { AuditLogsPage } from "@/pages/AuditLogsPage";
@@ -136,14 +135,6 @@ export function AppRoutes() {
         element={
           <Protected>
             <UsersSettingsPage />
-          </Protected>
-        }
-      />
-      <Route
-        path={ROUTES.SETTINGS_MEMBERS}
-        element={
-          <Protected>
-            <MembersSettingsPage />
           </Protected>
         }
       />

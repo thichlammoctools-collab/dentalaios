@@ -6,7 +6,15 @@ import { hashPassword } from "../lib/password";
 import { AppError, ConflictError } from "../lib/errors";
 import { isUniqueConstraintError, isForeignKeyError } from "../lib/db-errors";
 import { ERROR_CODES } from "@shared/constants";
-import { assertAllInTenant } from "../lib/tenant-scope";
+
+async function assertSystemRole(db: D1Database, tenantId: string, roleId: string | undefined): Promise<void> {
+  if (!roleId) return;
+  const role = await db
+    .prepare("SELECT 1 FROM roles WHERE tenant_id = ? AND id = ? AND system_key IS NOT NULL LIMIT 1")
+    .bind(tenantId, roleId)
+    .first();
+  if (!role) throw new AppError("Vai trò không hợp lệ", 400, ERROR_CODES.INVALID_REFERENCE);
+}
 
 export const usersService = {
   list(db: D1Database, tenantId: string): Promise<User[]> {
@@ -24,12 +32,13 @@ export const usersService = {
       branch_id: string;
     },
   ): Promise<User> {
-    // FK constraints only validate existence. Explicit tenant checks prevent a
-    // manager in tenant A from assigning a role or branch from tenant B.
-    await assertAllInTenant(db, tenantId, [
-      { table: "roles", id: data.role_id },
-      { table: "branches", id: data.branch_id },
-    ]);
+    // Only platform-defined roles may be assigned to a user.
+    await assertSystemRole(db, tenantId, data.role_id);
+    const branch = await db
+      .prepare("SELECT 1 FROM branches WHERE tenant_id = ? AND id = ? LIMIT 1")
+      .bind(tenantId, data.branch_id)
+      .first();
+    if (!branch) throw new AppError("Role hoặc chi nhánh không hợp lệ", 400, ERROR_CODES.INVALID_REFERENCE);
     const password_hash = await hashPassword(data.password);
     try {
       return await createUsersRepository(db).create(tenantId, {
@@ -57,10 +66,14 @@ export const usersService = {
     id: string,
     data: { name?: string; role_id?: string; branch_id?: string; password?: string; is_active?: boolean },
   ): Promise<User | null> {
-    await assertAllInTenant(db, tenantId, [
-      { table: "roles", id: data.role_id ?? undefined },
-      { table: "branches", id: data.branch_id ?? undefined },
-    ]);
+    await assertSystemRole(db, tenantId, data.role_id);
+    if (data.branch_id) {
+      const branch = await db
+        .prepare("SELECT 1 FROM branches WHERE tenant_id = ? AND id = ? LIMIT 1")
+        .bind(tenantId, data.branch_id)
+        .first();
+      if (!branch) throw new AppError("Role hoặc chi nhánh không hợp lệ", 400, ERROR_CODES.INVALID_REFERENCE);
+    }
     const repo = createUsersRepository(db);
     const patch: Parameters<typeof repo.update>[2] = {};
     if (data.name !== undefined) patch.name = data.name;

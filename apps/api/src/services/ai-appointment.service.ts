@@ -21,6 +21,7 @@ import { createTreatmentItemsRepository } from "../repositories/treatment-items.
 import { createPatientsRepository } from "../repositories/patients.repo";
 import { createUsersRepository } from "../repositories/users.repo";
 import { NotFoundError } from "../lib/errors";
+import { isDoctorRole } from "@shared/constants";
 
 // ─── Result types ────────────────────────────────────────────
 
@@ -87,14 +88,17 @@ export const aiAppointmentService = {
     const [patients, doctors] = await Promise.all([
       db.prepare("SELECT id, name, phone FROM patients WHERE tenant_id = ? LIMIT 100")
         .bind(tenantId).all<{ id: string; name: string; phone: string }>(),
-      db.prepare(`SELECT u.id, u.name, r.name AS role_name
-                   FROM users u JOIN roles r ON r.id = u.role_id
-                   WHERE u.tenant_id = ? AND r.name = 'doctor' AND u.is_active = 1 LIMIT 50`)
-        .bind(tenantId).all<{ id: string; name: string; role_name: string }>(),
+      db.prepare(`SELECT u.id, u.role_id, u.name, r.system_key AS role_key, r.name AS role_name
+                    FROM users u JOIN roles r ON r.id = u.role_id
+                    WHERE u.tenant_id = ? AND u.is_active = 1 LIMIT 50`)
+        .bind(tenantId).all<{ id: string; role_id: string; name: string; role_key?: string; role_name: string }>(),
     ]);
 
     const patientList = patients.results.map((p) => `  - ${p.name} (SĐT: ${p.phone})`).join("\n");
-    const doctorList = doctors.results.map((d) => `  - ${d.name}`).join("\n");
+    const doctorList = doctors.results
+      .filter((d) => isDoctorRole(d.role_key, d.role_id, d.role_name))
+      .map((d) => `  - ${d.name}`)
+      .join("\n");
 
     if (AI && typeof (AI as { run?: unknown }).run === "function") {
       try {

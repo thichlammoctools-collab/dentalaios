@@ -14,7 +14,6 @@ export const ROUTES = {
   SCHEDULE: "/schedule",
   SCHEDULE_NEW: "/schedule/new",
   SETTINGS_USERS: "/settings/users",
-  SETTINGS_MEMBERS: "/settings/members",
   SETTINGS_ROLES: "/settings/roles",
   SETTINGS_AUDIT_LOGS: "/settings/audit-logs",
   SETTINGS_CLINIC: "/settings/clinic",
@@ -29,6 +28,24 @@ export const ROLES = {
 } as const;
 
 export type RoleName = (typeof ROLES)[keyof typeof ROLES];
+
+/**
+ * System role catalog. A role's key and permission set are platform-owned;
+ * each clinic may only customize its display name.
+ */
+export const SYSTEM_ROLES = [
+  { key: ROLES.ADMIN, name: "Quản trị viên", permissions: ["all"] },
+  { key: ROLES.DOCTOR, name: "Bác sĩ", permissions: ["read_patients", "write_findings", "write_plans", "approve_plans"] },
+  { key: ROLES.ASSISTANT, name: "Phụ tá", permissions: ["read_patients", "write_visits"] },
+  { key: ROLES.RECEPTIONIST, name: "Lễ tân", permissions: ["read_patients", "write_payments", "write_appointments"] },
+  { key: "manager", name: "Quản lý", permissions: ["all"] },
+  { key: "accountant", name: "Kế toán", permissions: ["read_patients", "write_payments"] },
+  { key: "hr", name: "Nhân sự", permissions: ["manage_users", "read_patients"] },
+  { key: "marketing", name: "Marketing", permissions: ["read_patients"] },
+  { key: "security", name: "Bảo vệ", permissions: [] },
+] as const;
+
+export type SystemRoleKey = (typeof SYSTEM_ROLES)[number]["key"];
 
 /** Vietnamese labels for built-in role names. Custom roles keep their original name. */
 export const ROLE_LABELS: Record<RoleName, string> = {
@@ -54,12 +71,12 @@ function normalizeRoleName(name: string): string {
  * Built-in clinical roles may have a localized display name in existing data.
  * Keep role-based scheduling independent from that editable name.
  */
-export function isDoctorRole(roleId: string, roleName: string): boolean {
-  return roleId === "role-doctor" || ["doctor", "bac si"].includes(normalizeRoleName(roleName));
+export function isDoctorRole(roleKey?: string, roleId?: string, roleName?: string): boolean {
+  return roleKey === ROLES.DOCTOR || roleId === "role-doctor" || ["doctor", "bac si"].includes(normalizeRoleName(roleName ?? ""));
 }
 
-export function isAssistantRole(roleId: string, roleName: string): boolean {
-  return roleId === "role-assistant" || ["assistant", "phu ta", "tro ly"].includes(normalizeRoleName(roleName));
+export function isAssistantRole(roleKey?: string, roleId?: string, roleName?: string): boolean {
+  return roleKey === ROLES.ASSISTANT || roleId === "role-assistant" || ["assistant", "phu ta", "tro ly"].includes(normalizeRoleName(roleName ?? ""));
 }
 
 /** Permission strings used in role.permissions JSON array. */

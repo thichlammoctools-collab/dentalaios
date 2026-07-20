@@ -12,7 +12,7 @@
  */
 
 import { z } from "zod";
-import { isValidFdiTooth, PERMISSIONS } from "../constants";
+import { isValidFdiTooth } from "../constants";
 
 /** Non-empty string (after trim) with reasonable max length */
 const nonEmpty = (max: number) =>
@@ -342,38 +342,11 @@ export type UserUpdateInput = z.infer<typeof userUpdateSchema>;
 
 // ──────────────── Roles ────────────────
 
-// `all` is intentionally excluded. It is a bootstrap/system-admin capability
-// seeded by migrations, never a permission that role-management CRUD may grant.
-const assignablePermissions = [
-  PERMISSIONS.READ_PATIENTS,
-  PERMISSIONS.WRITE_PATIENTS,
-  PERMISSIONS.WRITE_VISITS,
-  PERMISSIONS.WRITE_FINDINGS,
-  PERMISSIONS.WRITE_PLANS,
-  PERMISSIONS.APPROVE_PLANS,
-  PERMISSIONS.WRITE_PAYMENTS,
-  PERMISSIONS.WRITE_APPOINTMENTS,
-  PERMISSIONS.MANAGE_USERS,
-  PERMISSIONS.MANAGE_ROLES,
-  PERMISSIONS.MANAGE_PATIENTS,
-  PERMISSIONS.MANAGE_SCHEDULE,
-] as const;
-
-const permissionsSchema = z.array(z.enum(assignablePermissions)).max(assignablePermissions.length);
-
-export const roleCreateSchema = z.object({
-  name: nonEmpty(50),
-  description: optionalText(200),
-  permissions: permissionsSchema.default([]),
-});
-
 export const roleUpdateSchema = z.object({
   name: nonEmpty(50).optional(),
   description: optionalText(200).optional(),
-  permissions: permissionsSchema.optional(),
-});
+}).strict().refine((data) => Object.keys(data).length > 0, "Cần cập nhật ít nhất một trường");
 
-export type RoleCreateInput = z.infer<typeof roleCreateSchema>;
 export type RoleUpdateInput = z.infer<typeof roleUpdateSchema>;
 
 // ──────────────── Appointment ────────────────

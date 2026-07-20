@@ -47,35 +47,26 @@ describe("GET /api/roles", () => {
 });
 
 describe("PUT /api/roles/:id", () => {
-  it("returns 200 + updated role when changing permissions", async () => {
+  it("rejects attempts to change system role permissions", async () => {
     const app = mountRoute("/api/roles", rolesRoutes);
-    // D1 stores permissions as JSON string; mapRole parses it
-    const updated = roleRow({
-      permissions: JSON.stringify(["read_patients", "write_findings"]),
-    });
     const res = await authedRequestWithDB(
       app,
       "PUT",
       "/api/roles/role-1",
-      new Map<string, unknown[]>([
-        ["FROM roles", [updated]],
-      ]),
+      new Map(),
       {
         permissions: ["all"],
         body: {
-          name: "doctor",
           permissions: ["read_patients", "write_findings"],
         },
       },
     );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { permissions: string[] };
-    expect(body.permissions).toEqual(["read_patients", "write_findings"]);
+    expect(res.status).toBe(400);
   });
 
   it("returns 200 + updated role when renaming", async () => {
     const app = mountRoute("/api/roles", rolesRoutes);
-    const updated = roleRow({ name: "doctor_v2" });
+    const updated = roleRow({ name: "Bác sĩ điều trị", system_key: "doctor" });
     const res = await authedRequestWithDB(
       app,
       "PUT",
@@ -85,12 +76,12 @@ describe("PUT /api/roles/:id", () => {
       ]),
       {
         permissions: ["manage_roles"],
-        body: { name: "doctor_v2" },
+        body: { name: "Bác sĩ điều trị" },
       },
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as { name: string };
-    expect(body.name).toBe("doctor_v2");
+    expect(body.name).toBe("Bác sĩ điều trị");
   });
 
   it("returns 404 for non-existent role", async () => {
@@ -123,23 +114,17 @@ describe("PUT /api/roles/:id", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns 409 for duplicate role name (tenant scope)", async () => {
+  it("does not expose deletion for system roles", async () => {
     const app = mountRoute("/api/roles", rolesRoutes);
-    // Simulate UNIQUE violation by NOT providing successful UPDATE result
-    // The service catches UNIQUE in err.message
-    // For mock simplicity: mock returns no row (so update returns null → 404, not 409)
-    // We expect 404 here, not 409, since the mock can't easily throw UNIQUE error
     const res = await authedRequestWithDB(
       app,
-      "PUT",
+      "DELETE",
       "/api/roles/role-1",
-      new Map(), // empty → no UPDATE result → null → 404
+      new Map(),
       {
-        permissions: ["manage_roles"],
-        body: { name: "doctor_v2" },
+        permissions: ["all"],
       },
     );
-    // Acceptable outcomes: 404 (mock returns null), 409 (UNIQUE caught)
-    expect([404, 409]).toContain(res.status);
+    expect(res.status).toBe(404);
   });
 });

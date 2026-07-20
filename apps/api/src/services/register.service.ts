@@ -17,6 +17,7 @@ import { signJwt } from "../lib/jwt";
 import { NotFoundError, ConflictError } from "../lib/errors";
 import { newId } from "../lib/ids";
 import { isUniqueConstraintError } from "../lib/db-errors";
+import { SYSTEM_ROLES } from "@shared/constants";
 
 function slugify(text: string): string {
   return text
@@ -54,7 +55,7 @@ export const registerService = {
     const tenantId = newId();
     const branchId = newId();
     const userId = newId();
-    const roleId = newId();
+    const roleIds = new Map(SYSTEM_ROLES.map((role) => [role.key, newId()]));
     const verifyToken = generateSecureToken();
     const tokenId = newId();
     const slug = slugify(data.clinic_name);
@@ -74,15 +75,15 @@ export const registerService = {
         db
           .prepare("INSERT INTO branches (id, tenant_id, name, address) VALUES (?, ?, ?, ?)")
           .bind(branchId, tenantId, (data.branch_name || "Chi nhánh chính").trim(), ""),
-        db
-          .prepare("INSERT INTO roles (id, tenant_id, name, permissions) VALUES (?, ?, ?, ?)")
-          .bind(roleId, tenantId, "admin", JSON.stringify(["all"])),
+        ...SYSTEM_ROLES.map((role) => db
+          .prepare("INSERT INTO roles (id, tenant_id, system_key, name, permissions) VALUES (?, ?, ?, ?, ?)")
+          .bind(roleIds.get(role.key), tenantId, role.key, role.name, JSON.stringify(role.permissions))),
         db
           .prepare(
             `INSERT INTO users (id, tenant_id, branch_id, role_id, email, name, password_hash, is_active)
              VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
           )
-          .bind(userId, tenantId, branchId, roleId, email, data.name.trim(), password_hash),
+          .bind(userId, tenantId, branchId, roleIds.get("admin"), email, data.name.trim(), password_hash),
         db
           .prepare(
             `INSERT INTO email_verification_tokens (id, token, user_id, tenant_id, email, expires_at)
@@ -181,7 +182,7 @@ export const registerService = {
       .first();
     if (existing) throw new ConflictError("Email đã là thành viên của phòng khám này");
 
-    const role = await db.prepare("SELECT id FROM roles WHERE id = ? AND tenant_id = ? LIMIT 1").bind(data.role_id, tenantId).first();
+    const role = await db.prepare("SELECT id FROM roles WHERE id = ? AND tenant_id = ? AND system_key IS NOT NULL LIMIT 1").bind(data.role_id, tenantId).first();
     if (!role) throw new NotFoundError("Role không hợp lệ");
 
     const branch = await db.prepare("SELECT id FROM branches WHERE id = ? AND tenant_id = ? LIMIT 1").bind(data.branch_id, tenantId).first();

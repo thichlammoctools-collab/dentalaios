@@ -299,6 +299,69 @@ describe("GET /api/treatment-plans/:id/items", () => {
   });
 });
 
+describe("GET /api/treatment-plans/:id/pdf", () => {
+  it("returns a downloadable PDF for a plan in the caller tenant", async () => {
+    const app = mountRoute("/api/treatment-plans", treatmentPlansExtras);
+    const userContextRow = {
+      u_id: "test-user",
+      u_tenant_id: "test-tenant",
+      u_branch_id: "test-branch",
+      u_role_id: "test-role",
+      u_email: "admin@demo.clinic",
+      u_name: "Demo Admin",
+      u_is_active: 1,
+      u_password_hash: "x",
+      u_created_at: "2026-01-01",
+      r_id: "test-role",
+      r_tenant_id: "test-tenant",
+      r_name: "admin",
+      r_permissions: '["all"]',
+      r_created_at: "2026-01-01",
+      t_id: "test-tenant",
+      t_name: "Demo Clinic",
+      t_slug: "demo-clinic",
+      t_is_active: 1,
+      t_created_at: "2026-01-01",
+      b_id: "test-branch",
+      b_tenant_id: "test-tenant",
+      b_name: "Main",
+      b_address: "1 Main Street",
+      b_created_at: "2026-01-01",
+    };
+    const res = await authedRequestWithDB(
+      app,
+      "GET",
+      "/api/treatment-plans/plan-1/pdf",
+      new Map([
+        ["FROM treatment_plans", [planRow({ total_cost: 500000 })]],
+        ["FROM treatment_plan_items", [itemRow()]],
+        ["FROM users", [userContextRow]],
+        ["FROM patients", [patientRow()]],
+      ]),
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/pdf");
+    expect(res.headers.get("content-disposition")).toContain("Ke-hoach-dieu-tri-plan-1.pdf");
+    expect(new Uint8Array(await res.arrayBuffer()).slice(0, 4)).toEqual(
+      new Uint8Array([0x25, 0x50, 0x44, 0x46]),
+    );
+  });
+
+  it("rejects access without read_patients permission", async () => {
+    const app = mountRoute("/api/treatment-plans", treatmentPlansExtras);
+    const res = await authedRequestWithDB(
+      app,
+      "GET",
+      "/api/treatment-plans/plan-1/pdf",
+      new Map(),
+      { permissions: ["write_plans"] },
+    );
+
+    expect(res.status).toBe(403);
+  });
+});
+
 describe("POST /api/treatment-plans/:id/lark-handover", () => {
   it("returns mock task ID when Lark credentials not configured", async () => {
     const app = mountRoute("/api/treatment-plans", treatmentPlansExtras);

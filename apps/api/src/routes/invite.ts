@@ -46,10 +46,8 @@ router.post(
 
 const inviteCreateSchema = z.object({
   email: z.string().email("Email không hợp lệ"),
-  role_name: z.enum([
-    "doctor", "assistant", "admin", "receptionist",
-    "Quản lý", "Kế toán", "Nhân sự", "Marketing", "Bảo vệ",
-  ]),
+  role_id: z.string().min(1),
+  branch_id: z.string().min(1),
 });
 
 router.use("*", requireAuth());
@@ -75,26 +73,25 @@ router.get("/", async (c) => {
 // POST /api/invites — create invite
 router.post("/", zValidator("json", inviteCreateSchema), async (c) => {
   const jwt = getJwt(c);
-  const { email, role_name } = c.req.valid("json");
+  const { email, role_id, branch_id } = c.req.valid("json");
 
-  // Look up role_id by role_name for this tenant
+  // Role IDs remain stable when an administrator changes a role's display name.
   const roleRow = await c.env.DB
-    .prepare("SELECT id FROM roles WHERE name = ? AND tenant_id = ?")
-    .bind(role_name, jwt.tenant_id)
+    .prepare("SELECT id FROM roles WHERE id = ? AND tenant_id = ? AND system_key IS NOT NULL")
+    .bind(role_id, jwt.tenant_id)
     .first<{ id: string }>();
 
   if (!roleRow) {
-    return c.json({ error: `Role "${role_name}" not found` }, 400);
+    return c.json({ error: "Role not found" }, 400);
   }
 
-  // Use first branch if none specified
   const branchRow = await c.env.DB
-    .prepare("SELECT id FROM branches WHERE tenant_id = ? LIMIT 1")
-    .bind(jwt.tenant_id)
+    .prepare("SELECT id FROM branches WHERE id = ? AND tenant_id = ?")
+    .bind(branch_id, jwt.tenant_id)
     .first<{ id: string }>();
 
   if (!branchRow) {
-    return c.json({ error: "No branch found" }, 400);
+    return c.json({ error: "Branch not found" }, 400);
   }
 
   const result = await registerService.createInvite(

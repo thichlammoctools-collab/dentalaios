@@ -29,6 +29,7 @@ export interface UserWithDetails {
   avatar_file_id?: string;
   is_active: boolean;
   created_at: string;
+  role_key?: string;
   role_name: string;
   branch_name: string;
 }
@@ -60,7 +61,7 @@ export function createUsersRepository(db: D1Database): UsersRepository {
              u.id AS u_id, u.tenant_id AS u_tenant_id, u.branch_id AS u_branch_id,
              u.role_id AS u_role_id, u.email AS u_email, u.name AS u_name, u.avatar_file_id AS u_avatar_file_id,
              u.is_active AS u_is_active, u.password_hash AS u_password_hash, u.created_at AS u_created_at,
-             r.id AS r_id, r.tenant_id AS r_tenant_id, r.name AS r_name,
+             r.id AS r_id, r.tenant_id AS r_tenant_id, r.system_key AS r_system_key, r.name AS r_name,
              r.permissions AS r_permissions, r.created_at AS r_created_at,
              t.id AS t_id, t.name AS t_name, t.slug AS t_slug, t.is_active AS t_is_active, t.created_at AS t_created_at,
              b.id AS b_id, b.tenant_id AS b_tenant_id, b.name AS b_name,
@@ -86,7 +87,7 @@ export function createUsersRepository(db: D1Database): UsersRepository {
              u.id AS u_id, u.tenant_id AS u_tenant_id, u.branch_id AS u_branch_id,
              u.role_id AS u_role_id, u.email AS u_email, u.name AS u_name, u.avatar_file_id AS u_avatar_file_id,
              u.is_active AS u_is_active, u.password_hash AS u_password_hash, u.created_at AS u_created_at,
-             r.id AS r_id, r.tenant_id AS r_tenant_id, r.name AS r_name,
+             r.id AS r_id, r.tenant_id AS r_tenant_id, r.system_key AS r_system_key, r.name AS r_name,
              r.permissions AS r_permissions, r.created_at AS r_created_at,
              t.id AS t_id, t.name AS t_name, t.slug AS t_slug, t.is_active AS t_is_active, t.created_at AS t_created_at,
              b.id AS b_id, b.tenant_id AS b_tenant_id, b.name AS b_name,
@@ -128,7 +129,7 @@ export function createUsersRepository(db: D1Database): UsersRepository {
         .prepare(
           `SELECT u.id, u.tenant_id, u.branch_id, u.role_id, u.email, u.name, u.avatar_file_id,
                   u.is_active, u.created_at,
-                  r.name AS role_name, b.name AS branch_name
+                  r.system_key AS role_key, r.name AS role_name, b.name AS branch_name
            FROM users u
            JOIN roles r ON r.id = u.role_id
            JOIN branches b ON b.id = u.branch_id
@@ -147,6 +148,7 @@ export function createUsersRepository(db: D1Database): UsersRepository {
         avatar_file_id: (row.avatar_file_id as string | null) ?? undefined,
         is_active: (row.is_active as number) === 1,
         created_at: row.created_at as string,
+        role_key: (row.role_key as string | null) ?? undefined,
         role_name: row.role_name as string,
         branch_name: row.branch_name as string,
       }));
@@ -254,6 +256,7 @@ function mapUserWithContext(row: D1Row): UserWithContext {
   const role: Role = {
     id: row.r_id as string,
     tenant_id: row.r_tenant_id as string,
+    system_key: (row.r_system_key as string | null) ?? undefined,
     name: row.r_name as string,
     permissions: parsePermissions(row.r_permissions as string | null),
     created_at: row.r_created_at as string,

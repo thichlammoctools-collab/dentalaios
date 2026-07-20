@@ -43,7 +43,7 @@ export function ScheduleNewPage() {
     apiGet<UsersResponse>(`/api/users/branch/${session.branch.id}`)
       .then((res) => {
         setAllUsers(res.items);
-        setDoctors(res.items.filter((u) => isDoctorRole(u.role_id, u.role_name)));
+        setDoctors(res.items.filter((u) => isDoctorRole(u.role_key, u.role_id, u.role_name)));
       })
       .catch(() => {});
     apiGet<PatientsResponse>(`/api/patients?limit=200&search=${encodeURIComponent(patientSearch)}`)
@@ -53,7 +53,7 @@ export function ScheduleNewPage() {
 
   useEffect(() => {
     if (clinicianId || !session?.user?.id) return;
-    if (isDoctorRole(session.role.id, session.role.name)) {
+    if (isDoctorRole(session.role.system_key, session.role.id, session.role.name)) {
       setClinicianId(session.user.id);
     }
   }, [session, clinicianId, setClinicianId]);
@@ -166,12 +166,12 @@ export function ScheduleNewPage() {
                   </Select>
                 </div>
 
-                {allUsers.some((u) => isAssistantRole(u.role_id, u.role_name)) && (
+                {allUsers.some((u) => isAssistantRole(u.role_key, u.role_id, u.role_name)) && (
                   <div className="grid gap-1.5">
                     <Label>Phụ tá chính</Label>
                     <Select value={assistantId} onChange={(e) => setAssistantId(e.target.value)}>
                       <option value="">— Không chọn —</option>
-                      {allUsers.filter((u) => isAssistantRole(u.role_id, u.role_name)).map((a) => (
+                      {allUsers.filter((u) => isAssistantRole(u.role_key, u.role_id, u.role_name)).map((a) => (
                         <option key={a.id} value={a.id}>{a.name}</option>
                       ))}
                     </Select>

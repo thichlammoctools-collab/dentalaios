@@ -14,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "@/lib/api";
+import { apiGet, apiPut, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
 import type { Role } from "@shared/types";
@@ -22,10 +22,6 @@ import { getRoleLabel } from "@shared/constants";
 
 export function RolesSettingsPage() {
   const [roles, setRoles] = useState<Role[]>([]);
-  const [openCreate, setOpenCreate] = useState(false);
-  const [createName, setCreateName] = useState("");
-  const [createDesc, setCreateDesc] = useState("");
-  const [savingCreate, setSavingCreate] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
   const [editRole, setEditRole] = useState<Role | null>(null);
   const [editName, setEditName] = useState("");
@@ -40,23 +36,6 @@ export function RolesSettingsPage() {
   useEffect(() => {
     loadRoles();
   }, []);
-
-  async function onCreate(e: React.FormEvent) {
-    e.preventDefault();
-    setSavingCreate(true);
-    try {
-      await apiPost("/api/roles", { name: createName, description: createDesc });
-      toast.success("Đã tạo vai trò");
-      setOpenCreate(false);
-      setCreateName("");
-      setCreateDesc("");
-      loadRoles();
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Lỗi");
-    } finally {
-      setSavingCreate(false);
-    }
-  }
 
   function openEditDialog(r: Role) {
     setEditRole(r);
@@ -81,25 +60,13 @@ export function RolesSettingsPage() {
     }
   }
 
-  async function onDelete(r: Role) {
-    if (!confirm(`Xóa vai trò "${r.name}"?`)) return;
-    try {
-      await apiDelete(`/api/roles/${r.id}`);
-      toast.success("Đã xóa vai trò");
-      loadRoles();
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Lỗi xóa");
-    }
-  }
-
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Vai trò & Phân quyền</h1>
-          <p className="text-sm text-muted-foreground">Quản lý vai trò và quyền hạn của người dùng</p>
+          <p className="text-sm text-muted-foreground">Vai trò và quyền hạn do hệ thống quản lý. Phòng khám chỉ có thể đổi tên hiển thị.</p>
         </div>
-        <Button onClick={() => setOpenCreate(true)}>+ Tạo vai trò</Button>
       </div>
 
       <Card>
@@ -126,14 +93,6 @@ export function RolesSettingsPage() {
                     <Button variant="ghost" size="sm" onClick={() => openEditDialog(r)}>
                       Sửa
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-500 hover:text-red-600"
-                      onClick={() => onDelete(r)}
-                    >
-                      Xóa
-                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -148,46 +107,6 @@ export function RolesSettingsPage() {
           </Table>
         </CardContent>
       </Card>
-
-      {/* ─── Create Dialog ─── */}
-      <Dialog open={openCreate} onOpenChange={setOpenCreate}>
-        <form onSubmit={onCreate}>
-          <DialogHeader>
-            <DialogTitle>Tạo vai trò mới</DialogTitle>
-          </DialogHeader>
-          <DialogBody className="grid gap-3">
-            <div className="grid gap-1.5">
-              <Label htmlFor="r-name">
-                Tên vai trò <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="r-name"
-                required
-                value={createName}
-                onChange={(e) => setCreateName(e.target.value)}
-                placeholder="VD: Bác sĩ"
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="r-desc">Mô tả</Label>
-              <Input
-                id="r-desc"
-                value={createDesc}
-                onChange={(e) => setCreateDesc(e.target.value)}
-                placeholder="Mô tả ngắn về vai trò này"
-              />
-            </div>
-          </DialogBody>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpenCreate(false)}>
-              Hủy
-            </Button>
-            <Button type="submit" disabled={savingCreate}>
-              {savingCreate ? "Đang tạo…" : "Tạo vai trò"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </Dialog>
 
       {/* ─── Edit Dialog ─── */}
       <Dialog open={openEdit} onOpenChange={setOpenEdit}>

@@ -18,7 +18,11 @@ export interface AppointmentsRepository {
     tenantId: string,
     data: Omit<Appointment, "id" | "tenant_id" | "created_at" | "updated_at">,
   ): Promise<Appointment | null>;
-  update(tenantId: string, id: string, data: Partial<Appointment>): Promise<Appointment | null>;
+  update(
+    tenantId: string,
+    id: string,
+    data: Partial<Omit<Appointment, "assistant_id">> & { assistant_id?: string | null },
+  ): Promise<Appointment | null>;
   /**
    * Find appointments that overlap with [startISO, endISO) for a clinician.
    * Used for conflict detection — excludes cancelled / no_show.
@@ -141,7 +145,7 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
     async update(tenantId, id, data) {
       const fields: string[] = [];
       const binds: unknown[] = [];
-      const allowed: (keyof Appointment)[] = [
+      const allowed = [
         "status",
         "scheduled_at",
         "duration_min",
@@ -153,7 +157,7 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
         "lark_event_id",
         "reminder_sent_at",
         "reminder_method",
-      ];
+      ] as const;
       for (const key of allowed) {
         if (data[key] !== undefined) {
           fields.push(`${key} = ?`);

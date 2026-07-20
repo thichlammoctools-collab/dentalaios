@@ -259,8 +259,8 @@ function EditAppointmentDialog({
   const [assistantId, setAssistantId] = useState(appointment.assistant_id ?? "");
   const [saving, setSaving] = useState(false);
 
-  const doctorsOnly = doctors.filter((u) => isDoctorRole(u.role_id, u.role_name));
-  const assistantsOnly = doctors.filter((u) => isAssistantRole(u.role_id, u.role_name));
+  const doctorsOnly = doctors.filter((u) => isDoctorRole(u.role_key, u.role_id, u.role_name));
+  const assistantsOnly = doctors.filter((u) => isAssistantRole(u.role_key, u.role_id, u.role_name));
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();

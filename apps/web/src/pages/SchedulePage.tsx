@@ -34,7 +34,7 @@ export function SchedulePage() {
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
 
-  // Filters (Day view)
+  // Filters apply to both schedule views.
   const [filterStatuses, setFilterStatuses] = useState<Set<string>>(new Set());
   const [filterClinician, setFilterClinician] = useState("");
   const [filterAssistant, setFilterAssistant] = useState("");
@@ -87,7 +87,7 @@ export function SchedulePage() {
       filterAssistant === "__none__" ? !a.assistant_id : a.assistant_id === filterAssistant
     ));
 
-  // Day view: apply the same filters used by the week view.
+  // Day view: use the same filters as the week view.
   const dayApptsAll = appointments.filter((a) => isoToYmd(a.scheduled_at) === ymd(selectedDate));
   const dayAppts = filteredAppointments
     .filter((a) => isoToYmd(a.scheduled_at) === ymd(selectedDate))
@@ -205,13 +205,13 @@ export function SchedulePage() {
                 className="h-7 w-44 text-xs"
               >
                 <option value="">Tất cả</option>
-                       {users.filter((u) => isDoctorRole(u.role_id, u.role_name)).map((d) => (
+                {users.filter((u) => isDoctorRole(u.role_key, u.role_id, u.role_name)).map((d) => (
                   <option key={d.id} value={d.id}>{d.name}</option>
                 ))}
               </Select>
             </div>
 
-                   {users.some((u) => isAssistantRole(u.role_id, u.role_name)) && (
+            {users.some((u) => isAssistantRole(u.role_key, u.role_id, u.role_name)) && (
               <div className="flex items-center gap-1.5">
                 <Label htmlFor="filter-assistant" className="text-xs">Phụ tá:</Label>
                 <Select
@@ -222,7 +222,7 @@ export function SchedulePage() {
                 >
                   <option value="">Tất cả</option>
                   <option value="__none__">— Không có —</option>
-                         {users.filter((u) => isAssistantRole(u.role_id, u.role_name)).map((a) => (
+                  {users.filter((u) => isAssistantRole(u.role_key, u.role_id, u.role_name)).map((a) => (
                     <option key={a.id} value={a.id}>{a.name}</option>
                   ))}
                 </Select>
@@ -543,8 +543,8 @@ function EditAppointmentDialog({
   const [saving, setSaving] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
-  const doctorsOnly = doctors.filter((u) => isDoctorRole(u.role_id, u.role_name));
-  const assistantsOnly = doctors.filter((u) => isAssistantRole(u.role_id, u.role_name));
+  const doctorsOnly = doctors.filter((u) => isDoctorRole(u.role_key, u.role_id, u.role_name));
+  const assistantsOnly = doctors.filter((u) => isAssistantRole(u.role_key, u.role_id, u.role_name));
 
   async function handleSave() {
     if (!clinicianId) {

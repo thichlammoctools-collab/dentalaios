@@ -6,7 +6,7 @@ interface NavItem {
   label: string;
   href: string;
   match: (path: string) => boolean;
-  icon: "calendar" | "patients" | "settings" | "users" | "members" | "clinic" | "roles" | "audit" | "schedule";
+  icon: "calendar" | "patients" | "settings" | "users" | "clinic" | "roles" | "audit" | "schedule";
 }
 
 const ICONS: Record<NavItem["icon"], React.ReactNode> = {
@@ -30,13 +30,6 @@ const ICONS: Record<NavItem["icon"], React.ReactNode> = {
     </svg>
   ),
   users: (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
-    </svg>
-  ),
-  members: (
     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
       <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
       <circle cx="9" cy="7" r="4" />
@@ -82,7 +75,6 @@ const NAV: NavItem[] = [
 
 const SUB_NAV: NavItem[] = [
   { label: "Người dùng", href: ROUTES.SETTINGS_USERS, match: (p) => p === ROUTES.SETTINGS_USERS, icon: "users" },
-  { label: "Thành viên", href: ROUTES.SETTINGS_MEMBERS, match: (p) => p === ROUTES.SETTINGS_MEMBERS, icon: "members" },
   { label: "Phòng khám", href: ROUTES.SETTINGS_CLINIC, match: (p) => p === ROUTES.SETTINGS_CLINIC, icon: "clinic" },
   { label: "Vai trò", href: ROUTES.SETTINGS_ROLES, match: (p) => p === ROUTES.SETTINGS_ROLES, icon: "roles" },
   { label: "Audit logs", href: ROUTES.SETTINGS_AUDIT_LOGS, match: (p) => p === ROUTES.SETTINGS_AUDIT_LOGS, icon: "audit" },

@@ -7,8 +7,20 @@
 
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
-function formatVnd(amount: number): string {
-  return new Intl.NumberFormat("vi-VN").format(amount) + " VND";
+function formatAmount(amount: number, currency: string): string {
+  return `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(amount)} ${currency}`;
+}
+
+function formatDate(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (match) return `${match[3]}/${match[2]}/${match[1]}`;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
 }
 
 /** Strip Vietnamese diacritics → ASCII base form. */
@@ -49,6 +61,7 @@ const C = {
 };
 
 const STATUS_STYLE: Record<string, { color: ReturnType<typeof rgb>; bg: ReturnType<typeof rgb>; label: string }> = {
+  draft: { color: C.gray, bg: C.grayLight, label: "Ban nhap" },
   proposed: { color: C.gray, bg: C.grayLight, label: "De xuat" },
   approved: { color: C.green, bg: C.greenLight, label: "Da duyet" },
   completed: { color: C.teal, bg: C.tealLight, label: "Hoan thanh" },
@@ -111,6 +124,38 @@ export async function buildProposalPdf(input: {
     page.drawLine({ start: { x: x1, y: y1 }, end: { x: x2, y: y2 }, thickness: thick, color });
   }
 
+  function wrapText(text: string, maxWidth: number, textFont = font, size = 9): string[] {
+    const words = strip(text).split(/\s+/).filter(Boolean);
+    if (words.length === 0) return [""];
+    const lines: string[] = [];
+    let current = "";
+    for (const word of words) {
+      const candidate = current ? `${current} ${word}` : word;
+      if (textFont.widthOfTextAtSize(candidate, size) <= maxWidth) {
+        current = candidate;
+      } else if (current) {
+        lines.push(current);
+        current = word;
+      } else {
+        lines.push(word.slice(0, Math.max(1, Math.floor(maxWidth / (size * 0.55)) - 1)) + "...");
+        current = "";
+      }
+    }
+    if (current) lines.push(current);
+    return lines;
+  }
+
+  function drawTableHeader() {
+    const TH = 22;
+    page.drawRectangle({ x: L, y: y - TH, width: CW, height: TH, color: C.blue });
+    txt(bold, "#", COL_TOOTH + 4, y - 15, 9, C.white);
+    txt(bold, "Thu thuat", COL_PROC, y - 15, 9, C.white);
+    txt(bold, "Mo ta", COL_DESC, y - 15, 9, C.white);
+    txt(bold, "Don gia", COL_UNIT, y - 15, 8, C.white, "right");
+    txt(bold, "Thanh tien", COL_TOTAL, y - 15, 8, C.white, "right");
+    y -= TH;
+  }
+
   function checkPage(need: number) {
     if (y - need < 70) {
       page = pdf.addPage([595.28, 841.89]);
@@ -140,7 +185,7 @@ export async function buildProposalPdf(input: {
   const badgeW = bold.widthOfTextAtSize(statusLabel, 9) + 16;
   page.drawRectangle({ x: L, y: y - 16, width: badgeW, height: 20, color: statusStyle.bg, borderColor: statusStyle.color, borderWidth: 1 });
   txt(bold, statusLabel, L + 8, y - 5, 9, statusStyle.color);
-  const dateLabel = `Ngay tao: ${new Date(plan.created_at).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })}`;
+  const dateLabel = `Ngay tao: ${formatDate(plan.created_at)}`;
   txt(font, dateLabel, R, y - 5, 9, C.gray, "right");
   y -= lh * 2;
 
@@ -177,26 +222,23 @@ export async function buildProposalPdf(input: {
   const COL_UNIT = R - 100;
   const COL_TOTAL = R;
 
-  const TH = 22;
-  page.drawRectangle({ x: L, y: y - TH, width: CW, height: TH, color: C.blue });
-  txt(bold, "#", COL_TOOTH + 4, y - 15, 9, C.white);
-  txt(bold, "Thu thuat", COL_PROC, y - 15, 9, C.white);
-  txt(bold, "Mo ta", COL_DESC, y - 15, 9, C.white);
-  txt(bold, "Don gia", COL_UNIT, y - 15, 8, C.white, "right");
-  txt(bold, "Thanh tien", COL_TOTAL, y - 15, 8, C.white, "right");
-
-  y -= TH;
-  const ROW_H = 28;
+  drawTableHeader();
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    checkPage(ROW_H);
+    const descriptionLines = wrapText(item.description, COL_UNIT - COL_DESC - 12, font, 8).slice(0, 3);
+    const rowHeight = Math.max(28, 12 + descriptionLines.length * 10);
+    if (y - rowHeight < 70) {
+      page = pdf.addPage([595.28, 841.89]);
+      y = 800;
+      drawTableHeader();
+    }
 
     const even = i % 2 === 0;
-    page.drawRectangle({ x: L, y: y - ROW_H, width: CW, height: ROW_H, color: even ? C.white : C.headerBg });
-    line(L, y - ROW_H, R, y - ROW_H, 0.5, C.border);
+    page.drawRectangle({ x: L, y: y - rowHeight, width: CW, height: rowHeight, color: even ? C.white : C.headerBg });
+    line(L, y - rowHeight, R, y - rowHeight, 0.5, C.border);
 
-    const cy = y - ROW_H / 2 + 4;
+    const cy = y - rowHeight / 2 + 4;
     const toothStr = item.tooth_number != null ? `#${item.tooth_number}` : "—";
     const toothW = bold.widthOfTextAtSize(toothStr, 9) + 8;
     page.drawRectangle({ x: COL_TOOTH + 2, y: cy - 8, width: toothW, height: 16, color: C.blueLight });
@@ -204,12 +246,14 @@ export async function buildProposalPdf(input: {
 
     const procLabel = PROC_LABELS[item.procedure] || item.procedure;
     txt(font, strip(procLabel), COL_PROC, cy - 2, 9, C.dark);
-    txt(font, strip(item.description), COL_DESC, cy + 3, 8, C.gray);
+    descriptionLines.forEach((descriptionLine, index) => {
+      txt(font, descriptionLine, COL_DESC, y - 12 - index * 10, 8, C.gray);
+    });
 
-    txt(font, formatVnd(item.unit_cost), COL_UNIT, cy - 2, 9, C.dark, "right");
-    txt(bold, formatVnd(item.unit_cost), COL_TOTAL, cy - 2, 9, C.dark, "right");
+    txt(font, formatAmount(item.unit_cost, plan.currency), COL_UNIT, cy - 2, 9, C.dark, "right");
+    txt(bold, formatAmount(item.unit_cost, plan.currency), COL_TOTAL, cy - 2, 9, C.dark, "right");
 
-    y -= ROW_H;
+    y -= rowHeight;
   }
 
   line(L, y, R, y, 1, C.border);
@@ -219,7 +263,7 @@ export async function buildProposalPdf(input: {
   checkPage(60);
   page.drawRectangle({ x: L, y: y - 44, width: CW, height: 44, color: C.blueLight });
   txt(bold, "TONG CONG (VAT CHUA) / SUBTOTAL", L + 12, y - 16, 10, C.blue);
-  txt(bold, formatVnd(plan.total_cost), R, y - 16, 14, C.blue, "right");
+  txt(bold, formatAmount(plan.total_cost, plan.currency), R, y - 16, 14, C.blue, "right");
   const count = items.length;
   const uniqProc = new Set(items.map((i) => i.procedure)).size;
   txt(font, `${count} hang muc  |  ${uniqProc} thu thuat`, L + 12, y - 32, 9, C.gray);
@@ -227,11 +271,15 @@ export async function buildProposalPdf(input: {
 
   // ── Notes ────────────────────────────────────────────────────
   if (plan.notes) {
-    checkPage(56);
-    page.drawRectangle({ x: L, y: y - 48, width: CW, height: 48, color: C.tealLight, borderColor: C.teal, borderWidth: 1 });
+    const noteLines = wrapText(plan.notes, CW - 20, font, 9).slice(0, 4);
+    const notesHeight = 28 + noteLines.length * 11;
+    checkPage(notesHeight + 8);
+    page.drawRectangle({ x: L, y: y - notesHeight, width: CW, height: notesHeight, color: C.tealLight, borderColor: C.teal, borderWidth: 1 });
     txt(bold, "Ghi chu / Notes", L + 10, y - 14, 9, C.teal);
-    txt(font, strip(plan.notes), L + 10, y - 28, 9, C.dark);
-    y -= 48 + lh;
+    noteLines.forEach((noteLine, index) => {
+      txt(font, noteLine, L + 10, y - 28 - index * 11, 9, C.dark);
+    });
+    y -= notesHeight + lh;
   }
 
   // ── Signature ────────────────────────────────────────────────
@@ -244,7 +292,7 @@ export async function buildProposalPdf(input: {
   txt(bold, "XAC NHAN CUA PHONG KHAM", L + 10, y - 20, 8, C.gray);
   txt(font, `Nguoi duyet: ${strip(approverName)}`, L + 10, y - 42, 9, C.dark);
   if (plan.approved_at) {
-    txt(font, `Ngay: ${new Date(plan.approved_at).toLocaleDateString("vi-VN")}`, L + 10, y - 56, 9, C.gray);
+    txt(font, `Ngay: ${formatDate(plan.approved_at)}`, L + 10, y - 56, 9, C.gray);
   }
   txt(font, "(Ky va dong dau)", L + 10, y - 72, 8, C.gray);
 
@@ -256,12 +304,17 @@ export async function buildProposalPdf(input: {
   txt(font, "(Ky xac nhan dong y)", L + sigW + 30, y - 72, 8, C.gray);
 
   // ── Footer ───────────────────────────────────────────────────
-  const footerY = 30;
-  line(L, footerY + 12, R, footerY + 12, 0.5, C.border);
-  txt(font, `${strip(tenant.name)}  |  Ma: ${plan.id}`, L, footerY, 8, C.gray);
-  txt(font, "Trang " + pdf.getPageCount(), R, footerY, 8, C.gray, "right");
-  txt(font, "Tai lieu chi co tinh thong tin — Khong thanh lap quan he phap ly.", L, footerY - 10, 7, C.gray);
-  txt(font, "This document is for informational purposes only.", L, footerY - 18, 7, C.gray);
+  const pages = pdf.getPages();
+  pages.forEach((pdfPage, index) => {
+    page = pdfPage;
+    const pageNumber = index + 1;
+    const footerY = 30;
+    line(L, footerY + 12, R, footerY + 12, 0.5, C.border);
+    txt(font, `${strip(tenant.name)}  |  Ma: ${plan.id}`, L, footerY, 8, C.gray);
+    txt(font, `Trang ${pageNumber}/${pages.length}`, R, footerY, 8, C.gray, "right");
+    txt(font, "Tai lieu chi co tinh thong tin — Khong thanh lap quan he phap ly.", L, footerY - 10, 7, C.gray);
+    txt(font, "This document is for informational purposes only.", L, footerY - 18, 7, C.gray);
+  });
 
   return pdf.save();
 }

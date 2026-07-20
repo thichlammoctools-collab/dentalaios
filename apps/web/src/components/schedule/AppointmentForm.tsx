@@ -55,11 +55,11 @@ export function AppointmentForm({
   // Default clinician = currently logged-in user if doctor, else first doctor in branch
   useEffect(() => {
     if (!open || clinicianId || users.length === 0) return;
-    const isDoctor = session && isDoctorRole(session.role.id, session.role.name);
+    const isDoctor = session && isDoctorRole(session.role.system_key, session.role.id, session.role.name);
     if (isDoctor && session?.user.id) {
       setClinicianId(session.user.id);
     } else {
-      const firstDoctor = users.find((u) => isDoctorRole(u.role_id, u.role_name));
+      const firstDoctor = users.find((u) => isDoctorRole(u.role_key, u.role_id, u.role_name));
       if (firstDoctor) setClinicianId(firstDoctor.id);
     }
   }, [open, users, clinicianId, session]);
@@ -101,8 +101,8 @@ export function AppointmentForm({
     }
   }
 
-  const doctors = users.filter((u) => isDoctorRole(u.role_id, u.role_name));
-  const assistants = users.filter((u) => isAssistantRole(u.role_id, u.role_name));
+  const doctors = users.filter((u) => isDoctorRole(u.role_key, u.role_id, u.role_name));
+  const assistants = users.filter((u) => isAssistantRole(u.role_key, u.role_id, u.role_name));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

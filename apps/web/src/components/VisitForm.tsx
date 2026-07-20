@@ -82,8 +82,8 @@ export function VisitForm({ open, onOpenChange, patientId, onCreated }: VisitFor
     }
   }
 
-  const doctors = users.filter((u) => isDoctorRole(u.role_id, u.role_name));
-  const assistants = users.filter((u) => isAssistantRole(u.role_id, u.role_name));
+  const doctors = users.filter((u) => isDoctorRole(u.role_key, u.role_id, u.role_name));
+  const assistants = users.filter((u) => isAssistantRole(u.role_key, u.role_id, u.role_name));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
