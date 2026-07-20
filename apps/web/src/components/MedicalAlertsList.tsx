@@ -18,6 +18,13 @@ interface MedicalAlertsListProps {
   onDeleted: (id: string) => void;
 }
 
+const ALERT_TYPE_LABELS: Record<string, string> = {
+  allergy: "Dị ứng",
+  chronic: "Bệnh mãn tính",
+  medication: "Thuốc đang dùng",
+  other: "Khác",
+};
+
 export function MedicalAlertsList({
   patientId,
   alerts,
@@ -81,7 +88,9 @@ export function MedicalAlertsList({
             {alerts.map((a) => (
               <TableRow key={a.id}>
                 <TableCell>
-                  <Badge variant="outline" color="blue">{a.type}</Badge>
+                  <Badge variant="outline" color="blue">
+                    {ALERT_TYPE_LABELS[a.type] || a.type}
+                  </Badge>
                 </TableCell>
                 <TableCell>{a.description}</TableCell>
                 <TableCell>

@@ -150,7 +150,13 @@ export function PatientImageGallery({
       load();
       onImagesChanged?.();
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Lỗi tải lên hình ảnh");
+      console.error("Upload error:", err);
+      const message = err instanceof ApiError
+        ? err.message
+        : err instanceof Error
+        ? err.message
+        : "Lỗi tải lên hình ảnh";
+      toast.error(message);
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -298,11 +304,9 @@ export function PatientImageGallery({
               onClick={() => setSelected(img)}
               className="group relative aspect-square rounded-xl overflow-hidden border border-border bg-muted/30 hover:border-teal-400 transition-all hover:shadow-md"
             >
-              <div className="absolute inset-0 flex items-center justify-center">
-                <svg className="w-9 h-9 text-muted-foreground/40" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2 1.879-1.879a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
+              {/* Thumbnail image */}
+              <ImageThumbnail img={img} />
+
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-2">
                 <p className="text-white text-[10px] font-medium truncate">
                   {PATIENT_IMAGE_TYPE_LABELS[img.image_type]}
@@ -471,15 +475,22 @@ function ImageThumbnail({ img }: { img: PatientImage }) {
     apiBlob(`/api/patient-images/${img.id}/file`, { signal: controller.signal })
       .then((image) => {
         objectUrl = URL.createObjectURL(image);
-        if (!cancelled) setSrc(objectUrl);
-        else URL.revokeObjectURL(objectUrl);
+        if (!cancelled) {
+          setSrc(objectUrl);
+          setLoading(false);
+        } else {
+          URL.revokeObjectURL(objectUrl);
+        }
       })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
+      .catch((err) => {
+        if (!cancelled) {
+          console.error(`Failed to load thumbnail for image ${img.id}:`, err);
+          setFailed(true);
+          setLoading(false);
+        }
       })
       .finally(() => {
         clearTimeout(timeoutId);
-        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
@@ -503,7 +514,7 @@ function ImageThumbnail({ img }: { img: PatientImage }) {
     return (
       <div className="w-full h-full bg-muted/40 flex items-center justify-center">
         <svg className="w-6 h-6 text-muted-foreground/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2 1.879-1.879a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2 1.879-1.879a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
       </div>
     );
@@ -514,7 +525,10 @@ function ImageThumbnail({ img }: { img: PatientImage }) {
       src={src}
       alt={img.original_name || img.image_type}
       className="w-full h-full object-cover"
-      onError={() => setFailed(true)}
+      onError={() => {
+        console.error(`Image render error for ${img.id}`);
+        setFailed(true);
+      }}
     />
   );
 }
@@ -545,16 +559,32 @@ async function compressImage(
     // Skip compression for DICOM — upload as-is
     return { blob: file, originalSize };
   }
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
-  const canvas = new OffscreenCanvas(
-    Math.round(bitmap.width * scale),
-    Math.round(bitmap.height * scale),
-  );
-  const ctx = canvas.getContext("2d")!;
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  const blob = await canvas.convertToBlob({ type: "image/jpeg", quality });
-  return { blob, originalSize };
+
+  // Check if browser supports required APIs
+  if (typeof createImageBitmap === "undefined" || typeof OffscreenCanvas === "undefined") {
+    console.warn("Browser doesn't support createImageBitmap/OffscreenCanvas, uploading original");
+    return { blob: file, originalSize };
+  }
+
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+    const canvas = new OffscreenCanvas(
+      Math.round(bitmap.width * scale),
+      Math.round(bitmap.height * scale),
+    );
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      console.warn("Failed to get canvas context, uploading original");
+      return { blob: file, originalSize };
+    }
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await canvas.convertToBlob({ type: "image/jpeg", quality });
+    return { blob, originalSize };
+  } catch (err) {
+    console.error("Image compression failed, uploading original:", err);
+    return { blob: file, originalSize };
+  }
 }
 
 function detectImageType(filename: string, mimeType: string): PatientImageType {

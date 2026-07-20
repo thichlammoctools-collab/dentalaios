@@ -8,8 +8,9 @@ import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/c
 import { apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
-import type { Appointment, Patient, UserWithDetails } from "@shared/types";
+import type { Appointment, UserWithDetails } from "@shared/types";
 import { combineDateTime, ymd } from "@/lib/utils";
+import { PatientCombobox } from "./PatientCombobox";
 
 interface AppointmentFormProps {
   open: boolean;
@@ -19,7 +20,6 @@ interface AppointmentFormProps {
   onCreated?: (appt: Appointment) => void;
 }
 
-interface PatientsResponse { items: Patient[]; total: number }
 interface UsersResponse { items: UserWithDetails[]; total: number }
 
 export function AppointmentForm({
@@ -30,7 +30,6 @@ export function AppointmentForm({
   onCreated,
 }: AppointmentFormProps) {
   const { session } = useAuth();
-  const [patients, setPatients] = useState<Patient[]>([]);
   const [users, setUsers] = useState<UserWithDetails[]>([]);
   const [patientId, setPatientId] = useState("");
   const [clinicianId, setClinicianId] = useState("");
@@ -43,17 +42,13 @@ export function AppointmentForm({
   const [procedure, setProcedure] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
-  const [patientSearch, setPatientSearch] = useState("");
 
   useEffect(() => {
     if (!open || !session?.branch?.id) return;
     apiGet<UsersResponse>(`/api/users/branch/${session.branch.id}`)
       .then((res) => setUsers(res.items))
       .catch(() => setUsers([]));
-    apiGet<PatientsResponse>(`/api/patients?limit=50&search=${encodeURIComponent(patientSearch)}`)
-      .then((res) => setPatients(res.items))
-      .catch(() => setPatients([]));
-  }, [open, session, patientSearch]);
+  }, [open, session]);
 
   // Default clinician = currently logged-in user if doctor, else first doctor in branch
   useEffect(() => {
@@ -72,7 +67,6 @@ export function AppointmentForm({
     setAssistantId("");
     setProcedure("");
     setNotes("");
-    setPatientSearch("");
   }
 
   async function onSubmit(e: FormEvent) {
@@ -118,25 +112,12 @@ export function AppointmentForm({
 
           {/* Bệnh nhân */}
           <div className="grid gap-1.5">
-            <Label htmlFor="patientSearch">Bệnh nhân</Label>
-            <Input
-              id="patientSearch"
-              placeholder="Tìm theo tên / SĐT…"
-              value={patientSearch}
-              onChange={(e) => setPatientSearch(e.target.value)}
-            />
-            <Select
+            <Label htmlFor="patient">Bệnh nhân</Label>
+            <PatientCombobox
               value={patientId}
-              onChange={(e) => setPatientId(e.target.value)}
+              onChange={setPatientId}
               required
-            >
-              <option value="">— Chọn bệnh nhân —</option>
-              {patients.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} · {p.phone}
-                </option>
-              ))}
-            </Select>
+            />
           </div>
 
           {/* Bác sĩ */}
