@@ -1,5 +1,5 @@
--- Backfill the service catalog for deployments where the duplicate 0022
--- migration prefix prevented the treatment service migration from applying.
+-- Migration 0022 — Tenant-level treatment service catalog. All prices include VAT.
+
 CREATE TABLE IF NOT EXISTS treatment_services (
   id          TEXT PRIMARY KEY,
   tenant_id   TEXT NOT NULL REFERENCES tenants(id),
@@ -15,3 +15,8 @@ CREATE TABLE IF NOT EXISTS treatment_services (
 
 CREATE INDEX IF NOT EXISTS idx_treatment_services_tenant
   ON treatment_services(tenant_id, is_active, code);
+
+ALTER TABLE treatment_plan_items ADD COLUMN service_code TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_plan_items_tenant_service_code
+  ON treatment_plan_items(tenant_id, service_code);

@@ -69,7 +69,6 @@ export const planService = {
     }
     const item = await createTreatmentItemsRepository(db).create(tenantId, planId, {
       tooth_number: data.tooth_number ?? undefined,
-      service_code: service?.code,
       procedure: service?.procedure ?? data.procedure,
       description: data.description,
       unit_cost: service?.price ?? data.unit_cost,

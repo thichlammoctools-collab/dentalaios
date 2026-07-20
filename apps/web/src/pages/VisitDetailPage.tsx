@@ -449,7 +449,7 @@ export function VisitDetailPage() {
           unit_cost: item.cost,
         });
       }
-      toast.success("Da tao kế hoạch điều trị tu AI");
+      toast.success("Đã lưu kế hoạch điều trị AI. Đang mở chi tiết kế hoạch.");
       setPlanDialogOpen(false);
       navigate(`/treatment-plans/${plan.id}`);
     } catch (err) {
