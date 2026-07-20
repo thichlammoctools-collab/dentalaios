@@ -3,6 +3,11 @@
   "name": "dentalaios",
   "account_id": "6c99b69a2ef00c1754fae70793262cd3",
   "main": "src/index.ts",
+  "alias": {
+    "@shared/constants": "../../src/shared/constants/index.ts",
+    "@shared/types": "../../src/shared/types/index.ts",
+    "@shared/validation": "../../src/shared/validation/index.ts"
+  },
   "compatibility_date": "2026-07-01",
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
