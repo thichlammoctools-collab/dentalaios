@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -65,7 +66,7 @@ export function SchedulePage() {
       .finally(() => mounted && setLoading(false));
 
     return () => { mounted = false; };
-  }, [weekDays, refreshTick]);
+  }, [weekDays, refreshTick, session?.branch?.id]);
 
   const patientsById = useMemo(() => {
     const m = new Map<string, Patient>();
@@ -518,6 +519,10 @@ function EditAppointmentDialog({
   const assistantsOnly = doctors.filter((u) => u.role_name === "assistant");
 
   async function handleSave() {
+    if (!clinicianId) {
+      toast.error("Vui lòng chọn bác sĩ");
+      return;
+    }
     setSaving(true);
     try {
       const scheduled_at = combineDateTime(date, time);
@@ -549,7 +554,12 @@ function EditAppointmentDialog({
         {/* Bác sĩ */}
         <div className="grid gap-1.5">
           <Label>Bác sĩ</Label>
-          <Select value={clinicianId} onChange={(e) => setClinicianId(e.target.value)}>
+          <Select
+            value={clinicianId}
+            onChange={(e) => setClinicianId(e.target.value)}
+            disabled={doctorsOnly.length === 0}
+          >
+            {doctorsOnly.length === 0 && <option value="">Không có bác sĩ khả dụng</option>}
             {doctorsOnly.map((d) => (
               <option key={d.id} value={d.id}>{d.name}</option>
             ))}
@@ -586,7 +596,7 @@ function EditAppointmentDialog({
         <div className="grid grid-cols-2 gap-3">
           <div className="grid gap-1.5">
             <Label>Ngày</Label>
-            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <DateInput value={date} onChange={setDate} />
           </div>
           <div className="grid gap-1.5">
             <Label>Giờ</Label>

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -483,11 +484,10 @@ export function CalendarPage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="date">Ngày *</Label>
-              <Input
+              <DateInput
                 id="date"
-                type="date"
                 value={form.scheduled_date}
-                onChange={(e) => setForm((f) => ({ ...f, scheduled_date: e.target.value }))}
+                onChange={(scheduled_date) => setForm((f) => ({ ...f, scheduled_date }))}
                 required
               />
             </div>

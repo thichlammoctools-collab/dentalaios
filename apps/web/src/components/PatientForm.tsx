@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -171,12 +172,11 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
               <Label htmlFor="pf-dob">
                 Ngày sinh <span className="text-red-500">*</span>
               </Label>
-              <Input
+              <DateInput
                 id="pf-dob"
-                type="date"
                 required
                 value={dateOfBirth}
-                onChange={(e) => setDateOfBirth(e.target.value)}
+                onChange={setDateOfBirth}
               />
             </div>
             <div className="grid gap-1.5">

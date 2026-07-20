@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -171,11 +172,10 @@ export function BranchForm({ open, onOpenChange, branch, onSaved }: BranchFormPr
 
           <div className="grid gap-1.5">
             <Label htmlFor="bf-opening">Ngày khai trương</Label>
-            <Input
+            <DateInput
               id="bf-opening"
-              type="date"
               value={openingDate}
-              onChange={(e) => setOpeningDate(e.target.value)}
+              onChange={setOpeningDate}
             />
             <p className="text-xs text-muted-foreground">
               Nếu có, sẽ tạo thêm Lark Calendar event để đánh dấu ngày khai trương.

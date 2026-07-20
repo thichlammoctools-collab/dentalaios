@@ -23,6 +23,15 @@ function writePermissionFor(subject: AvatarSubject) {
   return subject === "users" ? PERMISSIONS.MANAGE_USERS : PERMISSIONS.WRITE_PATIENTS;
 }
 
+function decodeFilename(value: string | undefined, fallback: string): string {
+  if (!value) return fallback;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 router.on(["POST", "PUT"],
   "/:subject/:id/file",
   async (c, next) => {
@@ -35,7 +44,7 @@ router.on(["POST", "PUT"],
     const jwt = getJwt(c);
     const subject = c.req.param("subject") as AvatarSubject;
     const contentType = c.req.header("content-type")?.split(";", 1)[0] ?? "";
-    const filename = c.req.header("x-avatar-filename") ?? "avatar.jpg";
+    const filename = decodeFilename(c.req.header("x-avatar-filename"), "avatar.jpg");
     const updated = await avatarService.upload(c.env.DB, c.env, jwt.tenant_id, jwt.sub, subject, c.req.param("id"), {
       filename,
       content_type: contentType,

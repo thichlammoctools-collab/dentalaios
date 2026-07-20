@@ -60,6 +60,15 @@ const imageUploadQuerySchema = z.object({
   original_size: z.coerce.number().int().positive(),
 });
 
+function decodeFilename(value: string | undefined, fallback: string): string {
+  if (!value) return fallback;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 // POST /api/patient-images/presign — get presigned upload URLs (main + thumb)
 router.post(
   "/presign",
@@ -127,7 +136,7 @@ router.post(
     const jwt = getJwt(c);
     const input = c.req.valid("query");
     const contentType = c.req.header("content-type")?.split(";", 1)[0] ?? "application/octet-stream";
-    const filename = c.req.header("x-image-filename") ?? "image";
+    const filename = decodeFilename(c.req.header("x-image-filename"), "image");
     const created = await patientImagesService.upload(c.env.DB, c.env, jwt.tenant_id, jwt.sub, {
       ...input,
       filename,

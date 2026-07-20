@@ -69,7 +69,7 @@ export function ProfileAvatar({
         body: image,
         headers: {
           "Content-Type": "image/jpeg",
-          "X-Avatar-Filename": file.name,
+          "X-Avatar-Filename": encodeURIComponent(file.name),
         },
       });
       setUrl(URL.createObjectURL(image));

@@ -141,7 +141,8 @@ export function PatientImageGallery({
       if (visitId) params.set("visit_id", visitId);
       await apiUpload(`/api/patient-images/file?${params}`, blob, {
         "Content-Type": blob.type || "image/jpeg",
-        "X-Image-Filename": file.name,
+        // HTTP headers only accept Latin-1 characters; preserve Unicode names safely.
+        "X-Image-Filename": encodeURIComponent(file.name),
       }, setUploadProgress);
 
       toast.success("Đã tải lên hình ảnh");

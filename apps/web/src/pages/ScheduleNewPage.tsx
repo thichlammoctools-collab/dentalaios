@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -180,7 +181,7 @@ export function ScheduleNewPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="grid gap-1.5">
                     <Label>Ngày *</Label>
-                    <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+                    <DateInput value={date} onChange={setDate} required />
                   </div>
                   <div className="grid gap-1.5">
                     <Label>Giờ *</Label>
