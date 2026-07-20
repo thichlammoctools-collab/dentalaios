@@ -204,3 +204,11 @@ export default {
 };
 
 export { TenantDashboardHub };
+import platformAuthRoutes from "./routes/platform-auth";
+import platformRoutes from "./routes/platform";
+  PLATFORM_JWT_SECRET?: string;
+  PLATFORM_MFA_ENCRYPTION_KEY?: string;
+// Platform administration has independent identity, JWT, and RBAC.
+app.route("/api/platform/auth", platformAuthRoutes);
+app.route("/api/platform", platformRoutes);
+
