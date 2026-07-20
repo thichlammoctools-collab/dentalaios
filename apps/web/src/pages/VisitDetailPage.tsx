@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { VoiceFindingsDialog } from "@/components/VoiceFindingsDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,8 @@ import { Dialog, DialogBody, DialogHeader, DialogTitle, DialogFooter } from "@/c
 import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatDateTime } from "@/lib/utils";
+import { patientReturnPath, withPatientReturnContext } from "@/lib/patient-navigation";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import type { Visit, ClinicalFinding, TreatmentPlan, GeneratePlanResult, GeneratePlanItemDraft, ProcedureCatalogItem } from "@shared/types";
 
@@ -274,6 +276,7 @@ function SummaryNotesCard({ items }: { items: SummarySection["items"] }) {
 export function VisitDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [visit, setVisit] = useState<Visit | null>(null);
   const [findings, setFindings] = useState<ClinicalFinding[]>([]);
   const [procedures, setProcedures] = useState<ProcedureCatalogItem[]>([]);
@@ -387,7 +390,7 @@ export function VisitDetailPage() {
         currency: "VND",
       });
       toast.success("Đã tạo kế hoạch điều trị");
-      navigate(`/treatment-plans/${created.id}`);
+      navigate(withPatientReturnContext(`/treatment-plans/${created.id}`, visit.patient_id, "plans"));
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Loi tao plan");
     }
@@ -474,7 +477,7 @@ export function VisitDetailPage() {
       }
       toast.success("Đã lưu kế hoạch điều trị AI. Đang mở chi tiết kế hoạch.");
       setPlanDialogOpen(false);
-      navigate(`/treatment-plans/${plan.id}`);
+      navigate(withPatientReturnContext(`/treatment-plans/${plan.id}`, visit.patient_id, "plans"));
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Loi luu kế hoạch");
     } finally {
@@ -506,15 +509,20 @@ export function VisitDetailPage() {
     return <p className="px-6 py-6 text-sm text-muted-foreground">Đang tải…</p>;
   }
 
+  const returnPath = patientReturnPath(searchParams.get("return_to"), visit.patient_id, "visits");
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-6 py-6">
       {/* Header */}
       <div>
-        <p className="text-sm text-muted-foreground">
-          <a href={`/patients/${visit.patient_id}`} className="hover:underline">
-            ← Quay lại bệnh nhân
-          </a>
-        </p>
+        <Breadcrumbs items={[
+          { label: "Bệnh nhân", href: "/patients" },
+          { label: "Hồ sơ bệnh nhân", href: returnPath },
+          { label: "Lượt khám" },
+        ]} />
+        <Button className="mt-4" variant="ghost" size="sm" onClick={() => navigate(returnPath)}>
+          ← Quay lại lượt khám
+        </Button>
         <div className="mt-1 flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Lượt khám</h1>

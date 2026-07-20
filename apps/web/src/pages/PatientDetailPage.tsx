@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,11 @@ import {
 import { apiGet, apiDelete, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
+import {
+  isPatientWorkspaceSection,
+  patientWorkspacePath,
+  withPatientReturnContext,
+} from "@/lib/patient-navigation";
 import { MARKETING_SOURCE_LABELS, type MarketingSource } from "@shared/constants";
 import type {
   Patient,
@@ -49,7 +54,7 @@ interface ListResponse<T> {
 }
 
 export function PatientDetailPage() {
-  const { id } = useParams();
+  const { id, section } = useParams();
   const navigate = useNavigate();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [alerts, setAlerts] = useState<MedicalAlert[]>([]);
@@ -98,6 +103,20 @@ export function PatientDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  const activeSection = isPatientWorkspaceSection(section) ? section : "overview";
+
+  useEffect(() => {
+    if (!patient || !isPatientWorkspaceSection(section)) return;
+    const scrollKey = `patient-workspace:${patient.id}:${activeSection}:scroll`;
+    const savedPosition = Number(sessionStorage.getItem(scrollKey));
+
+    if (Number.isFinite(savedPosition)) {
+      window.requestAnimationFrame(() => window.scrollTo({ top: savedPosition }));
+    }
+
+    return () => sessionStorage.setItem(scrollKey, String(window.scrollY));
+  }, [activeSection, patient, section]);
+
   async function confirmDeletePlan() {
     if (!planToDelete) return;
     setDeleting(true);
@@ -137,9 +156,21 @@ export function PatientDetailPage() {
     );
   }
 
+  if (!isPatientWorkspaceSection(section)) {
+    return <Navigate to={patientWorkspacePath(patient.id)} replace />;
+  }
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-6">
-      <Tabs defaultValue="info">
+      <Tabs
+        defaultValue="overview"
+        value={activeSection}
+        onValueChange={(nextSection) => {
+          if (isPatientWorkspaceSection(nextSection)) {
+            navigate(patientWorkspacePath(patient.id, nextSection));
+          }
+        }}
+      >
         <div className="sticky top-0 z-10 -mx-6 border-b border-border bg-background px-6 pb-4 pt-6 shadow-sm">
           <div className="mx-auto max-w-6xl space-y-6">
             <Breadcrumbs
@@ -173,21 +204,36 @@ export function PatientDetailPage() {
                 Sửa
               </Button>
             </div>
-            <div className="overflow-x-auto pb-1">
+            <div className="overflow-x-auto pb-1 lg:hidden">
               <TabsList className="min-w-max">
-          <TabsTrigger value="info">Thông tin</TabsTrigger>
-          <TabsTrigger value="alerts">Cảnh báo ({alerts.length})</TabsTrigger>
-          <TabsTrigger value="visits">Lượt khám ({visits.length})</TabsTrigger>
-          <TabsTrigger value="plans">Kế hoạch ({plans.length})</TabsTrigger>
-          <TabsTrigger value="payments">Thanh toán ({payments.length})</TabsTrigger>
-          <TabsTrigger value="appointments">Lịch hẹn ({appointments.length})</TabsTrigger>
-          <TabsTrigger value="images">Hình ảnh</TabsTrigger>
+                <TabsTrigger value="overview">Tổng quan</TabsTrigger>
+                <TabsTrigger value="alerts">Cảnh báo ({alerts.length})</TabsTrigger>
+                <TabsTrigger value="visits">Lượt khám ({visits.length})</TabsTrigger>
+                <TabsTrigger value="plans">Kế hoạch ({plans.length})</TabsTrigger>
+                <TabsTrigger value="payments">Tài chính ({payments.length})</TabsTrigger>
+                <TabsTrigger value="appointments">Lịch hẹn ({appointments.length})</TabsTrigger>
+                <TabsTrigger value="images">Hình ảnh</TabsTrigger>
               </TabsList>
             </div>
           </div>
         </div>
 
-        <TabsContent className="mt-6" value="info">
+        <div className="mt-6 grid items-start gap-6 lg:grid-cols-[13.5rem_minmax(0,1fr)]">
+          <aside className="sticky top-28 hidden rounded-xl border border-border bg-card p-2 shadow-sm lg:block">
+            <p className="px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Hồ sơ bệnh nhân</p>
+            <TabsList className="h-auto w-full flex-col items-stretch justify-start gap-1 bg-transparent p-0">
+              <TabsTrigger value="overview" className="w-full justify-between px-3 py-2 text-left">Tổng quan</TabsTrigger>
+              <TabsTrigger value="alerts" className="w-full justify-between px-3 py-2 text-left">Cảnh báo <Count value={alerts.length} urgent /></TabsTrigger>
+              <TabsTrigger value="visits" className="w-full justify-between px-3 py-2 text-left">Lượt khám <Count value={visits.length} /></TabsTrigger>
+              <TabsTrigger value="plans" className="w-full justify-between px-3 py-2 text-left">Kế hoạch <Count value={plans.length} /></TabsTrigger>
+              <TabsTrigger value="appointments" className="w-full justify-between px-3 py-2 text-left">Lịch hẹn <Count value={appointments.length} /></TabsTrigger>
+              <TabsTrigger value="payments" className="w-full justify-between px-3 py-2 text-left">Tài chính <Count value={payments.length} /></TabsTrigger>
+              <TabsTrigger value="images" className="w-full justify-between px-3 py-2 text-left">Hình ảnh</TabsTrigger>
+            </TabsList>
+          </aside>
+
+          <main className="min-w-0">
+        <TabsContent className="mt-0" value="overview">
           <Card>
             <CardHeader>
               <CardTitle>Thông tin chi tiết</CardTitle>
@@ -350,7 +396,7 @@ export function PatientDetailPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="alerts">
+        <TabsContent className="mt-0" value="alerts">
           <Card>
             <CardContent className="pt-6">
               <MedicalAlertsList
@@ -363,7 +409,7 @@ export function PatientDetailPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="visits">
+        <TabsContent className="mt-0" value="visits">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -392,7 +438,7 @@ export function PatientDetailPage() {
                       <TableRow
                         key={v.id}
                         className="cursor-pointer"
-                        onClick={() => navigate(`/visits/${v.id}`)}
+                        onClick={() => navigate(withPatientReturnContext(`/visits/${v.id}`, patient.id, "visits"))}
                       >
                         <TableCell>{formatDateTime(v.date)}</TableCell>
                         <TableCell>
@@ -436,7 +482,7 @@ export function PatientDetailPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="plans">
+        <TabsContent className="mt-0" value="plans">
           <Card>
             <CardContent className="pt-6">
               {plans.length === 0 ? (
@@ -458,7 +504,7 @@ export function PatientDetailPage() {
                       <TableRow
                         key={p.id}
                         className="cursor-pointer"
-                        onClick={() => navigate(`/treatment-plans/${p.id}`)}
+                        onClick={() => navigate(withPatientReturnContext(`/treatment-plans/${p.id}`, patient.id, "plans"))}
                       >
                         <TableCell>{formatDateTime(p.created_at)}</TableCell>
                         <TableCell>
@@ -497,7 +543,7 @@ export function PatientDetailPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="payments">
+        <TabsContent className="mt-0" value="payments">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -564,7 +610,7 @@ export function PatientDetailPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="appointments">
+        <TabsContent className="mt-0" value="appointments">
           <Card>
             <CardHeader>
               <CardTitle>Lịch hẹn</CardTitle>
@@ -579,7 +625,7 @@ export function PatientDetailPage() {
                       key={apt.id}
                       appointment={apt}
                       patientName={patient.name}
-                      onClick={() => navigate(`/appointments/${apt.id}`)}
+                      onClick={() => navigate(withPatientReturnContext(`/appointments/${apt.id}`, patient.id, "appointments"))}
                     />
                   ))}
                 </div>
@@ -588,13 +634,15 @@ export function PatientDetailPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="images">
+        <TabsContent className="mt-0" value="images">
           <Card>
             <CardContent className="pt-4">
               <PatientImageGallery patientId={patient.id} />
             </CardContent>
           </Card>
         </TabsContent>
+          </main>
+        </div>
       </Tabs>
 
       <PatientForm
@@ -609,7 +657,7 @@ export function PatientDetailPage() {
         patientId={patient.id}
         onCreated={(v) => {
           setVisits((prev) => [v, ...prev]);
-          navigate(`/visits/${v.id}`);
+          navigate(withPatientReturnContext(`/visits/${v.id}`, patient.id, "visits"));
         }}
       />
       <PaymentForm
@@ -667,5 +715,15 @@ export function PatientDetailPage() {
         </DialogFooter>
       </Dialog>
     </div>
+  );
+}
+
+function Count({ value, urgent = false }: { value: number; urgent?: boolean }) {
+  const className = urgent && value > 0
+    ? "rounded-full bg-destructive/15 px-2 py-0.5 text-xs font-semibold text-destructive"
+    : "rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground";
+
+  return (
+    <span className={className}>{value}</span>
   );
 }

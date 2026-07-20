@@ -22,6 +22,7 @@ import { useAuth } from "@/lib/auth-context";
 import { APPOINTMENT_STATUS_LABELS, isAssistantRole, isDoctorRole } from "@shared/constants";
 import type { Appointment, DentalChair, Patient, UserWithDetails, Visit } from "@shared/types";
 import { formatDateTime, formatTime, ymd, combineDateTime, isoToYmd, isoToTime } from "@/lib/utils";
+import { patientReturnPath, withPatientReturnContext } from "@/lib/patient-navigation";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 
 interface PatientsResponse { items: Patient[]; total: number }
@@ -109,6 +110,7 @@ export function AppointmentDetailPage() {
   const endTime = new Date(new Date(appt.scheduled_at).getTime() + appt.duration_min * 60 * 1000);
   const canStartVisit = appt.status === "arrived" && Boolean(appt.chair_id)
     && new Date(appt.scheduled_at) <= now && now < endTime;
+  const returnPath = patientReturnPath(searchParams.get("return_to"), appt.patient_id, "appointments");
 
   function closeEdit() {
     setEditOpen(false);
@@ -140,7 +142,7 @@ export function AppointmentDetailPage() {
         source_appointment_id: appt.id,
       });
       toast.success("Đã bắt đầu lượt khám");
-      navigate(`/visits/${visit.id}`);
+      navigate(withPatientReturnContext(`/visits/${visit.id}`, appt.patient_id, "visits"));
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Không thể bắt đầu lượt khám");
     } finally {
@@ -153,13 +155,16 @@ export function AppointmentDetailPage() {
       <Breadcrumbs
         items={[
           { label: "Bệnh nhân", href: "/patients" },
-          ...(patient ? [{ label: patient.name, href: `/patients/${patient.id}` }] : []),
+          ...(patient ? [{ label: patient.name, href: returnPath }] : []),
           { label: "Lịch hẹn" },
         ]}
       />
 
       <div className="flex items-start justify-between">
         <div>
+          <Button variant="ghost" size="sm" className="-ml-3 mb-2" onClick={() => navigate(returnPath)}>
+            ← Quay lại lịch hẹn
+          </Button>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">Lịch hẹn</h1>
           <p className="text-sm text-muted-foreground">
             {formatDateTime(appt.scheduled_at)} → {formatTime(endTime.toISOString())} · {appt.duration_min} phút

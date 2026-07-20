@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { apiDelete, apiGet, apiPatch, apiPost, getToken, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
+import { patientReturnPath } from "@/lib/patient-navigation";
 import type { TreatmentCase, TreatmentCaseFinancialSummary, TreatmentCaseMilestone, TreatmentCaseMilestoneStatus, TreatmentCaseType, TreatmentMilestoneAppointment, TreatmentPlan, TreatmentPlanItem } from "@shared/types";
 
 const CASE_TYPE_LABELS: Record<TreatmentCaseType, string> = {
@@ -47,6 +48,7 @@ const MILESTONE_STATUS_VARIANTS: Record<TreatmentCaseMilestoneStatus, "secondary
 export function TreatmentPlanDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [plan, setPlan] = useState<TreatmentPlan | null>(null);
   const [items, setItems] = useState<TreatmentPlanItem[]>([]);
   const [treatmentCase, setTreatmentCase] = useState<TreatmentCase | null>(null);
@@ -236,7 +238,7 @@ export function TreatmentPlanDetailPage() {
     try {
       await apiDelete(`/api/treatment-plans/${plan.id}`);
       toast.success("Đã xóa kế hoạch");
-      navigate(`/patients/${plan.patient_id}`);
+      navigate(patientReturnPath(searchParams.get("return_to"), plan.patient_id, "plans"));
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi xóa");
     }
@@ -284,20 +286,22 @@ export function TreatmentPlanDetailPage() {
   const canDelete = plan.can_delete === true;
   const canApprove = plan.status === "draft" && items.length > 0;
   const canHandOver = plan.status === "approved";
+  const returnPath = patientReturnPath(searchParams.get("return_to"), plan.patient_id, "plans");
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-6 py-6">
       <Breadcrumbs
         items={[
-          { label: "Bệnh nhân", href: `/patients/${plan.patient_id}` },
+          { label: "Bệnh nhân", href: "/patients" },
+          { label: "Kế hoạch điều trị", href: returnPath },
           { label: `Kế hoạch` },
         ]}
       />
       <div>
         <p className="text-sm text-muted-foreground">
-          <a href={`/patients/${plan.patient_id}`} className="hover:underline">
-            ← Quay lại bệnh nhân
-          </a>
+          <Button variant="ghost" size="sm" onClick={() => navigate(returnPath)}>
+            ← Quay lại kế hoạch điều trị
+          </Button>
         </p>
         <div className="mt-1 flex items-start justify-between">
           <div>

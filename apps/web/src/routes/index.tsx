@@ -42,6 +42,7 @@ import {
 
 const PATTERNS = {
   PATIENT_DETAIL: "/patients/:id",
+  PATIENT_WORKSPACE: "/patients/:id/:section",
   VISIT_DETAIL: "/visits/:id",
   TREATMENT_PLAN: "/treatment-plans/:id",
   TREATMENT_PLAN_AI: "/treatment-plans/:id/ai-suggest",
@@ -194,6 +195,14 @@ export function AppRoutes() {
         element={
           <Protected>
             <ClinicSettingsPage />
+          </Protected>
+        }
+      />
+      <Route
+        path={PATTERNS.PATIENT_WORKSPACE}
+        element={
+          <Protected>
+            <PatientDetailPage />
           </Protected>
         }
       />
