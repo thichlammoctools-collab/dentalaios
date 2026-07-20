@@ -91,6 +91,51 @@ export const apiPatch = <T = unknown>(path: string, body?: unknown) =>
 export const apiDelete = <T = unknown>(path: string, body?: unknown) =>
   api<T>(path, { method: "DELETE", body: body != null ? JSON.stringify(body) : undefined });
 
+/** Uploads binary data while reporting actual browser upload progress. */
+export function apiUpload<T = unknown>(
+  path: string,
+  body: XMLHttpRequestBodyInit,
+  headers: Record<string, string>,
+  onProgress?: (progress: number) => void,
+): Promise<T> {
+  const token = getToken();
+
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("POST", `${BASE_URL}${path}`);
+    request.withCredentials = true;
+    request.responseType = "json";
+
+    if (token) request.setRequestHeader("Authorization", `Bearer ${token}`);
+    for (const [name, value] of Object.entries(headers)) {
+      request.setRequestHeader(name, value);
+    }
+
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        onProgress?.(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+
+    request.onerror = () => reject(new ApiError("Không thể kết nối đến máy chủ", 0));
+    request.onload = () => {
+      const response = request.response as { error?: string; code?: string } | null;
+      if (request.status === 401) {
+        clearSession();
+        reject(new ApiError(response?.error ?? "Phiên đăng nhập đã hết hạn — vui lòng đăng nhập lại", 401, "unauthorized"));
+        return;
+      }
+      if (request.status < 200 || request.status >= 300) {
+        reject(new ApiError(response?.error ?? `HTTP ${request.status} ${request.statusText}`, request.status, response?.code));
+        return;
+      }
+      resolve(response as T);
+    };
+
+    request.send(body);
+  });
+}
+
 /** Fetches an authenticated binary response (for private R2-backed assets). */
 export async function apiBlob(path: string, init?: RequestInit): Promise<Blob> {
   const token = getToken();

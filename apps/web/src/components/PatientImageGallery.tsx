@@ -7,7 +7,7 @@
  *   compact    — hide the "Hình ảnh" header (for embedding inside another section)
  */
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { api, apiBlob, apiDelete, apiGet, apiPost, ApiError } from "@/lib/api";
+import { apiBlob, apiDelete, apiGet, apiPost, apiUpload, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import type { PatientImage, PatientImageType, AnalyzeImageResult } from "@shared/types";
 import { PATIENT_IMAGE_TYPE_LABELS } from "@shared/types";
@@ -47,6 +47,7 @@ export function PatientImageGallery({
   const [viewLoading, setViewLoading] = useState(false);
   const [viewError, setViewError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalyzeImageResult | null>(null);
 
@@ -127,6 +128,7 @@ export function PatientImageGallery({
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
+    setUploadProgress(0);
     try {
       // Compress image client-side
       const { blob, originalSize } = await compressImage(file);
@@ -137,14 +139,10 @@ export function PatientImageGallery({
         original_size: String(originalSize),
       });
       if (visitId) params.set("visit_id", visitId);
-      await api(`/api/patient-images/file?${params}`, {
-        method: "POST",
-        body: blob,
-        headers: {
-          "Content-Type": blob.type || "image/jpeg",
-          "X-Image-Filename": file.name,
-        },
-      });
+      await apiUpload(`/api/patient-images/file?${params}`, blob, {
+        "Content-Type": blob.type || "image/jpeg",
+        "X-Image-Filename": file.name,
+      }, setUploadProgress);
 
       toast.success("Đã tải lên hình ảnh");
       load();
@@ -159,6 +157,7 @@ export function PatientImageGallery({
       toast.error(message);
     } finally {
       setUploading(false);
+      setUploadProgress(0);
       e.target.value = "";
     }
   }
@@ -235,6 +234,28 @@ export function PatientImageGallery({
               <span>{uploading ? "Đang tải…" : "+ Tải ảnh lên"}</span>
             </Button>
           </label>
+        </div>
+      )}
+
+      {uploading && (
+        <div className="mb-4" role="status" aria-live="polite">
+          <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+            <span>Đang tải hình ảnh</span>
+            <span>{uploadProgress}%</span>
+          </div>
+          <div
+            className="h-2 overflow-hidden rounded-full bg-muted"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={uploadProgress}
+            aria-label="Tiến trình tải hình ảnh"
+          >
+            <div
+              className="h-full rounded-full bg-teal-600 transition-[width] duration-150"
+              style={{ width: `${uploadProgress}%` }}
+            />
+          </div>
         </div>
       )}
 

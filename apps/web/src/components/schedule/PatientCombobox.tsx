@@ -22,6 +22,7 @@ export function PatientCombobox({ value, onChange, required }: PatientComboboxPr
   const [highlightIndex, setHighlightIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const selectedPatientIdRef = useRef("");
 
   // Load patients when query changes (debounced via useEffect cleanup)
   useEffect(() => {
@@ -46,18 +47,16 @@ export function PatientCombobox({ value, onChange, required }: PatientComboboxPr
     return () => clearTimeout(timer);
   }, [query]);
 
-  // Set display text when value (patient_id) changes externally
+  // Keep the display in sync when the parent clears the selected patient.
+  // Do not clear while a user is typing a search query with no selection.
   useEffect(() => {
     if (!value) {
-      setQuery("");
-      return;
+      if (selectedPatientIdRef.current) {
+        selectedPatientIdRef.current = "";
+        setQuery("");
+      }
     }
-    // Find selected patient from current list or fetch by ID
-    const selected = patients.find((p) => p.id === value);
-    if (selected) {
-      setQuery(`${selected.name} · ${selected.phone}`);
-    }
-  }, [value, patients]);
+  }, [value]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -76,11 +75,13 @@ export function PatientCombobox({ value, onChange, required }: PatientComboboxPr
   }, []);
 
   function handleInputChange(e: ChangeEvent<HTMLInputElement>) {
+    selectedPatientIdRef.current = "";
     setQuery(e.target.value);
     onChange(""); // Clear selection when user types
   }
 
   function selectPatient(patient: Patient) {
+    selectedPatientIdRef.current = patient.id;
     setQuery(`${patient.name} · ${patient.phone}`);
     onChange(patient.id);
     setShowDropdown(false);
