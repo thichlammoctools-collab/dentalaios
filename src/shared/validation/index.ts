@@ -124,8 +124,7 @@ export const patientCreateSchema = z.object({
   district_name: optionalAdministrativeName(120),
   district_code: z.string().max(30).regex(/^[A-Za-z0-9._-]+$/, "Mã quận/huyện không hợp lệ").optional(),
   province_name: optionalAdministrativeName(120),
-  province_code: z.string().max(30).regex(/^[A-Za-z0-9._-]+$/, "Mã tỉnh/thành phố không hợp lệ").optional(),
-  postal_code: z.string().max(20).regex(/^[A-Za-z0-9 -]+$/, "Mã bưu chính không hợp lệ").optional(),
+  country_name: optionalAdministrativeName(120),
   country_code: z.string().length(2).toUpperCase().optional(),
   // Family contact
   family_name: optionalText(200),

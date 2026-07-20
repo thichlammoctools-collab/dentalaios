@@ -80,8 +80,7 @@ export interface Patient {
   district_name?: string;
   district_code?: string;
   province_name?: string;
-  province_code?: string;
-  postal_code?: string;
+  country_name?: string;
   country_code?: string;
   notes?: string;
   avatar_file_id?: string;

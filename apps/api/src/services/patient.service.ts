@@ -4,8 +4,14 @@ import type { PatientCreateInput, PatientUpdateInput } from "@shared/validation"
 import { createPatientsRepository } from "../repositories/patients.repo";
 import { assertAllInTenant } from "../lib/tenant-scope";
 
-function displayAddress(data: Pick<Patient, "address" | "address_line" | "ward_name" | "district_name" | "province_name">) {
-  const structuredParts = [data.address_line, data.ward_name, data.district_name, data.province_name]
+function displayAddress(data: Pick<Patient, "address" | "address_line" | "ward_name" | "district_name" | "province_name" | "country_name">) {
+  const structuredParts = [
+    data.address_line,
+    data.ward_name,
+    data.district_name,
+    data.province_name,
+    data.country_name !== "Việt Nam" ? data.country_name : undefined,
+  ]
     .filter((part): part is string => Boolean(part?.trim()));
   return structuredParts.length > 0 ? structuredParts.join(", ") : data.address;
 }
@@ -17,6 +23,14 @@ export const patientService = {
     opts: Parameters<ReturnType<typeof createPatientsRepository>["list"]>[1],
   ): Promise<Patient[]> {
     return createPatientsRepository(db).list(tenantId, opts);
+  },
+
+  count(
+    db: D1Database,
+    tenantId: string,
+    opts: Parameters<ReturnType<typeof createPatientsRepository>["count"]>[1],
+  ): Promise<number> {
+    return createPatientsRepository(db).count(tenantId, opts);
   },
 
   get(db: D1Database, tenantId: string, id: string): Promise<Patient | null> {
@@ -43,8 +57,7 @@ export const patientService = {
         district_name: data.district_name,
         district_code: data.district_code,
         province_name: data.province_name,
-        province_code: data.province_code,
-        postal_code: data.postal_code,
+        country_name: data.country_name ?? "Việt Nam",
         country_code: data.country_code,
       family_name: data.family_name ?? undefined,
       family_phone: data.family_phone ?? undefined,
@@ -80,6 +93,7 @@ export const patientService = {
         ward_name: data.ward_name ?? existing.ward_name,
         district_name: data.district_name ?? existing.district_name,
         province_name: data.province_name ?? existing.province_name,
+        country_name: data.country_name ?? existing.country_name,
       });
       return repository.update(tenantId, id, {
       name: data.name,
@@ -94,8 +108,7 @@ export const patientService = {
         district_name: data.district_name,
         district_code: data.district_code,
         province_name: data.province_name,
-        province_code: data.province_code,
-        postal_code: data.postal_code,
+        country_name: data.country_name,
         country_code: data.country_code,
       family_name: data.family_name ?? undefined,
       family_phone: data.family_phone ?? undefined,

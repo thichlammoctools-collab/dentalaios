@@ -734,6 +734,7 @@ function formatPatientAddress(patient: Patient) {
     patient.ward_name,
     patient.district_name,
     patient.province_name,
+    patient.country_name !== "Việt Nam" ? patient.country_name : undefined,
   ].filter((part): part is string => Boolean(part));
 
   return structuredParts.length > 0 ? structuredParts.join(", ") : patient.address;

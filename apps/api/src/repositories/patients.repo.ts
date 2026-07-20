@@ -10,6 +10,7 @@ import type { D1Row, Pagination } from "./base";
 
 export interface PatientsRepository {
   list(tenantId: string, opts?: Pagination & { branchId?: string; search?: string }): Promise<Patient[]>;
+  count(tenantId: string, opts?: { branchId?: string; search?: string }): Promise<number>;
   getById(tenantId: string, id: string): Promise<Patient | null>;
   create(tenantId: string, data: Omit<Patient, "id" | "tenant_id" | "created_at">): Promise<Patient>;
   update(tenantId: string, id: string, data: Omit<Partial<Patient>, "avatar_file_id"> & { avatar_file_id?: string | null }): Promise<Patient | null>;
@@ -46,6 +47,22 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
       return (result.results as D1Row[]).map(mapPatient);
     },
 
+    async count(tenantId, opts = {}) {
+      const conditions = ["tenant_id = ?"];
+      const binds: unknown[] = [tenantId];
+      if (opts.branchId) {
+        conditions.push("branch_id = ?");
+        binds.push(opts.branchId);
+      }
+      if (opts.search) {
+        conditions.push("(name LIKE ? OR phone LIKE ? OR cccd LIKE ?)");
+        const like = `%${opts.search}%`;
+        binds.push(like, like, like);
+      }
+      const row = await db.prepare(`SELECT COUNT(*) AS total FROM patients WHERE ${conditions.join(" AND ")}`).bind(...binds).first<D1Row>();
+      return Number(row?.total ?? 0);
+    },
+
     async getById(tenantId, id) {
       const row = (await db
         .prepare(`SELECT p.*,
@@ -64,11 +81,11 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
         .prepare(
           `INSERT INTO patients
              (id, tenant_id, branch_id, name, date_of_birth, gender, phone, email, notes, address,
-              address_line, ward_name, ward_code, district_name, district_code, province_name, province_code, postal_code, country_code,
+              address_line, ward_name, ward_code, district_name, district_code, province_name, country_name, country_code,
               family_name, family_phone, family_relation, marketing_source,
               referral_type, referral_user_id, referral_notes,
               height_cm, weight_kg, cccd)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
@@ -87,8 +104,7 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
           data.district_name ?? null,
           data.district_code ?? null,
           data.province_name ?? null,
-          data.province_code ?? null,
-          data.postal_code ?? null,
+          data.country_name ?? "Việt Nam",
           data.country_code ?? "VN",
           data.family_name ?? null,
           data.family_phone ?? null,
@@ -126,8 +142,7 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
         "district_name",
         "district_code",
         "province_name",
-        "province_code",
-        "postal_code",
+        "country_name",
         "country_code",
         "family_name",
         "family_phone",
@@ -195,8 +210,7 @@ function mapPatient(row: D1Row): Patient {
     district_name: (row.district_name as string | null) ?? undefined,
     district_code: (row.district_code as string | null) ?? undefined,
     province_name: (row.province_name as string | null) ?? undefined,
-    province_code: (row.province_code as string | null) ?? undefined,
-    postal_code: (row.postal_code as string | null) ?? undefined,
+    country_name: (row.country_name as string | null) ?? undefined,
     country_code: (row.country_code as string | null) ?? undefined,
     created_at: row.created_at as string,
     family_name: (row.family_name as string | null) ?? undefined,

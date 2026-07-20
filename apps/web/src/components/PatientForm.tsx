@@ -15,6 +15,18 @@ import type { UserWithDetails } from "@shared/types";
 import type { PatientCreateInput } from "@shared/validation";
 import { getRoleLabel, MARKETING_SOURCES, MARKETING_SOURCE_LABELS } from "@shared/constants";
 
+const COUNTRY_OPTIONS = [
+  { code: "VN", name: "Việt Nam" },
+  { code: "AU", name: "Australia" },
+  { code: "CA", name: "Canada" },
+  { code: "DE", name: "Đức" },
+  { code: "FR", name: "Pháp" },
+  { code: "GB", name: "Vương quốc Anh" },
+  { code: "JP", name: "Nhật Bản" },
+  { code: "KR", name: "Hàn Quốc" },
+  { code: "US", name: "Hoa Kỳ" },
+] as const;
+
 interface PatientFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -39,8 +51,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
   const [districtName, setDistrictName] = useState(patient?.district_name ?? "");
   const [districtCode, setDistrictCode] = useState(patient?.district_code ?? "");
   const [provinceName, setProvinceName] = useState(patient?.province_name ?? "");
-  const [provinceCode, setProvinceCode] = useState(patient?.province_code ?? "");
-  const [postalCode, setPostalCode] = useState(patient?.postal_code ?? "");
+  const [countryCode, setCountryCode] = useState(patient?.country_code ?? "VN");
   const [initialNote, setInitialNote] = useState("");
   const [cccd, setCccd] = useState(patient?.cccd ?? "");
   const [saving, setSaving] = useState(false);
@@ -81,8 +92,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
       setDistrictName(patient?.district_name ?? "");
       setDistrictCode(patient?.district_code ?? "");
       setProvinceName(patient?.province_name ?? "");
-      setProvinceCode(patient?.province_code ?? "");
-      setPostalCode(patient?.postal_code ?? "");
+      setCountryCode(patient?.country_code ?? "VN");
       setInitialNote("");
       setCccd(patient?.cccd ?? "");
       setFamilyName(patient?.family_name ?? "");
@@ -115,9 +125,8 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
         district_name: districtName || undefined,
         district_code: districtCode || undefined,
         province_name: provinceName || undefined,
-        province_code: provinceCode || undefined,
-        postal_code: postalCode || undefined,
-        country_code: "VN",
+        country_name: COUNTRY_OPTIONS.find((country) => country.code === countryCode)?.name ?? "Việt Nam",
+        country_code: countryCode,
         family_name: familyName || undefined,
         family_phone: familyPhone || undefined,
         family_relation: familyRelation || undefined,
@@ -296,33 +305,25 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="pf-province">Tỉnh/Thành phố</Label>
-                  <Input
-                    id="pf-province"
-                    value={provinceName}
-                    onChange={(e) => setProvinceName(e.target.value)}
-                    placeholder="VD: TP. Hồ Chí Minh"
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="pf-province-code">Mã tỉnh/thành phố</Label>
-                  <Input
-                    id="pf-province-code"
-                    value={provinceCode}
-                    onChange={(e) => setProvinceCode(e.target.value)}
-                    placeholder="Tùy chọn"
-                  />
-                </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="pf-country">Quốc gia</Label>
+                <Select
+                  id="pf-country"
+                  value={countryCode}
+                  onChange={(e) => setCountryCode(e.target.value)}
+                >
+                  {COUNTRY_OPTIONS.map((country) => (
+                    <option key={country.code} value={country.code}>{country.name}</option>
+                  ))}
+                </Select>
               </div>
-              <div className="grid gap-1.5 sm:max-w-48">
-                <Label htmlFor="pf-postal-code">Mã bưu chính</Label>
+              <div className="grid gap-1.5">
+                <Label htmlFor="pf-province">Tỉnh/Thành phố</Label>
                 <Input
-                  id="pf-postal-code"
-                  value={postalCode}
-                  onChange={(e) => setPostalCode(e.target.value)}
-                  placeholder="Tùy chọn"
+                  id="pf-province"
+                  value={provinceName}
+                  onChange={(e) => setProvinceName(e.target.value)}
+                  placeholder="VD: TP. Hồ Chí Minh"
                 />
               </div>
             </div>
