@@ -235,6 +235,48 @@ export interface TreatmentPlanItem {
   created_at: string;
 }
 
+export type TreatmentCaseType = "general" | "implant" | "orthodontics" | "prosthodontics" | "full_mouth" | "other";
+export type TreatmentCaseStatus = "active" | "paused" | "completed" | "cancelled";
+export type TreatmentCaseMemberRole = "primary_clinician" | "co_clinician" | "consultant" | "assistant" | "coordinator" | "lab_contact";
+
+export interface TreatmentCase {
+  id: string;
+  tenant_id: string;
+  treatment_plan_id: string;
+  patient_id: string;
+  case_number: string;
+  case_type: TreatmentCaseType;
+  status: TreatmentCaseStatus;
+  primary_branch_id: string;
+  primary_branch_name?: string;
+  primary_clinician_id: string;
+  primary_clinician_name?: string;
+  title: string;
+  clinical_summary?: string;
+  treatment_goal?: string;
+  activated_at: string;
+  target_completed_at?: string;
+  completed_at?: string;
+  paused_at?: string;
+  paused_reason?: string;
+  cancelled_at?: string;
+  cancelled_reason?: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TreatmentCaseStatusHistory {
+  id: string;
+  tenant_id: string;
+  treatment_case_id: string;
+  from_status?: TreatmentCaseStatus;
+  to_status: TreatmentCaseStatus;
+  reason?: string;
+  changed_by: string;
+  changed_at: string;
+}
+
 // ───────────────────────── Billing ─────────────────────────
 
 export type PaymentMethod = "cash" | "transfer" | "card" | "other";

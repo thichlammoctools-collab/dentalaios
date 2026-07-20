@@ -233,6 +233,30 @@ export const planItemUpdateSchema = planItemCreateSchema;
 
 export type PlanCreateInput = z.infer<typeof planCreateSchema>;
 export type PlanItemCreateInput = z.infer<typeof planItemCreateSchema>;
+
+const treatmentCaseTypes = ["general", "implant", "orthodontics", "prosthodontics", "full_mouth", "other"] as const;
+
+export const treatmentCaseActivateSchema = z.object({
+  case_type: z.enum(treatmentCaseTypes).default("general"),
+  title: nonEmpty(200).optional(),
+  clinical_summary: optionalText(4000),
+  treatment_goal: optionalText(2000),
+  target_completed_at: dateString.optional(),
+}).strict();
+
+export type TreatmentCaseActivateInput = z.infer<typeof treatmentCaseActivateSchema>;
+
+export const treatmentCasePauseSchema = z.object({
+  reason: nonEmpty(1000),
+}).strict();
+
+export type TreatmentCasePauseInput = z.infer<typeof treatmentCasePauseSchema>;
+
+export const treatmentCaseCancelSchema = z.object({
+  reason: nonEmpty(1000),
+}).strict();
+
+export type TreatmentCaseCancelInput = z.infer<typeof treatmentCaseCancelSchema>;
 export type PlanItemUpdateInput = z.infer<typeof planItemUpdateSchema>;
 
 export const treatmentServiceUpsertSchema = z.object({

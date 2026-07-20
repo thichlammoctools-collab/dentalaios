@@ -6,16 +6,36 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { TreatmentPlanItemForm } from "@/components/TreatmentPlanItemForm";
+import { Select } from "@/components/ui/select";
 import { apiDelete, apiGet, apiPost, getToken, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
-import type { TreatmentPlan, TreatmentPlanItem } from "@shared/types";
+import type { TreatmentCase, TreatmentCaseType, TreatmentPlan, TreatmentPlanItem } from "@shared/types";
+
+const CASE_TYPE_LABELS: Record<TreatmentCaseType, string> = {
+  general: "Điều trị tổng quát",
+  implant: "Implant",
+  orthodontics: "Chỉnh nha",
+  prosthodontics: "Phục hình",
+  full_mouth: "Điều trị toàn hàm",
+  other: "Khác",
+};
+
+const CASE_STATUS_LABELS: Record<TreatmentCase["status"], string> = {
+  active: "Đang điều trị",
+  paused: "Tạm ngưng",
+  completed: "Hoàn tất",
+  cancelled: "Đã hủy",
+};
 
 export function TreatmentPlanDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [plan, setPlan] = useState<TreatmentPlan | null>(null);
   const [items, setItems] = useState<TreatmentPlanItem[]>([]);
+  const [treatmentCase, setTreatmentCase] = useState<TreatmentCase | null>(null);
+  const [caseType, setCaseType] = useState<TreatmentCaseType>("general");
+  const [caseSaving, setCaseSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [openForm, setOpenForm] = useState(false);
   const [editingItem, setEditingItem] = useState<TreatmentPlanItem | null>(null);
@@ -28,11 +48,13 @@ export function TreatmentPlanDetailPage() {
     setError(null);
     try {
       const p = await apiGet<TreatmentPlan>(`/api/treatment-plans/${id}`);
-      const its = await apiGet<{ items: TreatmentPlanItem[] }>(
-        `/api/treatment-plans/${id}/items`,
-      );
+      const [its, caseResult] = await Promise.all([
+        apiGet<{ items: TreatmentPlanItem[] }>(`/api/treatment-plans/${id}/items`),
+        apiGet<{ case: TreatmentCase | null }>(`/api/treatment-plans/${id}/case`),
+      ]);
       setPlan(p);
       setItems(its.items);
+      setTreatmentCase(caseResult.case);
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Lỗi tải plan";
       setError(msg);
@@ -62,6 +84,41 @@ export function TreatmentPlanDetailPage() {
       setPlan(updated);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi duyệt");
+    }
+  }
+
+  async function activateCase() {
+    if (!plan) return;
+    setCaseSaving(true);
+    try {
+      const created = await apiPost<TreatmentCase>(`/api/treatment-plans/${plan.id}/case/activate`, {
+        case_type: caseType,
+      });
+      setTreatmentCase(created);
+      toast.success("Đã kích hoạt ca điều trị");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Không thể kích hoạt ca điều trị");
+    } finally {
+      setCaseSaving(false);
+    }
+  }
+
+  async function changeCaseStatus(action: "pause" | "resume" | "complete" | "cancel") {
+    if (!plan) return;
+    const requiresReason = action === "pause" || action === "cancel";
+    const reason = requiresReason ? window.prompt(action === "pause" ? "Lý do tạm ngưng ca điều trị:" : "Lý do hủy ca điều trị:") : undefined;
+    if (requiresReason && !reason?.trim()) return;
+    setCaseSaving(true);
+    try {
+      const updated = await apiPost<TreatmentCase>(`/api/treatment-plans/${plan.id}/case/${action}`, reason ? { reason } : {});
+      setTreatmentCase(updated);
+      toast.success(
+        action === "pause" ? "Đã tạm ngưng ca" : action === "resume" ? "Đã tiếp tục ca" : action === "complete" ? "Đã hoàn tất ca" : "Đã hủy ca",
+      );
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Không thể cập nhật ca điều trị");
+    } finally {
+      setCaseSaving(false);
     }
   }
 
@@ -196,7 +253,56 @@ export function TreatmentPlanDetailPage() {
             {plan.status}
           </Badge>
         </div>
-      </div>
+       </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <CardTitle>Ca điều trị</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">Theo dõi vòng đời điều trị dài hạn. Milestone và tài chính sẽ được bổ sung ở phase tiếp theo.</p>
+            </div>
+            {treatmentCase && (
+              <Badge variant={treatmentCase.status === "active" || treatmentCase.status === "completed" ? "success" : "warning"}>
+                {CASE_STATUS_LABELS[treatmentCase.status]}
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!treatmentCase ? (
+            plan.status === "approved" ? (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <label className="grid flex-1 gap-1.5 text-sm font-medium">
+                  Loại ca điều trị
+                  <Select value={caseType} onChange={(event) => setCaseType(event.target.value as TreatmentCaseType)}>
+                    {Object.entries(CASE_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </Select>
+                </label>
+                <Button onClick={activateCase} disabled={caseSaving}>{caseSaving ? "Đang kích hoạt..." : "Kích hoạt ca điều trị"}</Button>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Duyệt báo giá trước khi kích hoạt ca điều trị.</p>
+            )
+          ) : (
+            <div className="space-y-4">
+              <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <div><p className="text-muted-foreground">Mã ca</p><p className="font-mono font-medium">{treatmentCase.case_number}</p></div>
+                <div><p className="text-muted-foreground">Loại ca</p><p className="font-medium">{CASE_TYPE_LABELS[treatmentCase.case_type]}</p></div>
+                <div><p className="text-muted-foreground">Chi nhánh chính</p><p className="font-medium">{treatmentCase.primary_branch_name ?? treatmentCase.primary_branch_id}</p></div>
+                <div><p className="text-muted-foreground">Bác sĩ phụ trách</p><p className="font-medium">{treatmentCase.primary_clinician_name ?? treatmentCase.primary_clinician_id}</p></div>
+              </div>
+              {treatmentCase.target_completed_at && <p className="text-sm text-muted-foreground">Dự kiến hoàn thành: {treatmentCase.target_completed_at}</p>}
+              {treatmentCase.paused_reason && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">Lý do tạm ngưng: {treatmentCase.paused_reason}</p>}
+              {treatmentCase.cancelled_reason && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">Lý do hủy: {treatmentCase.cancelled_reason}</p>}
+              <div className="flex flex-wrap gap-2">
+                {treatmentCase.status === "active" && <><Button variant="outline" onClick={() => void changeCaseStatus("pause")} disabled={caseSaving}>Tạm ngưng</Button><Button onClick={() => void changeCaseStatus("complete")} disabled={caseSaving}>Hoàn tất ca</Button><Button variant="destructive" onClick={() => void changeCaseStatus("cancel")} disabled={caseSaving}>Hủy ca</Button></>}
+                {treatmentCase.status === "paused" && <><Button onClick={() => void changeCaseStatus("resume")} disabled={caseSaving}>Tiếp tục ca</Button><Button variant="destructive" onClick={() => void changeCaseStatus("cancel")} disabled={caseSaving}>Hủy ca</Button></>}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

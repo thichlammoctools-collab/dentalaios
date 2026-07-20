@@ -1,6 +1,13 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { planCreateSchema, planItemCreateSchema, planItemUpdateSchema } from "@shared/validation";
+import {
+  planCreateSchema,
+  planItemCreateSchema,
+  planItemUpdateSchema,
+  treatmentCaseActivateSchema,
+  treatmentCaseCancelSchema,
+  treatmentCasePauseSchema,
+} from "@shared/validation";
 import { PERMISSIONS } from "@shared/constants";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
@@ -8,6 +15,7 @@ import { requirePermission } from "../middleware/rbac";
 import { auditLog } from "../middleware/audit";
 import type { AuthContext } from "../middleware/auth";
 import { planService } from "../services/plan.service";
+import { treatmentCasesService } from "../services/treatment-cases.service";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -60,6 +68,28 @@ router.get(
   async (c) => {
     const jwt = getJwt(c);
     const items = await planService.listItems(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    return c.json({ items, total: items.length });
+  },
+);
+
+// GET /api/treatment-plans/:id/case — operational case for an approved plan
+router.get(
+  "/:id/case",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const treatmentCase = await treatmentCasesService.getByPlanId(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    return c.json({ case: treatmentCase });
+  },
+);
+
+// GET /api/treatment-plans/:id/case/history — immutable lifecycle history
+router.get(
+  "/:id/case/history",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const items = await treatmentCasesService.listStatusHistory(c.env.DB, jwt.tenant_id, c.req.param("id"));
     return c.json({ items, total: items.length });
   },
 );
@@ -124,6 +154,75 @@ router.post(
     const jwt = getJwt(c);
     const approved = await planService.approve(c.env.DB, jwt.tenant_id, c.req.param("id"));
     return c.json(approved, 200);
+  },
+);
+
+// POST /api/treatment-plans/:id/case/activate — starts operational treatment after approval
+router.post(
+  "/:id/case/activate",
+  requirePermission(PERMISSIONS.APPROVE_PLANS),
+  auditLog("case_activated", "treatment_case"),
+  zValidator("json", treatmentCaseActivateSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const treatmentCase = await treatmentCasesService.activate(
+      c.env.DB,
+      jwt.tenant_id,
+      c.req.param("id"),
+      { userId: jwt.sub, branchId: jwt.branch_id },
+      c.req.valid("json"),
+    );
+    return c.json(treatmentCase, 201);
+  },
+);
+
+router.post(
+  "/:id/case/pause",
+  requirePermission(PERMISSIONS.APPROVE_PLANS),
+  auditLog("case_paused", "treatment_case"),
+  zValidator("json", treatmentCasePauseSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const treatmentCase = await treatmentCasesService.transition(
+      c.env.DB, jwt.tenant_id, c.req.param("id"), jwt.sub, "paused", c.req.valid("json").reason,
+    );
+    return c.json(treatmentCase);
+  },
+);
+
+router.post(
+  "/:id/case/resume",
+  requirePermission(PERMISSIONS.APPROVE_PLANS),
+  auditLog("case_resumed", "treatment_case"),
+  async (c) => {
+    const jwt = getJwt(c);
+    const treatmentCase = await treatmentCasesService.transition(c.env.DB, jwt.tenant_id, c.req.param("id"), jwt.sub, "active");
+    return c.json(treatmentCase);
+  },
+);
+
+router.post(
+  "/:id/case/complete",
+  requirePermission(PERMISSIONS.APPROVE_PLANS),
+  auditLog("case_completed", "treatment_case"),
+  async (c) => {
+    const jwt = getJwt(c);
+    const treatmentCase = await treatmentCasesService.transition(c.env.DB, jwt.tenant_id, c.req.param("id"), jwt.sub, "completed");
+    return c.json(treatmentCase);
+  },
+);
+
+router.post(
+  "/:id/case/cancel",
+  requirePermission(PERMISSIONS.APPROVE_PLANS),
+  auditLog("case_cancelled", "treatment_case"),
+  zValidator("json", treatmentCaseCancelSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const treatmentCase = await treatmentCasesService.transition(
+      c.env.DB, jwt.tenant_id, c.req.param("id"), jwt.sub, "cancelled", c.req.valid("json").reason,
+    );
+    return c.json(treatmentCase);
   },
 );
 
