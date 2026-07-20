@@ -42,6 +42,26 @@ export function getRoleLabel(name: string): string {
   return ROLE_LABELS[name as RoleName] ?? name;
 }
 
+function normalizeRoleName(name: string): string {
+  return name
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+/**
+ * Built-in clinical roles may have a localized display name in existing data.
+ * Keep role-based scheduling independent from that editable name.
+ */
+export function isDoctorRole(roleId: string, roleName: string): boolean {
+  return roleId === "role-doctor" || ["doctor", "bac si"].includes(normalizeRoleName(roleName));
+}
+
+export function isAssistantRole(roleId: string, roleName: string): boolean {
+  return roleId === "role-assistant" || ["assistant", "phu ta", "tro ly"].includes(normalizeRoleName(roleName));
+}
+
 /** Permission strings used in role.permissions JSON array. */
 export const PERMISSIONS = {
   ALL: "all",

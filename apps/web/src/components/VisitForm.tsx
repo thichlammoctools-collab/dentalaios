@@ -10,6 +10,7 @@ import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import type { Visit } from "@shared/types";
 import type { UserWithDetails } from "@shared/types";
+import { isAssistantRole, isDoctorRole } from "@shared/constants";
 
 interface UserWithDetailsResponse {
   items: UserWithDetails[];
@@ -81,8 +82,8 @@ export function VisitForm({ open, onOpenChange, patientId, onCreated }: VisitFor
     }
   }
 
-  const doctors = users.filter((u) => u.role_name === "doctor");
-  const assistants = users.filter((u) => u.role_name === "assistant");
+  const doctors = users.filter((u) => isDoctorRole(u.role_id, u.role_name));
+  const assistants = users.filter((u) => isAssistantRole(u.role_id, u.role_name));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

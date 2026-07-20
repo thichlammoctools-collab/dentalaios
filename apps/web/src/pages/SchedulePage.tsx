@@ -16,7 +16,7 @@ import { apiDelete, apiGet, apiPatch, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import type { Appointment, Patient, UserWithDetails } from "@shared/types";
-import { ROUTES } from "@shared/constants";
+import { isAssistantRole, isDoctorRole, ROUTES } from "@shared/constants";
 import { formatDate, formatTime, getWeekDays, isoToYmd, weekdayLabel, ymd, combineDateTime } from "@/lib/utils";
 
 interface AppointmentsResponse { items: Appointment[]; total: number }
@@ -80,14 +80,17 @@ export function SchedulePage() {
     return m;
   }, [users]);
 
-  // Day view: filter today + multi-filter
-  const dayApptsAll = appointments.filter((a) => isoToYmd(a.scheduled_at) === ymd(selectedDate));
-  const dayAppts = dayApptsAll
+  const filteredAppointments = appointments
     .filter((a) => filterStatuses.size === 0 || filterStatuses.has(a.status))
     .filter((a) => !filterClinician || a.clinician_id === filterClinician)
     .filter((a) => !filterAssistant || (
       filterAssistant === "__none__" ? !a.assistant_id : a.assistant_id === filterAssistant
-    ))
+    ));
+
+  // Day view: apply the same filters used by the week view.
+  const dayApptsAll = appointments.filter((a) => isoToYmd(a.scheduled_at) === ymd(selectedDate));
+  const dayAppts = filteredAppointments
+    .filter((a) => isoToYmd(a.scheduled_at) === ymd(selectedDate))
     .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
 
   function toggleStatus(s: string) {
@@ -102,14 +105,14 @@ export function SchedulePage() {
   // Week view: bucket by date
   const weekByDate = useMemo(() => {
     const m = new Map<string, Appointment[]>();
-    appointments.forEach((a) => {
+    filteredAppointments.forEach((a) => {
       const key = isoToYmd(a.scheduled_at);
       const arr = m.get(key) ?? [];
       arr.push(a);
       m.set(key, arr);
     });
     return m;
-  }, [appointments]);
+  }, [filteredAppointments]);
 
   function shiftDay(days: number) {
     const d = new Date(selectedDate);
@@ -167,6 +170,82 @@ export function SchedulePage() {
           <TabsTrigger value="week">Tuần</TabsTrigger>
         </TabsList>
 
+        {/* Filters apply to both day and week views. */}
+        <div className="mt-4 space-y-2 rounded-lg border border-border bg-muted/20 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">Trạng thái:</span>
+            {(["booked", "confirmed", "arrived", "completed", "cancelled", "no_show"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => toggleStatus(s)}
+                className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-all ${filterStatuses.size === 0 || filterStatuses.has(s) ? statusBgClass(s) : "bg-muted/40 text-muted-foreground opacity-50 line-through"}`}
+              >
+                {statusLabelVi(s)}
+              </button>
+            ))}
+            {filterStatuses.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setFilterStatuses(new Set())}
+                className="text-[11px] text-blue-600 hover:underline"
+              >
+                Xóa trạng thái
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="filter-doctor" className="text-xs">BS:</Label>
+              <Select
+                id="filter-doctor"
+                value={filterClinician}
+                onChange={(e) => setFilterClinician(e.target.value)}
+                className="h-7 w-44 text-xs"
+              >
+                <option value="">Tất cả</option>
+                       {users.filter((u) => isDoctorRole(u.role_id, u.role_name)).map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </Select>
+            </div>
+
+                   {users.some((u) => isAssistantRole(u.role_id, u.role_name)) && (
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="filter-assistant" className="text-xs">Phụ tá:</Label>
+                <Select
+                  id="filter-assistant"
+                  value={filterAssistant}
+                  onChange={(e) => setFilterAssistant(e.target.value)}
+                  className="h-7 w-44 text-xs"
+                >
+                  <option value="">Tất cả</option>
+                  <option value="__none__">— Không có —</option>
+                         {users.filter((u) => isAssistantRole(u.role_id, u.role_name)).map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </Select>
+              </div>
+            )}
+
+            {(filterClinician || filterAssistant || filterStatuses.size > 0) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setFilterClinician("");
+                  setFilterAssistant("");
+                  setFilterStatuses(new Set());
+                }}
+                className="h-7 text-xs"
+              >
+                ✕ Xóa hết lọc
+              </Button>
+            )}
+          </div>
+        </div>
+
         {/* Day view */}
         <TabsContent value="day">
           <Card>
@@ -187,84 +266,6 @@ export function SchedulePage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {/* Filter bar */}
-              <div className="mb-4 space-y-2 rounded-lg border border-border bg-muted/20 p-3">
-                {/* Status toggles */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-medium text-muted-foreground">Trạng thái:</span>
-                  {(["booked", "confirmed", "arrived", "completed", "cancelled", "no_show"] as const).map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => toggleStatus(s)}
-                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-all ${filterStatuses.size === 0 || filterStatuses.has(s) ? statusBgClass(s) : "bg-muted/40 text-muted-foreground opacity-50 line-through"}`}
-                    >
-                      {statusLabelVi(s)}
-                    </button>
-                  ))}
-                  {filterStatuses.size > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setFilterStatuses(new Set())}
-                      className="text-[11px] text-blue-600 hover:underline"
-                    >
-                      Xóa trạng thái
-                    </button>
-                  )}
-                </div>
-
-                {/* Clinician + Assistant dropdowns */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <Label htmlFor="filter-doctor" className="text-xs">BS:</Label>
-                    <Select
-                      id="filter-doctor"
-                      value={filterClinician}
-                      onChange={(e) => setFilterClinician(e.target.value)}
-                      className="h-7 w-44 text-xs"
-                    >
-                      <option value="">Tất cả</option>
-                      {users.filter((u) => u.role_name === "doctor").map((d) => (
-                        <option key={d.id} value={d.id}>{d.name}</option>
-                      ))}
-                    </Select>
-                  </div>
-
-                  {users.filter((u) => u.role_name === "assistant").length > 0 && (
-                    <div className="flex items-center gap-1.5">
-                      <Label htmlFor="filter-assistant" className="text-xs">Phụ tá:</Label>
-                      <Select
-                        id="filter-assistant"
-                        value={filterAssistant}
-                        onChange={(e) => setFilterAssistant(e.target.value)}
-                        className="h-7 w-44 text-xs"
-                      >
-                        <option value="">Tất cả</option>
-                        <option value="__none__">— Không có —</option>
-                        {users.filter((u) => u.role_name === "assistant").map((a) => (
-                          <option key={a.id} value={a.id}>{a.name}</option>
-                        ))}
-                      </Select>
-                    </div>
-                  )}
-
-                  {(filterClinician || filterAssistant || filterStatuses.size > 0) && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setFilterClinician("");
-                        setFilterAssistant("");
-                        setFilterStatuses(new Set());
-                      }}
-                      className="h-7 text-xs"
-                    >
-                      ✕ Xóa hết lọc
-                    </Button>
-                  )}
-                </div>
-              </div>
-
               {loading ? (
                 <div className="h-40 flex items-center justify-center">
                   <div className="h-6 w-6 animate-spin rounded-full border-3 border-muted border-t-primary" />
@@ -542,8 +543,8 @@ function EditAppointmentDialog({
   const [saving, setSaving] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
-  const doctorsOnly = doctors.filter((u) => u.role_name === "doctor");
-  const assistantsOnly = doctors.filter((u) => u.role_name === "assistant");
+  const doctorsOnly = doctors.filter((u) => isDoctorRole(u.role_id, u.role_name));
+  const assistantsOnly = doctors.filter((u) => isAssistantRole(u.role_id, u.role_name));
 
   async function handleSave() {
     if (!clinicianId) {

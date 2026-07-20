@@ -19,7 +19,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { apiGet, apiPatch, apiDelete, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
-import { APPOINTMENT_STATUS_LABELS } from "@shared/constants";
+import { APPOINTMENT_STATUS_LABELS, isAssistantRole, isDoctorRole } from "@shared/constants";
 import type { Appointment, Patient, UserWithDetails } from "@shared/types";
 import { formatDateTime, formatTime, ymd, combineDateTime, isoToYmd, isoToTime } from "@/lib/utils";
 
@@ -259,8 +259,8 @@ function EditAppointmentDialog({
   const [assistantId, setAssistantId] = useState(appointment.assistant_id ?? "");
   const [saving, setSaving] = useState(false);
 
-  const doctorsOnly = doctors.filter((u) => u.role_name === "doctor");
-  const assistantsOnly = doctors.filter((u) => u.role_name === "assistant");
+  const doctorsOnly = doctors.filter((u) => isDoctorRole(u.role_id, u.role_name));
+  const assistantsOnly = doctors.filter((u) => isAssistantRole(u.role_id, u.role_name));
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();

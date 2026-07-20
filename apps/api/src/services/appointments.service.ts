@@ -161,7 +161,7 @@ export const appointmentsService = {
       scheduled_at: input.scheduled_at,
       duration_min: input.duration_min,
       clinician_id: input.clinician_id,
-      assistant_id: input.assistant_id ?? undefined,
+      assistant_id: input.assistant_id,
       status: input.status,
       procedure: input.procedure,
       notes: input.notes,

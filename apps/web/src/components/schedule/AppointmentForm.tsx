@@ -10,6 +10,7 @@ import { apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import type { Appointment, UserWithDetails } from "@shared/types";
+import { isAssistantRole, isDoctorRole } from "@shared/constants";
 import { combineDateTime, ymd } from "@/lib/utils";
 import { PatientCombobox } from "./PatientCombobox";
 
@@ -54,11 +55,11 @@ export function AppointmentForm({
   // Default clinician = currently logged-in user if doctor, else first doctor in branch
   useEffect(() => {
     if (!open || clinicianId || users.length === 0) return;
-    const isDoctor = session?.role.name === "doctor";
+    const isDoctor = session && isDoctorRole(session.role.id, session.role.name);
     if (isDoctor && session?.user.id) {
       setClinicianId(session.user.id);
     } else {
-      const firstDoctor = users.find((u) => u.role_name === "doctor");
+      const firstDoctor = users.find((u) => isDoctorRole(u.role_id, u.role_name));
       if (firstDoctor) setClinicianId(firstDoctor.id);
     }
   }, [open, users, clinicianId, session]);
@@ -100,8 +101,8 @@ export function AppointmentForm({
     }
   }
 
-  const doctors = users.filter((u) => u.role_name === "doctor");
-  const assistants = users.filter((u) => u.role_name === "assistant");
+  const doctors = users.filter((u) => isDoctorRole(u.role_id, u.role_name));
+  const assistants = users.filter((u) => isAssistantRole(u.role_id, u.role_name));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

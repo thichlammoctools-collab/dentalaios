@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
-import { ROUTES } from "@shared/constants";
+import { isAssistantRole, isDoctorRole, ROUTES } from "@shared/constants";
 import { combineDateTime, ymd, isoToYmd, isoToTime } from "@/lib/utils";
 import { AiChatInput, type ParsedAppointment } from "@/components/schedule/AiChatInput";
 import type { Appointment, Patient, UserWithDetails } from "@shared/types";
@@ -43,7 +43,7 @@ export function ScheduleNewPage() {
     apiGet<UsersResponse>(`/api/users/branch/${session.branch.id}`)
       .then((res) => {
         setAllUsers(res.items);
-        setDoctors(res.items.filter((u) => u.role_name === "doctor"));
+        setDoctors(res.items.filter((u) => isDoctorRole(u.role_id, u.role_name)));
       })
       .catch(() => {});
     apiGet<PatientsResponse>(`/api/patients?limit=200&search=${encodeURIComponent(patientSearch)}`)
@@ -53,7 +53,7 @@ export function ScheduleNewPage() {
 
   useEffect(() => {
     if (clinicianId || !session?.user?.id) return;
-    if (session?.role.name === "doctor") {
+    if (isDoctorRole(session.role.id, session.role.name)) {
       setClinicianId(session.user.id);
     }
   }, [session, clinicianId, setClinicianId]);
@@ -166,12 +166,12 @@ export function ScheduleNewPage() {
                   </Select>
                 </div>
 
-                {allUsers.filter((u) => u.role_name === "assistant").length > 0 && (
+                {allUsers.some((u) => isAssistantRole(u.role_id, u.role_name)) && (
                   <div className="grid gap-1.5">
                     <Label>Phụ tá chính</Label>
                     <Select value={assistantId} onChange={(e) => setAssistantId(e.target.value)}>
                       <option value="">— Không chọn —</option>
-                      {allUsers.filter((u) => u.role_name === "assistant").map((a) => (
+                      {allUsers.filter((u) => isAssistantRole(u.role_id, u.role_name)).map((a) => (
                         <option key={a.id} value={a.id}>{a.name}</option>
                       ))}
                     </Select>
