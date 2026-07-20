@@ -265,7 +265,7 @@ function mapUserWithContext(row: D1Row): UserWithContext {
     id: row.t_id as string,
     name: row.t_name as string,
     slug: (row as Record<string, unknown>).t_slug as string | undefined,
-    is_active: ((row as Record<string, unknown>).t_is_active as number) === 1,
+    is_active: ((row as Record<string, unknown>).t_is_active as number | undefined) !== 0,
     created_at: row.t_created_at as string,
   };
   const branch: Branch = {

@@ -44,6 +44,13 @@ export function createPlatformConfigRepository(db: D1Database) {
         .bind(data.key, data.description, Number(data.default_enabled))
         .run();
     },
+    async hasFlag(key: string): Promise<boolean> {
+      const row = await db
+        .prepare("SELECT 1 AS present FROM platform_feature_flags WHERE key = ? LIMIT 1")
+        .bind(key)
+        .first<{ present: number }>();
+      return Boolean(row?.present);
+    },
     async tenantFlags(
       tenantId: string,
     ): Promise<

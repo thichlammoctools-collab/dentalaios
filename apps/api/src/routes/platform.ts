@@ -17,7 +17,7 @@ import {
 } from "@shared/validation";
 import type { Env } from "../index";
 import { newId } from "../lib/ids";
-import { NotFoundError, ForbiddenError } from "../lib/errors";
+import { NotFoundError, ForbiddenError, ConflictError } from "../lib/errors";
 import { hashPassword } from "../lib/password";
 import {
   getPlatformJwt,

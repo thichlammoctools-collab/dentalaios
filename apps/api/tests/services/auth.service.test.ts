@@ -65,6 +65,15 @@ describe("authService.login", () => {
     });
   });
 
+  it("rejects login for a suspended tenant", async () => {
+    const userRow = baseUserRow({ t_is_active: 0 });
+    const deps = makeDeps(new Map([["FROM users", [userRow]]]));
+    await expect(authService.login(deps, "admin@demo.clinic", "password123")).rejects.toMatchObject({
+      status: 401,
+      code: "unauthorized",
+    });
+  });
+
   it("accepts correct credentials and returns valid session", async () => {
     const userRow = baseUserRow({ u_password_hash: VALID_HASH });
     const deps = makeDeps(new Map([["FROM users", [userRow]]]));

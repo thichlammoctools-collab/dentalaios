@@ -20,6 +20,10 @@ export const authService = {
       throw new UnauthorizedError("Tài khoản chưa được kích hoạt. Vui lòng xác thực email.");
     }
 
+    if (!ctx.tenant.is_active) {
+      throw new UnauthorizedError("Tài khoản không còn hoạt động");
+    }
+
     const valid = await verifyPassword(password, ctx.password_hash);
     if (!valid) throw new UnauthorizedError("Email hoặc mật khẩu không đúng");
 
