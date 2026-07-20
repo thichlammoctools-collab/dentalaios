@@ -47,6 +47,7 @@ export function SchedulePage() {
   const [filterStatuses, setFilterStatuses] = useState<Set<string>>(() => new Set(requestedStatuses));
   const [filterClinician, setFilterClinician] = useState("");
   const [filterAssistant, setFilterAssistant] = useState("");
+  const [hideFinishedAppointments, setHideFinishedAppointments] = useState(false);
 
   useEffect(() => {
     setFilterStatuses(new Set(requestedStatuses));
@@ -117,6 +118,17 @@ export function SchedulePage() {
   const dayAppts = filteredAppointments
     .filter((a) => isoToYmd(a.scheduled_at) === ymd(selectedDate))
     .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
+  const dayAppointmentGroups = {
+    finished: dayAppts.filter((a) => appointmentTiming(a) === "finished"),
+    inProgress: dayAppts.filter((a) => appointmentTiming(a) === "in_progress"),
+    upcoming: dayAppts.filter((a) => appointmentTiming(a) === "upcoming"),
+  };
+  const visibleDayAppointmentGroups = {
+    ...dayAppointmentGroups,
+    finished: hideFinishedAppointments ? [] : dayAppointmentGroups.finished,
+  };
+  const visibleDayAppointmentCount = Object.values(visibleDayAppointmentGroups)
+    .reduce((total, group) => total + group.length, 0);
 
   function toggleStatus(s: string) {
     setFilterStatuses((prev) => {
@@ -304,7 +316,7 @@ export function SchedulePage() {
                   {formatDate(selectedDate.toISOString())}
                   <Badge variant="outline" className="text-[10px]">
                     {dayApptsAll.length} lịch
-                    {dayAppts.length !== dayApptsAll.length && ` (hiện ${dayAppts.length})`}
+                    {visibleDayAppointmentCount !== dayApptsAll.length && ` (hiện ${visibleDayAppointmentCount})`}
                   </Badge>
                 </span>
                 <div className="flex items-center gap-2">
@@ -319,30 +331,65 @@ export function SchedulePage() {
                 <div className="h-40 flex items-center justify-center">
                   <div className="h-6 w-6 animate-spin rounded-full border-3 border-muted border-t-primary" />
                 </div>
-              ) : dayAppts.length === 0 ? (
+              ) : visibleDayAppointmentCount === 0 ? (
                 <div className="py-10 text-center">
                   <p className="text-sm text-muted-foreground">
                     {dayApptsAll.length === 0
                       ? "Chưa có lịch hẹn nào trong ngày này"
-                      : "Không có lịch hẹn nào khớp với bộ lọc"}
+                      : hideFinishedAppointments && dayAppointmentGroups.finished.length > 0
+                        ? "Các ca trong ngày đã được ẩn"
+                        : "Không có lịch hẹn nào khớp với bộ lọc"}
                   </p>
                   <Button className="mt-4" onClick={() => setCreateOpen(true)}>
                     + Tạo lịch hẹn
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {dayAppts.map((a) => {
-                    const patient = patientsById.get(a.patient_id);
-                    const doctor = usersById.get(a.clinician_id);
-                    const assistant = a.assistant_id ? usersById.get(a.assistant_id) : null;
-                    const chair = a.chair_id ? chairsById.get(a.chair_id) : null;
-                    const endTime = new Date(new Date(a.scheduled_at).getTime() + a.duration_min * 60 * 1000);
+                <div className="space-y-4">
+                  {dayAppointmentGroups.finished.length > 0 && (
+                    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-muted-foreground/50" />
+                        <span className="text-sm font-semibold text-muted-foreground">Đã xong</span>
+                        <Badge variant="outline" className="text-[10px]">{dayAppointmentGroups.finished.length}</Badge>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setHideFinishedAppointments((value) => !value)}
+                        className="h-7 text-xs"
+                      >
+                        {hideFinishedAppointments ? "Hiện ca đã xong" : "Ẩn ca đã xong"}
+                      </Button>
+                    </div>
+                  )}
+                  {([
+                    ["inProgress", "Đang làm", "bg-amber-500"],
+                    ["upcoming", "Sắp tới", "bg-blue-500"],
+                    ["finished", "Đã xong", "bg-muted-foreground/50"],
+                  ] as const).map(([groupKey, label, dotClass]) => {
+                    const group = visibleDayAppointmentGroups[groupKey];
+                    if (group.length === 0) return null;
                     return (
-                      <div
-                        key={a.id}
-                        onClick={() => setEditing(a)}
-                        className={`cursor-pointer rounded-lg border-l-4 px-3 py-2.5 transition-all hover:shadow-md hover:bg-accent/40 ${statusBorderClass(a.status)}`}
+                      <section key={groupKey} className="space-y-2">
+                        <div className="flex items-center gap-2 px-1">
+                          <span className={`h-2 w-2 rounded-full ${dotClass}`} />
+                          <h2 className="text-sm font-semibold">{label}</h2>
+                          <Badge variant="outline" className="text-[10px]">{group.length}</Badge>
+                        </div>
+                        <div className="space-y-2">
+                          {group.map((a) => {
+                     const patient = patientsById.get(a.patient_id);
+                     const doctor = usersById.get(a.clinician_id);
+                     const assistant = a.assistant_id ? usersById.get(a.assistant_id) : null;
+                     const chair = a.chair_id ? chairsById.get(a.chair_id) : null;
+                     const endTime = new Date(new Date(a.scheduled_at).getTime() + a.duration_min * 60 * 1000);
+                     const isFinished = appointmentTiming(a) === "finished";
+                     return (
+                       <div
+                         key={a.id}
+                         onClick={() => setEditing(a)}
+                         className={`cursor-pointer rounded-lg border-l-4 px-3 py-2.5 transition-all hover:shadow-md hover:bg-accent/40 ${statusBorderClass(a.status)} ${isFinished ? "opacity-55 saturate-50" : ""}`}
                       >
                         <div className="flex items-stretch gap-3">
                           {/* Time block */}
@@ -411,7 +458,11 @@ export function SchedulePage() {
                               )}
                             </div>
                          </div>
-                      </div>
+                       </div>
+                     );
+                          })}
+                        </div>
+                      </section>
                     );
                   })}
                 </div>
@@ -551,6 +602,12 @@ function statusBorderClass(status: string): string {
     case "no_show": return "border-l-slate-300 bg-slate-50/30 dark:bg-slate-900/20 opacity-60";
     default: return "border-l-border bg-card";
   }
+}
+
+function appointmentTiming(appointment: Appointment): "finished" | "in_progress" | "upcoming" {
+  if (["completed", "cancelled", "no_show"].includes(appointment.status)) return "finished";
+  if (appointment.status === "arrived") return "in_progress";
+  return "upcoming";
 }
 
 function statusBgClass(status: string): string {
