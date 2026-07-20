@@ -217,7 +217,7 @@ export function TreatmentPlanDetailPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Răng</TableHead>
-                  <TableHead>Thủ thuật</TableHead>
+                    <TableHead>Dịch vụ</TableHead>
                   <TableHead>Mô tả</TableHead>
                   <TableHead className="text-right">Đơn giá</TableHead>
                   {canEdit && <TableHead></TableHead>}
@@ -230,7 +230,10 @@ export function TreatmentPlanDetailPage() {
                       {item.tooth_number != null ? `#${item.tooth_number}` : <span className="text-xs font-normal text-orange-700">Toàn hàm</span>}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{item.procedure}</Badge>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {item.service_code && <Badge variant="outline">{item.service_code}</Badge>}
+                        <span>{item.procedure}</span>
+                      </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{item.description}</TableCell>
                     <TableCell className="text-right">

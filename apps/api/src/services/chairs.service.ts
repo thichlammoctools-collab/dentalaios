@@ -48,6 +48,15 @@ function localDayBounds(date: string): { start: string; end: string } {
   };
 }
 
+function localDateKey(date: Date): string {
+  return new Date(date.getTime() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function addLocalDays(date: string, days: number): string {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
 export const chairsService = {
   list(db: D1Database, tenantId: string, branchId?: string): Promise<DentalChair[]> {
     return createChairsRepository(db).list(tenantId, { branchId });
@@ -207,6 +216,45 @@ export const chairsService = {
       }
     }
     return { chairs: items, unallocated_revenue: revenue?.unallocatedRevenue };
+  },
+
+  async revenueReport(db: D1Database, tenantId: string, branchId: string, range: 7 | 30 | 90) {
+    await assertAllInTenant(db, tenantId, [{ table: "branches", id: branchId }]);
+    const today = localDateKey(new Date());
+    const start = localDayBounds(addLocalDays(today, -(range - 1))).start;
+    const end = localDayBounds(addLocalDays(today, 1)).start;
+    const chairs = await createChairsRepository(db).list(tenantId, { branchId });
+    const [paymentResult, appointmentResult] = await Promise.all([
+      db.prepare(`SELECT v.chair_id, COALESCE(SUM(p.amount), 0) AS confirmed_revenue, COUNT(*) AS payment_count
+        FROM payments p
+        JOIN treatment_plans tp ON tp.id = p.treatment_plan_id AND tp.tenant_id = p.tenant_id
+        JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = p.tenant_id
+        WHERE p.tenant_id = ? AND v.branch_id = ? AND p.status = 'confirmed' AND p.currency = 'VND'
+          AND datetime(p.created_at) >= datetime(?) AND datetime(p.created_at) < datetime(?)
+        GROUP BY v.chair_id`).bind(tenantId, branchId, start, end).all<D1Row>(),
+      db.prepare(`SELECT chair_id, COALESCE(SUM(duration_min), 0) AS completed_minutes
+        FROM appointments WHERE tenant_id = ? AND branch_id = ? AND status = 'completed'
+          AND datetime(scheduled_at) >= datetime(?) AND datetime(scheduled_at) < datetime(?)
+        GROUP BY chair_id`).bind(tenantId, branchId, start, end).all<D1Row>(),
+    ]);
+    const paymentByChair = new Map((paymentResult.results ?? []).map((row) => [row.chair_id as string | null, {
+      confirmed_revenue: Number(row.confirmed_revenue ?? 0), payment_count: Number(row.payment_count ?? 0),
+    }]));
+    const minutesByChair = new Map((appointmentResult.results ?? []).map((row) => [row.chair_id as string | null, Number(row.completed_minutes ?? 0)]));
+    const unallocatedRevenue = paymentByChair.get(null)?.confirmed_revenue ?? 0;
+    const items = chairs.map((chair) => {
+      const payment = paymentByChair.get(chair.id);
+      const completedMinutes = minutesByChair.get(chair.id) ?? 0;
+      const confirmedRevenue = payment?.confirmed_revenue ?? 0;
+      return {
+        chair,
+        confirmed_revenue: confirmedRevenue,
+        payment_count: payment?.payment_count ?? 0,
+        completed_minutes: completedMinutes,
+        revenue_per_completed_hour: completedMinutes ? confirmedRevenue / (completedMinutes / 60) : null,
+      };
+    }).sort((left, right) => right.confirmed_revenue - left.confirmed_revenue || right.completed_minutes - left.completed_minutes);
+    return { range, start, end, items, unallocated_revenue: unallocatedRevenue };
   },
 };
 

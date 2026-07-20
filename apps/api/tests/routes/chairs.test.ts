@@ -91,6 +91,39 @@ describe("GET /api/chairs/rooms", () => {
   });
 });
 
+describe("GET /api/chairs/revenue-report", () => {
+  it("requires management dashboard permission", async () => {
+    const app = mountRoute("/api/chairs", chairsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "GET",
+      "/api/chairs/revenue-report?branch_id=test-branch&range=30",
+      new Map(),
+      { permissions: ["read_patients"] },
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("scopes aggregates to the requested tenant branch", async () => {
+    const app = mountRoute("/api/chairs", chairsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "GET",
+      "/api/chairs/revenue-report?branch_id=test-branch&range=7",
+      new Map([
+        ["FROM branches", [{ id: "test-branch" }]],
+        ["FROM dental_chairs", [chairRow()]],
+        ["FROM payments", [{ chair_id: "chair-1", confirmed_revenue: 500_000, payment_count: 1 }]],
+        ["FROM appointments", [{ chair_id: "chair-1", completed_minutes: 60 }]],
+      ]),
+      { permissions: ["view_management_dashboard"] },
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as { items: Array<{ confirmed_revenue: number; revenue_per_completed_hour: number | null }> };
+    expect(body.items[0]).toMatchObject({ confirmed_revenue: 500_000, revenue_per_completed_hour: 500_000 });
+  });
+});
+
 describe("PATCH /api/chairs/:id/status", () => {
   it("requires appointment write permission", async () => {
     const app = mountRoute("/api/chairs", chairsRoutes);

@@ -3,13 +3,13 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DateInput } from "@/components/ui/date-input";
-import { apiGet, apiPatch, ApiError } from "@/lib/api";
+import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import { formatTime, ymd } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils";
 import { createDashboardStream } from "@/lib/dashboard-stream";
-import type { Appointment, ChairRevenueMetrics, DentalChair, Patient, UserWithDetails } from "@shared/types";
+import type { Appointment, ChairRevenueMetrics, DentalChair, Patient, UserWithDetails, Visit } from "@shared/types";
 import { PERMISSIONS, ROUTES } from "@shared/constants";
 
 interface ChairBoardItem {
@@ -57,8 +57,12 @@ export function ChairBoardPage() {
   const [users, setUsers] = useState<UserWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [startingAppointmentId, setStartingAppointmentId] = useState<string | null>(null);
   const canManage = Boolean(
     session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.MANAGE_USERS),
+  );
+  const canEditAppointments = Boolean(
+    session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.WRITE_APPOINTMENTS),
   );
   const canViewRevenue = Boolean(
     session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.VIEW_MANAGEMENT_DASHBOARD),
@@ -100,6 +104,11 @@ export function ChairBoardPage() {
   const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
 
   async function changeStatus(chairId: string, operationalStatus: DentalChair["operational_status"]) {
+    const item = board?.chairs.find((candidate) => candidate.chair.id === chairId);
+    const affected = operationalStatus === "maintenance"
+      ? item?.appointments.filter((appointment) => new Date(appointment.scheduled_at) > new Date()).length ?? 0
+      : 0;
+    if (affected > 0 && !confirm(`Ghế này còn ${affected} lịch hẹn sắp tới. Chuyển sang bảo trì sẽ không tự động đổi ghế các lịch này. Tiếp tục?`)) return;
     try {
       const chair = await apiPatch<DentalChair>(`/api/chairs/${chairId}/status`, { operational_status: operationalStatus });
       setBoard((current) => current && {
@@ -111,6 +120,24 @@ export function ChairBoardPage() {
       toast.success("Đã cập nhật trạng thái ghế");
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Không thể cập nhật trạng thái ghế");
+    }
+  }
+
+  async function startVisit(appointment: Appointment) {
+    if (!session?.user?.id) return;
+    setStartingAppointmentId(appointment.id);
+    try {
+      const visit = await apiPost<Visit>("/api/visits", {
+        patient_id: appointment.patient_id,
+        branch_id: appointment.branch_id,
+        clinician_id: session.user.id,
+        source_appointment_id: appointment.id,
+      });
+      window.location.assign(`/visits/${visit.id}`);
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Không thể bắt đầu lượt khám");
+    } finally {
+      setStartingAppointmentId(null);
     }
   }
 
@@ -130,6 +157,7 @@ export function ChairBoardPage() {
             Hôm nay
           </Button>
           {canManage && <Button className="bg-white text-blue-700 hover:bg-blue-50" asChild><Link to={ROUTES.CHAIRS_SETTINGS}>Quản lý ghế</Link></Button>}
+          {canViewRevenue && <Button variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white" asChild><Link to={ROUTES.CHAIRS_REPORTS}>Báo cáo ghế</Link></Button>}
         </div>
       </div>
 
@@ -167,12 +195,12 @@ export function ChairBoardPage() {
                 </CardHeader>
                 <CardContent className="space-y-4 pt-4">
                   {item.current_appointment ? (
-                    <AppointmentSummary title="Đang diễn ra" appointment={item.current_appointment} patients={patientsById} users={usersById} />
+                    <AppointmentSummary title="Đang diễn ra" appointment={item.current_appointment} patients={patientsById} users={usersById} canEdit={canEditAppointments} onStart={startVisit} starting={startingAppointmentId === item.current_appointment.id} />
                   ) : (
                     <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">Không có lịch đang diễn ra</p>
                   )}
                   {item.next_appointment && item.next_appointment.id !== item.current_appointment?.id && (
-                    <AppointmentSummary title="Lịch tiếp theo" appointment={item.next_appointment} patients={patientsById} users={usersById} compact />
+                    <AppointmentSummary title="Lịch tiếp theo" appointment={item.next_appointment} patients={patientsById} users={usersById} compact canEdit={canEditAppointments} onStart={startVisit} starting={startingAppointmentId === item.next_appointment.id} />
                   )}
                   {canViewRevenue && item.revenue && (
                     <div className="grid grid-cols-3 gap-2 rounded-lg bg-emerald-50 p-3 text-xs dark:bg-emerald-950/30">
@@ -208,12 +236,15 @@ function Metric({ label, value }: { label: string; value: string }) {
   return <div><p className="text-[11px] text-muted-foreground">{label}</p><p className="mt-0.5 font-semibold tabular-nums">{value}</p></div>;
 }
 
-function AppointmentSummary({ title, appointment, patients, users, compact = false }: {
+function AppointmentSummary({ title, appointment, patients, users, compact = false, canEdit = false, onStart, starting }: {
   title: string;
   appointment: Appointment;
   patients: Map<string, Patient>;
   users: Map<string, UserWithDetails>;
   compact?: boolean;
+  canEdit?: boolean;
+  onStart: (appointment: Appointment) => void;
+  starting: boolean;
 }) {
   const end = new Date(new Date(appointment.scheduled_at).getTime() + appointment.duration_min * 60_000);
   return (
@@ -222,6 +253,8 @@ function AppointmentSummary({ title, appointment, patients, users, compact = fal
       <p className="mt-1 font-medium">{patients.get(appointment.patient_id)?.name ?? appointment.patient_id.slice(0, 8)}</p>
       <p className="mt-1 text-xs text-muted-foreground">{formatTime(appointment.scheduled_at)} - {formatTime(end.toISOString())} · {users.get(appointment.clinician_id)?.name ?? "Chưa rõ bác sĩ"}</p>
       {!compact && appointment.procedure && <p className="mt-1 text-xs text-muted-foreground">{appointment.procedure}</p>}
+      {!compact && appointment.chair_id && !["cancelled", "no_show", "completed"].includes(appointment.status) && <Button size="sm" className="mt-3" onClick={() => onStart(appointment)} disabled={starting}>{starting ? "Đang bắt đầu..." : "Bắt đầu khám"}</Button>}
+      {canEdit && <Button size="sm" variant="outline" className="mt-3" asChild><Link to={`/appointments/${appointment.id}?edit=1`}>Sửa lịch</Link></Button>}
     </div>
   );
 }

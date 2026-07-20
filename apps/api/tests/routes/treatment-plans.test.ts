@@ -348,6 +348,24 @@ describe("GET /api/treatment-plans/:id/pdf", () => {
     );
   });
 
+  it("uses the active clinic service price from the submitted service code", async () => {
+    const app = mountRoute("/api/treatment-plans", treatmentPlansRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/treatment-plans/plan-1/items",
+      new Map([
+        ["FROM treatment_plans", [planRow()]],
+        ["FROM treatment_services", [{ id: "service-1", tenant_id: "test-tenant", code: "TRAM-COM", name: "Trám composite", procedure: "filling", price: 650000, is_active: 1, created_at: "2026-01-01", updated_at: "2026-01-01" }]],
+        ["FROM treatment_plan_items WHERE tenant_id", [itemRow({ service_code: "TRAM-COM", unit_cost: 650000 })]],
+        ["COALESCE(SUM", [{ total: 650000 }]],
+      ]),
+      { body: { tooth_number: 11, service_code: "TRAM-COM", procedure: "other", description: "Trám răng", unit_cost: 1 } },
+    );
+    expect(res.status).toBe(201);
+    expect((await res.json() as { unit_cost: number }).unit_cost).toBe(650000);
+  });
+
   it("rejects access without read_patients permission", async () => {
     const app = mountRoute("/api/treatment-plans", treatmentPlansExtras);
     const res = await authedRequestWithDB(

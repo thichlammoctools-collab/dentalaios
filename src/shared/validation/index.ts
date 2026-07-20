@@ -218,6 +218,7 @@ export const planCreateSchema = z.object({
 
 export const planItemCreateSchema = z.object({
   tooth_number: z.number().int().nullable(),
+  service_code: z.string().trim().min(1).max(40).optional(),
   procedure: nonEmpty(100),
   description: nonEmpty(500),
   unit_cost: z.number().nonnegative(),
@@ -229,6 +230,16 @@ export const planItemCreateSchema = z.object({
 
 export type PlanCreateInput = z.infer<typeof planCreateSchema>;
 export type PlanItemCreateInput = z.infer<typeof planItemCreateSchema>;
+
+export const treatmentServiceUpsertSchema = z.object({
+  code: z.string().trim().min(2, "Mã dịch vụ tối thiểu 2 ký tự").max(40).regex(/^[A-Za-z0-9_-]+$/, "Mã dịch vụ chỉ gồm chữ, số, gạch ngang hoặc gạch dưới").transform((value) => value.toUpperCase()),
+  name: nonEmpty(200),
+  procedure: nonEmpty(100),
+  price: z.number().nonnegative("Giá dịch vụ phải lớn hơn hoặc bằng 0"),
+  is_active: z.boolean().default(true),
+});
+
+export type TreatmentServiceUpsertInput = z.infer<typeof treatmentServiceUpsertSchema>;
 
 // ──────────────── Payment ────────────────
 
@@ -444,6 +455,13 @@ export const chairAvailabilityQuerySchema = z.object({
 export const chairBoardQuerySchema = z.object({
   branch_id: z.string().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+export const chairRevenueReportQuerySchema = z.object({
+  branch_id: z.string().min(1),
+  range: z.coerce.number().int().refine((value): value is 7 | 30 | 90 => [7, 30, 90].includes(value), {
+    message: "Khoảng thời gian phải là 7, 30 hoặc 90 ngày",
+  }).default(30),
 });
 
 export type ChairCreateInput = z.infer<typeof chairCreateSchema>;

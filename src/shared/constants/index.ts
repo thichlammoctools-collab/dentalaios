@@ -16,6 +16,7 @@ export const ROUTES = {
   MANAGEMENT_DASHBOARD: "/management-dashboard",
   CHAIRS: "/chairs",
   CHAIRS_SETTINGS: "/chairs/settings",
+  CHAIRS_REPORTS: "/chairs/reports",
   SETTINGS_USERS: "/settings/users",
   SETTINGS_ROLES: "/settings/roles",
   SETTINGS_AUDIT_LOGS: "/settings/audit-logs",

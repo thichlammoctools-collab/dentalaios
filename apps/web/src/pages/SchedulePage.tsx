@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -12,10 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { AppointmentCard } from "@/components/schedule/AppointmentCard";
 import { AppointmentForm } from "@/components/schedule/AppointmentForm";
-import { apiDelete, apiGet, apiPatch, ApiError } from "@/lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
-import type { Appointment, DentalChair, Patient, UserWithDetails } from "@shared/types";
+import type { Appointment, DentalChair, Patient, UserWithDetails, Visit } from "@shared/types";
 import { isAssistantRole, isDoctorRole, ROUTES } from "@shared/constants";
 import { formatDate, formatTime, getWeekDays, isoToYmd, weekdayLabel, ymd, combineDateTime } from "@/lib/utils";
 
@@ -26,6 +26,7 @@ interface ChairsResponse { items: DentalChair[]; total: number }
 
 export function SchedulePage() {
   const { session } = useAuth();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const selectedBranchId = searchParams.get("branch_id") ?? "";
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -37,6 +38,7 @@ export function SchedulePage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [startingAppointmentId, setStartingAppointmentId] = useState<string | null>(null);
 
   // Filters apply to both schedule views.
   const [filterStatuses, setFilterStatuses] = useState<Set<string>>(new Set());
@@ -156,6 +158,25 @@ export function SchedulePage() {
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi hủy lịch hẹn");
       return false;
+    }
+  }
+
+  async function startVisit(appointment: Appointment) {
+    if (!session?.user?.id) return;
+    setStartingAppointmentId(appointment.id);
+    try {
+      const visit = await apiPost<Visit>("/api/visits", {
+        patient_id: appointment.patient_id,
+        branch_id: appointment.branch_id,
+        clinician_id: session.user.id,
+        source_appointment_id: appointment.id,
+      });
+      toast.success("Đã bắt đầu lượt khám");
+      navigate(`/visits/${visit.id}`);
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Không thể bắt đầu lượt khám");
+    } finally {
+      setStartingAppointmentId(null);
     }
   }
 
@@ -367,12 +388,19 @@ export function SchedulePage() {
                                 {a.source === "ai_next_visit" && "🤖 AI suggest"}
                               </span>
                             </div>
-                            {a.notes && (
-                              <p className="mt-1 truncate text-[11px] text-muted-foreground italic">
-                                💬 {a.notes}
-                              </p>
-                            )}
-                          </div>
+                             {a.notes && (
+                               <p className="mt-1 truncate text-[11px] text-muted-foreground italic">
+                                 💬 {a.notes}
+                               </p>
+                             )}
+                             {a.chair_id && !["cancelled", "no_show", "completed"].includes(a.status) && (
+                               <div className="mt-2">
+                                 <Button size="sm" onClick={(event) => { event.stopPropagation(); void startVisit(a); }} disabled={startingAppointmentId === a.id}>
+                                   {startingAppointmentId === a.id ? "Đang bắt đầu..." : "Bắt đầu khám"}
+                                 </Button>
+                               </div>
+                             )}
+                           </div>
                         </div>
                       </div>
                     );

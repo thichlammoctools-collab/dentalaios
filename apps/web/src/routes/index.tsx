@@ -22,6 +22,7 @@ import { ScheduleNewPage } from "@/pages/ScheduleNewPage";
 import { ManagementDashboardPage } from "@/pages/ManagementDashboardPage";
 import { ChairBoardPage } from "@/pages/ChairBoardPage";
 import { ChairSettingsPage } from "@/pages/ChairSettingsPage";
+import { ChairRevenueReportPage } from "@/pages/ChairRevenueReportPage";
 import { RequireAuth } from "@/components/RequireAuth";
 import { AppShell } from "@/components/AppShell";
 
@@ -100,6 +101,10 @@ export function AppRoutes() {
       <Route
         path={ROUTES.CHAIRS_SETTINGS}
         element={<Protected><ChairSettingsPage /></Protected>}
+      />
+      <Route
+        path={ROUTES.CHAIRS_REPORTS}
+        element={<Protected><ChairRevenueReportPage /></Protected>}
       />
       <Route
         path={ROUTES.PATIENTS}

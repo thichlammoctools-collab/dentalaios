@@ -11,7 +11,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { PERMISSIONS } from "@shared/constants";
-import { branchCreateSchema, branchUpdateSchema, paymentPrefixSchema } from "@shared/validation";
+import { branchCreateSchema, branchUpdateSchema, paymentPrefixSchema, treatmentServiceUpsertSchema } from "@shared/validation";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
 import { requirePermission } from "../middleware/rbac";
@@ -22,6 +22,7 @@ import { authService } from "../services/auth.service";
 import { testLarkCredentials } from "../lib/lark-client";
 import { NotFoundError, ValidationError } from "../lib/errors";
 import { paymentService } from "../services/payment.service";
+import { treatmentServicesService } from "../services/treatment-service-prices.service";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -113,6 +114,31 @@ router.delete(
     const deleted = await clinicService.deleteBranch(c.env.DB, jwt.tenant_id, c.req.param("id"));
     if (!deleted) throw new NotFoundError("Branch not found");
     return c.json({ ok: true });
+  },
+);
+
+// ──────────────── Treatment service catalog (admin managed) ────────────────
+
+// GET /api/clinic/treatment-services — prices include VAT
+router.get(
+  "/treatment-services",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const items = await treatmentServicesService.list(c.env.DB, jwt.tenant_id);
+    return c.json({ items, total: items.length, prices_include_vat: true });
+  },
+);
+
+// PUT /api/clinic/treatment-services — create or update a VAT-inclusive service price
+router.put(
+  "/treatment-services",
+  requirePermission(PERMISSIONS.MANAGE_USERS),
+  auditLog("update", "treatment_service"),
+  zValidator("json", treatmentServiceUpsertSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    return c.json(await treatmentServicesService.upsert(c.env.DB, jwt.tenant_id, c.req.valid("json")));
   },
 );
 

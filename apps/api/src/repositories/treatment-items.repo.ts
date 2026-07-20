@@ -31,14 +31,15 @@ export function createTreatmentItemsRepository(db: D1Database): TreatmentItemsRe
       await db
         .prepare(
           `INSERT INTO treatment_plan_items
-             (id, tenant_id, treatment_plan_id, tooth_number, procedure, description, unit_cost)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              (id, tenant_id, treatment_plan_id, tooth_number, service_code, procedure, description, unit_cost)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
           tenantId,
           planId,
           data.tooth_number ?? null,
+          data.service_code ?? null,
           data.procedure,
           data.description,
           data.unit_cost,
@@ -68,6 +69,7 @@ function mapItem(row: D1Row): TreatmentPlanItem {
     tenant_id: row.tenant_id as string,
     treatment_plan_id: row.treatment_plan_id as string,
     tooth_number: row.tooth_number as number | undefined,
+    service_code: (row.service_code as string | null) ?? undefined,
     procedure: row.procedure as string,
     description: row.description as string,
     unit_cost: Number(row.unit_cost ?? 0),

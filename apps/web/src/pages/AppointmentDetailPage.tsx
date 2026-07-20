@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +46,7 @@ const SOURCE_LABEL: Record<string, string> = {
 export function AppointmentDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { session } = useAuth();
   const [appt, setAppt] = useState<Appointment | null>(null);
   const [patient, setPatient] = useState<Patient | null>(null);
@@ -87,6 +88,10 @@ export function AppointmentDetailPage() {
     return () => { mounted = false; };
   }, [id, session?.branch?.id]);
 
+  useEffect(() => {
+    if (searchParams.get("edit") === "1") setEditOpen(true);
+  }, [searchParams]);
+
   if (loading || !appt) {
     return <p className="px-6 py-6 text-sm text-muted-foreground">Đang tải…</p>;
   }
@@ -95,6 +100,14 @@ export function AppointmentDetailPage() {
   const assistant = appt.assistant_id ? users.find((u) => u.id === appt.assistant_id) : null;
   const chair = appt.chair_id ? chairs.find((item) => item.id === appt.chair_id) : null;
   const endTime = new Date(new Date(appt.scheduled_at).getTime() + appt.duration_min * 60 * 1000);
+
+  function closeEdit() {
+    setEditOpen(false);
+    if (searchParams.has("edit")) {
+      searchParams.delete("edit");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }
 
   async function handleCancel(reason: string) {
     try {
@@ -200,10 +213,10 @@ export function AppointmentDetailPage() {
           appointment={appt}
           doctors={users}
           chairs={chairs}
-          onClose={() => setEditOpen(false)}
+          onClose={closeEdit}
           onSaved={(updated) => {
             setAppt(updated);
-            setEditOpen(false);
+            closeEdit();
           }}
         />
       )}

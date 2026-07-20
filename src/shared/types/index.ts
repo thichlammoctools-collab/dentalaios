@@ -187,6 +187,19 @@ export interface ClinicalFinding {
 
 export type TreatmentPlanStatus = "draft" | "approved" | "completed" | "cancelled";
 
+/** Tenant-configured treatment service. `price` always includes VAT. */
+export interface TreatmentService {
+  id: string;
+  tenant_id: string;
+  code: string;
+  name: string;
+  procedure: string;
+  price: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface TreatmentPlan {
   id: string;
   tenant_id: string;
@@ -207,6 +220,7 @@ export interface TreatmentPlanItem {
   tenant_id: string;
   treatment_plan_id: string;
   tooth_number?: number; // present for per-tooth items; absent for full-mouth procedures
+  service_code?: string;
   procedure: string; // e.g. "root_canal", "crown", "implant", "filling"
   description: string;
   unit_cost: number;

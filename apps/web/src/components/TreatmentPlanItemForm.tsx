@@ -1,14 +1,14 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { apiPost, ApiError } from "@/lib/api";
+import { apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { isValidFdiTooth } from "@shared/constants";
-import type { TreatmentPlanItem } from "@shared/types";
+import type { TreatmentPlanItem, TreatmentService } from "@shared/types";
 
 interface TreatmentPlanItemFormProps {
   open: boolean;
@@ -27,11 +27,28 @@ export function TreatmentPlanItemForm({
   const [procedure, setProcedure] = useState("filling");
   const [description, setDescription] = useState("");
   const [unitCost, setUnitCost] = useState<number | "">("");
+  const [services, setServices] = useState<TreatmentService[]>([]);
+  const [serviceCode, setServiceCode] = useState("");
   const [saving, setSaving] = useState(false);
   const [fullMouth, setFullMouth] = useState(false);
 
   const validTooth =
     fullMouth || (typeof toothNumber === "number" ? isValidFdiTooth(toothNumber) : false);
+
+  useEffect(() => {
+    if (!open) return;
+    void apiGet<{ items: TreatmentService[] }>("/api/clinic/treatment-services")
+      .then((response) => setServices(response.items.filter((service) => service.is_active)))
+      .catch(() => setServices([]));
+  }, [open]);
+
+  function selectService(code: string) {
+    setServiceCode(code);
+    const service = services.find((item) => item.code === code);
+    if (!service) return;
+    setProcedure(service.procedure);
+    setUnitCost(service.price);
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -50,6 +67,7 @@ export function TreatmentPlanItemForm({
         {
           tooth_number: fullMouth ? null : toothNumber,
           procedure,
+          service_code: serviceCode || undefined,
           description,
           unit_cost: unitCost,
         },
@@ -60,6 +78,7 @@ export function TreatmentPlanItemForm({
       setToothNumber("");
       setDescription("");
       setUnitCost("");
+      setServiceCode("");
       setFullMouth(false);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi thêm item");
@@ -94,8 +113,18 @@ export function TreatmentPlanItemForm({
             </Label>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-1.5">
+           <div className="grid gap-4 sm:grid-cols-2">
+             <div className="grid gap-1.5 sm:col-span-2">
+               <Label htmlFor="service">Dịch vụ áp dụng</Label>
+               <Select id="service" value={serviceCode} onChange={(e) => selectService(e.target.value)}>
+                 <option value="">— Dịch vụ tùy chỉnh —</option>
+                 {services.map((service) => (
+                   <option key={service.code} value={service.code}>{service.code} · {service.name}</option>
+                 ))}
+               </Select>
+               <p className="text-xs text-muted-foreground">Chọn dịch vụ để áp dụng mã và đơn giá đã gồm VAT của phòng khám.</p>
+             </div>
+             <div className="grid gap-1.5">
               <Label htmlFor="tooth">
                 Số răng FDI <span className="text-destructive">*</span>
               </Label>
@@ -167,12 +196,14 @@ export function TreatmentPlanItemForm({
                 min="0"
                 required
                 value={unitCost}
+                readOnly={Boolean(serviceCode)}
                 onChange={(e) => {
                   const v = e.target.value;
                   setUnitCost(v ? Number(v) : "");
                 }}
                 placeholder="VD: 500000"
               />
+              {serviceCode && <p className="text-xs text-muted-foreground">Giá được lấy từ danh mục dịch vụ, đã gồm VAT.</p>}
             </div>
           </div>
         </DialogBody>

@@ -3,6 +3,7 @@ import type { TreatmentPlan, TreatmentPlanItem } from "@shared/types";
 import type { PlanCreateInput, PlanItemCreateInput } from "@shared/validation";
 import { createTreatmentPlansRepository } from "../repositories/treatment-plans.repo";
 import { createTreatmentItemsRepository } from "../repositories/treatment-items.repo";
+import { createTreatmentServicesRepository } from "../repositories/treatment-service-prices.repo";
 import { NotFoundError, ValidationError } from "../lib/errors";
 import { assertAllInTenant } from "../lib/tenant-scope";
 
@@ -60,11 +61,18 @@ export const planService = {
     if (plan.status !== "draft") {
       throw new ValidationError("Chỉ có thể thêm item khi plan đang ở trạng thái draft");
     }
+    const service = data.service_code
+      ? await createTreatmentServicesRepository(db).getActiveByCode(tenantId, data.service_code)
+      : null;
+    if (data.service_code && !service) {
+      throw new ValidationError("Mã dịch vụ không hợp lệ hoặc đã ngừng áp dụng");
+    }
     const item = await createTreatmentItemsRepository(db).create(tenantId, planId, {
       tooth_number: data.tooth_number ?? undefined,
-      procedure: data.procedure,
+      service_code: service?.code,
+      procedure: service?.procedure ?? data.procedure,
       description: data.description,
-      unit_cost: data.unit_cost,
+      unit_cost: service?.price ?? data.unit_cost,
     });
     // Recompute total in same tenant scope
     await plans.recomputeTotal(tenantId, planId);
