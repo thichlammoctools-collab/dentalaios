@@ -43,7 +43,6 @@ jobs:
 
       # ─── Deploy Frontend to Pages ─────────────────────
       - name: Deploy Frontend
-        working-directory: apps/web
-        run: npm exec --workspace @dentalaios/api -- wrangler pages deploy dist --project-name=dentalaios-web --branch=main
+        run: npx wrangler pages deploy apps/web/dist --project-name=dentalaios-web --branch=main
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
