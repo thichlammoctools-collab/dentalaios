@@ -45,6 +45,20 @@ async function tenant(c: { env: Env }, id: string) {
   if (!value) throw new NotFoundError("Tenant not found");
   return value;
 }
+
+function validateContentScope(
+  current: { audience: "global" | "tenant"; tenant_id?: string | null },
+  update: { audience?: "global" | "tenant"; tenant_id?: string | null },
+): void {
+  const audience = update.audience ?? current.audience;
+  const tenantId = update.tenant_id === undefined ? current.tenant_id : update.tenant_id;
+  if (audience === "tenant" && !tenantId) {
+    throw new ConflictError("Tenant content requires a tenant");
+  }
+  if (audience === "global" && tenantId) {
+    throw new ConflictError("Global content cannot target a tenant");
+  }
+}
 router.use("*", requirePlatformAuth());
 router.get(
   "/dashboard",
@@ -199,8 +213,12 @@ router.put(
   async (c) => {
     const id = c.req.param("id");
     await tenant(c, id);
+    const config = createPlatformConfigRepository(c.env.DB);
+    if (!(await config.hasFlag(c.req.param("key")))) {
+      throw new NotFoundError("Feature flag not found");
+    }
     const data = c.req.valid("json");
-    await createPlatformConfigRepository(c.env.DB).setTenantFlag(
+    await config.setTenantFlag(
       id,
       c.req.param("key"),
       data.enabled,
@@ -277,6 +295,7 @@ router.post(
   zValidator("json", platformContentCreateSchema),
   async (c) => {
     const data = c.req.valid("json");
+    if (data.tenant_id) await tenant(c, data.tenant_id);
     const id = newId();
     await createPlatformContentRepository(c.env.DB).create(
       id,
@@ -300,10 +319,13 @@ router.patch(
   zValidator("json", platformContentUpdateSchema),
   async (c) => {
     const id = c.req.param("id");
-    if (!(await createPlatformContentRepository(c.env.DB).get(id)))
-      throw new NotFoundError("Content not found");
+    const repository = createPlatformContentRepository(c.env.DB);
+    const existing = await repository.get(id);
+    if (!existing) throw new NotFoundError("Content not found");
     const data = c.req.valid("json");
-    await createPlatformContentRepository(c.env.DB).update(
+    validateContentScope(existing, data);
+    if (data.tenant_id) await tenant(c, data.tenant_id);
+    await repository.update(
       id,
       data,
       getPlatformJwt(c).sub,
@@ -318,7 +340,10 @@ router.patch(
             : "content.updated",
       entity_type: "content",
       entity_id: id,
-      tenant_id: data.tenant_id ?? undefined,
+      tenant_id:
+        data.tenant_id === undefined
+          ? existing.tenant_id ?? undefined
+          : data.tenant_id ?? undefined,
     });
     return c.json(await createPlatformContentRepository(c.env.DB).get(id));
   },

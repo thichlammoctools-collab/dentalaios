@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -165,13 +166,11 @@ export function PaymentDetailDialog({ paymentId, onClose, onSaved }: PaymentDeta
                   <Label htmlFor="amount">
                     Số tiền (VND) <span className="text-red-500">*</span>
                   </Label>
-                  <Input
+                  <CurrencyInput
                     id="amount"
-                    type="number"
-                    min="1"
                     required
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value ? Number(e.target.value) : "")}
+                    onChange={setAmount}
                   />
                 </div>
                 <div className="grid gap-1.5">

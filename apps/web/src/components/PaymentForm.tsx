@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -99,14 +100,12 @@ export function PaymentForm({ open, onOpenChange, patientId, plans, onCreated }:
               <Label htmlFor="amt">
                 Số tiền (VND) <span className="text-red-500">*</span>
               </Label>
-              <Input
+              <CurrencyInput
                 id="amt"
-                type="number"
-                min="1"
                 required
                 value={amount}
-                onChange={(e) => setAmount(e.target.value ? Number(e.target.value) : "")}
-                placeholder="VD: 1500000"
+                onChange={setAmount}
+                placeholder="VD: 1 500 000"
               />
             </div>
             <div className="grid gap-1.5">

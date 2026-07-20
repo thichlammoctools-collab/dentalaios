@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -191,18 +192,13 @@ export function TreatmentPlanItemForm({
               <Label htmlFor="cost">
                 Đơn giá (VNĐ) <span className="text-destructive">*</span>
               </Label>
-              <Input
+              <CurrencyInput
                 id="cost"
-                type="number"
-                min="0"
                 required
                 value={unitCost}
                 readOnly={Boolean(serviceCode)}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setUnitCost(v ? Number(v) : "");
-                }}
-                placeholder="VD: 500000"
+                onChange={setUnitCost}
+                placeholder="VD: 500 000"
               />
               {serviceCode && <p className="text-xs text-muted-foreground">Giá được lấy từ danh mục dịch vụ, đã gồm VAT.</p>}
             </div>

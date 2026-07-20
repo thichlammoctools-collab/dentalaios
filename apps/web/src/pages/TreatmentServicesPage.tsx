@@ -3,10 +3,11 @@ import { apiDelete, apiGet, apiPut, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import { Dialog, DialogBody, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import type { TreatmentService } from "@shared/types";
 import { PERMISSIONS } from "@shared/constants";
 
-const EMPTY_SERVICE = { code: "", name: "", procedure: "filling", price: "", is_active: true };
+const EMPTY_SERVICE = { code: "", name: "", procedure: "filling", price: "" as number | "", is_active: true };
 
 export function TreatmentServicesPage() {
   const { session } = useAuth();
@@ -34,7 +35,7 @@ export function TreatmentServicesPage() {
   }
 
   function openNew() { setEditingCode(null); setForm(EMPTY_SERVICE); setDialogOpen(true); }
-  function openEdit(service: TreatmentService) { setEditingCode(service.code); setForm({ code: service.code, name: service.name, procedure: service.procedure, price: String(service.price), is_active: service.is_active }); setDialogOpen(true); }
+  function openEdit(service: TreatmentService) { setEditingCode(service.code); setForm({ code: service.code, name: service.name, procedure: service.procedure, price: service.price, is_active: service.is_active }); setDialogOpen(true); }
 
   async function remove(service: TreatmentService) {
     if (!confirm(`Xóa dịch vụ ${service.code} - ${service.name}? Nếu dịch vụ đã có trong kế hoạch điều trị, hệ thống sẽ chỉ ngừng áp dụng để bảo toàn lịch sử.`)) return;
@@ -49,8 +50,8 @@ export function TreatmentServicesPage() {
   }
 
   async function save() {
-    const price = Number(form.price);
-    if (!form.code.trim() || !form.name.trim() || !Number.isFinite(price) || price < 0) { toast.error("Nhập mã, tên và giá dịch vụ hợp lệ"); return; }
+    const price = form.price;
+    if (!form.code.trim() || !form.name.trim() || typeof price !== "number" || !Number.isFinite(price) || price < 0) { toast.error("Nhập mã, tên và giá dịch vụ hợp lệ"); return; }
     setSaving(true);
     try {
       const saved = await apiPut<TreatmentService>("/api/clinic/treatment-services", { ...form, price });

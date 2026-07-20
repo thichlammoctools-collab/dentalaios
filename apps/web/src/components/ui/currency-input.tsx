@@ -8,11 +8,11 @@ interface CurrencyInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>,
 }
 
 /**
- * Input component tự động format số tiền với dấu chấm phân cách hàng nghìn (100.000).
+ * Input component tự động format số tiền với dấu cách phân cách hàng nghìn (100 000).
  *
  * @example
  * const [amount, setAmount] = useState<number | "">("");
- * <CurrencyInput value={amount} onChange={setAmount} placeholder="VD: 500.000" />
+ * <CurrencyInput value={amount} onChange={setAmount} placeholder="VD: 500 000" />
  */
 export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
   ({ value, onChange, ...props }, ref) => {
@@ -37,8 +37,8 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
         return;
       }
 
-      // Chỉ cho phép số và dấu chấm
-      if (!/^[\d.]*$/.test(input)) {
+      // Chấp nhận số cùng dấu cách hoặc dấu chấm khi dán dữ liệu.
+      if (!/^[\d.\s]*$/.test(input)) {
         return;
       }
 

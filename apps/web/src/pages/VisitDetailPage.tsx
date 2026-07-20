@@ -5,6 +5,7 @@ import { VoiceFindingsDialog } from "@/components/VoiceFindingsDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { VisitForm } from "@/components/VisitForm";
 import { FdiToothChart } from "@/components/FdiToothChart";
 import { FindingsList } from "@/components/FindingsList";
@@ -822,10 +823,9 @@ export function VisitDetailPage() {
                               />
                             </td>
                             <td className="px-3 py-2">
-                              <Input
-                                type="number"
+                              <CurrencyInput
                                 value={item.cost || ""}
-                                onChange={(e) => updateItem(item.id, "cost", Number(e.target.value))}
+                                onChange={(value) => updateItem(item.id, "cost", value === "" ? 0 : value)}
                                 className="h-8 text-right text-xs border-slate-200 dark:border-zinc-700 dark:bg-zinc-800 font-mono"
                                 placeholder="0"
                               />
