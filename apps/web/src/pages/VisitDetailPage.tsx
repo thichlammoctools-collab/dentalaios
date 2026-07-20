@@ -935,7 +935,7 @@ export function VisitDetailPage() {
           </DialogHeader>
           {suggestNextResult && (
             <div className="space-y-3">
-              <div className="rounded-md border bg-gradient-to-br from-blue-50 to-purple-50 p-3">
+              <div className="rounded-md border bg-gradient-to-br from-blue-50 to-purple-50 p-3 dark:from-blue-950/30 dark:to-purple-950/30">
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div>
                     <p className="text-xs text-muted-foreground">Ngày đề xuất</p>

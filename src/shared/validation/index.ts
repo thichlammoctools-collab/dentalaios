@@ -257,6 +257,17 @@ export const treatmentCaseCancelSchema = z.object({
 }).strict();
 
 export type TreatmentCaseCancelInput = z.infer<typeof treatmentCaseCancelSchema>;
+
+export const treatmentCaseMilestoneUpdateSchema = z.object({
+  status: z.enum(["not_started", "in_progress", "completed", "skipped"]),
+  reason: optionalText(1000),
+}).strict().superRefine((data, context) => {
+  if (data.status === "skipped" && !data.reason?.trim()) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["reason"], message: "Cần nhập lý do bỏ qua hạng mục" });
+  }
+});
+
+export type TreatmentCaseMilestoneUpdateInput = z.infer<typeof treatmentCaseMilestoneUpdateSchema>;
 export type PlanItemUpdateInput = z.infer<typeof planItemUpdateSchema>;
 
 export const treatmentServiceUpsertSchema = z.object({

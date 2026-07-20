@@ -7,6 +7,7 @@ import {
   treatmentCaseActivateSchema,
   treatmentCaseCancelSchema,
   treatmentCasePauseSchema,
+  treatmentCaseMilestoneUpdateSchema,
 } from "@shared/validation";
 import { PERMISSIONS } from "@shared/constants";
 import type { Env } from "../index";
@@ -33,6 +34,31 @@ router.get(
       status: (url.searchParams.get("status") as "draft" | "approved" | "completed" | "cancelled" | null) ?? undefined,
     });
     return c.json({ items, total: items.length });
+  },
+);
+
+// Milestones are an ordered operational projection of the approved plan items.
+router.get(
+  "/:id/case/milestones",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const items = await treatmentCasesService.listMilestones(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    return c.json({ items, total: items.length });
+  },
+);
+
+router.patch(
+  "/:id/case/milestones/:milestoneId",
+  requirePermission(PERMISSIONS.APPROVE_PLANS),
+  auditLog("milestone_updated", "treatment_case_milestone"),
+  zValidator("json", treatmentCaseMilestoneUpdateSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const milestone = await treatmentCasesService.updateMilestone(
+      c.env.DB, jwt.tenant_id, c.req.param("id"), c.req.param("milestoneId"), jwt.sub, c.req.valid("json"),
+    );
+    return c.json(milestone);
   },
 );
 

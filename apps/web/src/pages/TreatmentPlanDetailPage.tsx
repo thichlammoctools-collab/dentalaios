@@ -7,10 +7,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { TreatmentPlanItemForm } from "@/components/TreatmentPlanItemForm";
 import { Select } from "@/components/ui/select";
-import { apiDelete, apiGet, apiPost, getToken, ApiError } from "@/lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost, getToken, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
-import type { TreatmentCase, TreatmentCaseType, TreatmentPlan, TreatmentPlanItem } from "@shared/types";
+import type { TreatmentCase, TreatmentCaseMilestone, TreatmentCaseMilestoneStatus, TreatmentCaseType, TreatmentPlan, TreatmentPlanItem } from "@shared/types";
 
 const CASE_TYPE_LABELS: Record<TreatmentCaseType, string> = {
   general: "Điều trị tổng quát",
@@ -28,12 +28,27 @@ const CASE_STATUS_LABELS: Record<TreatmentCase["status"], string> = {
   cancelled: "Đã hủy",
 };
 
+const MILESTONE_STATUS_LABELS: Record<TreatmentCaseMilestoneStatus, string> = {
+  not_started: "Chưa bắt đầu",
+  in_progress: "Đang thực hiện",
+  completed: "Hoàn thành",
+  skipped: "Bỏ qua",
+};
+
+const MILESTONE_STATUS_VARIANTS: Record<TreatmentCaseMilestoneStatus, "secondary" | "warning" | "success" | "outline"> = {
+  not_started: "secondary",
+  in_progress: "warning",
+  completed: "success",
+  skipped: "outline",
+};
+
 export function TreatmentPlanDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [plan, setPlan] = useState<TreatmentPlan | null>(null);
   const [items, setItems] = useState<TreatmentPlanItem[]>([]);
   const [treatmentCase, setTreatmentCase] = useState<TreatmentCase | null>(null);
+  const [milestones, setMilestones] = useState<TreatmentCaseMilestone[]>([]);
   const [caseType, setCaseType] = useState<TreatmentCaseType>("general");
   const [caseSaving, setCaseSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -55,6 +70,12 @@ export function TreatmentPlanDetailPage() {
       setPlan(p);
       setItems(its.items);
       setTreatmentCase(caseResult.case);
+      if (caseResult.case) {
+        const milestoneResult = await apiGet<{ items: TreatmentCaseMilestone[] }>(`/api/treatment-plans/${id}/case/milestones`);
+        setMilestones(milestoneResult.items);
+      } else {
+        setMilestones([]);
+      }
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Lỗi tải plan";
       setError(msg);
@@ -95,9 +116,26 @@ export function TreatmentPlanDetailPage() {
         case_type: caseType,
       });
       setTreatmentCase(created);
+      await load();
       toast.success("Đã kích hoạt ca điều trị");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Không thể kích hoạt ca điều trị");
+    } finally {
+      setCaseSaving(false);
+    }
+  }
+
+  async function changeMilestoneStatus(milestone: TreatmentCaseMilestone, status: TreatmentCaseMilestoneStatus) {
+    if (!plan) return;
+    const reason = status === "skipped" ? window.prompt("Lý do bỏ qua hạng mục này:") : undefined;
+    if (status === "skipped" && !reason?.trim()) return;
+    setCaseSaving(true);
+    try {
+      await apiPatch(`/api/treatment-plans/${plan.id}/case/milestones/${milestone.id}`, { status, ...(reason ? { reason } : {}) });
+      await load();
+      toast.success(status === "in_progress" ? "Đã bắt đầu milestone" : status === "completed" ? "Đã hoàn thành milestone" : "Đã bỏ qua milestone");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Không thể cập nhật milestone");
     } finally {
       setCaseSaving(false);
     }
@@ -260,7 +298,7 @@ export function TreatmentPlanDetailPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <CardTitle>Ca điều trị</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">Theo dõi vòng đời điều trị dài hạn. Milestone và tài chính sẽ được bổ sung ở phase tiếp theo.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Milestone được tạo tự động từ các hạng mục của kế hoạch đã duyệt.</p>
             </div>
             {treatmentCase && (
               <Badge variant={treatmentCase.status === "active" || treatmentCase.status === "completed" ? "success" : "warning"}>
@@ -286,20 +324,28 @@ export function TreatmentPlanDetailPage() {
             )
           ) : (
             <div className="space-y-4">
-              <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+               <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
                 <div><p className="text-muted-foreground">Mã ca</p><p className="font-mono font-medium">{treatmentCase.case_number}</p></div>
                 <div><p className="text-muted-foreground">Loại ca</p><p className="font-medium">{CASE_TYPE_LABELS[treatmentCase.case_type]}</p></div>
                 <div><p className="text-muted-foreground">Chi nhánh chính</p><p className="font-medium">{treatmentCase.primary_branch_name ?? treatmentCase.primary_branch_id}</p></div>
                 <div><p className="text-muted-foreground">Bác sĩ phụ trách</p><p className="font-medium">{treatmentCase.primary_clinician_name ?? treatmentCase.primary_clinician_id}</p></div>
-              </div>
-              {treatmentCase.target_completed_at && <p className="text-sm text-muted-foreground">Dự kiến hoàn thành: {treatmentCase.target_completed_at}</p>}
+               </div>
+               <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+                 <div className="flex items-center justify-between"><span className="text-muted-foreground">Tiến độ hạng mục</span><span className="font-semibold">{milestones.filter((item) => ["completed", "skipped"].includes(item.status)).length}/{milestones.length}</span></div>
+                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${milestones.length ? (milestones.filter((item) => ["completed", "skipped"].includes(item.status)).length / milestones.length) * 100 : 0}%` }} /></div>
+               </div>
+               {treatmentCase.target_completed_at && <p className="text-sm text-muted-foreground">Dự kiến hoàn thành: {treatmentCase.target_completed_at}</p>}
               {treatmentCase.paused_reason && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">Lý do tạm ngưng: {treatmentCase.paused_reason}</p>}
               {treatmentCase.cancelled_reason && <p className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">Lý do hủy: {treatmentCase.cancelled_reason}</p>}
-              <div className="flex flex-wrap gap-2">
+               <div className="flex flex-wrap gap-2">
                 {treatmentCase.status === "active" && <><Button variant="outline" onClick={() => void changeCaseStatus("pause")} disabled={caseSaving}>Tạm ngưng</Button><Button onClick={() => void changeCaseStatus("complete")} disabled={caseSaving}>Hoàn tất ca</Button><Button variant="destructive" onClick={() => void changeCaseStatus("cancel")} disabled={caseSaving}>Hủy ca</Button></>}
                 {treatmentCase.status === "paused" && <><Button onClick={() => void changeCaseStatus("resume")} disabled={caseSaving}>Tiếp tục ca</Button><Button variant="destructive" onClick={() => void changeCaseStatus("cancel")} disabled={caseSaving}>Hủy ca</Button></>}
-              </div>
-            </div>
+               </div>
+               <div className="border-t pt-4">
+                 <div className="mb-4 flex items-center justify-between"><div><p className="font-medium">Timeline điều trị</p><p className="text-sm text-muted-foreground">Thực hiện lần lượt các hạng mục đã chốt trong kế hoạch.</p></div><Badge variant="outline">{milestones.length} milestone</Badge></div>
+                 {milestones.length === 0 ? <p className="text-sm text-muted-foreground">Chưa có milestone. Tải lại ca hoặc liên hệ quản trị nếu ca được tạo trước khi tính năng milestone được kích hoạt.</p> : <ol className="relative ml-2 border-l border-border pl-5">{milestones.map((milestone, index) => <li key={milestone.id} className="relative pb-5 last:pb-0"><span className={`absolute -left-[1.82rem] top-1 grid h-5 w-5 place-items-center rounded-full border-2 border-background ${milestone.status === "completed" ? "bg-emerald-500" : milestone.status === "in_progress" ? "bg-amber-500" : milestone.status === "skipped" ? "bg-slate-400" : "bg-muted"}`}><span className="h-1.5 w-1.5 rounded-full bg-white" /></span><div className="rounded-lg border bg-card p-3"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-xs text-muted-foreground">Mốc {index + 1} · {milestone.item.tooth_number != null ? `Răng #${milestone.item.tooth_number}` : "Toàn hàm"}</p><p className="font-medium">{milestone.item.service_name ?? milestone.item.procedure}</p><p className="mt-1 text-sm text-muted-foreground">{milestone.item.description}</p></div><div className="text-left sm:text-right"><Badge variant={MILESTONE_STATUS_VARIANTS[milestone.status]}>{MILESTONE_STATUS_LABELS[milestone.status]}</Badge><p className="mt-1 text-sm font-medium">{formatCurrency(milestone.item.unit_cost, plan.currency)}</p></div></div>{milestone.status === "in_progress" && milestone.started_at && <p className="mt-2 text-xs text-muted-foreground">Bắt đầu: {formatDateTime(milestone.started_at)}</p>}{milestone.status === "completed" && milestone.completed_at && <p className="mt-2 text-xs text-emerald-700 dark:text-emerald-300">Hoàn thành: {formatDateTime(milestone.completed_at)}</p>}{milestone.status === "skipped" && <p className="mt-2 text-xs text-muted-foreground">Bỏ qua: {milestone.skipped_reason}</p>}{treatmentCase.status === "active" && !["completed", "skipped"].includes(milestone.status) && <div className="mt-3 flex flex-wrap gap-2">{milestone.status === "not_started" && <Button size="sm" variant="outline" disabled={caseSaving} onClick={() => void changeMilestoneStatus(milestone, "in_progress")}>Bắt đầu</Button>}<Button size="sm" disabled={caseSaving} onClick={() => void changeMilestoneStatus(milestone, "completed")}>Hoàn thành</Button><Button size="sm" variant="ghost" disabled={caseSaving} onClick={() => void changeMilestoneStatus(milestone, "skipped")}>Bỏ qua</Button></div>}</div></li>)}</ol>}
+               </div>
+             </div>
           )}
         </CardContent>
       </Card>

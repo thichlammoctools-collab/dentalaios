@@ -1,7 +1,8 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import type { TreatmentCase, TreatmentCaseStatus, TreatmentCaseStatusHistory } from "@shared/types";
-import type { TreatmentCaseActivateInput } from "@shared/validation";
+import type { TreatmentCase, TreatmentCaseMilestone, TreatmentCaseMilestoneStatus, TreatmentCaseStatus, TreatmentCaseStatusHistory } from "@shared/types";
+import type { TreatmentCaseActivateInput, TreatmentCaseMilestoneUpdateInput } from "@shared/validation";
 import { createTreatmentPlansRepository } from "../repositories/treatment-plans.repo";
+import { createTreatmentItemsRepository } from "../repositories/treatment-items.repo";
 import { createTreatmentCasesRepository } from "../repositories/treatment-cases.repo";
 import { assertAllInTenant } from "../lib/tenant-scope";
 import { ConflictError, NotFoundError, ValidationError } from "../lib/errors";
@@ -42,6 +43,10 @@ export const treatmentCasesService = {
       { table: "branches", id: actor.branchId },
       { table: "users", id: actor.userId },
     ]);
+    const planItems = await createTreatmentItemsRepository(db).listByPlan(tenantId, planId);
+    if (planItems.length === 0) {
+      throw new ValidationError("Kế hoạch phải có ít nhất một hạng mục để kích hoạt ca điều trị");
+    }
     const caseNumber = await allocateCaseNumber(db, tenantId);
     const caseType = data.case_type;
     try {
@@ -58,6 +63,7 @@ export const treatmentCasesService = {
         treatmentGoal: data.treatment_goal,
         targetCompletedAt: data.target_completed_at,
         createdBy: actor.userId,
+        milestones: planItems.map((item, index) => ({ treatmentPlanItemId: item.id, sortOrder: index + 1 })),
       });
     } catch (err) {
       if (isUniqueConstraintError(err)) {
@@ -90,6 +96,12 @@ export const treatmentCasesService = {
     if ((target === "paused" || target === "cancelled") && !reason) {
       throw new ValidationError("Cần nhập lý do cho thay đổi trạng thái này");
     }
+    if (target === "completed") {
+      const milestones = await cases.listMilestones(tenantId, treatmentCase.id);
+      if (milestones.some((milestone) => !["completed", "skipped"].includes(milestone.status))) {
+        throw new ValidationError("Hoàn tất hoặc bỏ qua có lý do tất cả milestone trước khi hoàn tất ca");
+      }
+    }
     const changed = await cases.transition(tenantId, treatmentCase.id, treatmentCase.status, target, actorUserId, reason);
     if (!changed) throw new ConflictError("Trạng thái ca đã thay đổi, vui lòng tải lại");
     const updated = await cases.getById(tenantId, treatmentCase.id);
@@ -101,6 +113,47 @@ export const treatmentCasesService = {
     const treatmentCase = await createTreatmentCasesRepository(db).getByPlanId(tenantId, planId);
     if (!treatmentCase) throw new NotFoundError("Ca điều trị không tồn tại");
     return createTreatmentCasesRepository(db).listStatusHistory(tenantId, treatmentCase.id);
+  },
+
+  async listMilestones(db: D1Database, tenantId: string, planId: string): Promise<TreatmentCaseMilestone[]> {
+    const treatmentCase = await createTreatmentCasesRepository(db).getByPlanId(tenantId, planId);
+    if (!treatmentCase) throw new NotFoundError("Ca điều trị không tồn tại");
+    return createTreatmentCasesRepository(db).listMilestones(tenantId, treatmentCase.id);
+  },
+
+  async updateMilestone(
+    db: D1Database,
+    tenantId: string,
+    planId: string,
+    milestoneId: string,
+    actorUserId: string,
+    data: TreatmentCaseMilestoneUpdateInput,
+  ): Promise<TreatmentCaseMilestone> {
+    const cases = createTreatmentCasesRepository(db);
+    const treatmentCase = await cases.getByPlanId(tenantId, planId);
+    if (!treatmentCase) throw new NotFoundError("Ca điều trị không tồn tại");
+    if (treatmentCase.status !== "active") {
+      throw new ConflictError("Chỉ có thể cập nhật milestone khi ca đang điều trị");
+    }
+    const milestone = await cases.getMilestone(tenantId, treatmentCase.id, milestoneId);
+    if (!milestone) throw new NotFoundError("Milestone không tồn tại");
+    if (milestone.status === data.status) return milestone;
+    const allowed: Record<TreatmentCaseMilestoneStatus, TreatmentCaseMilestoneStatus[]> = {
+      not_started: ["in_progress", "completed", "skipped"],
+      in_progress: ["not_started", "completed", "skipped"],
+      completed: [],
+      skipped: [],
+    };
+    if (!allowed[milestone.status].includes(data.status)) {
+      throw new ConflictError("Không thể chuyển milestone sang trạng thái đã chọn");
+    }
+    const changed = await cases.transitionMilestone(
+      tenantId, treatmentCase.id, milestoneId, milestone.status, data.status, actorUserId, data.reason,
+    );
+    if (!changed) throw new ConflictError("Milestone đã thay đổi, vui lòng tải lại");
+    const updated = await cases.getMilestone(tenantId, treatmentCase.id, milestoneId);
+    if (!updated) throw new NotFoundError("Milestone không tồn tại");
+    return updated;
   },
 };
 

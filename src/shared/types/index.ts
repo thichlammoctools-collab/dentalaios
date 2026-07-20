@@ -277,6 +277,27 @@ export interface TreatmentCaseStatusHistory {
   changed_at: string;
 }
 
+export type TreatmentCaseMilestoneStatus = "not_started" | "in_progress" | "completed" | "skipped";
+
+/** A case milestone is created from exactly one approved treatment-plan item. */
+export interface TreatmentCaseMilestone {
+  id: string;
+  tenant_id: string;
+  treatment_case_id: string;
+  treatment_plan_item_id: string;
+  sort_order: number;
+  status: TreatmentCaseMilestoneStatus;
+  planned_at: string;
+  started_at?: string;
+  completed_at?: string;
+  skipped_at?: string;
+  skipped_reason?: string;
+  updated_by: string;
+  created_at: string;
+  updated_at: string;
+  item: TreatmentPlanItem;
+}
+
 // ───────────────────────── Billing ─────────────────────────
 
 export type PaymentMethod = "cash" | "transfer" | "card" | "other";
