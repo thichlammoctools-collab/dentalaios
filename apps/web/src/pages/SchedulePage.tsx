@@ -344,14 +344,28 @@ export function SchedulePage() {
                         onClick={() => setEditing(a)}
                         className={`cursor-pointer rounded-lg border-l-4 px-3 py-2.5 transition-all hover:shadow-md hover:bg-accent/40 ${statusBorderClass(a.status)}`}
                       >
-                        <div className="flex items-start gap-3">
+                        <div className="flex items-stretch gap-3">
                           {/* Time block */}
-                          <div className="shrink-0 min-w-[80px] text-center">
+                          <div className="shrink-0 min-w-[148px] text-left">
                             <div className="font-mono text-xl font-bold leading-tight tabular-nums">
                               {formatTime(a.scheduled_at)} → {formatTime(endTime.toISOString())}
                             </div>
                             <div className="font-mono text-sm font-medium text-muted-foreground tabular-nums">
                               {a.duration_min} phút
+                            </div>
+                            <div className="mt-2 space-y-1.5 text-[11px] text-muted-foreground">
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-9 shrink-0 text-[10px] uppercase opacity-70">BS</span>
+                                {doctor && <ProfileAvatar subject="users" entityId={doctor.id} name={doctor.name} avatarFileId={doctor.avatar_file_id} size="sm" />}
+                                <span className="truncate font-medium text-foreground">{doctor?.name ?? "—"}</span>
+                              </div>
+                              {assistant && (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="w-9 shrink-0 text-[10px] uppercase opacity-70">Phụ tá</span>
+                                  <ProfileAvatar subject="users" entityId={assistant.id} name={assistant.name} avatarFileId={assistant.avatar_file_id} size="sm" />
+                                  <span className="truncate font-medium text-foreground">{assistant.name}</span>
+                                </div>
+                              )}
                             </div>
                           </div>
 
@@ -369,24 +383,6 @@ export function SchedulePage() {
                               </span>
                             </div>
                             <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <span className="text-[10px] uppercase opacity-70">BS</span>
-                                {doctor && <ProfileAvatar subject="users" entityId={doctor.id} name={doctor.name} avatarFileId={doctor.avatar_file_id} size="sm" />}
-                                <span className="font-medium text-foreground">{doctor?.name ?? "—"}</span>
-                              </span>
-                              {assistant && (
-                                <span className="flex items-center gap-1">
-                                <span className="text-[10px] uppercase opacity-70">Phụ tá</span>
-                                <ProfileAvatar subject="users" entityId={assistant.id} name={assistant.name} avatarFileId={assistant.avatar_file_id} size="sm" />
-                                  <span className="font-medium text-foreground">{assistant.name}</span>
-                                </span>
-                              )}
-                              {chair && (
-                                <span className="flex items-center gap-1">
-                                  <span className="text-[10px] uppercase opacity-70">Ghế</span>
-                                  <span className="font-medium text-foreground">{chair.name}</span>
-                                </span>
-                              )}
                               {a.procedure && (
                                 <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">
                                   {a.procedure}
@@ -402,15 +398,21 @@ export function SchedulePage() {
                                  💬 {a.notes}
                                </p>
                              )}
-                             {a.chair_id && !["cancelled", "no_show", "completed"].includes(a.status) && (
-                               <div className="mt-2">
-                                 <Button size="sm" onClick={(event) => { event.stopPropagation(); void startVisit(a); }} disabled={startingAppointmentId === a.id}>
-                                   {startingAppointmentId === a.id ? "Đang bắt đầu..." : "Bắt đầu khám"}
-                                 </Button>
-                               </div>
-                             )}
-                           </div>
-                        </div>
+                            </div>
+                            <div className="flex shrink-0 flex-col items-end justify-end gap-2 text-right">
+                              {chair && (
+                                <div className="rounded-md bg-muted px-2 py-1 text-[11px]">
+                                  <span className="mr-1 text-[10px] uppercase text-muted-foreground">Ghế</span>
+                                  <span className="font-medium text-foreground">{chair.name}</span>
+                                </div>
+                              )}
+                              {a.chair_id && !["cancelled", "no_show", "completed"].includes(a.status) && (
+                                <Button size="sm" onClick={(event) => { event.stopPropagation(); void startVisit(a); }} disabled={startingAppointmentId === a.id}>
+                                  {startingAppointmentId === a.id ? "Đang bắt đầu..." : "Bắt đầu khám"}
+                                </Button>
+                              )}
+                            </div>
+                         </div>
                       </div>
                     );
                   })}
