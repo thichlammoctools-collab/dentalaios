@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { TreatmentPlanItemForm } from "@/components/TreatmentPlanItemForm";
 import { Select } from "@/components/ui/select";
+import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { apiDelete, apiGet, apiPatch, apiPost, getToken, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
@@ -372,6 +373,8 @@ export function TreatmentPlanDetailPage() {
                   <TableHead>Răng</TableHead>
                     <TableHead>Dịch vụ</TableHead>
                   <TableHead>Mô tả</TableHead>
+                  <TableHead>Bác sĩ điều trị</TableHead>
+                  <TableHead>Phụ tá</TableHead>
                   <TableHead className="text-right">Đơn giá (gồm VAT)</TableHead>
                   {canEdit && <TableHead></TableHead>}
                 </TableRow>
@@ -390,6 +393,8 @@ export function TreatmentPlanDetailPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{item.description}</TableCell>
+                    <TableCell>{item.treating_clinician_name ? <div className="flex items-center gap-2"><ProfileAvatar subject="users" entityId={item.treating_clinician_id} name={item.treating_clinician_name} size="sm" /><span>{item.treating_clinician_name}</span></div> : "—"}</TableCell>
+                    <TableCell>{item.assistant_name ? <div className="flex items-center gap-2"><ProfileAvatar subject="users" entityId={item.assistant_id} name={item.assistant_name} size="sm" /><span>{item.assistant_name}</span></div> : "—"}</TableCell>
                     <TableCell className="text-right">
                       {formatCurrency(item.unit_cost, plan.currency)}
                     </TableCell>

@@ -127,6 +127,8 @@ export function createVisitsRepository(db: D1Database): VisitsRepository {
       const binds: unknown[] = [];
       const allowed: (keyof Visit)[] = [
         "status",
+        "completed_at",
+        "completed_by",
         "notes",
         "treating_clinician_id",
         "assistant_id",
@@ -163,6 +165,8 @@ function mapVisit(row: D1Row): Visit {
     clinician_id: row.clinician_id as string,
     date: row.date as string,
     status: row.status as Visit["status"],
+    completed_at: (row.completed_at as string | null) ?? undefined,
+    completed_by: (row.completed_by as string | null) ?? undefined,
     notes: (row.notes as string | null) ?? undefined,
     created_at: row.created_at as string,
     blood_pressure_systolic: (row.blood_pressure_systolic as number | null) ?? undefined,

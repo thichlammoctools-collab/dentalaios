@@ -7,6 +7,7 @@ import { createAppointmentsRepository } from "../repositories/appointments.repo"
 import { createChairsRepository } from "../repositories/chairs.repo";
 import { ConflictError, NotFoundError, ValidationError } from "../lib/errors";
 import { assertAllInTenant } from "../lib/tenant-scope";
+import { assertTreatmentPersonnel } from "../lib/personnel";
 
 export const visitService = {
   list(
@@ -34,6 +35,10 @@ export const visitService = {
       { table: "users", id: data.treating_clinician_id ?? undefined },
       { table: "users", id: data.assistant_id ?? undefined },
     ]);
+    await assertTreatmentPersonnel(db, tenantId, {
+      treatingClinicianId: data.treating_clinician_id ?? undefined,
+      assistantId: data.assistant_id ?? undefined,
+    });
     const visits = createVisitsRepository(db);
     let chairId = data.chair_id;
     if (data.source_appointment_id) {
@@ -76,7 +81,7 @@ export const visitService = {
     return created;
   },
 
-  async update(db: D1Database, tenantId: string, id: string, data: VisitUpdateInput): Promise<Visit> {
+  async update(db: D1Database, tenantId: string, id: string, data: VisitUpdateInput, actorUserId: string): Promise<Visit> {
     // Ownership check for optional user references on update.
     await assertAllInTenant(db, tenantId, [
       { table: "users", id: data.treating_clinician_id ?? undefined },
@@ -85,16 +90,27 @@ export const visitService = {
     const visits = createVisitsRepository(db);
     const current = await visits.getById(tenantId, id);
     if (!current) throw new NotFoundError("Visit not found");
+    if (data.status) {
+      if (current.status !== "in_progress" || !["completed", "cancelled"].includes(data.status)) {
+        throw new ConflictError("Chỉ có thể hoàn tất hoặc hủy lượt khám đang thực hiện");
+      }
+    }
     if (data.chair_id !== undefined) {
       if (await hasConfirmedPayment(db, tenantId, id)) {
         throw new ConflictError("Không thể đổi ghế vì lượt khám đã có doanh thu xác nhận");
       }
       await assertVisitChair(db, tenantId, current.branch_id, data.chair_id, false);
     }
+    await assertTreatmentPersonnel(db, tenantId, {
+      treatingClinicianId: data.treating_clinician_id ?? undefined,
+      assistantId: data.assistant_id ?? undefined,
+    });
     const updated = await visits.update(tenantId, id, {
       ...data,
       treating_clinician_id: data.treating_clinician_id ?? undefined,
       assistant_id: data.assistant_id ?? undefined,
+      completed_at: data.status === "completed" ? new Date().toISOString() : undefined,
+      completed_by: data.status === "completed" ? actorUserId : undefined,
     });
     if (!updated) throw new NotFoundError("Visit not found");
     return updated;

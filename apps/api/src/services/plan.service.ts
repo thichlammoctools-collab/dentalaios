@@ -6,6 +6,7 @@ import { createTreatmentItemsRepository } from "../repositories/treatment-items.
 import { createTreatmentServicesRepository } from "../repositories/treatment-service-prices.repo";
 import { NotFoundError, ValidationError } from "../lib/errors";
 import { assertAllInTenant } from "../lib/tenant-scope";
+import { assertTreatmentPersonnel } from "../lib/personnel";
 
 export const planService = {
   list(
@@ -67,6 +68,14 @@ export const planService = {
     if (data.service_code && !service) {
       throw new ValidationError("Mã dịch vụ không hợp lệ hoặc đã ngừng áp dụng");
     }
+    await assertAllInTenant(db, tenantId, [
+      { table: "users", id: data.treating_clinician_id ?? undefined },
+      { table: "users", id: data.assistant_id ?? undefined },
+    ]);
+    await assertTreatmentPersonnel(db, tenantId, {
+      treatingClinicianId: data.treating_clinician_id ?? undefined,
+      assistantId: data.assistant_id ?? undefined,
+    });
     const item = await createTreatmentItemsRepository(db).create(tenantId, planId, {
       tooth_number: data.tooth_number ?? undefined,
       service_code: service?.code,
@@ -75,6 +84,8 @@ export const planService = {
       description: data.description,
       unit_cost: service?.price ?? data.unit_cost,
       price_includes_vat: true,
+      treating_clinician_id: data.treating_clinician_id ?? undefined,
+      assistant_id: data.assistant_id ?? undefined,
     });
     // Recompute total in same tenant scope
     await plans.recomputeTotal(tenantId, planId);
@@ -114,6 +125,14 @@ export const planService = {
     if (data.service_code && !service) {
       throw new ValidationError("Mã dịch vụ không hợp lệ hoặc đã ngừng áp dụng");
     }
+    await assertAllInTenant(db, tenantId, [
+      { table: "users", id: data.treating_clinician_id ?? undefined },
+      { table: "users", id: data.assistant_id ?? undefined },
+    ]);
+    await assertTreatmentPersonnel(db, tenantId, {
+      treatingClinicianId: data.treating_clinician_id ?? undefined,
+      assistantId: data.assistant_id ?? undefined,
+    });
     const updated = await items.update(tenantId, itemId, {
       tooth_number: data.tooth_number ?? undefined,
       service_code: service?.code,
@@ -122,6 +141,8 @@ export const planService = {
       description: data.description,
       unit_cost: service?.price ?? data.unit_cost,
       price_includes_vat: true,
+      treating_clinician_id: data.treating_clinician_id ?? undefined,
+      assistant_id: data.assistant_id ?? undefined,
     });
     if (!updated) throw new NotFoundError("Treatment plan item not found");
     await plans.recomputeTotal(tenantId, planId);

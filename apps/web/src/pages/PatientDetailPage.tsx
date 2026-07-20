@@ -376,6 +376,8 @@ export function PatientDetailPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Ngày</TableHead>
+                      <TableHead>Bác sĩ điều trị</TableHead>
+                      <TableHead>Phụ tá</TableHead>
                       <TableHead>Trạng thái</TableHead>
                       <TableHead>Ghi chú</TableHead>
                     </TableRow>
@@ -388,6 +390,22 @@ export function PatientDetailPage() {
                         onClick={() => navigate(`/visits/${v.id}`)}
                       >
                         <TableCell>{formatDateTime(v.date)}</TableCell>
+                        <TableCell>
+                          {v.treating_clinician_name ? (
+                            <div className="flex items-center gap-2">
+                              <ProfileAvatar subject="users" entityId={v.treating_clinician_id} name={v.treating_clinician_name} avatarFileId={v.treating_clinician_avatar_file_id} size="sm" />
+                              <span>{v.treating_clinician_name}</span>
+                            </div>
+                          ) : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {v.assistant_name ? (
+                            <div className="flex items-center gap-2">
+                              <ProfileAvatar subject="users" entityId={v.assistant_id} name={v.assistant_name} avatarFileId={v.assistant_avatar_file_id} size="sm" />
+                              <span>{v.assistant_name}</span>
+                            </div>
+                          ) : "—"}
+                        </TableCell>
                         <TableCell>
                           <Badge
                             variant={

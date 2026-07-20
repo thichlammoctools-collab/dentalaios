@@ -129,6 +129,8 @@ export interface Visit {
   clinician_id: string; // FK to User — bác sĩ khám
   date: string; // ISO datetime
   status: VisitStatus;
+  completed_at?: string;
+  completed_by?: string;
   notes?: string;
   created_at: string;
   // Operational chair snapshot, retained to attribute confirmed payments.
@@ -231,6 +233,10 @@ export interface TreatmentPlanItem {
   unit_cost: number;
   price_includes_vat: boolean;
   price_snapshot_at?: string;
+  treating_clinician_id?: string;
+  treating_clinician_name?: string;
+  assistant_id?: string;
+  assistant_name?: string;
   status: TreatmentItemStatus;
   created_at: string;
 }

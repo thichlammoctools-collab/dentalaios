@@ -11,7 +11,7 @@ import { FdiToothChart } from "@/components/FdiToothChart";
 import { FindingsList } from "@/components/FindingsList";
 import { PatientImageGallery } from "@/components/PatientImageGallery";
 import { Dialog, DialogBody, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { apiGet, apiPost, ApiError } from "@/lib/api";
+import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatDateTime } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
@@ -390,6 +390,17 @@ export function VisitDetailPage() {
     }
   }
 
+  async function completeVisit() {
+    if (!visit || visit.status !== "in_progress") return;
+    try {
+      const updated = await apiPatch<Visit>(`/api/visits/${visit.id}`, { status: "completed" });
+      setVisit(updated);
+      toast.success("Đã hoàn tất lượt khám");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Không thể hoàn tất lượt khám");
+    }
+  }
+
   async function onSummarize() {
     if (!visit) return;
     setSummarizing(true);
@@ -448,13 +459,15 @@ export function VisitDetailPage() {
         currency: "VND",
       });
       for (const item of editableItems) {
-        await apiPost(`/api/treatment-plans/${plan.id}/items`, {
-          tooth_number: item.tooth,
-          service_code: item.service_code,
-          procedure: item.procedure,
-          description: item.description,
-          unit_cost: item.cost,
-        });
+          await apiPost(`/api/treatment-plans/${plan.id}/items`, {
+            tooth_number: item.tooth,
+            service_code: item.service_code,
+            procedure: item.procedure,
+            description: item.description,
+            unit_cost: item.cost,
+            treating_clinician_id: visit.treating_clinician_id ?? null,
+            assistant_id: visit.assistant_id ?? null,
+          });
       }
       toast.success("Đã lưu kế hoạch điều trị AI. Đang mở chi tiết kế hoạch.");
       setPlanDialogOpen(false);
@@ -512,6 +525,11 @@ export function VisitDetailPage() {
             {visit.status}
           </Badge>
         </div>
+        {visit.status === "in_progress" && (
+          <div className="mt-3">
+            <Button size="sm" onClick={() => void completeVisit()}>Hoàn tất lượt khám</Button>
+          </div>
+        )}
         {(visit.treating_clinician_name || visit.assistant_name) && (
           <div className="mt-2 flex flex-wrap gap-4 text-sm">
             {visit.treating_clinician_name && (

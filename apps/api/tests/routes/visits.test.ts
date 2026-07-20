@@ -219,8 +219,8 @@ describe("PATCH /api/visits/:id", () => {
       "PATCH",
       "/api/visits/visit-1",
       new Map<string, unknown[]>([
-        // getById after UPDATE returns updated row
-        ["FROM visits", [updated]],
+        // First read validates the current lifecycle state; second read is after UPDATE.
+        ["FROM visits", (sql, index) => index === 0 ? [visitRow()] : [updated]],
       ]),
       {
         body: { status: "completed", notes: "Done" },
@@ -229,6 +229,19 @@ describe("PATCH /api/visits/:id", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { status: string };
     expect(body.status).toBe("completed");
+  });
+
+  it("rejects completing a visit that is already completed", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "PATCH",
+      "/api/visits/visit-1",
+      new Map([["FROM visits", [visitRow({ status: "completed" })]]]),
+      { body: { status: "completed" } },
+    );
+
+    expect(res.status).toBe(409);
   });
 
   it("returns 422 for invalid status value", async () => {

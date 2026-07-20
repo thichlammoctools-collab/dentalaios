@@ -219,6 +219,8 @@ export const planCreateSchema = z.object({
 export const planItemCreateSchema = z.object({
   tooth_number: z.number().int().nullable(),
   service_code: z.string().trim().min(1).max(40).optional(),
+  treating_clinician_id: z.string().min(1).nullable().optional(),
+  assistant_id: z.string().min(1).nullable().optional(),
   procedure: nonEmpty(100),
   description: nonEmpty(500),
   unit_cost: z.number().nonnegative(),

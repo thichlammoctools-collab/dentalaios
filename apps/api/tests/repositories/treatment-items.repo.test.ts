@@ -36,7 +36,7 @@ describe("treatment items repository", () => {
 
     const insert = db.__calls.find((call) => call.method === "run" && call.sql.startsWith("INSERT INTO treatment_plan_items"));
     const snapshotInsert = db.__calls.find((call) => call.method === "run" && call.sql.startsWith("INSERT INTO treatment_plan_item_price_snapshots"));
-    expect(insert?.binds.slice(4)).toEqual(["filling", "Trám răng", 650000]);
+    expect(insert?.binds.slice(4)).toEqual(["filling", "Trám răng", 650000, null, null]);
     expect(snapshotInsert?.binds.slice(2)).toEqual(["TRAM-COM", "Trám composite", 1]);
     expect(item).toMatchObject({
       service_code: "TRAM-COM",

@@ -63,7 +63,7 @@ router.patch(
   async (c) => {
     const jwt = getJwt(c);
     const data = c.req.valid("json");
-    const updated = await visitService.update(c.env.DB, jwt.tenant_id, c.req.param("id"), data);
+    const updated = await visitService.update(c.env.DB, jwt.tenant_id, c.req.param("id"), data, jwt.sub);
     return c.json(updated, 200);
   },
 );

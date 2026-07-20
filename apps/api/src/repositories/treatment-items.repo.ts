@@ -26,11 +26,19 @@ export function createTreatmentItemsRepository(db: D1Database): TreatmentItemsRe
                     price_snapshot.service_code AS snapshot_service_code,
                     price_snapshot.service_name AS snapshot_service_name,
                     price_snapshot.price_includes_vat AS snapshot_price_includes_vat,
-                    price_snapshot.price_snapshot_at AS snapshot_price_snapshot_at
+                    price_snapshot.price_snapshot_at AS snapshot_price_snapshot_at,
+                    clinician.name AS treating_clinician_name,
+                    assistant.name AS assistant_name
              FROM treatment_plan_items
             LEFT JOIN treatment_plan_item_price_snapshots AS price_snapshot
               ON price_snapshot.tenant_id = treatment_plan_items.tenant_id
              AND price_snapshot.treatment_plan_item_id = treatment_plan_items.id
+             LEFT JOIN users clinician
+               ON clinician.id = treatment_plan_items.treating_clinician_id
+              AND clinician.tenant_id = treatment_plan_items.tenant_id
+             LEFT JOIN users assistant
+               ON assistant.id = treatment_plan_items.assistant_id
+              AND assistant.tenant_id = treatment_plan_items.tenant_id
             WHERE treatment_plan_items.tenant_id = ? AND treatment_plan_items.treatment_plan_id = ?
             ORDER BY tooth_number ASC`,
         )
@@ -44,8 +52,9 @@ export function createTreatmentItemsRepository(db: D1Database): TreatmentItemsRe
       const itemInsert = db
         .prepare(
           `INSERT INTO treatment_plan_items
-              (id, tenant_id, treatment_plan_id, tooth_number, procedure, description, unit_cost)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              (id, tenant_id, treatment_plan_id, tooth_number, procedure, description, unit_cost,
+               treating_clinician_id, assistant_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
@@ -55,6 +64,8 @@ export function createTreatmentItemsRepository(db: D1Database): TreatmentItemsRe
           data.procedure,
           data.description,
           data.unit_cost,
+          data.treating_clinician_id ?? null,
+          data.assistant_id ?? null,
         );
       const snapshotInsert = db
         .prepare(
@@ -69,12 +80,20 @@ export function createTreatmentItemsRepository(db: D1Database): TreatmentItemsRe
           `SELECT treatment_plan_items.*,
                   price_snapshot.service_code AS snapshot_service_code,
                   price_snapshot.service_name AS snapshot_service_name,
-                  price_snapshot.price_includes_vat AS snapshot_price_includes_vat,
-                  price_snapshot.price_snapshot_at AS snapshot_price_snapshot_at
+                   price_snapshot.price_includes_vat AS snapshot_price_includes_vat,
+                  price_snapshot.price_snapshot_at AS snapshot_price_snapshot_at,
+                  clinician.name AS treating_clinician_name,
+                  assistant.name AS assistant_name
            FROM treatment_plan_items
            LEFT JOIN treatment_plan_item_price_snapshots AS price_snapshot
              ON price_snapshot.tenant_id = treatment_plan_items.tenant_id
             AND price_snapshot.treatment_plan_item_id = treatment_plan_items.id
+           LEFT JOIN users clinician
+             ON clinician.id = treatment_plan_items.treating_clinician_id
+            AND clinician.tenant_id = treatment_plan_items.tenant_id
+           LEFT JOIN users assistant
+             ON assistant.id = treatment_plan_items.assistant_id
+            AND assistant.tenant_id = treatment_plan_items.tenant_id
            WHERE treatment_plan_items.tenant_id = ? AND treatment_plan_items.id = ? LIMIT 1`,
         )
         .bind(tenantId, id)
@@ -87,7 +106,8 @@ export function createTreatmentItemsRepository(db: D1Database): TreatmentItemsRe
       const itemUpdate = db
         .prepare(
           `UPDATE treatment_plan_items
-           SET tooth_number = ?, procedure = ?, description = ?, unit_cost = ?
+           SET tooth_number = ?, procedure = ?, description = ?, unit_cost = ?,
+               treating_clinician_id = ?, assistant_id = ?
            WHERE tenant_id = ? AND id = ?`,
         )
         .bind(
@@ -95,6 +115,8 @@ export function createTreatmentItemsRepository(db: D1Database): TreatmentItemsRe
           data.procedure,
           data.description,
           data.unit_cost,
+          data.treating_clinician_id ?? null,
+          data.assistant_id ?? null,
           tenantId,
           id,
         );
@@ -123,12 +145,20 @@ export function createTreatmentItemsRepository(db: D1Database): TreatmentItemsRe
           `SELECT treatment_plan_items.*,
                   price_snapshot.service_code AS snapshot_service_code,
                   price_snapshot.service_name AS snapshot_service_name,
-                  price_snapshot.price_includes_vat AS snapshot_price_includes_vat,
-                  price_snapshot.price_snapshot_at AS snapshot_price_snapshot_at
+                   price_snapshot.price_includes_vat AS snapshot_price_includes_vat,
+                  price_snapshot.price_snapshot_at AS snapshot_price_snapshot_at,
+                  clinician.name AS treating_clinician_name,
+                  assistant.name AS assistant_name
            FROM treatment_plan_items
            LEFT JOIN treatment_plan_item_price_snapshots AS price_snapshot
              ON price_snapshot.tenant_id = treatment_plan_items.tenant_id
             AND price_snapshot.treatment_plan_item_id = treatment_plan_items.id
+           LEFT JOIN users clinician
+             ON clinician.id = treatment_plan_items.treating_clinician_id
+            AND clinician.tenant_id = treatment_plan_items.tenant_id
+           LEFT JOIN users assistant
+             ON assistant.id = treatment_plan_items.assistant_id
+            AND assistant.tenant_id = treatment_plan_items.tenant_id
            WHERE treatment_plan_items.tenant_id = ? AND treatment_plan_items.id = ? LIMIT 1`,
         )
         .bind(tenantId, id)
@@ -159,6 +189,10 @@ function mapItem(row: D1Row): TreatmentPlanItem {
     unit_cost: Number(row.unit_cost ?? 0),
     price_includes_vat: row.snapshot_price_includes_vat === undefined ? true : Boolean(row.snapshot_price_includes_vat),
     price_snapshot_at: (row.snapshot_price_snapshot_at as string | null) ?? undefined,
+    treating_clinician_id: (row.treating_clinician_id as string | null) ?? undefined,
+    treating_clinician_name: (row.treating_clinician_name as string | null) ?? undefined,
+    assistant_id: (row.assistant_id as string | null) ?? undefined,
+    assistant_name: (row.assistant_name as string | null) ?? undefined,
     status: row.status as TreatmentPlanItem["status"],
     created_at: row.created_at as string,
   };

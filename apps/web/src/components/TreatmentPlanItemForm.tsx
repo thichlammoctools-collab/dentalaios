@@ -8,8 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
-import { isValidFdiTooth } from "@shared/constants";
-import type { TreatmentPlanItem, TreatmentService } from "@shared/types";
+import { useAuth } from "@/lib/auth-context";
+import { isAssistantRole, isDoctorRole, isValidFdiTooth } from "@shared/constants";
+import type { TreatmentPlanItem, TreatmentService, UserWithDetails } from "@shared/types";
 
 interface TreatmentPlanItemFormProps {
   open: boolean;
@@ -26,6 +27,7 @@ export function TreatmentPlanItemForm({
   item,
   onCreated,
 }: TreatmentPlanItemFormProps) {
+  const { session } = useAuth();
   const [toothNumber, setToothNumber] = useState<number | "">("");
   const [procedure, setProcedure] = useState("filling");
   const [description, setDescription] = useState("");
@@ -34,6 +36,9 @@ export function TreatmentPlanItemForm({
   const [serviceCode, setServiceCode] = useState("");
   const [saving, setSaving] = useState(false);
   const [fullMouth, setFullMouth] = useState(false);
+  const [users, setUsers] = useState<UserWithDetails[]>([]);
+  const [treatingClinicianId, setTreatingClinicianId] = useState("");
+  const [assistantId, setAssistantId] = useState("");
 
   const validTooth =
     fullMouth || (typeof toothNumber === "number" ? isValidFdiTooth(toothNumber) : false);
@@ -45,11 +50,18 @@ export function TreatmentPlanItemForm({
     setDescription(item?.description ?? "");
     setUnitCost(item?.unit_cost ?? "");
     setServiceCode(item?.service_code ?? "");
+    setTreatingClinicianId(item?.treating_clinician_id ?? "");
+    setAssistantId(item?.assistant_id ?? "");
     setFullMouth(item?.tooth_number == null && Boolean(item));
     void apiGet<{ items: TreatmentService[] }>("/api/clinic/treatment-services")
       .then((response) => setServices(response.items.filter((service) => service.is_active)))
       .catch(() => setServices([]));
-  }, [open, item]);
+    if (session?.branch.id) {
+      void apiGet<{ items: UserWithDetails[] }>(`/api/users/branch/${session.branch.id}`)
+        .then((response) => setUsers(response.items))
+        .catch(() => setUsers([]));
+    }
+  }, [open, item, session?.branch.id]);
 
   function selectService(code: string) {
     setServiceCode(code);
@@ -75,6 +87,8 @@ export function TreatmentPlanItemForm({
         tooth_number: fullMouth ? null : toothNumber,
         procedure,
         service_code: serviceCode || undefined,
+        treating_clinician_id: treatingClinicianId || null,
+        assistant_id: assistantId || null,
         description,
         unit_cost: unitCost,
       };
@@ -88,6 +102,8 @@ export function TreatmentPlanItemForm({
       setDescription("");
       setUnitCost("");
       setServiceCode("");
+      setTreatingClinicianId("");
+      setAssistantId("");
       setFullMouth(false);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi thêm item");
@@ -211,6 +227,26 @@ export function TreatmentPlanItemForm({
               {serviceCode && <p className="text-xs text-muted-foreground">Giá được lấy từ danh mục dịch vụ, đã gồm VAT.</p>}
             </div>
           </div>
+
+          <SectionDivider icon={<TeamIcon />}>Nhân sự thực hiện</SectionDivider>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="item-clinician">Bác sĩ điều trị</Label>
+              <Select id="item-clinician" value={treatingClinicianId} onChange={(event) => setTreatingClinicianId(event.target.value)}>
+                <option value="">— Chưa phân công —</option>
+                {users.filter((user) => isDoctorRole(user.role_key, user.role_id, user.role_name)).map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="item-assistant">Phụ tá</Label>
+              <Select id="item-assistant" value={assistantId} onChange={(event) => setAssistantId(event.target.value)}>
+                <option value="">— Chưa phân công —</option>
+                {users.filter((user) => isAssistantRole(user.role_key, user.role_id, user.role_name)).map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+              </Select>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">Phân công này gắn với hạng mục điều trị và là nguồn dữ liệu cho tính hoa hồng ở phase tài chính.</p>
         </DialogBody>
         <DialogFooter className="mt-4">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -249,6 +285,15 @@ function DescIcon() {
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
       <polyline points="14 2 14 8 20 8" />
       <line x1="16" x2="8" y1="13" y2="13" /><line x1="16" x2="8" y1="17" y2="17" />
+    </svg>
+  );
+}
+
+function TeamIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
     </svg>
   );
 }
