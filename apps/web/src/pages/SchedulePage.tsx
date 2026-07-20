@@ -444,11 +444,11 @@ export function SchedulePage() {
                                 {a.source === "ai_next_visit" && "🤖 AI suggest"}
                               </span>
                             </div>
-                             {a.notes && (
-                               <p className="mt-1 truncate text-[11px] text-muted-foreground italic">
-                                 💬 {a.notes}
-                               </p>
-                             )}
+                              {a.notes && (
+                                <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground italic">
+                                  💬 {a.notes}
+                                </p>
+                              )}
                             </div>
                             <div className="flex shrink-0 flex-col items-end justify-end gap-2 text-right">
                               {chair && (
