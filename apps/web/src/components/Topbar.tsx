@@ -38,7 +38,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
 
   const getTitle = () => {
     if (isManagementDashboard) return "Quản trị tổng quan";
-    if (location.pathname === ROUTES.TODAY) return "Today";
+    if (location.pathname === ROUTES.TODAY) return "Điều hành chi nhánh";
     if (location.pathname === ROUTES.PATIENTS) return "Bệnh nhân";
     if (location.pathname.startsWith("/patients/")) return "Hồ sơ bệnh nhân";
     if (location.pathname.startsWith("/visits/")) return "Lượt khám";

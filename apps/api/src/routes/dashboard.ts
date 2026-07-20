@@ -9,7 +9,7 @@ import { PERMISSIONS } from "@shared/constants";
 import { managementDashboardQuerySchema } from "@shared/validation";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
-import { requirePermission } from "../middleware/rbac";
+import { requireAnyPermission, requirePermission } from "../middleware/rbac";
 import type { AuthContext } from "../middleware/auth";
 import { dashboardService } from "../services/dashboard.service";
 
@@ -36,7 +36,17 @@ router.get("/stream/:tenantId", async (c) => {
 
 router.use("*", requireAuth());
 
+// GET /api/dashboard/branch
+// The branch comes exclusively from the authenticated session. This prevents a
+// branch operator from widening the operational dashboard with a query string.
+router.get("/branch", requirePermission(PERMISSIONS.READ_PATIENTS), async (c) => {
+  const jwt = getJwt(c);
+  const snapshot = await dashboardService.getBranchSnapshot(c.env.DB, jwt.tenant_id, jwt.branch_id);
+  return c.json(snapshot);
+});
+
 // GET /api/dashboard/stats
+// Deprecated for new UI: it is tenant-scoped and retained for compatibility.
 router.get("/stats", requirePermission(PERMISSIONS.READ_PATIENTS), async (c) => {
   const jwt = getJwt(c);
   const stats = await dashboardService.getStats(c.env.DB, jwt.tenant_id);
@@ -53,7 +63,10 @@ router.get("/management", requirePermission(PERMISSIONS.VIEW_MANAGEMENT_DASHBOAR
 });
 
 // POST /api/dashboard/stream-ticket
-router.post("/stream-ticket", requirePermission(PERMISSIONS.VIEW_MANAGEMENT_DASHBOARD), async (c) => {
+router.post("/stream-ticket", requireAnyPermission([
+  PERMISSIONS.READ_PATIENTS,
+  PERMISSIONS.VIEW_MANAGEMENT_DASHBOARD,
+]), async (c) => {
   const jwt = getJwt(c);
   const namespace = c.env.DASHBOARD_HUB;
   if (!namespace) return c.json({ error: "Dashboard live updates are unavailable", code: "internal_error" }, 503);

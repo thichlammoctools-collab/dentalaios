@@ -605,7 +605,16 @@ export const platformContentCreateSchema = z.object({
   if (data.status === "scheduled" && !data.publish_at) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["publish_at"], message: "Lịch phát hành là bắt buộc" });
 });
 
-export const platformContentUpdateSchema = platformContentCreateSchema.partial().strict();
+export const platformContentUpdateSchema = z.object({
+  kind: z.enum(["announcement", "help_article"]).optional(),
+  title: nonEmpty(200).optional(),
+  body_markdown: nonEmpty(50_000).optional(),
+  status: z.enum(["draft", "scheduled", "published", "archived"]).optional(),
+  audience: z.enum(["global", "tenant"]).optional(),
+  tenant_id: z.string().min(1).nullable().optional(),
+  publish_at: platformIsoDate.nullable().optional(),
+  expire_at: platformIsoDate.nullable().optional(),
+}).strict().refine((data) => Object.keys(data).length > 0, "Cần ít nhất một trường để cập nhật");
 
 export const platformAdminCreateSchema = z.object({
   email: z.string().email(),

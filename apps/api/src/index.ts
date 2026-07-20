@@ -39,6 +39,8 @@ import patientImagesRoutes from "./routes/patient-images";
 import avatarRoutes from "./routes/avatars";
 import appointmentsRoutes from "./routes/appointments";
 import schedulesRoutes from "./routes/schedules";
+import platformAuthRoutes from "./routes/platform-auth";
+import platformRoutes from "./routes/platform";
 import { TenantDashboardHub } from "./durable-objects/tenant-dashboard-hub";
 import chairsRoutes from "./routes/chairs";
 
@@ -53,6 +55,8 @@ export type Env = {
   LARK_APP_ID?: string;    // DEPRECATED — kept as global fallback; prefer per-tenant lark_configs
   LARK_APP_SECRET?: string;// DEPRECATED — kept as global fallback; prefer per-tenant lark_configs
   JWT_SECRET?: string;
+  PLATFORM_JWT_SECRET?: string;
+  PLATFORM_MFA_ENCRYPTION_KEY?: string;
   R2_ACCOUNT_ID?: string;
   R2_ACCESS_KEY_ID?: string;
   R2_SECRET_ACCESS_KEY?: string;
@@ -127,6 +131,10 @@ app.route("/api/auth", authRoutes);
 
 // Registration (public)
 app.route("/api/register", registerRoutes);
+
+// Platform administration has independent identity, JWT, and RBAC.
+app.route("/api/platform/auth", platformAuthRoutes);
+app.route("/api/platform", platformRoutes);
 
 // Dashboard
 app.route("/api/dashboard", dashboardRoutes);
@@ -204,11 +212,3 @@ export default {
 };
 
 export { TenantDashboardHub };
-import platformAuthRoutes from "./routes/platform-auth";
-import platformRoutes from "./routes/platform";
-  PLATFORM_JWT_SECRET?: string;
-  PLATFORM_MFA_ENCRYPTION_KEY?: string;
-// Platform administration has independent identity, JWT, and RBAC.
-app.route("/api/platform/auth", platformAuthRoutes);
-app.route("/api/platform", platformRoutes);
-

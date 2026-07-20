@@ -1,440 +1,277 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { apiGet } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
+import { apiGet, ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
+import { createDashboardStream, type DashboardStreamStatus } from "@/lib/dashboard-stream";
 import { Button } from "@/components/ui/button";
-import { formatDateTime, formatCurrency } from "@/lib/utils";
-import type { Visit, Patient, TreatmentPlan } from "@shared/types";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatCurrency } from "@/lib/utils";
+import { ROUTES } from "@shared/constants";
+import type {
+  BranchDashboardActionGroup,
+  BranchDashboardActionItem,
+  BranchDashboardActionKind,
+  BranchDashboardSnapshot,
+  ManagementDashboardDailyPoint,
+} from "@shared/types";
 
-interface DashboardStats {
-  today: { visits: number; inProgress: number; completed: number };
-  totals: { patients: number; visits: number; approvedPlans: number; revenue: number };
-  monthlyVisits: { month: string; count: number }[];
-  monthlyRevenue: { month: string; amount: number }[];
-  recentActivity: { type: string; count: number }[];
+const actionOrder: BranchDashboardActionKind[] = [
+  "overdue_appointment",
+  "unconfirmed_appointment",
+  "appointment_outcome",
+  "pending_plan",
+];
+
+function formatNumber(value: number | null | undefined) {
+  return typeof value === "number" ? new Intl.NumberFormat("vi-VN").format(value) : "--";
 }
 
-interface VisitsResponse { items: Visit[]; total: number }
-interface PatientsResponse { items: Patient[]; total: number }
-interface PlansResponse { items: TreatmentPlan[]; total: number }
+function formatPercent(value: number | null | undefined) {
+  return typeof value === "number"
+    ? `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(value * 100)}%`
+    : "--";
+}
+
+function percentChange(current: number, previous: number) {
+  return previous === 0 ? undefined : ((current - previous) / Math.abs(previous)) * 100;
+}
+
+function hcmDate(value?: string) {
+  return new Intl.DateTimeFormat("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(value ? new Date(value) : new Date());
+}
+
+function hcmTime(value: string) {
+  return new Intl.DateTimeFormat("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function actionLabel(kind: BranchDashboardActionKind) {
+  const labels: Record<BranchDashboardActionKind, string> = {
+    overdue_appointment: "Lịch quá giờ chưa kết thúc",
+    unconfirmed_appointment: "Lịch hôm nay chưa xác nhận",
+    appointment_outcome: "Lịch đã hủy hoặc khách không đến",
+    pending_plan: "Kế hoạch điều trị bản nháp",
+  };
+  return labels[kind];
+}
+
+function actionDescription(kind: BranchDashboardActionKind) {
+  const descriptions: Record<BranchDashboardActionKind, string> = {
+    overdue_appointment: "Kiểm tra tình trạng ca khám và hoàn tất quy trình phù hợp.",
+    unconfirmed_appointment: "Liên hệ khách trước giờ hẹn để giảm rủi ro vắng mặt.",
+    appointment_outcome: "Theo dõi và sắp xếp gọi lại khách khi phù hợp.",
+    pending_plan: "Rà soát kế hoạch còn chờ xử lý tại chi nhánh.",
+  };
+  return descriptions[kind];
+}
+
+function actionClass(kind: BranchDashboardActionKind) {
+  const classes: Record<BranchDashboardActionKind, string> = {
+    overdue_appointment: "border-red-200 bg-red-50/60 dark:border-red-900 dark:bg-red-950/25",
+    unconfirmed_appointment: "border-amber-200 bg-amber-50/60 dark:border-amber-900 dark:bg-amber-950/25",
+    appointment_outcome: "border-orange-200 bg-orange-50/60 dark:border-orange-900 dark:bg-orange-950/25",
+    pending_plan: "border-violet-200 bg-violet-50/60 dark:border-violet-900 dark:bg-violet-950/25",
+  };
+  return classes[kind];
+}
 
 export function TodayPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [visits, setVisits] = useState<Visit[]>([]);
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [plans, setPlans] = useState<TreatmentPlan[]>([]);
+  const { session } = useAuth();
+  const [snapshot, setSnapshot] = useState<BranchDashboardSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [streamStatus, setStreamStatus] = useState<DashboardStreamStatus>("reconnecting");
+  const requestId = useRef(0);
+
+  async function loadSnapshot(manual = false) {
+    const currentRequest = ++requestId.current;
+    manual ? setRefreshing(true) : setLoading(true);
+    setError(null);
+    try {
+      const next = await apiGet<BranchDashboardSnapshot>("/api/dashboard/branch");
+      if (currentRequest !== requestId.current) return;
+      setSnapshot(next);
+    } catch (cause) {
+      if (currentRequest !== requestId.current) return;
+      setError(cause instanceof ApiError ? cause.message : "Không thể tải dữ liệu điều hành chi nhánh.");
+    } finally {
+      if (currentRequest === requestId.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
+  }
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const [st, v, p, pl] = await Promise.all([
-          apiGet<DashboardStats>("/api/dashboard/stats"),
-          apiGet<VisitsResponse>("/api/visits?limit=20"),
-          apiGet<PatientsResponse>("/api/patients?limit=20"),
-          apiGet<PlansResponse>("/api/treatment-plans?limit=20"),
-        ]);
-        if (!mounted) return;
-        setStats(st);
-        setVisits(v.items);
-        setPatients(p.items);
-        setPlans(pl.items);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => { mounted = false; };
+    void loadSnapshot();
+    // Initial branch scope comes from the server-side JWT, not browser state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  const todayVisits = visits.filter((v) => v.date?.slice(0, 10) === todayStr);
-  const pendingPlans = plans.filter((p) => p.status === "draft");
+  useEffect(() => {
+    const stream = createDashboardStream({
+      onInvalidate: () => void loadSnapshot(true),
+      onStatusChange: setStreamStatus,
+    });
+    return () => stream.stop();
+    // Stream refetches the same branch-scoped endpoint.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  return (
-    <div className="mx-auto max-w-6xl space-y-6 p-4 sm:space-y-6 sm:p-6">
-
-      {/* Hero */}
-      <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-5 text-white shadow-lg sm:p-8">
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Dashboard</h1>
-        <p className="mt-1 text-sm text-blue-100 sm:text-base">
-          {new Date().toLocaleDateString("vi-VN", {
-            weekday: "long", day: "2-digit", month: "long", year: "numeric",
-          })}
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2 sm:mt-6 sm:gap-3">
-          <Button asChild className="bg-white text-blue-700 hover:bg-blue-50">
-            <Link to="/patients">+ Bệnh nhân mới</Link>
-          </Button>
-          <Button asChild variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20">
-            <Link to="/patients">Danh sách bệnh nhân</Link>
-          </Button>
-        </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <StatCard label="Lượt khám hôm nay" value={stats?.today.visits ?? 0} icon="calendar" color="blue" />
-        <StatCard label="Đang điều trị" value={stats?.today.inProgress ?? 0} icon="progress" color="amber" />
-        <StatCard label="Hoàn thành hôm nay" value={stats?.today.completed ?? 0} icon="check" color="emerald" />
-        <StatCard label="Tổng bệnh nhân" value={stats?.totals.patients ?? 0} icon="patients" color="cyan" />
-        <StatCard
-          label="Doanh thu (VND)"
-          value={stats ? formatCurrency(stats.totals.revenue, "VND") : "—"}
-          icon="money"
-          color="purple"
-          small
-        />
-      </div>
-
-      {/* Charts + Tables */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Monthly Visits Chart */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Lượt khám theo tháng (6 tháng gần nhất)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="h-40 flex items-center justify-center">
-                <div className="h-6 w-6 animate-spin rounded-full border-3 border-muted border-t-primary" />
-              </div>
-            ) : (
-              <BarChart
-                data={stats?.monthlyVisits ?? []}
-                dataKey="count"
-                labelKey="month"
-                formatValue={(v) => `${v} lượt`}
-                color="#3b82f6"
-              />
-            )}
-          </CardContent>
-        </Card>
-
-        {/* KPIs */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Tổng quan</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <KpiRow label="Tổng lượt khám" value={stats?.totals.visits ?? 0} />
-            <KpiRow label="Kế hoạch đã duyệt" value={stats?.totals.approvedPlans ?? 0} />
-            <KpiRow label="Kế hoạch chờ duyệt" value={pendingPlans.length} accent="amber" />
-            <KpiRow label="Bệnh nhân mới (all)" value={stats?.totals.patients ?? 0} />
-            <div className="border-t border-border pt-3">
-              <KpiRow
-                label="Doanh thu"
-                value={stats ? formatCurrency(stats.totals.revenue, "VND") : "—"}
-                accent="green"
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Monthly Revenue Chart */}
-      {stats && stats.monthlyRevenue.some((r) => r.amount > 0) && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Doanh thu theo tháng (VND)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <BarChart
-              data={stats.monthlyRevenue}
-              dataKey="amount"
-              labelKey="month"
-              formatValue={(v) => formatCurrency(v, "VND")}
-              color="#a855f7"
-            />
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Recent + Pending */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Recent visits */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Lượt khám gần đây</span>
-              <Link to="/patients" className="text-sm font-normal text-primary hover:underline">
-                Xem tất cả →
-              </Link>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton />
-            ) : visits.length === 0 ? (
-              <EmptyList message="Chưa có lượt khám nào" />
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ngày</TableHead>
-                    <TableHead>Trạng thái</TableHead>
-                    <TableHead>Bệnh nhân</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visits.slice(0, 6).map((v) => (
-                    <TableRow
-                      key={v.id}
-                      className="cursor-pointer"
-                      onClick={() => { window.location.href = `/visits/${v.id}`; }}
-                    >
-                      <TableCell className="text-xs">{formatDateTime(v.date)}</TableCell>
-                      <TableCell><StatusBadge status={v.status} /></TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{v.patient_id.slice(0, 8)}…</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Pending plans */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Kế hoạch chờ duyệt</span>
-              <span className="text-sm font-normal text-muted-foreground">{pendingPlans.length} tổng</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton />
-            ) : pendingPlans.length === 0 ? (
-              <EmptyList message="Không có kế hoạch nào chờ duyệt" />
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Trạng thái</TableHead>
-                    <TableHead>Bệnh nhân</TableHead>
-                    <TableHead className="text-right">Tổng</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pendingPlans.slice(0, 6).map((p) => (
-                    <TableRow
-                      key={p.id}
-                      className="cursor-pointer"
-                      onClick={() => { window.location.href = `/treatment-plans/${p.id}`; }}
-                    >
-                      <TableCell><StatusBadge status={p.status} /></TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{p.patient_id.slice(0, 8)}…</TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(p.total_cost, p.currency)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+  const actions = [...(snapshot?.actions ?? [])].sort(
+    (left, right) => actionOrder.indexOf(left.kind) - actionOrder.indexOf(right.kind),
   );
-}
+  const hasActions = actions.some((group) => group.count > 0);
 
-// ─── Components ────────────────────────────────────────────────────────────────
-
-function StatCard({
-  label, value, icon, color, small,
-}: {
-  label: string; value: number | string;
-  icon: "calendar" | "progress" | "check" | "patients" | "money";
-  color: "blue" | "amber" | "emerald" | "purple" | "cyan";
-  small?: boolean;
-}) {
-  const colors: Record<string, string> = {
-    blue: "from-blue-50 to-blue-100/50 text-blue-700",
-    amber: "from-amber-50 to-amber-100/50 text-amber-700",
-    emerald: "from-emerald-50 to-emerald-100/50 text-emerald-700",
-    purple: "from-purple-50 to-purple-100/50 text-purple-700",
-    cyan: "from-cyan-50 to-cyan-100/50 text-cyan-700",
-  };
-  const icons: Record<string, React.ReactNode> = {
-    calendar: <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>,
-    progress: <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>,
-    check: <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
-    patients: <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>,
-    money: <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M12 1v22M17 5H9.5a3.5 3.5 0 100 7h5a3.5 3.5 0 010 7H6"/></svg>,
-  };
   return (
-    <Card className={`border-0 bg-gradient-to-br ${colors[color]} shadow-sm`}>
-      <CardContent className={`${small ? "p-3 sm:p-4" : "p-4 sm:p-5"}`}>
-        <div className="flex items-start justify-between">
+    <div className="mx-auto max-w-7xl space-y-5 p-4 sm:space-y-6 sm:p-6">
+      <section className="overflow-hidden rounded-2xl bg-gradient-to-br from-blue-700 via-indigo-700 to-violet-800 p-5 text-white shadow-lg sm:p-7">
+        <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
           <div>
-            <p className="text-[10px] font-medium uppercase tracking-wider opacity-70 sm:text-xs">{label}</p>
-            <p className={`font-bold mt-1 sm:mt-2 ${small ? "text-base sm:text-lg" : "text-2xl sm:text-3xl"} truncate`}>{value}</p>
+            <p className="text-sm font-medium text-blue-100">{snapshot?.branch.name ?? session?.branch.name}</p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Điều hành chi nhánh</h2>
+            <p className="mt-2 text-sm text-blue-100">{hcmDate(snapshot?.today_start)} · Theo giờ Hồ Chí Minh</p>
           </div>
-          <span className="opacity-60 shrink-0">{icons[icon]}</span>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild className="bg-white text-blue-700 hover:bg-blue-50">
+              <Link to={ROUTES.SCHEDULE_NEW}>+ Tạo lịch hẹn</Link>
+            </Button>
+            <Button asChild variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white">
+              <Link to={ROUTES.PATIENTS}>+ Tạo bệnh nhân</Link>
+            </Button>
+            <Button variant="outline" onClick={() => void loadSnapshot(true)} disabled={refreshing} className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white">
+              <RefreshIcon spinning={refreshing} /> Làm mới
+            </Button>
+          </div>
         </div>
-      </CardContent>
-    </Card>
-  );
-}
+        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-blue-100">
+          <LiveStatus status={streamStatus} />
+          <span>{snapshot ? `Cập nhật ${hcmTime(snapshot.generated_at)}` : "Đang lấy dữ liệu"}</span>
+        </div>
+      </section>
 
-function KpiRow({
-  label, value, accent,
-}: { label: string; value: string | number; accent?: string }) {
-  const accentColors: Record<string, string> = {
-    amber: "text-amber-600",
-    green: "text-emerald-600",
-  };
-  return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={`font-semibold ${accent ? accentColors[accent] : "text-foreground"}`}>{value}</span>
+      {error ? (
+        <Card>
+          <CardHeader><CardTitle>Không thể tải điều hành chi nhánh</CardTitle><CardDescription>{error}</CardDescription></CardHeader>
+          <CardContent><Button onClick={() => void loadSnapshot(true)}>Thử lại</Button></CardContent>
+        </Card>
+      ) : loading ? (
+        <DashboardSkeleton />
+      ) : snapshot ? (
+        <>
+          <section>
+            <div className="mb-3 flex items-baseline justify-between gap-3">
+              <div><h3 className="text-lg font-semibold">Luồng khách hôm nay</h3><p className="text-sm text-muted-foreground">Theo dõi lịch, khách đến và tiến độ khám tại chi nhánh.</p></div>
+              <span className="text-xs text-muted-foreground">Scope cố định theo chi nhánh đăng nhập</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+              <MetricCard label="Đã đặt lịch" value={formatNumber(snapshot.today.scheduled)} />
+              <MetricCard label="Chưa xác nhận" value={formatNumber(snapshot.today.unconfirmed)} risk="warning" />
+              <MetricCard label="Đã đến" value={formatNumber(snapshot.today.arrived)} />
+              <MetricCard label="Đang khám" value={formatNumber(snapshot.today.in_progress_visits)} />
+              <MetricCard label="Hoàn thành" value={formatNumber(snapshot.today.completed)} positive />
+              <MetricCard label="Đã hủy" value={formatNumber(snapshot.today.cancellations)} risk="warning" />
+              <MetricCard label="Không đến" value={formatNumber(snapshot.today.no_shows)} risk="danger" />
+              <MetricCard label="Doanh thu xác nhận hôm nay" value={formatCurrency(snapshot.today.confirmed_revenue)} money positive />
+            </div>
+          </section>
+
+          <section className="grid gap-5 lg:grid-cols-3">
+            <Card className="lg:col-span-2">
+              <CardHeader><CardTitle>Hiệu quả 7 ngày đã hoàn tất</CardTitle><CardDescription>So sánh với 7 ngày ngay trước kỳ hiện tại.</CardDescription></CardHeader>
+              <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <MetricCard label="Doanh thu xác nhận" value={formatCurrency(snapshot.kpis.confirmed_revenue)} delta={percentChange(snapshot.kpis.confirmed_revenue, snapshot.kpis.previous_revenue)} money />
+                <MetricCard label="Lượt khám" value={formatNumber(snapshot.kpis.visits)} delta={percentChange(snapshot.kpis.visits, snapshot.kpis.previous_visits)} />
+                <MetricCard label="Tỷ lệ hoàn thành" value={formatPercent(snapshot.kpis.completion_rate)} />
+                <MetricCard label="Lịch hẹn" value={formatNumber(snapshot.kpis.appointments)} />
+                <MetricCard label="Bệnh nhân mới" value={formatNumber(snapshot.kpis.new_patients)} />
+                <MetricCard label="Plan bản nháp" value={formatNumber(snapshot.kpis.pending_plans)} risk={snapshot.kpis.pending_plans > 0 ? "warning" : undefined} />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle>Chỉ số rủi ro 7 ngày</CardTitle><CardDescription>Hủy/vắng cần được xem cùng tổng số lịch hẹn.</CardDescription></CardHeader>
+              <CardContent className="space-y-4">
+                <RiskRow label="Hủy + không đến" value={snapshot.kpis.cancellations + snapshot.kpis.no_shows} denominator={snapshot.kpis.appointments} />
+                <RiskRow label="Kế hoạch bản nháp" value={snapshot.kpis.pending_plans} />
+                <Link to={ROUTES.SCHEDULE} className="inline-flex text-sm font-medium text-primary hover:underline">Mở lịch hẹn chi nhánh →</Link>
+              </CardContent>
+            </Card>
+          </section>
+
+          <section className="grid gap-5 lg:grid-cols-3">
+            <Card className="lg:col-span-2">
+              <CardHeader><CardTitle>Xu hướng lượt khám và doanh thu</CardTitle><CardDescription>7 ngày hoàn tất gần nhất.</CardDescription></CardHeader>
+              <CardContent><DailyChart data={snapshot.daily} /></CardContent>
+            </Card>
+            <ActionSummary groups={actions} hasActions={hasActions} />
+          </section>
+
+          {hasActions && <ActionCenter groups={actions} branchId={snapshot.branch.id} />}
+        </>
+      ) : null}
     </div>
   );
 }
 
-function BarChart({
-  data, dataKey, labelKey, formatValue, color,
-}: {
-  data: { month: string; [key: string]: unknown }[];
-  dataKey: string;
-  labelKey: string;
-  formatValue: (v: number) => string;
-  color: string;
+function MetricCard({ label, value, delta, money, positive, risk }: {
+  label: string;
+  value: string;
+  delta?: number;
+  money?: boolean;
+  positive?: boolean;
+  risk?: "warning" | "danger";
 }) {
-  if (data.length === 0) {
-    return (
-      <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-        Chưa có dữ liệu
-      </div>
-    );
-  }
-
-  const maxValue = Math.max(...data.map((d) => Number(d[dataKey]) || 0), 1);
-  const chartHeight = 120;
-  const barWidth = Math.max(16, Math.min(60, (700 / data.length) - 16));
-  const chartWidth = barWidth * data.length + 40;
-
-  // Month labels in Vietnamese
-  const monthLabels: Record<string, string> = {
-    "01": "Thg 1", "02": "Thg 2", "03": "Thg 3", "04": "Thg 4",
-    "05": "Thg 5", "06": "Thg 6", "07": "Thg 7", "08": "Thg 8",
-    "09": "Thg 9", "10": "Thg 10", "11": "Thg 11", "12": "Thg 12",
-  };
-
-  function getLabel(monthStr: string) {
-    const parts = monthStr.split("-");
-    if (parts.length === 2) return `${monthLabels[parts[1]] || parts[1]}`;
-    return monthStr;
-  }
-
-  return (
-    <div className="overflow-x-auto">
-      <svg
-        width={Math.max(chartWidth, 300)}
-        height={chartHeight + 50}
-        viewBox={`0 0 ${chartWidth} ${chartHeight + 50}`}
-        className="w-full"
-      >
-        {/* Y-axis grid lines */}
-        {[0, 0.25, 0.5, 0.75, 1].map((pct) => {
-          const y = chartHeight - pct * chartHeight;
-          return (
-            <g key={pct}>
-              <line
-                x1="40" y1={y} x2={chartWidth}
-                stroke="currentColor"
-                strokeWidth="0.5"
-                className="text-border"
-                strokeDasharray="4,4"
-                opacity="0.5"
-              />
-            </g>
-          );
-        })}
-
-        {/* Bars */}
-        {data.map((d, i) => {
-          const value = Number(d[dataKey]) || 0;
-          const barHeight = maxValue > 0 ? (value / maxValue) * chartHeight : 0;
-          const x = 40 + i * barWidth;
-          const y = chartHeight - barHeight;
-          const label = getLabel(String(d[labelKey] ?? ""));
-
-          return (
-            <g key={i}>
-              {/* Bar */}
-              <rect
-                x={x + 4}
-                y={y}
-                width={Math.max(barWidth - 8, 4)}
-                height={Math.max(barHeight, 2)}
-                rx="3"
-                fill={color}
-                opacity="0.85"
-              />
-              {/* Value label */}
-              {value > 0 && (
-                <text
-                  x={x + barWidth / 2}
-                  y={y - 4}
-                  textAnchor="middle"
-                  fontSize="9"
-                  fill="currentColor"
-                  className="text-muted-foreground"
-                >
-                  {formatValue(value)}
-                </text>
-              )}
-              {/* Month label */}
-              <text
-                x={x + barWidth / 2}
-                y={chartHeight + 16}
-                textAnchor="middle"
-                fontSize="10"
-                fill="currentColor"
-                className="text-muted-foreground"
-              >
-                {label}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-    </div>
-  );
+  const border = risk === "danger" ? "border-red-200 dark:border-red-900" : risk === "warning" ? "border-amber-200 dark:border-amber-900" : positive ? "border-emerald-200 dark:border-emerald-900" : "";
+  return <Card className={border}><CardContent className="p-4"><p className="text-xs font-medium text-muted-foreground">{label}</p><p className={`mt-2 truncate font-semibold ${money ? "text-lg" : "text-2xl"}`}>{value}</p>{typeof delta === "number" && <p className={`mt-1 text-xs ${delta >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>{delta >= 0 ? "+" : ""}{new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(delta)}% so với kỳ trước</p>}</CardContent></Card>;
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { variant: "default" | "success" | "warning" | "destructive" | "secondary" | "outline"; label: string }> = {
-    in_progress: { variant: "warning", label: "Đang điều trị" },
-    completed: { variant: "success", label: "Hoàn thành" },
-    cancelled: { variant: "destructive", label: "Đã hủy" },
-    draft: { variant: "outline", label: "Bản nháp" },
-    approved: { variant: "success", label: "Đã duyệt" },
-  };
-  const m = map[status] ?? { variant: "secondary" as const, label: status };
-  return <Badge variant={m.variant}>{m.label}</Badge>;
+function RiskRow({ label, value, denominator }: { label: string; value: number; denominator?: number }) {
+  const percentage = denominator ? (value / denominator) * 100 : undefined;
+  return <div className="flex items-end justify-between gap-3"><div><p className="text-sm font-medium">{label}</p><p className="text-xs text-muted-foreground">{denominator ? `Trên ${formatNumber(denominator)} lịch hẹn` : "Cần rà soát theo tuổi chờ"}</p></div><div className="text-right"><p className="text-2xl font-semibold">{formatNumber(value)}</p>{percentage !== undefined && <p className="text-xs text-muted-foreground">{new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(percentage)}%</p>}</div></div>;
 }
 
-function Skeleton() {
-  return (
-    <div className="space-y-2 py-4">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="h-10 rounded-md bg-muted animate-pulse" />
-      ))}
-    </div>
-  );
+function ActionSummary({ groups, hasActions }: { groups: BranchDashboardActionGroup[]; hasActions: boolean }) {
+  return <Card className={hasActions ? "border-amber-200 dark:border-amber-900" : "border-emerald-200 dark:border-emerald-900"}><CardHeader><CardTitle>Cần xử lý ngay</CardTitle><CardDescription>{hasActions ? "Các việc được ưu tiên theo mức độ ảnh hưởng vận hành." : "Không có việc vận hành cần xử lý ngay."}</CardDescription></CardHeader><CardContent>{hasActions ? <ul className="space-y-3">{groups.filter((group) => group.count > 0).map((group) => <li key={group.kind} className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium">{actionLabel(group.kind)}</p><p className="text-xs text-muted-foreground">{actionDescription(group.kind)}</p></div><span className="rounded-full bg-amber-100 px-2 py-0.5 text-sm font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-100">{formatNumber(group.count)}</span></li>)}</ul> : <div className="rounded-lg bg-emerald-50 p-4 text-sm text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100">Luồng lịch hẹn và kế hoạch hiện không có ngoại lệ cần theo dõi.</div>}</CardContent></Card>;
 }
 
-function EmptyList({ message }: { message: string }) {
-  return (
-    <div className="py-10 text-center">
-      <p className="text-sm text-muted-foreground">{message}</p>
-    </div>
-  );
+function ActionCenter({ groups, branchId }: { groups: BranchDashboardActionGroup[]; branchId: string }) {
+  return <section><div className="mb-3"><h3 className="text-lg font-semibold">Action Center</h3><p className="text-sm text-muted-foreground">Mở bản ghi phù hợp để tiếp tục xử lý, không hiển thị dữ liệu lâm sàng trên dashboard.</p></div><div className="grid gap-4 xl:grid-cols-2">{groups.filter((group) => group.count > 0).map((group) => <ActionGroupCard key={group.kind} group={group} branchId={branchId} />)}</div></section>;
 }
+
+function ActionGroupCard({ group, branchId }: { group: BranchDashboardActionGroup; branchId: string }) {
+  return <Card className={actionClass(group.kind)}><CardHeader className="pb-3"><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">{actionLabel(group.kind)}</CardTitle><CardDescription>{actionDescription(group.kind)}</CardDescription></div><span className="rounded-full bg-card px-2.5 py-1 text-sm font-semibold shadow-sm">{formatNumber(group.count)}</span></div></CardHeader><CardContent>{group.items.length > 0 && <ul className="divide-y divide-border/70">{group.items.map((item) => <ActionItem key={item.id} item={item} kind={group.kind} branchId={branchId} />)}</ul>}{group.remaining_count > 0 && <p className="mt-3 text-xs text-muted-foreground">Còn {formatNumber(group.remaining_count)} mục cùng loại cần theo dõi.</p>}</CardContent></Card>;
+}
+
+function ActionItem({ item, kind, branchId }: { item: BranchDashboardActionItem; kind: BranchDashboardActionKind; branchId: string }) {
+  const href = item.entity_type === "appointment"
+    ? `${ROUTES.SCHEDULE}?branch_id=${encodeURIComponent(branchId)}&status=${encodeURIComponent(item.status)}`
+    : `/treatment-plans/${encodeURIComponent(item.id)}`;
+  const timestamp = item.scheduled_at ?? item.created_at;
+  const meta = timestamp ? hcmTime(timestamp) : "";
+  return <li className="flex items-center justify-between gap-3 py-2.5"><div className="min-w-0"><p className="truncate text-sm font-medium">{item.patient_name}</p><p className="text-xs text-muted-foreground">{item.entity_type === "appointment" ? `${meta} · ${item.status}` : `Tạo ${meta} · bản nháp`}{kind === "overdue_appointment" && item.due_at ? ` · quá giờ từ ${hcmTime(item.due_at)}` : ""}</p></div><Link className="shrink-0 text-xs font-medium text-primary hover:underline" to={href}>Mở →</Link></li>;
+}
+
+function DailyChart({ data }: { data: ManagementDashboardDailyPoint[] }) {
+  if (!data.length || data.every((point) => !point.visits && !point.revenue)) return <p className="py-12 text-center text-sm text-muted-foreground">Chưa có hoạt động trong 7 ngày hoàn tất.</p>;
+  const visitsMax = Math.max(...data.map((point) => point.visits), 1);
+  const revenueMax = Math.max(...data.map((point) => point.revenue), 1);
+  const width = Math.max(560, data.length * 72);
+  return <div className="overflow-x-auto"><svg className="min-w-[560px] w-full" viewBox={`0 0 ${width} 220`} role="img" aria-label="Biểu đồ lượt khám và doanh thu theo ngày"><title>Biểu đồ lượt khám và doanh thu theo ngày</title><line x1="32" y1="180" x2={width - 8} y2="180" className="stroke-border" />{data.map((point, index) => { const x = 48 + index * ((width - 72) / Math.max(data.length - 1, 1)); const visitY = 180 - (point.visits / visitsMax) * 125; const revenueY = 180 - (point.revenue / revenueMax) * 125; return <g key={point.date}><title>{`${point.date}: ${formatNumber(point.visits)} lượt khám, ${formatCurrency(point.revenue)}`}</title><line x1={x} y1="180" x2={x} y2={visitY} stroke="#2563eb" strokeWidth="8" strokeLinecap="round" /><circle cx={x} cy={revenueY} r="4" fill="#7c3aed" /><text x={x} y="202" textAnchor="middle" fontSize="10" className="fill-muted-foreground">{point.date.slice(8, 10)}/{point.date.slice(5, 7)}</text></g>; })}<text x="32" y="18" fontSize="11" className="fill-blue-600 dark:fill-blue-400">Cột: lượt khám</text><text x="150" y="18" fontSize="11" className="fill-violet-600 dark:fill-violet-400">Điểm: doanh thu</text></svg></div>;
+}
+
+function DashboardSkeleton() {
+  return <div className="space-y-6"><div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">{Array.from({ length: 8 }, (_, index) => <div key={index} className="h-28 animate-pulse rounded-xl bg-muted" />)}</div><div className="grid gap-5 lg:grid-cols-3"><div className="h-72 animate-pulse rounded-xl bg-muted lg:col-span-2" /><div className="h-72 animate-pulse rounded-xl bg-muted" /></div></div>;
+}
+
+function RefreshIcon({ spinning }: { spinning: boolean }) { return <svg className={`h-4 w-4 ${spinning ? "animate-spin" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 11a8 8 0 10.85 3.87M20 4v7h-7" /></svg>; }
+function LiveStatus({ status }: { status: DashboardStreamStatus }) { const labels: Record<DashboardStreamStatus, string> = { live: "Cập nhật trực tiếp", reconnecting: "Đang kết nối lại", offline: "Tạm dừng khi tab ẩn" }; const colors: Record<DashboardStreamStatus, string> = { live: "bg-emerald-400", reconnecting: "bg-amber-400", offline: "bg-slate-400" }; return <span className="inline-flex items-center gap-1.5"><span className={`h-2 w-2 rounded-full ${colors[status]}`} aria-hidden="true" />{labels[status]}</span>; }

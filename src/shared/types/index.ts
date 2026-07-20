@@ -360,6 +360,73 @@ export interface ManagementDashboardSnapshot {
   exceptions: ManagementDashboardException[];
 }
 
+// ───────────────────────── Branch operations dashboard ─────────────────────────
+
+/** The branch dashboard is always scoped from the authenticated user's branch. */
+export interface BranchDashboardToday {
+  scheduled: number;
+  unconfirmed: number;
+  arrived: number;
+  completed: number;
+  in_progress_visits: number;
+  confirmed_revenue: number;
+  cancellations: number;
+  no_shows: number;
+}
+
+export interface BranchDashboardKpis {
+  confirmed_revenue: number;
+  previous_revenue: number;
+  visits: number;
+  previous_visits: number;
+  appointments: number;
+  completion_rate: number | null;
+  new_patients: number;
+  pending_plans: number;
+  cancellations: number;
+  no_shows: number;
+}
+
+export type BranchDashboardActionKind =
+  | "overdue_appointment"
+  | "unconfirmed_appointment"
+  | "appointment_outcome"
+  | "pending_plan";
+
+/** Minimal operational fields for an authorized branch user to open work. */
+export interface BranchDashboardActionItem {
+  id: string;
+  entity_type: "appointment" | "treatment_plan";
+  patient_name: string;
+  status: string;
+  scheduled_at?: string;
+  created_at?: string;
+  due_at?: string;
+  total_cost?: number;
+  currency?: string;
+}
+
+export interface BranchDashboardActionGroup {
+  kind: BranchDashboardActionKind;
+  count: number;
+  items: BranchDashboardActionItem[];
+  remaining_count: number;
+}
+
+export interface BranchDashboardSnapshot {
+  generated_at: string;
+  timezone: "Asia/Ho_Chi_Minh";
+  branch: ManagementDashboardBranch;
+  today_start: string;
+  today_end: string;
+  range_start: string;
+  range_end: string;
+  today: BranchDashboardToday;
+  kpis: BranchDashboardKpis;
+  daily: ManagementDashboardDailyPoint[];
+  actions: BranchDashboardActionGroup[];
+}
+
 /** A data-free signal that tells an authenticated dashboard client to refetch. */
 export interface DashboardInvalidation {
   type: "dashboard:invalidate";
@@ -785,7 +852,7 @@ export interface PlatformContent {
   body_markdown: string;
   status: "draft" | "scheduled" | "published" | "archived";
   audience: "global" | "tenant";
-  tenant_id?: string;
+  tenant_id?: string | null;
   publish_at?: string;
   expire_at?: string;
   created_at: string;
@@ -801,4 +868,24 @@ export interface PlatformAuditLog {
   result: "success" | "failure";
   reason?: string;
   created_at: string;
+}
+
+export interface PlatformDashboardSnapshot {
+  generated_at: string;
+  active_tenants: number;
+  suspended_tenants: number;
+  new_tenants: number;
+  active_users: number;
+  branches: number;
+  unhealthy_integrations: number;
+}
+
+export interface PlatformDashboardSnapshot {
+  generated_at: string;
+  active_tenants: number;
+  suspended_tenants: number;
+  new_tenants: number;
+  active_users: number;
+  branches: number;
+  unhealthy_integrations: number;
 }

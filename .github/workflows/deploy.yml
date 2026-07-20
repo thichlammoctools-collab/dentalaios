@@ -16,7 +16,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - run: npm ci
@@ -30,11 +30,9 @@ jobs:
 
       # ─── Deploy Worker ────────────────────────────────
       - name: Deploy Worker
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          workingDirectory: apps/api
-          command: deploy
+        run: npm exec --workspace @dentalaios/api -- wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
       # ─── Build Frontend ───────────────────────────────
       - name: Build Frontend
@@ -45,8 +43,6 @@ jobs:
 
       # ─── Deploy Frontend to Pages ─────────────────────
       - name: Deploy Frontend
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          workingDirectory: apps/web
-          command: pages deploy dist --project-name=dentalaios-web --branch=main
+        run: npm exec --workspace @dentalaios/api -- wrangler pages deploy apps/web/dist --project-name=dentalaios-web --branch=main
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

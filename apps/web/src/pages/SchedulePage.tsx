@@ -30,6 +30,7 @@ export function SchedulePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const selectedBranchId = searchParams.get("branch_id") ?? "";
+  const requestedStatuses = searchParams.get("status")?.split(",").filter(Boolean) ?? [];
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [users, setUsers] = useState<UserWithDetails[]>([]);
@@ -42,9 +43,13 @@ export function SchedulePage() {
   const [startingAppointmentId, setStartingAppointmentId] = useState<string | null>(null);
 
   // Filters apply to both schedule views.
-  const [filterStatuses, setFilterStatuses] = useState<Set<string>>(new Set());
+  const [filterStatuses, setFilterStatuses] = useState<Set<string>>(() => new Set(requestedStatuses));
   const [filterClinician, setFilterClinician] = useState("");
   const [filterAssistant, setFilterAssistant] = useState("");
+
+  useEffect(() => {
+    setFilterStatuses(new Set(requestedStatuses));
+  }, [searchParams]);
 
   // Compute week range from selectedDate
   const weekDays = useMemo(() => getWeekDays(selectedDate), [selectedDate]);

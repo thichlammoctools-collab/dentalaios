@@ -2,6 +2,9 @@
 
 import type { D1Database } from "@cloudflare/workers-types";
 import type {
+  BranchDashboardActionGroup,
+  BranchDashboardActionItem,
+  BranchDashboardSnapshot,
   ManagementDashboardBranchPerformance,
   ManagementDashboardDailyPoint,
   ManagementDashboardFilter,
@@ -86,6 +89,188 @@ async function rows(db: D1Database, sql: string, binds: unknown[]): Promise<D1Ro
 }
 
 export const dashboardService = {
+  async getBranchSnapshot(
+    db: D1Database,
+    tenantId: string,
+    branchId: string,
+    now = new Date(),
+  ): Promise<BranchDashboardSnapshot> {
+    const branch = await createBranchRepository(db).getById(tenantId, branchId);
+    if (!branch) throw new NotFoundError("Branch not found");
+
+    const bounds = getDashboardBounds(7, now);
+    const appointmentWhere = "a.tenant_id = ? AND a.branch_id = ?";
+    const visitWhere = "v.tenant_id = ? AND v.branch_id = ?";
+    const planWhere = "tp.tenant_id = ? AND v.branch_id = ?";
+    const paymentWhere = "p.tenant_id = ? AND v.branch_id = ?";
+    const actionLimit = 5;
+
+    const [todayAppointments, todayVisits, todayRevenue, periodAppointments, currentVisits, previousVisits, currentPatients, pendingPlans, currentRevenue, previousRevenue, dailyVisits, dailyRevenue, overdueCount, overdueItems, unconfirmedCount, unconfirmedItems, outcomeCount, outcomeItems, pendingPlanCount, pendingPlanItems] = await Promise.all([
+      first(db, `SELECT
+          COUNT(*) AS scheduled,
+          SUM(CASE WHEN a.status = 'booked' THEN 1 ELSE 0 END) AS unconfirmed,
+          SUM(CASE WHEN a.status = 'arrived' THEN 1 ELSE 0 END) AS arrived,
+          SUM(CASE WHEN a.status = 'completed' THEN 1 ELSE 0 END) AS completed,
+          SUM(CASE WHEN a.status = 'cancelled' THEN 1 ELSE 0 END) AS cancellations,
+          SUM(CASE WHEN a.status = 'no_show' THEN 1 ELSE 0 END) AS no_shows
+        FROM appointments a
+        WHERE ${appointmentWhere} AND a.scheduled_at >= ? AND a.scheduled_at < ?`,
+      [tenantId, branchId, bounds.todayStart, bounds.todayEnd]),
+      first(db, `SELECT SUM(CASE WHEN v.status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress_visits
+        FROM visits v WHERE ${visitWhere} AND v.date >= ? AND v.date < ?`,
+      [tenantId, branchId, bounds.todayStart, bounds.todayEnd]),
+      first(db, `SELECT COALESCE(SUM(p.amount), 0) AS confirmed_revenue
+        FROM payments p
+        JOIN treatment_plans tp ON tp.id = p.treatment_plan_id AND tp.tenant_id = p.tenant_id
+        JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = p.tenant_id
+        WHERE ${paymentWhere} AND p.status = 'confirmed' AND p.created_at >= ? AND p.created_at < ?`,
+      [tenantId, branchId, bounds.todayStart, bounds.todayEnd]),
+      first(db, `SELECT COUNT(*) AS appointments,
+          SUM(CASE WHEN a.status = 'completed' THEN 1 ELSE 0 END) AS completed,
+          SUM(CASE WHEN a.status = 'cancelled' THEN 1 ELSE 0 END) AS cancellations,
+          SUM(CASE WHEN a.status = 'no_show' THEN 1 ELSE 0 END) AS no_shows
+        FROM appointments a
+        WHERE ${appointmentWhere} AND a.scheduled_at >= ? AND a.scheduled_at < ?`,
+      [tenantId, branchId, bounds.rangeStart, bounds.rangeEnd]),
+      first(db, `SELECT COUNT(*) AS visits FROM visits v
+        WHERE ${visitWhere} AND v.date >= ? AND v.date < ?`,
+      [tenantId, branchId, bounds.rangeStart, bounds.rangeEnd]),
+      first(db, `SELECT COUNT(*) AS visits FROM visits v
+        WHERE ${visitWhere} AND v.date >= ? AND v.date < ?`,
+      [tenantId, branchId, bounds.previousStart, bounds.previousEnd]),
+      first(db, `SELECT COUNT(*) AS new_patients FROM patients p
+        WHERE p.tenant_id = ? AND p.branch_id = ? AND p.created_at >= ? AND p.created_at < ?`,
+      [tenantId, branchId, bounds.rangeStart, bounds.rangeEnd]),
+      first(db, `SELECT COUNT(*) AS pending_plans FROM treatment_plans tp
+        JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = tp.tenant_id
+        WHERE ${planWhere} AND tp.status = 'draft'`, [tenantId, branchId]),
+      first(db, `SELECT COALESCE(SUM(p.amount), 0) AS confirmed_revenue FROM payments p
+        JOIN treatment_plans tp ON tp.id = p.treatment_plan_id AND tp.tenant_id = p.tenant_id
+        JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = p.tenant_id
+        WHERE ${paymentWhere} AND p.status = 'confirmed' AND p.created_at >= ? AND p.created_at < ?`,
+      [tenantId, branchId, bounds.rangeStart, bounds.rangeEnd]),
+      first(db, `SELECT COALESCE(SUM(p.amount), 0) AS confirmed_revenue FROM payments p
+        JOIN treatment_plans tp ON tp.id = p.treatment_plan_id AND tp.tenant_id = p.tenant_id
+        JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = p.tenant_id
+        WHERE ${paymentWhere} AND p.status = 'confirmed' AND p.created_at >= ? AND p.created_at < ?`,
+      [tenantId, branchId, bounds.previousStart, bounds.previousEnd]),
+      rows(db, `SELECT date(datetime(v.date), '+7 hours') AS date, COUNT(*) AS visits FROM visits v
+        WHERE ${visitWhere} AND v.date >= ? AND v.date < ? GROUP BY date ORDER BY date`,
+      [tenantId, branchId, bounds.rangeStart, bounds.rangeEnd]),
+      rows(db, `SELECT date(datetime(p.created_at), '+7 hours') AS date, COALESCE(SUM(p.amount), 0) AS revenue FROM payments p
+        JOIN treatment_plans tp ON tp.id = p.treatment_plan_id AND tp.tenant_id = p.tenant_id
+        JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = p.tenant_id
+        WHERE ${paymentWhere} AND p.status = 'confirmed' AND p.created_at >= ? AND p.created_at < ? GROUP BY date ORDER BY date`,
+      [tenantId, branchId, bounds.rangeStart, bounds.rangeEnd]),
+      first(db, `SELECT COUNT(*) AS count FROM appointments a WHERE ${appointmentWhere}
+        AND a.status IN ('booked', 'confirmed', 'arrived')
+        AND datetime(a.scheduled_at, '+' || a.duration_min || ' minutes') < ?
+        AND a.scheduled_at >= ? AND a.scheduled_at < ?`,
+      [tenantId, branchId, now.toISOString(), bounds.todayStart, bounds.todayEnd]),
+      rows(db, `SELECT a.id, a.status, a.scheduled_at, a.duration_min, p.name AS patient_name
+        FROM appointments a JOIN patients p ON p.id = a.patient_id AND p.tenant_id = a.tenant_id
+        WHERE ${appointmentWhere} AND a.status IN ('booked', 'confirmed', 'arrived')
+        AND datetime(a.scheduled_at, '+' || a.duration_min || ' minutes') < ?
+        AND a.scheduled_at >= ? AND a.scheduled_at < ?
+        ORDER BY datetime(a.scheduled_at, '+' || a.duration_min || ' minutes') ASC LIMIT ?`,
+      [tenantId, branchId, now.toISOString(), bounds.todayStart, bounds.todayEnd, actionLimit]),
+      first(db, `SELECT COUNT(*) AS count FROM appointments a WHERE ${appointmentWhere}
+        AND a.status = 'booked' AND a.scheduled_at >= ? AND a.scheduled_at < ?`,
+      [tenantId, branchId, bounds.todayStart, bounds.todayEnd]),
+      rows(db, `SELECT a.id, a.status, a.scheduled_at, p.name AS patient_name
+        FROM appointments a JOIN patients p ON p.id = a.patient_id AND p.tenant_id = a.tenant_id
+        WHERE ${appointmentWhere} AND a.status = 'booked' AND a.scheduled_at >= ? AND a.scheduled_at < ?
+        ORDER BY a.scheduled_at ASC LIMIT ?`,
+      [tenantId, branchId, bounds.todayStart, bounds.todayEnd, actionLimit]),
+      first(db, `SELECT COUNT(*) AS count FROM appointments a WHERE ${appointmentWhere}
+        AND a.status IN ('cancelled', 'no_show') AND a.scheduled_at >= ? AND a.scheduled_at < ?`,
+      [tenantId, branchId, bounds.todayStart, bounds.todayEnd]),
+      rows(db, `SELECT a.id, a.status, a.scheduled_at, p.name AS patient_name
+        FROM appointments a JOIN patients p ON p.id = a.patient_id AND p.tenant_id = a.tenant_id
+        WHERE ${appointmentWhere} AND a.status IN ('cancelled', 'no_show')
+        AND a.scheduled_at >= ? AND a.scheduled_at < ? ORDER BY a.scheduled_at DESC LIMIT ?`,
+      [tenantId, branchId, bounds.todayStart, bounds.todayEnd, actionLimit]),
+      first(db, `SELECT COUNT(*) AS count FROM treatment_plans tp
+        JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = tp.tenant_id
+        WHERE ${planWhere} AND tp.status = 'draft'`, [tenantId, branchId]),
+      rows(db, `SELECT tp.id, tp.status, tp.created_at, tp.total_cost, tp.currency, p.name AS patient_name
+        FROM treatment_plans tp
+        JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = tp.tenant_id
+        JOIN patients p ON p.id = tp.patient_id AND p.tenant_id = tp.tenant_id
+        WHERE ${planWhere} AND tp.status = 'draft' ORDER BY tp.created_at ASC LIMIT ?`,
+      [tenantId, branchId, actionLimit]),
+    ]);
+
+    const appointmentItems = (source: D1Row[], overdue = false): BranchDashboardActionItem[] => source.map((row) => ({
+      id: row.id as string,
+      entity_type: "appointment",
+      patient_name: row.patient_name as string,
+      status: row.status as string,
+      scheduled_at: row.scheduled_at as string,
+      ...(overdue ? { due_at: new Date(new Date(row.scheduled_at as string).getTime() + number(row, "duration_min") * 60_000).toISOString() } : {}),
+    }));
+    const planItems: BranchDashboardActionItem[] = pendingPlanItems.map((row) => ({
+      id: row.id as string,
+      entity_type: "treatment_plan",
+      patient_name: row.patient_name as string,
+      status: row.status as string,
+      created_at: row.created_at as string,
+      total_cost: number(row, "total_cost"),
+      currency: row.currency as string,
+    }));
+    const actionGroup = (
+      kind: BranchDashboardActionGroup["kind"],
+      count: number,
+      items: BranchDashboardActionItem[],
+    ): BranchDashboardActionGroup => ({ kind, count, items, remaining_count: Math.max(count - items.length, 0) });
+    const terminal = number(periodAppointments, "completed") + number(periodAppointments, "cancellations") + number(periodAppointments, "no_shows");
+    const dailyVisitMap = new Map(dailyVisits.map((row) => [row.date as string, number(row, "visits")]));
+    const dailyRevenueMap = new Map(dailyRevenue.map((row) => [row.date as string, number(row, "revenue")]));
+
+    return {
+      generated_at: now.toISOString(),
+      timezone: TIMEZONE,
+      branch: { id: branch.id, name: branch.name },
+      today_start: bounds.todayStart,
+      today_end: bounds.todayEnd,
+      range_start: bounds.rangeStart,
+      range_end: bounds.rangeEnd,
+      today: {
+        scheduled: number(todayAppointments, "scheduled"),
+        unconfirmed: number(todayAppointments, "unconfirmed"),
+        arrived: number(todayAppointments, "arrived"),
+        completed: number(todayAppointments, "completed"),
+        in_progress_visits: number(todayVisits, "in_progress_visits"),
+        confirmed_revenue: number(todayRevenue, "confirmed_revenue"),
+        cancellations: number(todayAppointments, "cancellations"),
+        no_shows: number(todayAppointments, "no_shows"),
+      },
+      kpis: {
+        confirmed_revenue: number(currentRevenue, "confirmed_revenue"),
+        previous_revenue: number(previousRevenue, "confirmed_revenue"),
+        visits: number(currentVisits, "visits"),
+        previous_visits: number(previousVisits, "visits"),
+        appointments: number(periodAppointments, "appointments"),
+        completion_rate: terminal === 0 ? null : number(periodAppointments, "completed") / terminal,
+        new_patients: number(currentPatients, "new_patients"),
+        pending_plans: number(pendingPlans, "pending_plans"),
+        cancellations: number(periodAppointments, "cancellations"),
+        no_shows: number(periodAppointments, "no_shows"),
+      },
+      daily: bounds.localRangeDates.map((date) => ({
+        date,
+        visits: dailyVisitMap.get(date) ?? 0,
+        revenue: dailyRevenueMap.get(date) ?? 0,
+      })),
+      actions: [
+        actionGroup("overdue_appointment", number(overdueCount, "count"), appointmentItems(overdueItems, true)),
+        actionGroup("unconfirmed_appointment", number(unconfirmedCount, "count"), appointmentItems(unconfirmedItems)),
+        actionGroup("appointment_outcome", number(outcomeCount, "count"), appointmentItems(outcomeItems)),
+        actionGroup("pending_plan", number(pendingPlanCount, "count"), planItems),
+      ],
+    };
+  },
+
   async getManagementSnapshot(
     db: D1Database,
     tenantId: string,
