@@ -660,6 +660,19 @@ export const platformLimitsSchema = z.object({
   storage_quota_bytes: z.number().int().min(0).max(10_000_000_000_000),
 }).strict();
 
+export const procedureCatalogCreateSchema = z.object({
+  code: z.string().trim().min(2, "Mã thủ thuật tối thiểu 2 ký tự").max(100).regex(/^[a-z0-9_-]+$/, "Mã thủ thuật chỉ gồm chữ thường, số, gạch ngang hoặc gạch dưới"),
+  name: nonEmpty(200),
+  is_active: z.boolean().default(true),
+  sort_order: z.number().int().min(0).max(10_000).default(0),
+}).strict();
+
+export const procedureCatalogUpdateSchema = z.object({
+  name: nonEmpty(200).optional(),
+  is_active: z.boolean().optional(),
+  sort_order: z.number().int().min(0).max(10_000).optional(),
+}).strict().refine((data) => Object.keys(data).length > 0, "Cần ít nhất một trường để cập nhật");
+
 export const platformContentCreateSchema = z.object({
   kind: z.enum(["announcement", "help_article"]),
   title: nonEmpty(200),

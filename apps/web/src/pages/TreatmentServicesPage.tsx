@@ -4,7 +4,7 @@ import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Dialog, DialogBody, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import type { TreatmentService } from "@shared/types";
+import type { ProcedureCatalogItem, TreatmentService } from "@shared/types";
 import { PERMISSIONS } from "@shared/constants";
 
 const EMPTY_SERVICE = {
@@ -18,6 +18,7 @@ const EMPTY_SERVICE = {
 export function TreatmentServicesPage() {
   const { session } = useAuth();
   const [services, setServices] = useState<TreatmentService[]>([]);
+  const [procedures, setProcedures] = useState<ProcedureCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(EMPTY_SERVICE);
@@ -36,8 +37,12 @@ export function TreatmentServicesPage() {
   async function loadServices() {
     setLoading(true);
     try {
-      const response = await apiGet<{ items: TreatmentService[] }>("/api/clinic/treatment-services");
-      setServices(response.items);
+      const [servicesResponse, proceduresResponse] = await Promise.all([
+        apiGet<{ items: TreatmentService[] }>("/api/clinic/treatment-services"),
+        apiGet<{ items: ProcedureCatalogItem[] }>("/api/clinic/procedures"),
+      ]);
+      setServices(servicesResponse.items);
+      setProcedures(proceduresResponse.items);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi tải dịch vụ điều trị");
     } finally {
@@ -90,7 +95,7 @@ export function TreatmentServicesPage() {
 
   async function save() {
     const price = form.price;
-    if (!form.code.trim() || !form.name.trim() || typeof price !== "number" || !Number.isFinite(price) || price < 0) {
+    if (!form.code.trim() || !form.name.trim() || !form.procedure || typeof price !== "number" || !Number.isFinite(price) || price < 0) {
       toast.error("Nhập mã, tên và giá dịch vụ hợp lệ");
       return;
     }
@@ -171,7 +176,7 @@ export function TreatmentServicesPage() {
         <DialogBody className="grid gap-3">
           <label className="grid gap-1.5 text-sm font-medium">Mã dịch vụ<input value={form.code} disabled={Boolean(editingCode)} onChange={(event) => setForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))} maxLength={40} placeholder="VD: TRAM-COM" className="rounded-md border border-input bg-background px-3 py-2 font-mono text-sm disabled:opacity-60" /></label>
           <label className="grid gap-1.5 text-sm font-medium">Tên dịch vụ<input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} maxLength={200} placeholder="VD: Trám composite" className="rounded-md border border-input bg-background px-3 py-2 text-sm" /></label>
-          <label className="grid gap-1.5 text-sm font-medium">Thủ thuật<select value={form.procedure} onChange={(event) => setForm((current) => ({ ...current, procedure: event.target.value }))} className="rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="filling">Trám răng</option><option value="root_canal">Điều trị tủy</option><option value="crown">Bọc mão răng</option><option value="implant">Cấy ghép implant</option><option value="extraction">Nhổ răng</option><option value="scaling">Cạo vôi răng</option><option value="fluoride">Tẩy trắng fluoride</option><option value="bridge">Cầu răng sứ</option><option value="other">Khác</option></select></label>
+           <label className="grid gap-1.5 text-sm font-medium">Thủ thuật<select value={form.procedure} onChange={(event) => setForm((current) => ({ ...current, procedure: event.target.value }))} className="rounded-md border border-input bg-background px-3 py-2 text-sm">{!procedures.some((item) => item.code === form.procedure) && form.procedure && <option value={form.procedure}>{form.procedure} (đã ngừng áp dụng)</option>}{procedures.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}</select></label>
           <label className="grid gap-1.5 text-sm font-medium">Giá đã gồm VAT (VND)<CurrencyInput min="0" value={form.price} onChange={(price) => setForm((current) => ({ ...current, price }))} placeholder="VD: 500 000" /></label>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_active} onChange={(event) => setForm((current) => ({ ...current, is_active: event.target.checked }))} />Đang áp dụng</label>
         </DialogBody>

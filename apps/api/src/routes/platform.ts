@@ -11,6 +11,8 @@ import {
   platformFlagSchema,
   platformLifecycleSchema,
   platformLimitsSchema,
+  procedureCatalogCreateSchema,
+  procedureCatalogUpdateSchema,
   platformTenantCreateSchema,
   platformTenantListQuerySchema,
   platformTenantUpdateSchema,
@@ -32,6 +34,7 @@ import { createPlatformConfigRepository } from "../repositories/platform-config.
 import { createPlatformContentRepository } from "../repositories/platform-content.repo";
 import { createPlatformTenantsRepository } from "../repositories/platform-tenants.repo";
 import { createPlatformUsersRepository } from "../repositories/platform-users.repo";
+import { createProcedureCatalogRepository } from "../repositories/procedure-catalog.repo";
 import { platformService } from "../services/platform.service";
 import { platformTenantProvisionService } from "../services/platform-tenant-provision.service";
 const router = new Hono<{ Bindings: Env; Variables: PlatformAuthContext }>();
@@ -61,6 +64,34 @@ function validateContentScope(
   }
 }
 router.use("*", requirePlatformAuth());
+router.get(
+  "/procedures",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.PROCEDURES_READ),
+  async (c) => c.json({ items: await createProcedureCatalogRepository(c.env.DB).list() }),
+);
+router.post(
+  "/procedures",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.PROCEDURES_WRITE),
+  requireRecentPlatformMfa(),
+  zValidator("json", procedureCatalogCreateSchema),
+  async (c) => {
+    const item = await createProcedureCatalogRepository(c.env.DB).create(c.req.valid("json"));
+    await platformAudit(c.env.DB, { ...actor(c), action: "procedure.created", entity_type: "procedure", entity_id: item.code });
+    return c.json(item, 201);
+  },
+);
+router.patch(
+  "/procedures/:code",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.PROCEDURES_WRITE),
+  requireRecentPlatformMfa(),
+  zValidator("json", procedureCatalogUpdateSchema),
+  async (c) => {
+    const item = await createProcedureCatalogRepository(c.env.DB).update(c.req.param("code"), c.req.valid("json"));
+    if (!item) throw new NotFoundError("Procedure not found");
+    await platformAudit(c.env.DB, { ...actor(c), action: "procedure.updated", entity_type: "procedure", entity_id: item.code, details: { fields: Object.keys(c.req.valid("json")) } });
+    return c.json(item);
+  },
+);
 router.get(
   "/dashboard",
   requirePlatformPermission(PLATFORM_PERMISSIONS.DASHBOARD_READ),

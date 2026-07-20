@@ -2,14 +2,22 @@ import type { D1Database } from "@cloudflare/workers-types";
 import type { TreatmentService } from "@shared/types";
 import type { TreatmentServiceUpsertInput } from "@shared/validation";
 import { createTreatmentServicesRepository } from "../repositories/treatment-service-prices.repo";
-import { NotFoundError } from "../lib/errors";
+import { NotFoundError, ValidationError } from "../lib/errors";
+import { createProcedureCatalogRepository } from "../repositories/procedure-catalog.repo";
 
 export const treatmentServicesService = {
   list(db: D1Database, tenantId: string): Promise<TreatmentService[]> {
     return createTreatmentServicesRepository(db).list(tenantId);
   },
 
-  upsert(db: D1Database, tenantId: string, data: TreatmentServiceUpsertInput): Promise<TreatmentService> {
+  async upsert(db: D1Database, tenantId: string, data: TreatmentServiceUpsertInput): Promise<TreatmentService> {
+    const [procedure, existing] = await Promise.all([
+      createProcedureCatalogRepository(db).get(data.procedure),
+      createTreatmentServicesRepository(db).getByCode(tenantId, data.code),
+    ]);
+    if (!procedure || (!procedure.is_active && existing?.procedure !== data.procedure)) {
+      throw new ValidationError("Thủ thuật không tồn tại hoặc đã ngừng áp dụng");
+    }
     return createTreatmentServicesRepository(db).upsert(tenantId, data);
   },
 

@@ -16,6 +16,12 @@ export function createTreatmentServicesRepository(db: D1Database) {
       return row ? mapPrice(row) : null;
     },
 
+    async getByCode(tenantId: string, code: string): Promise<TreatmentService | null> {
+      const row = await db.prepare("SELECT * FROM treatment_services WHERE tenant_id = ? AND code = ? LIMIT 1")
+        .bind(tenantId, code).first() as D1Row | null;
+      return row ? mapPrice(row) : null;
+    },
+
     async upsert(tenantId: string, data: { code: string; name: string; procedure: string; price: number; is_active: boolean }): Promise<TreatmentService> {
       await db.prepare(`INSERT INTO treatment_services (id, tenant_id, code, name, procedure, price, is_active)
         VALUES (?, ?, ?, ?, ?, ?, ?)

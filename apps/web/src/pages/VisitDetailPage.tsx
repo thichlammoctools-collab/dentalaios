@@ -15,7 +15,7 @@ import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatDateTime } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
-import type { Visit, ClinicalFinding, TreatmentPlan, GeneratePlanResult, GeneratePlanItemDraft } from "@shared/types";
+import type { Visit, ClinicalFinding, TreatmentPlan, GeneratePlanResult, GeneratePlanItemDraft, ProcedureCatalogItem } from "@shared/types";
 
 interface SummarizeResult {
   summary: string;
@@ -276,6 +276,7 @@ export function VisitDetailPage() {
   const navigate = useNavigate();
   const [visit, setVisit] = useState<Visit | null>(null);
   const [findings, setFindings] = useState<ClinicalFinding[]>([]);
+  const [procedures, setProcedures] = useState<ProcedureCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [summarizing, setSummarizing] = useState(false);
@@ -306,12 +307,14 @@ export function VisitDetailPage() {
     if (!id) return;
     setLoading(true);
     try {
-      const [v, f] = await Promise.all([
+      const [v, f, procedureResponse] = await Promise.all([
         apiGet<Visit>(`/api/visits/${id}`),
         apiGet<{ items: ClinicalFinding[] }>(`/api/visits/${id}/findings`),
+        apiGet<{ items: ProcedureCatalogItem[] }>("/api/clinic/procedures"),
       ]);
       setVisit(v);
       setFindings(f.items);
+      setProcedures(procedureResponse.items);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi tải visit");
     } finally {
@@ -833,8 +836,9 @@ export function VisitDetailPage() {
                                 onChange={(e) => updateItem(item.id, "procedure", e.target.value)}
                                 className={`h-8 w-full rounded-lg border-0 px-2 text-xs font-semibold ${procColor}`}
                               >
-                                {PROCEDURE_OPTIONS.map((o) => (
-                                  <option key={o.value} value={o.value} className="bg-white dark:bg-zinc-900 text-gray-800 dark:text-zinc-200 font-normal">{o.label}</option>
+                                {!procedures.some((procedure) => procedure.code === item.procedure) && item.procedure && <option value={item.procedure} className="bg-white dark:bg-zinc-900 text-gray-800 dark:text-zinc-200 font-normal">{procedureLabel(item.procedure)} (đã ngừng áp dụng)</option>}
+                                {procedures.map((procedure) => (
+                                  <option key={procedure.code} value={procedure.code} className="bg-white dark:bg-zinc-900 text-gray-800 dark:text-zinc-200 font-normal">{procedure.name}</option>
                                 ))}
                               </select>
                             </td>

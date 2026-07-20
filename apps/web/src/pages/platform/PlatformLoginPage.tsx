@@ -8,20 +8,22 @@ import { PlatformApiError } from "@/lib/platform-api";
 import { usePlatformAuth } from "@/lib/platform-auth-context";
 
 export function PlatformLoginPage() {
-  const { session, pendingChallenge, mfaEnrollment, login, verifyMfa } = usePlatformAuth();
+  const { session, pendingChallenge, mfaEnrollment, isRestoring, login, verifyMfa } = usePlatformAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const destination = (location.state as { from?: string } | null)?.from ?? "/platform/dashboard";
+  if (isRestoring) return <div className="grid min-h-svh place-items-center bg-[#090f1d] text-sm text-slate-400">Đang kiểm tra phiên đăng nhập...</div>;
   if (session) return <Navigate to={destination} replace />;
 
   async function submitCredentials(event: FormEvent) {
     event.preventDefault(); setLoading(true); setError(null);
-    try { await login(email, password); } catch (cause) { setError(cause instanceof PlatformApiError ? cause.message : "Không thể đăng nhập"); } finally { setLoading(false); }
+    try { await login(email, password, remember); } catch (cause) { setError(cause instanceof PlatformApiError ? cause.message : "Không thể đăng nhập"); } finally { setLoading(false); }
   }
   async function submitMfa(event: FormEvent) {
     event.preventDefault(); setLoading(true); setError(null);

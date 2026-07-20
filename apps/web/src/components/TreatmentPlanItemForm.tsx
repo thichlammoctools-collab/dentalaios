@@ -10,7 +10,7 @@ import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import { isAssistantRole, isDoctorRole, isValidFdiTooth } from "@shared/constants";
-import type { TreatmentPlanItem, TreatmentService, UserWithDetails } from "@shared/types";
+import type { ProcedureCatalogItem, TreatmentPlanItem, TreatmentService, UserWithDetails } from "@shared/types";
 
 interface TreatmentPlanItemFormProps {
   open: boolean;
@@ -33,6 +33,7 @@ export function TreatmentPlanItemForm({
   const [description, setDescription] = useState("");
   const [unitCost, setUnitCost] = useState<number | "">("");
   const [services, setServices] = useState<TreatmentService[]>([]);
+  const [procedures, setProcedures] = useState<ProcedureCatalogItem[]>([]);
   const [serviceCode, setServiceCode] = useState("");
   const [saving, setSaving] = useState(false);
   const [fullMouth, setFullMouth] = useState(false);
@@ -53,8 +54,14 @@ export function TreatmentPlanItemForm({
     setTreatingClinicianId(item?.treating_clinician_id ?? "");
     setAssistantId(item?.assistant_id ?? "");
     setFullMouth(item?.tooth_number == null && Boolean(item));
-    void apiGet<{ items: TreatmentService[] }>("/api/clinic/treatment-services")
-      .then((response) => setServices(response.items.filter((service) => service.is_active)))
+    void Promise.all([
+      apiGet<{ items: TreatmentService[] }>("/api/clinic/treatment-services"),
+      apiGet<{ items: ProcedureCatalogItem[] }>("/api/clinic/procedures"),
+    ])
+      .then(([servicesResponse, proceduresResponse]) => {
+        setServices(servicesResponse.items.filter((service) => service.is_active));
+        setProcedures(proceduresResponse.items);
+      })
       .catch(() => setServices([]));
     if (session?.branch.id) {
       void apiGet<{ items: UserWithDetails[] }>(`/api/users/branch/${session.branch.id}`)
@@ -183,15 +190,8 @@ export function TreatmentPlanItemForm({
                 onChange={(e) => setProcedure(e.target.value)}
                 disabled={Boolean(serviceCode)}
               >
-                <option value="filling">Trám răng</option>
-                <option value="root_canal">Điều trị tủy</option>
-                <option value="crown">Bọc mão răng</option>
-                <option value="implant">Cấy ghép implant</option>
-                <option value="extraction">Nhổ răng</option>
-                <option value="scaling">Cạo vôi răng</option>
-                <option value="fluoride">Tẩy trắng fluoride</option>
-                <option value="bridge">Cầu răng sứ</option>
-                <option value="other">Khác</option>
+                {!procedures.some((item) => item.code === procedure) && procedure && <option value={procedure}>{procedure} (đã ngừng áp dụng)</option>}
+                {procedures.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}
               </Select>
             </div>
           </div>

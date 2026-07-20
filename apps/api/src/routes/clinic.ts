@@ -23,6 +23,7 @@ import { testLarkCredentials } from "../lib/lark-client";
 import { NotFoundError, ValidationError } from "../lib/errors";
 import { paymentService } from "../services/payment.service";
 import { treatmentServicesService } from "../services/treatment-service-prices.service";
+import { createProcedureCatalogRepository } from "../repositories/procedure-catalog.repo";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -118,6 +119,13 @@ router.delete(
 );
 
 // ──────────────── Treatment service catalog (admin managed) ────────────────
+
+// GET /api/clinic/procedures — global active procedure choices for tenant forms.
+router.get(
+  "/procedures",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => c.json({ items: await createProcedureCatalogRepository(c.env.DB).list(true) }),
+);
 
 // GET /api/clinic/treatment-services — prices include VAT
 router.get(

@@ -7,6 +7,7 @@ const navigation = [
   { label: "Phòng khám", href: "/platform/tenants", icon: "building" },
   { label: "Nội dung", href: "/platform/content", icon: "document" },
   { label: "Cấu hình", href: "/platform/configuration", icon: "sliders" },
+  { label: "Thủ thuật", href: "/platform/procedures", icon: "stethoscope" },
   { label: "Super Admin", href: "/platform/admins", icon: "users" },
   { label: "Nhật ký", href: "/platform/audit-logs", icon: "log" },
 ] as const;
@@ -17,6 +18,7 @@ function Icon({ name }: { name: (typeof navigation)[number]["icon"] }) {
     building: <><path d="M3 21h18M6 21V5h12v16M9 9h1m4 0h1M9 13h1m4 0h1M10 21v-4h4v4" /></>,
     document: <><path d="M6 3h9l3 3v15H6z" /><path d="M14 3v4h4M9 12h6M9 16h6" /></>,
     sliders: <><path d="M4 7h16M4 17h16M9 4v6M15 14v6" /></>,
+    stethoscope: <><path d="M6 3v6a6 6 0 0012 0V3M6 3h3M15 3h3M12 15v3a3 3 0 003 3h3" /><circle cx="18" cy="21" r="1" /></>,
     users: <><circle cx="9" cy="8" r="3" /><path d="M3 21v-2a6 6 0 0112 0v2M16 4a3 3 0 010 6M21 21v-2a6 6 0 00-3-5.2" /></>,
     log: <><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6M8 13h8M8 17h6" /></>,
   } as const;
@@ -32,6 +34,7 @@ export function PlatformShell() {
     if (item.href.endsWith("/audit-logs")) return hasPermission("platform_audit.read");
     if (item.href.endsWith("/content")) return hasPermission("platform_content.read");
     if (item.href.endsWith("/configuration")) return hasPermission("platform_config.read");
+    if (item.href.endsWith("/procedures")) return hasPermission("platform_procedures.read");
     if (item.href.endsWith("/tenants")) return hasPermission("platform_tenants.read");
     return hasPermission("platform_dashboard.read");
   });

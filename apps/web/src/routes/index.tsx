@@ -35,6 +35,7 @@ import {
   PlatformConfigurationPage,
   PlatformContentPage,
   PlatformDashboardPage,
+  PlatformProceduresPage,
   PlatformTenantDetailPage,
   PlatformTenantsPage,
 } from "@/pages/platform/PlatformPages";
@@ -74,6 +75,7 @@ export function AppRoutes() {
         <Route path="/platform/tenants/:id" element={<PlatformTenantDetailPage />} />
         <Route path="/platform/content" element={<PlatformContentPage />} />
         <Route path="/platform/configuration" element={<PlatformConfigurationPage />} />
+        <Route path="/platform/procedures" element={<PlatformProceduresPage />} />
         <Route path="/platform/admins" element={<PlatformAdminsPage />} />
         <Route path="/platform/audit-logs" element={<PlatformAuditLogsPage />} />
       </Route>

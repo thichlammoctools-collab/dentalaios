@@ -871,6 +871,8 @@ export type PlatformPermission =
   | "platform_config.write"
   | "platform_admins.read"
   | "platform_admins.write"
+  | "platform_procedures.read"
+  | "platform_procedures.write"
   | "platform_audit.read";
 
 export interface PlatformRole {
@@ -931,6 +933,16 @@ export interface PlatformFeatureFlag {
   key: string;
   description: string;
   default_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Global clinical procedure maintained by Platform Admins. */
+export interface ProcedureCatalogItem {
+  code: string;
+  name: string;
+  is_active: boolean;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 }

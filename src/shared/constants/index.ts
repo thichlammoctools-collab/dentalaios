@@ -207,6 +207,8 @@ export const PLATFORM_PERMISSIONS = {
   CONFIG_WRITE: "platform_config.write",
   ADMINS_READ: "platform_admins.read",
   ADMINS_WRITE: "platform_admins.write",
+  PROCEDURES_READ: "platform_procedures.read",
+  PROCEDURES_WRITE: "platform_procedures.write",
   AUDIT_READ: "platform_audit.read",
 } as const;
 
