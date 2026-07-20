@@ -33,6 +33,18 @@ SET permissions = CASE system_key
 END
 WHERE system_key IS NOT NULL;
 
+WITH catalog(system_key, name, permissions) AS (
+  VALUES
+    ('admin', 'Quản trị viên', '["all"]'),
+    ('doctor', 'Bác sĩ', '["read_patients","write_findings","write_plans","approve_plans"]'),
+    ('assistant', 'Phụ tá', '["read_patients","write_visits"]'),
+    ('receptionist', 'Lễ tân', '["read_patients","write_payments","write_appointments"]'),
+    ('manager', 'Quản lý', '["all"]'),
+    ('accountant', 'Kế toán', '["read_patients","write_payments"]'),
+    ('hr', 'Nhân sự', '["manage_users","read_patients"]'),
+    ('marketing', 'Marketing', '["read_patients"]'),
+    ('security', 'Bảo vệ', '[]')
+)
 INSERT OR IGNORE INTO roles (id, tenant_id, system_key, name, permissions)
 SELECT
   lower(hex(randomblob(16))),
@@ -41,17 +53,7 @@ SELECT
   catalog.name,
   catalog.permissions
 FROM tenants
-CROSS JOIN (
-  SELECT 'admin' AS system_key, 'Quản trị viên' AS name, '["all"]' AS permissions
-  UNION ALL SELECT 'doctor', 'Bác sĩ', '["read_patients","write_findings","write_plans","approve_plans"]'
-  UNION ALL SELECT 'assistant', 'Phụ tá', '["read_patients","write_visits"]'
-  UNION ALL SELECT 'receptionist', 'Lễ tân', '["read_patients","write_payments","write_appointments"]'
-  UNION ALL SELECT 'manager', 'Quản lý', '["all"]'
-  UNION ALL SELECT 'accountant', 'Kế toán', '["read_patients","write_payments"]'
-  UNION ALL SELECT 'hr', 'Nhân sự', '["manage_users","read_patients"]'
-  UNION ALL SELECT 'marketing', 'Marketing', '["read_patients"]'
-  UNION ALL SELECT 'security', 'Bảo vệ', '[]'
-) AS catalog
+CROSS JOIN catalog
 LEFT JOIN roles
   ON roles.tenant_id = tenants.id AND roles.system_key = catalog.system_key
 WHERE roles.id IS NULL;
