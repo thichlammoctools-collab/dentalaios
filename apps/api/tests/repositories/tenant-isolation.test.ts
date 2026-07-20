@@ -252,7 +252,9 @@ describe("Tenant isolation: treatment-items.repo", () => {
 
   it("listByPlan() scopes by tenant_id", async () => {
     await createTreatmentItemsRepository(db as any).listByPlan(TENANT_A, "p1");
-    expect(db.__sqlContaining("FROM treatment_plan_items")[0].sql).toMatch(/tenant_id = \? AND treatment_plan_id = \?/);
+    expect(db.__sqlContaining("FROM treatment_plan_items")[0].sql).toMatch(
+      /treatment_plan_items\.tenant_id = \? AND treatment_plan_items\.treatment_plan_id = \?/,
+    );
   });
 
   it("create() sets tenant_id from first arg", async () => {
