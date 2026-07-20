@@ -258,6 +258,16 @@ export function TreatmentPlanDetailPage() {
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           {canEdit && <Button onClick={() => setOpenForm(true)}>+ Thêm hạng mục</Button>}
+          {canEdit && plan.visit_id && (
+            <Button
+              variant="outline"
+              className="bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200 hover:from-purple-100 hover:to-blue-100"
+              onClick={() => navigate(`/treatment-plans/${plan.id}/ai-suggest`)}
+            >
+              <span className="mr-1">✨</span>
+              AI gợi ý hạng mục
+            </Button>
+          )}
           {canApprove && <Button onClick={onApprove}>Duyệt kế hoạch</Button>}
           {canDelete && (
             <Button variant="destructive" onClick={onDeletePlan}>Xóa kế hoạch</Button>

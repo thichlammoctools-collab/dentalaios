@@ -10,6 +10,7 @@ import { PatientsPage } from "@/pages/PatientsPage";
 import { PatientDetailPage } from "@/pages/PatientDetailPage";
 import { VisitDetailPage } from "@/pages/VisitDetailPage";
 import { TreatmentPlanDetailPage } from "@/pages/TreatmentPlanDetailPage";
+import { TreatmentPlanAiPage } from "@/pages/TreatmentPlanAiPage";
 import { AppointmentDetailPage } from "@/pages/AppointmentDetailPage";
 import { CalendarPage } from "@/pages/CalendarPage";
 import { UsersSettingsPage } from "@/pages/UsersSettingsPage";
@@ -27,6 +28,7 @@ const PATTERNS = {
   PATIENT_DETAIL: "/patients/:id",
   VISIT_DETAIL: "/visits/:id",
   TREATMENT_PLAN: "/treatment-plans/:id",
+  TREATMENT_PLAN_AI: "/treatment-plans/:id/ai-suggest",
   APPOINTMENT_DETAIL: "/appointments/:id",
 } as const;
 
@@ -110,6 +112,14 @@ export function AppRoutes() {
         element={
           <Protected>
             <TreatmentPlanDetailPage />
+          </Protected>
+        }
+      />
+      <Route
+        path={PATTERNS.TREATMENT_PLAN_AI}
+        element={
+          <Protected>
+            <TreatmentPlanAiPage />
           </Protected>
         }
       />
