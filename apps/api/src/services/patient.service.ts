@@ -4,6 +4,12 @@ import type { PatientCreateInput, PatientUpdateInput } from "@shared/validation"
 import { createPatientsRepository } from "../repositories/patients.repo";
 import { assertAllInTenant } from "../lib/tenant-scope";
 
+function displayAddress(data: Pick<Patient, "address" | "address_line" | "ward_name" | "district_name" | "province_name">) {
+  const structuredParts = [data.address_line, data.ward_name, data.district_name, data.province_name]
+    .filter((part): part is string => Boolean(part?.trim()));
+  return structuredParts.length > 0 ? structuredParts.join(", ") : data.address;
+}
+
 export const patientService = {
   list(
     db: D1Database,
@@ -30,7 +36,16 @@ export const patientService = {
       gender: data.gender,
       phone: data.phone,
       email: data.email || undefined,
-      address: data.address,
+        address: displayAddress(data),
+        address_line: data.address_line,
+        ward_name: data.ward_name,
+        ward_code: data.ward_code,
+        district_name: data.district_name,
+        district_code: data.district_code,
+        province_name: data.province_name,
+        province_code: data.province_code,
+        postal_code: data.postal_code,
+        country_code: data.country_code,
       family_name: data.family_name ?? undefined,
       family_phone: data.family_phone ?? undefined,
       family_relation: data.family_relation ?? undefined,
@@ -56,13 +71,32 @@ export const patientService = {
         { table: "branches", id: data.branch_id ?? undefined },
         { table: "users", id: data.referral_user_id ?? undefined },
       ]);
-      return createPatientsRepository(db).update(tenantId, id, {
+      const repository = createPatientsRepository(db);
+      const existing = await repository.getById(tenantId, id);
+      if (!existing) return null;
+      const address = displayAddress({
+        address: data.address ?? existing.address,
+        address_line: data.address_line ?? existing.address_line,
+        ward_name: data.ward_name ?? existing.ward_name,
+        district_name: data.district_name ?? existing.district_name,
+        province_name: data.province_name ?? existing.province_name,
+      });
+      return repository.update(tenantId, id, {
       name: data.name,
       date_of_birth: data.date_of_birth,
       gender: data.gender,
       phone: data.phone,
       email: data.email ?? undefined,
-      address: data.address,
+        address,
+        address_line: data.address_line,
+        ward_name: data.ward_name,
+        ward_code: data.ward_code,
+        district_name: data.district_name,
+        district_code: data.district_code,
+        province_name: data.province_name,
+        province_code: data.province_code,
+        postal_code: data.postal_code,
+        country_code: data.country_code,
       family_name: data.family_name ?? undefined,
       family_phone: data.family_phone ?? undefined,
       family_relation: data.family_relation ?? undefined,

@@ -33,7 +33,14 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
   const [gender, setGender] = useState<"M" | "F" | "O">(patient?.gender ?? "M");
   const [phone, setPhone] = useState(patient?.phone ?? "");
   const [email, setEmail] = useState(patient?.email ?? "");
-  const [address, setAddress] = useState(patient?.address ?? "");
+  const [addressLine, setAddressLine] = useState(patient?.address_line ?? patient?.address ?? "");
+  const [wardName, setWardName] = useState(patient?.ward_name ?? "");
+  const [wardCode, setWardCode] = useState(patient?.ward_code ?? "");
+  const [districtName, setDistrictName] = useState(patient?.district_name ?? "");
+  const [districtCode, setDistrictCode] = useState(patient?.district_code ?? "");
+  const [provinceName, setProvinceName] = useState(patient?.province_name ?? "");
+  const [provinceCode, setProvinceCode] = useState(patient?.province_code ?? "");
+  const [postalCode, setPostalCode] = useState(patient?.postal_code ?? "");
   const [initialNote, setInitialNote] = useState("");
   const [cccd, setCccd] = useState(patient?.cccd ?? "");
   const [saving, setSaving] = useState(false);
@@ -68,7 +75,14 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
       setGender(patient?.gender ?? "M");
       setPhone(patient?.phone ?? "");
       setEmail(patient?.email ?? "");
-      setAddress(patient?.address ?? "");
+      setAddressLine(patient?.address_line ?? patient?.address ?? "");
+      setWardName(patient?.ward_name ?? "");
+      setWardCode(patient?.ward_code ?? "");
+      setDistrictName(patient?.district_name ?? "");
+      setDistrictCode(patient?.district_code ?? "");
+      setProvinceName(patient?.province_name ?? "");
+      setProvinceCode(patient?.province_code ?? "");
+      setPostalCode(patient?.postal_code ?? "");
       setInitialNote("");
       setCccd(patient?.cccd ?? "");
       setFamilyName(patient?.family_name ?? "");
@@ -95,7 +109,15 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
         gender,
         phone,
         email: email || undefined,
-        address: address || undefined,
+        address_line: addressLine || undefined,
+        ward_name: wardName || undefined,
+        ward_code: wardCode || undefined,
+        district_name: districtName || undefined,
+        district_code: districtCode || undefined,
+        province_name: provinceName || undefined,
+        province_code: provinceCode || undefined,
+        postal_code: postalCode || undefined,
+        country_code: "VN",
         family_name: familyName || undefined,
         family_phone: familyPhone || undefined,
         family_relation: familyRelation || undefined,
@@ -216,15 +238,94 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
             />
           </div>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="pf-address">Địa chỉ</Label>
-            <Textarea
-              id="pf-address"
-              rows={2}
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="VD: 123 Nguyễn Trãi, Quận 1, TP.HCM"
-            />
+          <div className="rounded-lg border border-border bg-muted/20 p-3">
+            <div className="mb-3">
+              <Label className="text-sm font-semibold">Địa chỉ thường trú</Label>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Lưu theo từng cấp hành chính để thống kê khu vực bệnh nhân chính xác.
+              </p>
+            </div>
+            <div className="grid gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="pf-address-line">Số nhà, đường, thôn/ấp, tòa nhà</Label>
+                <Textarea
+                  id="pf-address-line"
+                  rows={2}
+                  value={addressLine}
+                  onChange={(e) => setAddressLine(e.target.value)}
+                  placeholder="VD: 123 Nguyễn Trãi, Chung cư A"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="pf-ward">Phường/Xã</Label>
+                  <Input
+                    id="pf-ward"
+                    value={wardName}
+                    onChange={(e) => setWardName(e.target.value)}
+                    placeholder="VD: Phường Bến Thành"
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="pf-ward-code">Mã phường/xã</Label>
+                  <Input
+                    id="pf-ward-code"
+                    value={wardCode}
+                    onChange={(e) => setWardCode(e.target.value)}
+                    placeholder="Tùy chọn"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="pf-district">Quận/Huyện</Label>
+                  <Input
+                    id="pf-district"
+                    value={districtName}
+                    onChange={(e) => setDistrictName(e.target.value)}
+                    placeholder="VD: Quận 1"
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="pf-district-code">Mã quận/huyện</Label>
+                  <Input
+                    id="pf-district-code"
+                    value={districtCode}
+                    onChange={(e) => setDistrictCode(e.target.value)}
+                    placeholder="Tùy chọn"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="pf-province">Tỉnh/Thành phố</Label>
+                  <Input
+                    id="pf-province"
+                    value={provinceName}
+                    onChange={(e) => setProvinceName(e.target.value)}
+                    placeholder="VD: TP. Hồ Chí Minh"
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="pf-province-code">Mã tỉnh/thành phố</Label>
+                  <Input
+                    id="pf-province-code"
+                    value={provinceCode}
+                    onChange={(e) => setProvinceCode(e.target.value)}
+                    placeholder="Tùy chọn"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-1.5 sm:max-w-48">
+                <Label htmlFor="pf-postal-code">Mã bưu chính</Label>
+                <Input
+                  id="pf-postal-code"
+                  value={postalCode}
+                  onChange={(e) => setPostalCode(e.target.value)}
+                  placeholder="Tùy chọn"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="grid gap-1.5">

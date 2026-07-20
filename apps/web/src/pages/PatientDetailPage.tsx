@@ -267,7 +267,7 @@ export function PatientDetailPage() {
                     </div>
                     <div className="col-span-2">
                       <p className="text-muted-foreground text-xs">Địa chỉ</p>
-                      <p className="font-medium">{patient.address || "—"}</p>
+                      <p className="font-medium">{formatPatientAddress(patient) || "—"}</p>
                     </div>
                     <div className="col-span-2">
                       <p className="text-muted-foreground text-xs">Số CCCD</p>
@@ -726,4 +726,15 @@ function Count({ value, urgent = false }: { value: number; urgent?: boolean }) {
   return (
     <span className={className}>{value}</span>
   );
+}
+
+function formatPatientAddress(patient: Patient) {
+  const structuredParts = [
+    patient.address_line,
+    patient.ward_name,
+    patient.district_name,
+    patient.province_name,
+  ].filter((part): part is string => Boolean(part));
+
+  return structuredParts.length > 0 ? structuredParts.join(", ") : patient.address;
 }

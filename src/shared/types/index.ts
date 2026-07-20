@@ -71,7 +71,18 @@ export interface Patient {
   gender: Gender;
   phone: string;
   email?: string;
+  /** Legacy human-readable address retained for existing records and search. */
   address?: string;
+  /** Detail such as house number, street, hamlet, or building. */
+  address_line?: string;
+  ward_name?: string;
+  ward_code?: string;
+  district_name?: string;
+  district_code?: string;
+  province_name?: string;
+  province_code?: string;
+  postal_code?: string;
+  country_code?: string;
   notes?: string;
   avatar_file_id?: string;
   created_at: string;

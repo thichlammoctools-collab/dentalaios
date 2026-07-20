@@ -32,6 +32,14 @@ const optionalText = (max: number) =>
     .transform((s) => (s === "" ? undefined : s))
     .optional();
 
+const optionalAdministrativeName = (max: number) =>
+  z
+    .string()
+    .max(max)
+    .transform((s) => s.trim().replace(/\s+/g, " "))
+    .transform((s) => (s === "" ? undefined : s))
+    .optional();
+
 /** Validate YYYY-MM-DD with real month/day ranges */
 const dateString = z
   .string()
@@ -110,6 +118,15 @@ export const patientCreateSchema = z.object({
   ),
   notes: optionalText(2000),
   address: optionalText(500),
+  address_line: optionalText(300),
+  ward_name: optionalAdministrativeName(120),
+  ward_code: z.string().max(30).regex(/^[A-Za-z0-9._-]+$/, "Mã phường/xã không hợp lệ").optional(),
+  district_name: optionalAdministrativeName(120),
+  district_code: z.string().max(30).regex(/^[A-Za-z0-9._-]+$/, "Mã quận/huyện không hợp lệ").optional(),
+  province_name: optionalAdministrativeName(120),
+  province_code: z.string().max(30).regex(/^[A-Za-z0-9._-]+$/, "Mã tỉnh/thành phố không hợp lệ").optional(),
+  postal_code: z.string().max(20).regex(/^[A-Za-z0-9 -]+$/, "Mã bưu chính không hợp lệ").optional(),
+  country_code: z.string().length(2).toUpperCase().optional(),
   // Family contact
   family_name: optionalText(200),
   family_phone: z.string().max(20).transform((s) => (s === "" ? undefined : s)).optional(),
