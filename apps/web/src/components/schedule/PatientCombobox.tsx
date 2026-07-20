@@ -25,28 +25,32 @@ export function PatientCombobox({ value, onChange, required }: PatientComboboxPr
   const dropdownRef = useRef<HTMLDivElement>(null);
   const selectedPatientIdRef = useRef("");
 
-  // Load patients when query changes (debounced via useEffect cleanup)
+  // Open the ten newest patient records on focus; filter the same list as the user types.
   useEffect(() => {
-    if (!query.trim()) {
-      setPatients([]);
-      setShowDropdown(false);
-      return;
-    }
+    if (!showDropdown) return;
 
-    const timer = setTimeout(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
       setLoading(true);
       apiGet<PatientsResponse>(`/api/patients?limit=10&search=${encodeURIComponent(query)}`)
         .then((res) => {
+          if (cancelled) return;
           setPatients(res.items);
-          setShowDropdown(res.items.length > 0);
           setHighlightIndex(0);
         })
-        .catch(() => setPatients([]))
-        .finally(() => setLoading(false));
-    }, 300);
+        .catch(() => {
+          if (!cancelled) setPatients([]);
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    }, query.trim() ? 150 : 0);
 
-    return () => clearTimeout(timer);
-  }, [query]);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [query, showDropdown]);
 
   // Keep the display in sync when the parent clears the selected patient.
   // Do not clear while a user is typing a search query with no selection.
@@ -79,6 +83,7 @@ export function PatientCombobox({ value, onChange, required }: PatientComboboxPr
     selectedPatientIdRef.current = "";
     setQuery(e.target.value);
     onChange(""); // Clear selection when user types
+    setShowDropdown(true);
   }
 
   function selectPatient(patient: Patient) {
@@ -122,7 +127,7 @@ export function PatientCombobox({ value, onChange, required }: PatientComboboxPr
         value={query}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
-        onFocus={() => query.trim() && patients.length > 0 && setShowDropdown(true)}
+        onFocus={() => setShowDropdown(true)}
         required={required}
         autoComplete="off"
       />
@@ -131,7 +136,7 @@ export function PatientCombobox({ value, onChange, required }: PatientComboboxPr
           Đang tìm…
         </div>
       )}
-      {showDropdown && patients.length > 0 && (
+      {showDropdown && (loading || patients.length > 0 || query.trim()) && (
         <div
           ref={dropdownRef}
           className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
@@ -148,6 +153,12 @@ export function PatientCombobox({ value, onChange, required }: PatientComboboxPr
               <div className="flex items-center gap-2"><ProfileAvatar subject="patients" entityId={patient.id} name={patient.name} avatarFileId={patient.avatar_file_id} size="sm" /><div><div className="font-medium">{patient.name}</div><div className="text-muted-foreground">{patient.phone}</div></div></div>
             </button>
           ))}
+          {!loading && patients.length === 0 && query.trim() && (
+            <p className="px-3 py-2 text-sm text-muted-foreground">Không tìm thấy bệnh nhân phù hợp.</p>
+          )}
+          {!loading && patients.length === 0 && !query.trim() && (
+            <p className="px-3 py-2 text-sm text-muted-foreground">Chưa có bệnh nhân.</p>
+          )}
         </div>
       )}
     </div>

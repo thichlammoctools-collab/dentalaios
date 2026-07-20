@@ -270,6 +270,32 @@ export const treatmentCaseMilestoneUpdateSchema = z.object({
 });
 
 export type TreatmentCaseMilestoneUpdateInput = z.infer<typeof treatmentCaseMilestoneUpdateSchema>;
+
+const milestoneAppointmentLinkTypes = ["primary", "follow_up", "consultation", "preparation", "delivery"] as const;
+const milestoneAppointmentExecutionStatuses = ["planned", "partially_completed", "completed", "not_performed"] as const;
+
+export const milestoneAppointmentLinkSchema = z.object({
+  appointment_id: z.string().min(1),
+  link_type: z.enum(milestoneAppointmentLinkTypes).default("primary"),
+}).strict();
+export type MilestoneAppointmentLinkInput = z.infer<typeof milestoneAppointmentLinkSchema>;
+
+export const milestoneAppointmentCreateSchema = z.object({
+  clinician_id: z.string().min(1),
+  chair_id: z.string().min(1).optional(),
+  assistant_id: z.string().min(1).optional(),
+  scheduled_at: z.string().datetime({ offset: true }),
+  duration_min: z.number().int().min(15).max(480).default(30),
+  notes: optionalText(2000),
+  link_type: z.enum(milestoneAppointmentLinkTypes).default("primary"),
+}).strict();
+export type MilestoneAppointmentCreateInput = z.infer<typeof milestoneAppointmentCreateSchema>;
+
+export const milestoneAppointmentExecutionSchema = z.object({
+  execution_status: z.enum(milestoneAppointmentExecutionStatuses),
+  notes: optionalText(2000),
+}).strict();
+export type MilestoneAppointmentExecutionInput = z.infer<typeof milestoneAppointmentExecutionSchema>;
 export type PlanItemUpdateInput = z.infer<typeof planItemUpdateSchema>;
 
 export const treatmentServiceUpsertSchema = z.object({

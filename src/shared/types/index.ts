@@ -304,6 +304,32 @@ export interface TreatmentCaseMilestone {
   item: TreatmentPlanItem;
 }
 
+export type TreatmentMilestoneAppointmentLinkType = "primary" | "follow_up" | "consultation" | "preparation" | "delivery";
+export type TreatmentMilestoneAppointmentExecutionStatus = "planned" | "partially_completed" | "completed" | "not_performed";
+
+export interface TreatmentMilestoneAppointment {
+  id: string;
+  tenant_id: string;
+  treatment_case_milestone_id: string;
+  appointment_id: string;
+  link_type: TreatmentMilestoneAppointmentLinkType;
+  execution_status: TreatmentMilestoneAppointmentExecutionStatus;
+  notes?: string;
+  linked_by: string;
+  created_at: string;
+  updated_at: string;
+  appointment: Appointment;
+}
+
+export interface TreatmentCaseFinancialSummary {
+  plan_total: number;
+  confirmed_paid: number;
+  pending_amount: number;
+  failed_amount: number;
+  outstanding_amount: number;
+  payments: Payment[];
+}
+
 // ───────────────────────── Billing ─────────────────────────
 
 export type PaymentMethod = "cash" | "transfer" | "card" | "other";
