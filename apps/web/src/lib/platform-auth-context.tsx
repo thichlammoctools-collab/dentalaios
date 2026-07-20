@@ -16,6 +16,7 @@ import {
 interface PlatformAuthContextValue {
   session: PlatformSession | null;
   pendingChallenge: string | null;
+  mfaEnrollment: { secret: string; otpauthUri: string } | null;
   login: (email: string, password: string) => Promise<void>;
   verifyMfa: (code: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -29,10 +30,16 @@ const PlatformAuthContext = createContext<PlatformAuthContextValue | undefined>(
 export function PlatformAuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<PlatformSession | null>(null);
   const [pendingChallenge, setPendingChallenge] = useState<string | null>(null);
+  const [mfaEnrollment, setMfaEnrollment] = useState<{ secret: string; otpauthUri: string } | null>(null);
 
   async function login(email: string, password: string) {
     const result = await platformPost<PlatformLoginChallenge>("/api/platform/auth/login", { email, password });
     setPendingChallenge(result.challenge_id);
+    setMfaEnrollment(
+      result.mfa_enrollment_required && result.secret && result.otpauth_uri
+        ? { secret: result.secret, otpauthUri: result.otpauth_uri }
+        : null,
+    );
   }
 
   async function verifyMfa(code: string) {
@@ -44,6 +51,7 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
     setPlatformToken(result.session.token);
     setSession(result.session);
     setPendingChallenge(null);
+    setMfaEnrollment(null);
   }
 
   async function logout() {
@@ -53,19 +61,21 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
       setPlatformToken(null);
       setSession(null);
       setPendingChallenge(null);
+      setMfaEnrollment(null);
     }
   }
 
   const value = useMemo<PlatformAuthContextValue>(() => ({
     session,
     pendingChallenge,
+    mfaEnrollment,
     login,
     verifyMfa,
     logout,
     hasPermission: (permission) => Boolean(session?.role.permissions.includes(permission as never)),
     currentUser: session?.user ?? null,
     currentRole: session?.role ?? null,
-  }), [session, pendingChallenge]);
+  }), [session, pendingChallenge, mfaEnrollment]);
 
   return <PlatformAuthContext.Provider value={value}>{children}</PlatformAuthContext.Provider>;
 }

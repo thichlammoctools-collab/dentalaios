@@ -36,15 +36,19 @@ export const platformAuthService = {
     deps: PlatformAuthDeps,
     email: string,
     password: string,
-  ): Promise<{ challenge_id: string }> {
+  ): Promise<{
+    challenge_id: string;
+    mfa_enrollment_required?: boolean;
+    secret?: string;
+    otpauth_uri?: string;
+  }> {
     const user = await createPlatformUsersRepository(deps.db).findByEmail(
       email,
     );
     if (
       !user ||
       !user.user.is_active ||
-      !(await verifyPassword(password, user.password_hash)) ||
-      !user.mfa_secret_encrypted
+      !(await verifyPassword(password, user.password_hash))
     )
       throw new UnauthorizedError("Email hoặc mật khẩu không đúng");
     const challenge_id = newId();
@@ -53,6 +57,14 @@ export const platformAuthService = {
       user.user.id,
       new Date(Date.now() + 300000).toISOString(),
     );
+    if (!user.user.mfa_enabled) {
+      const enrollment = await this.provisionMfa(deps, user.user);
+      return {
+        challenge_id,
+        mfa_enrollment_required: true,
+        ...enrollment,
+      };
+    }
     return { challenge_id };
   },
   async verifyMfa(
@@ -77,6 +89,11 @@ export const platformAuthService = {
     );
     if (!(await verifyTotp(secret, input)))
       throw new UnauthorizedError("Mã xác thực không hợp lệ hoặc đã hết hạn");
+    if (!context.user.mfa_enabled) {
+      await users.update(context.user.id, {
+        mfa_enabled_at: new Date().toISOString(),
+      });
+    }
     const now = new Date().toISOString();
     const id = newId();
     const signed = await signPlatformJwt(

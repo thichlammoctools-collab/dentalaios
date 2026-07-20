@@ -75,5 +75,11 @@ export const platformPatch = <T = unknown>(path: string, body?: unknown) =>
     body: JSON.stringify(body ?? {}),
   });
 
-export type PlatformLoginChallenge = { mfa_required: true; challenge_id: string };
+export type PlatformLoginChallenge = {
+  mfa_required: true;
+  challenge_id: string;
+  mfa_enrollment_required?: boolean;
+  secret?: string;
+  otpauth_uri?: string;
+};
 export type PlatformMfaResponse = { session: PlatformSession };

@@ -32,6 +32,11 @@ const metadata = (c: {
   ip: c.req.header("cf-connecting-ip") ?? "",
   userAgent: c.req.header("user-agent") ?? "",
 });
+
+function requireMfaEncryptionKey(value: string | undefined): string {
+  if (!value) throw new Error("PLATFORM_MFA_ENCRYPTION_KEY is not configured");
+  return value;
+}
 router.post(
   "/login",
   rateLimit({ windowSeconds: 60, maxRequests: 5 }),
@@ -93,7 +98,11 @@ router.post("/reauth", zValidator("json", platformReauthSchema), async (c) => {
   const [ciphertext, iv] = context.mfa_secret_encrypted.split(".");
   if (
     !(await verifyTotp(
-      await decryptSecret(ciphertext, iv, c.env.PLATFORM_MFA_ENCRYPTION_KEY!),
+      await decryptSecret(
+        ciphertext,
+        iv,
+        requireMfaEncryptionKey(c.env.PLATFORM_MFA_ENCRYPTION_KEY),
+      ),
       data.code,
     ))
   )
