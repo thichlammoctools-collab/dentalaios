@@ -30,6 +30,18 @@ export const ROLES = {
 
 export type RoleName = (typeof ROLES)[keyof typeof ROLES];
 
+/** Vietnamese labels for built-in role names. Custom roles keep their original name. */
+export const ROLE_LABELS: Record<RoleName, string> = {
+  [ROLES.ADMIN]: "Quản trị viên",
+  [ROLES.DOCTOR]: "Bác sĩ",
+  [ROLES.ASSISTANT]: "Phụ tá",
+  [ROLES.RECEPTIONIST]: "Lễ tân",
+};
+
+export function getRoleLabel(name: string): string {
+  return ROLE_LABELS[name as RoleName] ?? name;
+}
+
 /** Permission strings used in role.permissions JSON array. */
 export const PERMISSIONS = {
   ALL: "all",

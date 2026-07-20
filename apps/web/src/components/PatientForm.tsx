@@ -12,7 +12,7 @@ import { useAuth } from "@/lib/auth-context";
 import type { Patient } from "@shared/types";
 import type { UserWithDetails } from "@shared/types";
 import type { PatientCreateInput } from "@shared/validation";
-import { MARKETING_SOURCES, MARKETING_SOURCE_LABELS } from "@shared/constants";
+import { getRoleLabel, MARKETING_SOURCES, MARKETING_SOURCE_LABELS } from "@shared/constants";
 
 interface PatientFormProps {
   open: boolean;
@@ -348,7 +348,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
                 <Select id="pf-ref-user" value={referralUserId} onChange={(e) => setReferralUserId(e.target.value)}>
                   <option value="">— Chọn người giới thiệu —</option>
                   {(users ?? []).map((u) => (
-                    <option key={u.id} value={u.id}>{u.name} ({u.role_name})</option>
+                    <option key={u.id} value={u.id}>{u.name} ({getRoleLabel(u.role_name)})</option>
                   ))}
                 </Select>
               </div>

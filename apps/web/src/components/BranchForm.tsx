@@ -8,6 +8,7 @@ import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/c
 import { apiGet, apiPost, apiPatch, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import type { Branch, UserWithDetails } from "@shared/types";
+import { getRoleLabel } from "@shared/constants";
 import { branchCreateSchema, branchUpdateSchema } from "@shared/validation";
 
 interface BranchFormProps {
@@ -159,7 +160,7 @@ export function BranchForm({ open, onOpenChange, branch, onSaved }: BranchFormPr
               <option value="">— Chọn nhân viên —</option>
               {staff.map((u) => (
                 <option key={u.id} value={u.name}>
-                  {u.name} {u.role_name ? `(${u.role_name})` : ""}
+                  {u.name} {u.role_name ? `(${getRoleLabel(u.role_name)})` : ""}
                 </option>
               ))}
             </Select>

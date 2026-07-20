@@ -18,6 +18,7 @@ import { apiDelete, apiGet, apiPost, apiPut, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
 import type { Role } from "@shared/types";
+import { getRoleLabel } from "@shared/constants";
 
 export function RolesSettingsPage() {
   const [roles, setRoles] = useState<Role[]>([]);
@@ -118,7 +119,7 @@ export function RolesSettingsPage() {
             <TableBody>
               {roles.map((r) => (
                 <TableRow key={r.id}>
-                  <TableCell className="font-medium">{r.name}</TableCell>
+                  <TableCell className="font-medium">{getRoleLabel(r.name)}</TableCell>
                   <TableCell className="text-muted-foreground">{r.description ?? "—"}</TableCell>
                   <TableCell className="text-muted-foreground">{formatDate(r.created_at)}</TableCell>
                   <TableCell className="text-right">

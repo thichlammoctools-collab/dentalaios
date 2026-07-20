@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Dialog, DialogHeader, DialogTitle, DialogBody, DialogFooter } from "@/components/ui/dialog";
 import type { Branch, Role, User } from "@shared/types";
+import { getRoleLabel } from "@shared/constants";
 import { cn } from "@/lib/utils";
 
 interface Invite {
@@ -208,7 +209,8 @@ export function MembersSettingsPage() {
   }
 
   function roleName(roleId: string): string {
-    return roles.find((r) => r.id === roleId)?.name ?? "—";
+    const role = roles.find((r) => r.id === roleId);
+    return role ? getRoleLabel(role.name) : "—";
   }
 
   function branchName(branchId: string): string {
@@ -294,7 +296,7 @@ export function MembersSettingsPage() {
             >
               <option value="">-- Chọn vai trò --</option>
               {roles.map((r) => (
-                <option key={r.id} value={r.id}>{r.name}</option>
+                <option key={r.id} value={r.id}>{getRoleLabel(r.name)}</option>
               ))}
             </select>
           </div>
@@ -355,7 +357,7 @@ export function MembersSettingsPage() {
           className="h-10 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
         >
           {roles.map((r) => (
-            <option key={r.id} value={r.name}>{r.name}</option>
+            <option key={r.id} value={r.name}>{getRoleLabel(r.name)}</option>
           ))}
         </select>
         <button
@@ -424,7 +426,7 @@ export function MembersSettingsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                        {invite.role_name}
+                        {getRoleLabel(invite.role_name)}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -540,7 +542,7 @@ export function MembersSettingsPage() {
                 className="w-full h-10 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50"
               >
                 {roles.map((r) => (
-                  <option key={r.id} value={r.name}>{r.name}</option>
+                  <option key={r.id} value={r.name}>{getRoleLabel(r.name)}</option>
                 ))}
               </select>
             </div>
@@ -592,7 +594,7 @@ export function MembersSettingsPage() {
                   onChange={(e) => setEditForm({ ...editForm, role_id: e.target.value })}
                 >
                   {roles.map((r) => (
-                    <option key={r.id} value={r.id}>{r.name}</option>
+                    <option key={r.id} value={r.id}>{getRoleLabel(r.name)}</option>
                   ))}
                 </Select>
               </div>

@@ -2,7 +2,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
-import { ROUTES } from "@shared/constants";
+import { getRoleLabel, ROUTES } from "@shared/constants";
 import { cn } from "@/lib/utils";
 
 interface TopbarProps {
@@ -82,7 +82,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
 
         <div className="hidden text-right sm:block">
           <p className="text-sm font-medium text-foreground">{session.user.name}</p>
-          <p className="text-xs text-muted-foreground">{session.role.name}</p>
+          <p className="text-xs text-muted-foreground">{getRoleLabel(session.role.name)}</p>
         </div>
         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-medium text-primary-foreground">
           {session.user.name.charAt(0).toUpperCase()}

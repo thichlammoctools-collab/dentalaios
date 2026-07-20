@@ -20,6 +20,7 @@ import { useAuth } from "@/lib/auth-context";
 import { cn, formatDate } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import type { User, Role, Branch } from "@shared/types";
+import { getRoleLabel } from "@shared/constants";
 
 interface UsersResponse {
   items: User[];
@@ -212,7 +213,7 @@ export function UsersSettingsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{role?.name ?? "—"}</Badge>
+                        <Badge variant="outline">{role ? getRoleLabel(role.name) : "—"}</Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {branch?.name ?? "—"}
@@ -317,7 +318,7 @@ export function UsersSettingsPage() {
                 onChange={(e) => setCreateForm({ ...createForm, role_id: e.target.value })}
               >
                 {roles.map((r) => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
+                  <option key={r.id} value={r.id}>{getRoleLabel(r.name)}</option>
                 ))}
               </Select>
             </div>
@@ -393,7 +394,7 @@ export function UsersSettingsPage() {
                       className="h-9"
                     >
                       {roles.map((r) => (
-                        <option key={r.id} value={r.id}>{r.name}</option>
+                        <option key={r.id} value={r.id}>{getRoleLabel(r.name)}</option>
                       ))}
                     </Select>
                   </div>
