@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { AppointmentCard } from "@/components/schedule/AppointmentCard";
 import { AppointmentForm } from "@/components/schedule/AppointmentForm";
-import { apiGet, apiPatch, ApiError } from "@/lib/api";
+import { apiDelete, apiGet, apiPatch, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import type { Appointment, Patient, UserWithDetails } from "@shared/types";
@@ -115,6 +115,29 @@ export function SchedulePage() {
     const d = new Date(selectedDate);
     d.setDate(d.getDate() + days);
     setSelectedDate(d);
+  }
+
+  async function handleCancel(appointment: Appointment): Promise<boolean> {
+    if (!confirm("Hủy lịch hẹn này? Lịch hẹn sẽ được lưu trong lịch sử với trạng thái đã hủy.")) {
+      return false;
+    }
+
+    const reason = prompt("Lý do hủy lịch (không bắt buộc):");
+    if (reason === null) return false;
+
+    try {
+      await apiDelete(`/api/appointments/${appointment.id}`, { reason: reason.trim() || undefined });
+      setAppointments((prev) => prev.map((item) => (
+        item.id === appointment.id
+          ? { ...item, status: "cancelled", cancelled_reason: reason.trim() || undefined }
+          : item
+      )));
+      toast.success("Đã hủy lịch hẹn");
+      return true;
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi hủy lịch hẹn");
+      return false;
+    }
   }
 
   return (
@@ -445,6 +468,7 @@ export function SchedulePage() {
           onSaved={(updated) => {
             setAppointments((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
           }}
+          onCancelled={handleCancel}
         />
       )}
     </div>
@@ -496,11 +520,13 @@ function EditAppointmentDialog({
   doctors,
   onClose,
   onSaved,
+  onCancelled,
 }: {
   appointment: Appointment;
   doctors: UserWithDetails[];
   onClose: () => void;
   onSaved: (appt: Appointment) => void;
+  onCancelled: (appt: Appointment) => Promise<boolean>;
 }) {
   const apptDate = new Date(appointment.scheduled_at);
   const [date, setDate] = useState(ymd(apptDate));
@@ -514,6 +540,7 @@ function EditAppointmentDialog({
   const [clinicianId, setClinicianId] = useState(appointment.clinician_id);
   const [assistantId, setAssistantId] = useState(appointment.assistant_id ?? "");
   const [saving, setSaving] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const doctorsOnly = doctors.filter((u) => u.role_name === "doctor");
   const assistantsOnly = doctors.filter((u) => u.role_name === "assistant");
@@ -542,6 +569,15 @@ function EditAppointmentDialog({
       toast.error(err instanceof ApiError ? err.message : "Lỗi cập nhật");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleCancel() {
+    setCancelling(true);
+    try {
+      if (await onCancelled(appointment)) onClose();
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -630,8 +666,13 @@ function EditAppointmentDialog({
         </div>
       </DialogBody>
       <DialogFooter className="mt-4">
+        {appointment.status !== "cancelled" && appointment.status !== "completed" && (
+          <Button type="button" variant="destructive" disabled={saving || cancelling} onClick={handleCancel}>
+            {cancelling ? "Đang hủy…" : "Hủy lịch"}
+          </Button>
+        )}
         <Button type="button" variant="outline" onClick={onClose}>Đóng</Button>
-        <Button type="button" disabled={saving} onClick={handleSave}>
+        <Button type="button" disabled={saving || cancelling} onClick={handleSave}>
           {saving ? "Đang lưu…" : "Lưu thay đổi"}
         </Button>
       </DialogFooter>

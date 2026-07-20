@@ -33,17 +33,24 @@ export function RegisterPage() {
       return;
     }
 
+    const data = {
+      name: form.name.trim(),
+      email: form.email.trim().toLowerCase(),
+      password: form.password,
+      clinic_name: form.clinic_name.trim(),
+      branch_name: form.branch_name.trim() || undefined,
+    };
+    const validation = registerSchema.safeParse(data);
+    if (!validation.success) {
+      setError(validation.error.issues[0]?.message ?? "Thông tin đăng ký không hợp lệ");
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await apiPost<{ verify_token: string; message: string }>(
         "/api/register",
-        {
-          name: form.name.trim(),
-          email: form.email.trim().toLowerCase(),
-          password: form.password,
-          clinic_name: form.clinic_name.trim(),
-          branch_name: form.branch_name.trim() || undefined,
-        },
+        validation.data,
       );
       setVerifyToken(res.verify_token);
       setSuccess(true);
@@ -138,8 +145,9 @@ export function RegisterPage() {
                   value={form.password}
                   onChange={(e) => update("password", e.target.value)}
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/40"
-                  placeholder="Min 8 ký tự"
+                  placeholder="Ít nhất 8 ký tự"
                 />
+                <p className="text-xs text-muted-foreground">Gồm chữ hoa, chữ thường và số.</p>
               </div>
               <div className="space-y-1.5">
                 <label htmlFor="confirmPassword" className="text-sm font-medium">Xác nhận</label>
