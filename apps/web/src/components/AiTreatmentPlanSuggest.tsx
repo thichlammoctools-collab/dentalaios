@@ -85,7 +85,7 @@ export function AiTreatmentPlanSuggest({ visitId, onApply }: AiTreatmentPlanSugg
     : 0;
 
   return (
-    <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50">
+    <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 dark:border-purple-900 dark:from-purple-950/50 dark:to-blue-950/50">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-blue-600 text-white text-sm">
@@ -118,14 +118,14 @@ export function AiTreatmentPlanSuggest({ visitId, onApply }: AiTreatmentPlanSugg
           <>
             {/* AI Notes */}
             {result.notes && (
-              <div className="rounded-md border border-purple-200 bg-white p-3 text-sm">
-                <p className="font-medium text-purple-900 mb-1">Ghi chú từ AI:</p>
+              <div className="rounded-md border border-purple-200 bg-card p-3 text-sm dark:border-purple-900">
+                <p className="font-medium text-purple-900 dark:text-purple-300 mb-1">Ghi chú từ AI:</p>
                 <p className="text-muted-foreground">{result.notes}</p>
               </div>
             )}
 
             {/* Suggested Items Table */}
-            <div className="rounded-md border border-purple-200 bg-white overflow-hidden">
+            <div className="rounded-md border border-purple-200 bg-card overflow-hidden dark:border-purple-900">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -140,7 +140,7 @@ export function AiTreatmentPlanSuggest({ visitId, onApply }: AiTreatmentPlanSugg
                   {result.items.map((item, idx) => (
                     <TableRow
                       key={idx}
-                      className={selectedItems.has(idx) ? "bg-purple-50" : ""}
+                      className={selectedItems.has(idx) ? "bg-purple-50 dark:bg-purple-950/40" : ""}
                     >
                       <TableCell>
                         <input
@@ -154,7 +154,7 @@ export function AiTreatmentPlanSuggest({ visitId, onApply }: AiTreatmentPlanSugg
                         {item.tooth != null ? (
                           `#${item.tooth}`
                         ) : (
-                          <span className="text-xs font-normal text-orange-700">
+                          <span className="text-xs font-normal text-orange-700 dark:text-orange-300">
                             Toàn hàm
                           </span>
                         )}
@@ -175,7 +175,7 @@ export function AiTreatmentPlanSuggest({ visitId, onApply }: AiTreatmentPlanSugg
             </div>
 
             {/* Summary */}
-            <div className="flex items-center justify-between rounded-md border border-purple-200 bg-white p-3">
+            <div className="flex items-center justify-between rounded-md border border-purple-200 bg-card p-3 dark:border-purple-900">
               <div className="text-sm">
                 <span className="text-muted-foreground">Đã chọn: </span>
                 <span className="font-medium">{selectedItems.size}/{result.items.length} hạng mục</span>

@@ -125,10 +125,10 @@ export function TreatmentPlanAiPage() {
       </div>
 
       {applying && (
-        <Card className="border-blue-200 bg-blue-50">
+        <Card className="border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950/40">
           <CardContent className="p-4 flex items-center gap-3">
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-            <span className="text-sm font-medium text-blue-900">
+            <span className="text-sm font-medium text-blue-900 dark:text-blue-300">
               Đang thêm hạng mục vào kế hoạch...
             </span>
           </CardContent>

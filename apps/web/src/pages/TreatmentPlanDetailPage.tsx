@@ -93,8 +93,11 @@ export function TreatmentPlanDetailPage() {
       const a = document.createElement("a");
       a.href = url;
       a.download = `Ke-hoach-dieu-tri-${plan.id}.pdf`;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      a.remove();
+      // Revoking immediately can truncate downloads in some browsers.
+      window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
       toast.success("Đã tải PDF");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi PDF");
