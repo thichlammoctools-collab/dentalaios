@@ -18,9 +18,12 @@ describe("buildProposalPdf", () => {
       },
       items: Array.from({ length: 40 }, (_, index) => ({
         tooth_number: 11 + (index % 8),
+        service_code: "TRAM-COM",
+        service_name: "Tram composite",
         procedure: "filling",
         description: "Mo ta dieu tri chi tiet de kiem tra viec xuong dong va phan trang trong file PDF.",
         unit_cost: 625_000,
+        price_includes_vat: true,
         status: "planned",
       })),
       approverName: "Bac si Demo",

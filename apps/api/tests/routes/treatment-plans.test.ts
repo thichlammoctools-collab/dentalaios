@@ -25,10 +25,14 @@ const itemRow = (overrides: Record<string, unknown> = {}) => ({
   id: "item-1",
   tenant_id: "test-tenant",
   treatment_plan_id: "plan-1",
-  tooth_number: 11,
-  procedure: "filling",
-  description: "Trám răng cửa trên",
-  unit_cost: 500000,
+    tooth_number: 11,
+    service_code: null,
+    service_name: null,
+    procedure: "filling",
+    description: "Trám răng cửa trên",
+    unit_cost: 500000,
+    price_includes_vat: 1,
+    price_snapshot_at: "2026-01-01",
   status: "planned",
   created_at: "2026-01-01",
   ...overrides,
@@ -108,7 +112,7 @@ describe("POST /api/treatment-plans/:id/items", () => {
       new Map([
         ["FROM treatment_plans", [planRow()]],
         // SELECT for createItem: WHERE tenant_id AND id
-        ["FROM treatment_plan_items WHERE tenant_id", [itemRow()]],
+        ["FROM treatment_plan_items", [itemRow()]],
         // SELECT SUM for recomputeTotal
         ["COALESCE(SUM", [{ total: 500000 }]],
       ]),
@@ -122,9 +126,10 @@ describe("POST /api/treatment-plans/:id/items", () => {
       },
     );
     expect(res.status).toBe(201);
-    const body = (await res.json()) as { tooth_number: number; unit_cost: number };
+    const body = (await res.json()) as { tooth_number: number; unit_cost: number; price_includes_vat: boolean };
     expect(body.tooth_number).toBe(11);
     expect(body.unit_cost).toBe(500000);
+    expect(body.price_includes_vat).toBe(true);
   });
 
   it("returns 422 for invalid FDI tooth (00)", async () => {
@@ -357,13 +362,34 @@ describe("GET /api/treatment-plans/:id/pdf", () => {
       new Map([
         ["FROM treatment_plans", [planRow()]],
         ["FROM treatment_services", [{ id: "service-1", tenant_id: "test-tenant", code: "TRAM-COM", name: "Trám composite", procedure: "filling", price: 650000, is_active: 1, created_at: "2026-01-01", updated_at: "2026-01-01" }]],
-        ["FROM treatment_plan_items WHERE tenant_id", [itemRow({ service_code: "TRAM-COM", unit_cost: 650000 })]],
+        ["FROM treatment_plan_items", [itemRow({
+          snapshot_service_code: "TRAM-COM",
+          snapshot_service_name: "Trám composite",
+          snapshot_price_includes_vat: 1,
+          snapshot_price_snapshot_at: "2026-01-01",
+          unit_cost: 650000,
+        })]],
         ["COALESCE(SUM", [{ total: 650000 }]],
       ]),
       { body: { tooth_number: 11, service_code: "TRAM-COM", procedure: "other", description: "Trám răng", unit_cost: 1 } },
     );
     expect(res.status).toBe(201);
-    expect((await res.json() as { unit_cost: number }).unit_cost).toBe(650000);
+    const body = await res.json() as {
+      service_code?: string;
+      service_name?: string;
+      procedure: string;
+      unit_cost: number;
+      price_includes_vat: boolean;
+      price_snapshot_at?: string;
+    };
+    expect(body).toMatchObject({
+      service_code: "TRAM-COM",
+      service_name: "Trám composite",
+      procedure: "filling",
+      unit_cost: 650000,
+      price_includes_vat: true,
+      price_snapshot_at: "2026-01-01",
+    });
   });
 
   it("rejects access without read_patients permission", async () => {
