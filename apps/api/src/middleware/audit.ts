@@ -74,6 +74,21 @@ export function auditLog(
       )
         .bind(newId(), jwt.tenant_id, jwt.sub, action, entityType, entityId, ip)
         .run();
+
+      // Dashboard clients receive only a data-free invalidation and then make
+      // their own authorized aggregate request. A failed broadcast is non-fatal.
+      if (c.env.DASHBOARD_HUB) {
+        try {
+          const hub = c.env.DASHBOARD_HUB.get(c.env.DASHBOARD_HUB.idFromName(jwt.tenant_id));
+          await hub.fetch("https://dashboard-hub/publish", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ entity_type: entityType }),
+          });
+        } catch (broadcastError) {
+          console.error("[dashboard] failed to publish invalidation:", broadcastError instanceof Error ? broadcastError.message : String(broadcastError));
+        }
+      }
     } catch (err) {
       console.error(
         `[audit] failed to write log action=${action} entity=${entityType}:`,

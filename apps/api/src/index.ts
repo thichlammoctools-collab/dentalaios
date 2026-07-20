@@ -39,6 +39,7 @@ import patientImagesRoutes from "./routes/patient-images";
 import avatarRoutes from "./routes/avatars";
 import appointmentsRoutes from "./routes/appointments";
 import schedulesRoutes from "./routes/schedules";
+import { TenantDashboardHub } from "./durable-objects/tenant-dashboard-hub";
 import chairsRoutes from "./routes/chairs";
 
 export type Env = {
@@ -55,6 +56,7 @@ export type Env = {
   R2_ACCOUNT_ID?: string;
   R2_ACCESS_KEY_ID?: string;
   R2_SECRET_ACCESS_KEY?: string;
+  DASHBOARD_HUB?: DurableObjectNamespace;
 };
 
 const app = new Hono<{ Bindings: Env }>();
@@ -200,3 +202,5 @@ export default {
     app.fetch(request, env, ctx),
   queue: queueHandler,
 };
+
+export { TenantDashboardHub };

@@ -24,6 +24,7 @@ const appointmentRow = (overrides: Record<string, unknown> = {}) => ({
   branch_id: "test-branch",
   clinician_id: "doc-1",
   patient_id: "patient-1",
+  chair_id: null,
   source_visit_id: null,
   scheduled_at: "2026-07-15T08:00:00.000Z",
   duration_min: 30,
@@ -120,6 +121,35 @@ describe("POST /api/appointments", () => {
       },
     );
     expect(res.status).toBe(403);
+  });
+
+  it("returns 409 when an assigned chair has an overlapping appointment", async () => {
+    const app = mountRoute("/api/appointments", appointmentsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/appointments",
+      new Map<string, unknown[]>([
+        ["FROM branches", [{ id: "test-branch", tenant_id: "test-tenant" }]],
+        ["FROM patients", [{ id: "patient-1", tenant_id: "test-tenant" }]],
+        ["FROM users", [{ id: "doc-1", tenant_id: "test-tenant" }]],
+        ["FROM dental_chairs", [{ id: "chair-1", tenant_id: "test-tenant", branch_id: "test-branch", is_active: 1, operational_status: "available" }]],
+        ["FROM appointments", (_sql: string, index: number) => index === 0 ? [] : [appointmentRow({ chair_id: "chair-1" })]],
+      ]),
+      {
+        permissions: ["write_appointments"],
+        body: {
+          patient_id: "patient-1",
+          clinician_id: "doc-1",
+          chair_id: "chair-1",
+          scheduled_at: "2026-07-15T08:00:00.000Z",
+          duration_min: 30,
+        },
+      },
+    );
+    expect(res.status).toBe(409);
+    const body = await res.json() as { error: string };
+    expect(body.error).toContain("Ghế nha");
   });
 
   it("returns 400 for missing required field", async () => {

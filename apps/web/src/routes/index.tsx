@@ -19,6 +19,7 @@ import { AuditLogsPage } from "@/pages/AuditLogsPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { SchedulePage } from "@/pages/SchedulePage";
 import { ScheduleNewPage } from "@/pages/ScheduleNewPage";
+import { ManagementDashboardPage } from "@/pages/ManagementDashboardPage";
 import { ChairBoardPage } from "@/pages/ChairBoardPage";
 import { RequireAuth } from "@/components/RequireAuth";
 import { AppShell } from "@/components/AppShell";
@@ -40,6 +41,8 @@ function Protected({ children }: { children: ReactNode }) {
 }
 
 export function AppRoutes() {
+  const dashboardRoute = (ROUTES as Record<string, string>).MANAGEMENT_DASHBOARD ?? "/management-dashboard";
+
   return (
     <Routes>
       {/* Public */}
@@ -49,6 +52,14 @@ export function AppRoutes() {
       <Route path="/verify-email" element={<VerifyEmailPage />} />
 
       {/* Protected */}
+      <Route
+        path={dashboardRoute}
+        element={
+          <Protected>
+            <ManagementDashboardPage />
+          </Protected>
+        }
+      />
       <Route
         path={ROUTES.TODAY}
         element={

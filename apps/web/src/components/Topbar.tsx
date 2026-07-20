@@ -22,7 +22,14 @@ export function Topbar({ onMenuClick }: TopbarProps) {
 
   if (!session) return null;
 
+  const dashboardRoute = (ROUTES as Record<string, string>).MANAGEMENT_DASHBOARD ?? "/management-dashboard";
+  const isManagementDashboard = location.pathname === dashboardRoute;
+  const dashboardContext = new URLSearchParams(location.search).get("branch_id")
+    ? "Chi nhánh đã chọn"
+    : "Tất cả chi nhánh";
+
   const getTitle = () => {
+    if (isManagementDashboard) return "Quản trị tổng quan";
     if (location.pathname === ROUTES.TODAY) return "Today";
     if (location.pathname === ROUTES.PATIENTS) return "Bệnh nhân";
     if (location.pathname.startsWith("/patients/")) return "Hồ sơ bệnh nhân";
@@ -55,7 +62,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
             {getTitle()}
           </h1>
           <p className="hidden text-xs text-muted-foreground sm:block">
-            {session.tenant.name} · {session.branch.name}
+            {session.tenant.name} · {isManagementDashboard ? dashboardContext : session.branch.name}
           </p>
         </div>
       </div>

@@ -44,7 +44,21 @@
         "max_retries": 3
       }
     ]
-  }
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "DASHBOARD_HUB",
+        "class_name": "TenantDashboardHub"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1-dashboard-hub",
+      "new_classes": ["TenantDashboardHub"]
+    }
+  ]
 }
 
 

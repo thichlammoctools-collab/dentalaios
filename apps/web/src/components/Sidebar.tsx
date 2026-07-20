@@ -1,12 +1,13 @@
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth-context";
 import { ROUTES } from "@shared/constants";
 
 interface NavItem {
   label: string;
   href: string;
   match: (path: string) => boolean;
-  icon: "calendar" | "patients" | "settings" | "users" | "clinic" | "roles" | "audit" | "schedule" | "chair";
+  icon: "calendar" | "patients" | "settings" | "users" | "clinic" | "roles" | "audit" | "schedule" | "chair" | "dashboard";
 }
 
 const ICONS: Record<NavItem["icon"], React.ReactNode> = {
@@ -64,6 +65,14 @@ const ICONS: Record<NavItem["icon"], React.ReactNode> = {
       <path d="M5 11h14v6H5zM7 17v4M17 17v4M8 11V7a4 4 0 018 0v4" />
     </svg>
   ),
+  dashboard: (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  ),
 };
 
 const NAV: NavItem[] = [
@@ -92,6 +101,14 @@ interface SidebarProps {
 
 export function Sidebar({ onNavigate }: SidebarProps) {
   const { pathname } = useLocation();
+  const { session } = useAuth();
+  const dashboardRoute = (ROUTES as Record<string, string>).MANAGEMENT_DASHBOARD ?? "/management-dashboard";
+  const canViewDashboard = Boolean(
+    session?.role.permissions.includes("all") || session?.role.permissions.includes("view_management_dashboard"),
+  );
+  const navigation: NavItem[] = canViewDashboard
+    ? [{ label: "Quản trị tổng quan", href: dashboardRoute, match: (p) => p === dashboardRoute, icon: "dashboard" }, ...NAV]
+    : NAV;
 
   return (
     <div className="flex h-full w-60 flex-col">
@@ -106,7 +123,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       </div>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
-        {NAV.map((item) => {
+        {navigation.map((item) => {
           const active = item.match(pathname);
           return (
             <Link
