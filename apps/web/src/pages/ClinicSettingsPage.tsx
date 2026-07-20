@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { BranchForm } from "@/components/BranchForm";
 import { Dialog, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogBody } from "@/components/ui/dialog";
 import type { Branch, Tenant, TreatmentService } from "@shared/types";
+import { PERMISSIONS } from "@shared/constants";
 
 interface ClinicData {
   tenant: Tenant;
@@ -51,7 +52,9 @@ export function ClinicSettingsPage() {
   const [treatmentServices, setTreatmentServices] = useState<TreatmentService[]>([]);
   const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
   const [serviceForm, setServiceForm] = useState({ code: "", name: "", procedure: "filling", price: "", is_active: true });
+  const [editingServiceCode, setEditingServiceCode] = useState<string | null>(null);
   const [savingService, setSavingService] = useState(false);
+  const [removingServiceCode, setRemovingServiceCode] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -216,13 +219,34 @@ export function ClinicSettingsPage() {
   }
 
   function openNewService() {
+    setEditingServiceCode(null);
     setServiceForm({ code: "", name: "", procedure: "filling", price: "", is_active: true });
     setServiceDialogOpen(true);
   }
 
   function openEditService(service: TreatmentService) {
+    setEditingServiceCode(service.code);
     setServiceForm({ code: service.code, name: service.name, procedure: service.procedure, price: String(service.price), is_active: service.is_active });
     setServiceDialogOpen(true);
+  }
+
+  async function removeTreatmentService(service: TreatmentService) {
+    if (!confirm(`Xóa dịch vụ ${service.code} - ${service.name}? Nếu dịch vụ đã có trong kế hoạch điều trị, hệ thống sẽ chỉ ngừng áp dụng để bảo toàn lịch sử.`)) return;
+    setRemovingServiceCode(service.code);
+    try {
+      const result = await apiDelete<{ mode: "deleted" | "deactivated" }>(`/api/clinic/treatment-services/${encodeURIComponent(service.code)}`);
+      if (result.mode === "deleted") {
+        setTreatmentServices((current) => current.filter((item) => item.code !== service.code));
+        toast.success("Đã xóa dịch vụ chưa từng sử dụng");
+      } else {
+        setTreatmentServices((current) => current.map((item) => item.code === service.code ? { ...item, is_active: false } : item));
+        toast.success("Dịch vụ đã có lịch sử điều trị nên được chuyển sang ngừng áp dụng");
+      }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Không thể xóa dịch vụ");
+    } finally {
+      setRemovingServiceCode(null);
+    }
   }
 
   async function saveTreatmentService() {
@@ -254,7 +278,9 @@ export function ClinicSettingsPage() {
 
   if (!data) return null;
 
-  const isAdmin = session?.role?.name === "admin";
+  const isAdmin = Boolean(
+    session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.MANAGE_USERS),
+  );
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
@@ -327,7 +353,7 @@ export function ClinicSettingsPage() {
         </div>
         <div className="overflow-x-auto rounded-lg border border-border bg-card">
           {treatmentServices.length === 0 ? <p className="p-4 text-sm text-muted-foreground">Chưa có dịch vụ. Thêm dịch vụ để tự động áp dụng giá cho kế hoạch điều trị.</p> : (
-            <table className="w-full min-w-[620px] text-sm"><thead className="border-b bg-muted/30 text-left text-xs text-muted-foreground"><tr><th className="px-4 py-3 font-medium">Mã</th><th className="px-4 py-3 font-medium">Dịch vụ</th><th className="px-4 py-3 font-medium">Thủ thuật</th><th className="px-4 py-3 text-right font-medium">Giá gồm VAT</th><th className="px-4 py-3 font-medium">Trạng thái</th>{isAdmin && <th className="px-4 py-3" />}</tr></thead><tbody className="divide-y">{treatmentServices.map((service) => <tr key={service.code}><td className="px-4 py-3 font-mono text-xs">{service.code}</td><td className="px-4 py-3 font-medium">{service.name}</td><td className="px-4 py-3">{service.procedure}</td><td className="px-4 py-3 text-right tabular-nums">{service.price.toLocaleString("vi-VN")} VND</td><td className="px-4 py-3"><span className={service.is_active ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"}>{service.is_active ? "Đang áp dụng" : "Ngừng áp dụng"}</span></td>{isAdmin && <td className="px-4 py-3 text-right"><button onClick={() => openEditService(service)} className="rounded border border-input px-2 py-1 text-xs hover:bg-muted">Sửa</button></td>}</tr>)}</tbody></table>
+            <table className="w-full min-w-[690px] text-sm"><thead className="border-b bg-muted/30 text-left text-xs text-muted-foreground"><tr><th className="px-4 py-3 font-medium">Mã</th><th className="px-4 py-3 font-medium">Dịch vụ</th><th className="px-4 py-3 font-medium">Thủ thuật</th><th className="px-4 py-3 text-right font-medium">Giá gồm VAT</th><th className="px-4 py-3 font-medium">Trạng thái</th>{isAdmin && <th className="px-4 py-3" />}</tr></thead><tbody className="divide-y">{treatmentServices.map((service) => <tr key={service.code}><td className="px-4 py-3 font-mono text-xs">{service.code}</td><td className="px-4 py-3 font-medium">{service.name}</td><td className="px-4 py-3">{service.procedure}</td><td className="px-4 py-3 text-right tabular-nums">{service.price.toLocaleString("vi-VN")} VND</td><td className="px-4 py-3"><span className={service.is_active ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"}>{service.is_active ? "Đang áp dụng" : "Ngừng áp dụng"}</span></td>{isAdmin && <td className="px-4 py-3 text-right"><div className="flex justify-end gap-2"><button onClick={() => openEditService(service)} className="rounded border border-input px-2 py-1 text-xs hover:bg-muted">Sửa</button><button onClick={() => void removeTreatmentService(service)} disabled={removingServiceCode === service.code} className="rounded border border-destructive/30 px-2 py-1 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50">{removingServiceCode === service.code ? "..." : "Xóa"}</button></div></td>}</tr>)}</tbody></table>
           )}
         </div>
       </section>
@@ -618,9 +644,9 @@ export function ClinicSettingsPage() {
       </Dialog>
 
       <Dialog open={serviceDialogOpen} onOpenChange={setServiceDialogOpen}>
-        <DialogHeader><DialogTitle>{treatmentServices.some((service) => service.code === serviceForm.code) ? "Cập nhật dịch vụ" : "Thêm dịch vụ điều trị"}</DialogTitle><DialogDescription>Mã dịch vụ là định danh duy nhất trong phòng khám. Giá nhập là giá đã gồm VAT.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{editingServiceCode ? "Cập nhật dịch vụ" : "Thêm dịch vụ điều trị"}</DialogTitle><DialogDescription>{editingServiceCode ? "Mã dịch vụ không thể thay đổi để bảo toàn liên kết và lịch sử điều trị. Các thay đổi khác chỉ áp dụng cho kế hoạch mới." : "Mã dịch vụ là định danh duy nhất trong phòng khám. Giá nhập là giá đã gồm VAT."}</DialogDescription></DialogHeader>
         <DialogBody className="grid gap-3">
-          <label className="grid gap-1.5 text-sm font-medium">Mã dịch vụ<input value={serviceForm.code} onChange={(e) => setServiceForm((current) => ({ ...current, code: e.target.value.toUpperCase() }))} maxLength={40} placeholder="VD: TRAM-COM" className="rounded-md border border-input bg-background px-3 py-2 font-mono text-sm" /></label>
+          <label className="grid gap-1.5 text-sm font-medium">Mã dịch vụ<input value={serviceForm.code} disabled={Boolean(editingServiceCode)} onChange={(e) => setServiceForm((current) => ({ ...current, code: e.target.value.toUpperCase() }))} maxLength={40} placeholder="VD: TRAM-COM" className="rounded-md border border-input bg-background px-3 py-2 font-mono text-sm disabled:opacity-60" /></label>
           <label className="grid gap-1.5 text-sm font-medium">Tên dịch vụ<input value={serviceForm.name} onChange={(e) => setServiceForm((current) => ({ ...current, name: e.target.value }))} maxLength={200} placeholder="VD: Trám composite" className="rounded-md border border-input bg-background px-3 py-2 text-sm" /></label>
           <label className="grid gap-1.5 text-sm font-medium">Thủ thuật<select value={serviceForm.procedure} onChange={(e) => setServiceForm((current) => ({ ...current, procedure: e.target.value }))} className="rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="filling">Trám răng</option><option value="root_canal">Điều trị tủy</option><option value="crown">Bọc mão răng</option><option value="implant">Cấy ghép implant</option><option value="extraction">Nhổ răng</option><option value="scaling">Cạo vôi răng</option><option value="fluoride">Tẩy trắng fluoride</option><option value="bridge">Cầu răng sứ</option><option value="other">Khác</option></select></label>
           <label className="grid gap-1.5 text-sm font-medium">Giá đã gồm VAT (VND)<input type="number" min="0" value={serviceForm.price} onChange={(e) => setServiceForm((current) => ({ ...current, price: e.target.value }))} placeholder="VD: 500000" className="rounded-md border border-input bg-background px-3 py-2 text-sm" /></label>

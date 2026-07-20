@@ -26,6 +26,24 @@ export function createTreatmentServicesRepository(db: D1Database) {
       if (!row) throw new Error("Upsert succeeded but read failed");
       return mapPrice(row);
     },
+
+    async hasPlanItems(tenantId: string, code: string): Promise<boolean> {
+      const row = await db.prepare("SELECT 1 FROM treatment_plan_items WHERE tenant_id = ? AND service_code = ? LIMIT 1")
+        .bind(tenantId, code).first();
+      return row !== null;
+    },
+
+    async deactivate(tenantId: string, code: string): Promise<boolean> {
+      const result = await db.prepare("UPDATE treatment_services SET is_active = 0, updated_at = datetime('now') WHERE tenant_id = ? AND code = ?")
+        .bind(tenantId, code).run();
+      return result.meta.changes > 0;
+    },
+
+    async delete(tenantId: string, code: string): Promise<boolean> {
+      const result = await db.prepare("DELETE FROM treatment_services WHERE tenant_id = ? AND code = ?")
+        .bind(tenantId, code).run();
+      return result.meta.changes > 0;
+    },
   };
 }
 

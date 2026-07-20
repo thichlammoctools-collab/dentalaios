@@ -156,6 +156,7 @@ export function TreatmentPlanItemForm({
                 id="proc"
                 value={procedure}
                 onChange={(e) => setProcedure(e.target.value)}
+                disabled={Boolean(serviceCode)}
               >
                 <option value="filling">Trám răng</option>
                 <option value="root_canal">Điều trị tủy</option>

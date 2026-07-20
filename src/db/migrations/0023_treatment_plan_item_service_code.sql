@@ -1,5 +1,4 @@
--- Migration 0022 — Tenant-level treatment service catalog. All prices include VAT.
-
+-- Tenant-level treatment service catalog. All prices include VAT.
 CREATE TABLE IF NOT EXISTS treatment_services (
   id          TEXT PRIMARY KEY,
   tenant_id   TEXT NOT NULL REFERENCES tenants(id),
@@ -16,6 +15,7 @@ CREATE TABLE IF NOT EXISTS treatment_services (
 CREATE INDEX IF NOT EXISTS idx_treatment_services_tenant
   ON treatment_services(tenant_id, is_active, code);
 
+-- Needed for source-generated plan items to retain their catalog linkage.
 ALTER TABLE treatment_plan_items ADD COLUMN service_code TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_plan_items_tenant_service_code

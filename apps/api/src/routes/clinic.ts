@@ -142,6 +142,18 @@ router.put(
   },
 );
 
+// DELETE /api/clinic/treatment-services/:code — hard delete unused services;
+// deactivate services referenced by historical treatment plan items instead.
+router.delete(
+  "/treatment-services/:code",
+  requirePermission(PERMISSIONS.MANAGE_USERS),
+  auditLog("delete", "treatment_service"),
+  async (c) => {
+    const jwt = getJwt(c);
+    return c.json(await treatmentServicesService.remove(c.env.DB, jwt.tenant_id, c.req.param("code")));
+  },
+);
+
 // ──────────────── Per-tenant Lark configuration ────────────────
 
 const larkConfigSchema = z.object({
