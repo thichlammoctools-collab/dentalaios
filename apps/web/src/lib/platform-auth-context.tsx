@@ -3,6 +3,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -71,7 +72,7 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<PlatformSession | null>(null);
   const [pendingChallenge, setPendingChallenge] = useState<string | null>(null);
   const [mfaEnrollment, setMfaEnrollment] = useState<{ secret: string; otpauthUri: string } | null>(null);
-  const [rememberLogin, setRememberLogin] = useState(false);
+  const rememberLoginRef = useRef(false);
   const [isRestoring, setIsRestoring] = useState(true);
 
   useEffect(() => {
@@ -108,7 +109,7 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
       setSession(null);
       setPendingChallenge(null);
       setMfaEnrollment(null);
-      setRememberLogin(false);
+      rememberLoginRef.current = false;
     };
     window.addEventListener(PLATFORM_SESSION_EXPIRED_EVENT, clearExpiredSession);
     return () => window.removeEventListener(PLATFORM_SESSION_EXPIRED_EVENT, clearExpiredSession);
@@ -132,9 +133,11 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
   }, [session]);
 
   async function login(email: string, password: string, remember: boolean) {
+    // Keep this choice synchronously through the separate TOTP step. React
+    // state alone can be reset by an intervening render before MFA submits.
+    rememberLoginRef.current = remember;
     const result = await platformPost<PlatformLoginChallenge>("/api/platform/auth/login", { email, password });
     setPendingChallenge(result.challenge_id);
-    setRememberLogin(remember);
     setMfaEnrollment(
       result.mfa_enrollment_required && result.secret && result.otpauth_uri
         ? { secret: result.secret, otpauthUri: result.otpauth_uri }
@@ -148,13 +151,13 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
       challenge_id: pendingChallenge,
       code,
     });
+    if (rememberLoginRef.current) persistSession(result.session);
+    else clearRememberedSession();
     setPlatformToken(result.session.token);
     setSession(result.session);
-    if (rememberLogin) persistSession(result.session);
-    else clearRememberedSession();
     setPendingChallenge(null);
     setMfaEnrollment(null);
-    setRememberLogin(false);
+    rememberLoginRef.current = false;
   }
 
   async function logout() {
@@ -166,7 +169,7 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
       setSession(null);
       setPendingChallenge(null);
       setMfaEnrollment(null);
-      setRememberLogin(false);
+      rememberLoginRef.current = false;
     }
   }
 
