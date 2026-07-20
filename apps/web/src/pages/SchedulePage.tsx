@@ -42,6 +42,7 @@ export function SchedulePage() {
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
   const [startingAppointmentId, setStartingAppointmentId] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
 
   // Filters apply to both schedule views.
   const [filterStatuses, setFilterStatuses] = useState<Set<string>>(() => new Set(requestedStatuses));
@@ -52,6 +53,11 @@ export function SchedulePage() {
   useEffect(() => {
     setFilterStatuses(new Set(requestedStatuses));
   }, [requestedStatusValue]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   // Compute week range from selectedDate
   const weekDays = useMemo(() => getWeekDays(selectedDate), [selectedDate]);
@@ -451,7 +457,7 @@ export function SchedulePage() {
                                   <span className="font-medium text-foreground">{chair.name}</span>
                                 </div>
                               )}
-                              {a.chair_id && !["cancelled", "no_show", "completed"].includes(a.status) && (
+                              {canStartAppointmentVisit(a, now) && (
                                 <Button size="sm" onClick={(event) => { event.stopPropagation(); void startVisit(a); }} disabled={startingAppointmentId === a.id}>
                                   {startingAppointmentId === a.id ? "Đang bắt đầu..." : "Bắt đầu khám"}
                                 </Button>
@@ -611,6 +617,13 @@ function appointmentTiming(appointment: Appointment): "finished" | "in_progress"
   return "upcoming";
 }
 
+function canStartAppointmentVisit(appointment: Appointment, now: Date): boolean {
+  if (appointment.status !== "arrived" || !appointment.chair_id) return false;
+  const startsAt = new Date(appointment.scheduled_at);
+  const endsAt = new Date(startsAt.getTime() + appointment.duration_min * 60_000);
+  return startsAt <= now && now < endsAt;
+}
+
 function statusBgClass(status: string): string {
   switch (status) {
     case "booked": return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
@@ -652,6 +665,7 @@ function EditAppointmentDialog({
   onSaved: (appt: Appointment) => void;
   onCancelled: (appt: Appointment) => Promise<boolean>;
 }) {
+  const isCancelled = appointment.status === "cancelled";
   const apptDate = new Date(appointment.scheduled_at);
   const [date, setDate] = useState(ymd(apptDate));
   const [time, setTime] = useState(
@@ -719,7 +733,7 @@ function EditAppointmentDialog({
           <Select
             value={clinicianId}
             onChange={(e) => setClinicianId(e.target.value)}
-            disabled={doctorsOnly.length === 0}
+            disabled={isCancelled || doctorsOnly.length === 0}
           >
             {doctorsOnly.length === 0 && <option value="">Không có bác sĩ khả dụng</option>}
             {doctorsOnly.map((d) => (
@@ -732,7 +746,7 @@ function EditAppointmentDialog({
         {assistantsOnly.length > 0 && (
           <div className="grid gap-1.5">
             <Label>Phụ tá chính</Label>
-            <Select value={assistantId} onChange={(e) => setAssistantId(e.target.value)}>
+            <Select value={assistantId} onChange={(e) => setAssistantId(e.target.value)} disabled={isCancelled}>
               <option value="">— Không chọn —</option>
               {assistantsOnly.map((a) => (
                 <option key={a.id} value={a.id}>{a.name}</option>
@@ -743,7 +757,7 @@ function EditAppointmentDialog({
 
         <div className="grid gap-1.5">
           <Label>Ghế nha</Label>
-          <Select value={chairId} onChange={(e) => setChairId(e.target.value)}>
+          <Select value={chairId} onChange={(e) => setChairId(e.target.value)} disabled={isCancelled}>
             <option value="">— Chưa gán ghế —</option>
             {chairs.filter((chair) => chair.is_active || chair.id === appointment.chair_id).map((chair) => (
               <option key={chair.id} value={chair.id}>
@@ -756,7 +770,7 @@ function EditAppointmentDialog({
         {/* Trạng thái */}
         <div className="grid gap-1.5">
           <Label>Trạng thái</Label>
-          <Select value={status} onChange={(e) => setStatus(e.target.value as Appointment["status"])}>
+          <Select value={status} onChange={(e) => setStatus(e.target.value as Appointment["status"])} disabled={isCancelled}>
             <option value="booked">Đã đặt</option>
             <option value="confirmed">Xác nhận</option>
             <option value="arrived">Đã đến</option>
@@ -770,18 +784,18 @@ function EditAppointmentDialog({
         <div className="grid grid-cols-2 gap-3">
           <div className="grid gap-1.5">
             <Label>Ngày</Label>
-            <DateInput value={date} onChange={setDate} />
+            <DateInput value={date} onChange={setDate} disabled={isCancelled} />
           </div>
           <div className="grid gap-1.5">
             <Label>Giờ</Label>
-            <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+            <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} disabled={isCancelled} />
           </div>
         </div>
 
         {/* Thời lượng */}
         <div className="grid gap-1.5">
           <Label>Thời lượng (phút)</Label>
-          <Select value={String(durationMin)} onChange={(e) => setDurationMin(Number(e.target.value))}>
+          <Select value={String(durationMin)} onChange={(e) => setDurationMin(Number(e.target.value))} disabled={isCancelled}>
             <option value="15">15 phút</option>
             <option value="30">30 phút</option>
             <option value="45">45 phút</option>
@@ -794,13 +808,13 @@ function EditAppointmentDialog({
         {/* Hạng mục */}
         <div className="grid gap-1.5">
           <Label>Hạng mục</Label>
-          <Input value={procedure} onChange={(e) => setProcedure(e.target.value)} placeholder="VD: scaling, filling…" />
+          <Input value={procedure} onChange={(e) => setProcedure(e.target.value)} placeholder="VD: scaling, filling…" disabled={isCancelled} />
         </div>
 
         {/* Ghi chú */}
         <div className="grid gap-1.5">
           <Label>Ghi chú</Label>
-          <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} disabled={isCancelled} />
         </div>
       </DialogBody>
       <DialogFooter className="mt-4">
@@ -810,9 +824,11 @@ function EditAppointmentDialog({
           </Button>
         )}
         <Button type="button" variant="outline" onClick={onClose}>Đóng</Button>
-        <Button type="button" disabled={saving || cancelling} onClick={handleSave}>
-          {saving ? "Đang lưu…" : "Lưu thay đổi"}
-        </Button>
+        {!isCancelled && (
+          <Button type="button" disabled={saving || cancelling} onClick={handleSave}>
+            {saving ? "Đang lưu…" : "Lưu thay đổi"}
+          </Button>
+        )}
       </DialogFooter>
     </Dialog>
   );

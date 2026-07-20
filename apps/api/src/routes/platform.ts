@@ -9,6 +9,7 @@ import {
   platformContentUpdateSchema,
   platformFlagOverrideSchema,
   platformFlagSchema,
+  platformAiModelConfigSchema,
   platformLifecycleSchema,
   platformLimitsSchema,
   procedureCatalogCreateSchema,
@@ -37,6 +38,7 @@ import { createPlatformUsersRepository } from "../repositories/platform-users.re
 import { createProcedureCatalogRepository } from "../repositories/procedure-catalog.repo";
 import { platformService } from "../services/platform.service";
 import { platformTenantProvisionService } from "../services/platform-tenant-provision.service";
+import { aiModelConfigService } from "../services/ai-model-config.service";
 const router = new Hono<{ Bindings: Env; Variables: PlatformAuthContext }>();
 const actor = (c: any) => ({
   user_id: getPlatformJwt(c).sub,
@@ -202,6 +204,29 @@ router.get(
   requirePlatformPermission(PLATFORM_PERMISSIONS.CONFIG_READ),
   async (c) =>
     c.json({ items: await createPlatformConfigRepository(c.env.DB).flags() }),
+);
+router.get(
+  "/ai-model-configs",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.AI_CONFIG_READ),
+  async (c) => c.json({ items: await aiModelConfigService.list(c.env.DB) }),
+);
+router.put(
+  "/ai-model-configs",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.AI_CONFIG_WRITE),
+  requireRecentPlatformMfa(),
+  zValidator("json", platformAiModelConfigSchema),
+  async (c) => {
+    const data = c.req.valid("json");
+    const config = await aiModelConfigService.update(c.env.DB, data, getPlatformJwt(c).sub);
+    await platformAudit(c.env.DB, {
+      ...actor(c),
+      action: "ai_model_config.updated",
+      entity_type: "ai_model_config",
+      entity_id: `${data.application_key}:${data.use_case}`,
+      details: { model_id: data.model_id, is_enabled: data.is_enabled },
+    });
+    return c.json(config);
+  },
 );
 router.put(
   "/feature-flags",

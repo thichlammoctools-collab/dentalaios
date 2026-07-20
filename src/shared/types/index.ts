@@ -874,6 +874,8 @@ export type PlatformPermission =
   | "platform_admins.write"
   | "platform_procedures.read"
   | "platform_procedures.write"
+  | "platform_ai_config.read"
+  | "platform_ai_config.write"
   | "platform_audit.read";
 
 export interface PlatformRole {
@@ -936,6 +938,19 @@ export interface PlatformFeatureFlag {
   default_enabled: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface PlatformAiModelConfig {
+  application_key: "clinic_web";
+  use_case: string;
+  name: string;
+  modality: "text" | "vision";
+  model_id: string;
+  default_model_id: string;
+  allowed_models: Array<{ id: string; name: string }>;
+  is_enabled: boolean;
+  is_overridden: boolean;
+  updated_at?: string;
 }
 
 /** Global clinical procedure maintained by Platform Admins. */

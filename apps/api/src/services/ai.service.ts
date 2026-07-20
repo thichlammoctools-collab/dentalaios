@@ -13,6 +13,7 @@ import { createTreatmentItemsRepository } from "../repositories/treatment-items.
 import { createPatientsRepository } from "../repositories/patients.repo";
 import { createTreatmentServicesRepository } from "../repositories/treatment-service-prices.repo";
 import { NotFoundError } from "../lib/errors";
+import { aiModelConfigService } from "./ai-model-config.service";
 
 export interface SummarizeResult {
   summary: string;
@@ -96,10 +97,11 @@ export const aiService = {
     const data = buildSummaryData({ patient, visit, findings, planItems });
 
     // Try Cloudflare AI
-    if (AI && typeof (AI as { run?: unknown }).run === "function") {
+    const model = await aiModelConfigService.resolve(db, "visit_summary");
+    if (model.is_enabled && AI && typeof (AI as { run?: unknown }).run === "function") {
       try {
         const result = await (AI as { run: (model: string, inputs: object) => Promise<{ response?: string }> }).run(
-          "@cf/meta/llama-4-scout-17b-16e-instruct",
+          model.model_id,
           {
             messages: [
               { role: "system", content: "Bạn là trợ lý nha khoa chuyên nghiệp. Viết tóm tắt bệnh án bằng tiếng Việt, ngắn gọn, dễ hiểu. Dùng ngôn ngữ thân thiện, phù hợp để bác sĩ đọc lại nhanh." },
@@ -111,7 +113,7 @@ export const aiService = {
         );
         return {
           summary: (result as { response?: string }).response || "Không có phản hồi từ AI.",
-          ai_model: "llama-4-scout-17b",
+          ai_model: model.model_id,
           generated_at: new Date().toISOString(),
         };
       } catch {
@@ -197,10 +199,11 @@ QUY TẮC QUAN TRỌNG:
 - Không bào chữa, chỉ trả JSON thuần túy`;
 
     // Try Cloudflare AI
-    if (AI && typeof (AI as { run?: unknown }).run === "function") {
+    const model = await aiModelConfigService.resolve(db, "treatment_plan_draft");
+    if (model.is_enabled && AI && typeof (AI as { run?: unknown }).run === "function") {
       try {
         const result = await (AI as { run: (model: string, inputs: object) => Promise<{ response?: string }> }).run(
-          "@cf/meta/llama-4-scout-17b-16e-instruct",
+          model.model_id,
           {
             messages: [
               { role: "system", content: "Bạn là bác sĩ nha khoa chuyên nghiệp. Luôn trả lời đúng format JSON, không thêm text khác." },
@@ -213,7 +216,7 @@ QUY TẮC QUAN TRỌNG:
         const raw = (result as { response?: string }).response || "{}";
         const parsed = parseAiPlanResponse(raw, activeServices);
         if (parsed) {
-          return { ...parsed, ai_model: "llama-4-scout-17b", generated_at: new Date().toISOString() };
+          return { ...parsed, ai_model: model.model_id, generated_at: new Date().toISOString() };
         }
       } catch {
         // fall through
@@ -308,15 +311,18 @@ QUY TẮC QUAN TRỌNG:
 
     if (!imageBase64) throw new NotFoundError("Image file missing in storage");
 
+    const model = await aiModelConfigService.resolve(db, "clinical_image_analysis");
+
     // Step 3: Try vision model with base64 image
     if (
+      model.is_enabled &&
       AI &&
       typeof (AI as { run?: unknown }).run === "function" &&
       imageBase64
     ) {
       try {
         const result = await (AI as { run: (model: string, inputs: object) => Promise<unknown> }).run(
-          "@cf/meta/llama-3.2-11b-vision-instruct",
+          model.model_id,
           {
             messages: [
               {
@@ -341,37 +347,10 @@ QUY TẮC QUAN TRỌNG:
         const raw = (result as { response?: string })?.response || "{}";
         const parsed = parseAnalyzeImageResponse(raw);
         if (parsed) {
-          return { ...parsed, ai_model: "llama-3.2-11b-vision", generated_at: new Date().toISOString() };
+          return { ...parsed, ai_model: model.model_id, generated_at: new Date().toISOString() };
         }
       } catch {
         // fall through to text-only
-      }
-    }
-
-    // Step 3: Try base AI binding (text-only fallback)
-    if (AI && typeof (AI as { run?: unknown }).run === "function") {
-      try {
-        const result = await (AI as { run: (model: string, inputs: object) => Promise<{ response?: string }> }).run(
-          "@cf/meta/llama-4-scout-17b-16e-instruct",
-          {
-            messages: [
-              {
-                role: "system",
-                content: "Bạn là bác sĩ nha khoa giàu kinh nghiệm. Luôn trả lời đúng format JSON, không thêm text khác ngoài JSON.",
-              },
-              { role: "user", content: imageBase64 ? `${textPrompt}\n\n[Lưu ý: Không thể truy cập hình ảnh. Phân tích dựa trên thông tin có sẵn.]` : textPrompt },
-            ],
-            max_tokens: 1536,
-            temperature: 0.2,
-          },
-        );
-        const raw = (result as { response?: string }).response || "{}";
-        const parsed = parseAnalyzeImageResponse(raw);
-        if (parsed) {
-          return { ...parsed, ai_model: "llama-4-scout-17b", generated_at: new Date().toISOString() };
-        }
-      } catch {
-        // fall through
       }
     }
 

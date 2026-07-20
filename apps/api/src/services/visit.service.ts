@@ -49,8 +49,11 @@ export const visitService = {
       if (!appointment || appointment.patient_id !== data.patient_id || appointment.branch_id !== data.branch_id) {
         throw new ValidationError("Lịch hẹn không hợp lệ cho lượt khám này");
       }
-      if (appointment.status === "cancelled" || appointment.status === "no_show" || !appointment.chair_id) {
-        throw new ValidationError("Lịch hẹn chưa thể bắt đầu khám");
+      const startsAt = new Date(appointment.scheduled_at);
+      const endsAt = new Date(startsAt.getTime() + appointment.duration_min * 60_000);
+      const now = new Date();
+      if (appointment.status !== "arrived" || !appointment.chair_id || now < startsAt || now >= endsAt) {
+        throw new ValidationError("Chỉ có thể bắt đầu khám khi bệnh nhân đã đến và đang trong khung giờ hẹn");
       }
       chairId = appointment.chair_id;
     }

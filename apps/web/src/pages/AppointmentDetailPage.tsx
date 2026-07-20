@@ -57,6 +57,12 @@ export function AppointmentDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [startingVisit, setStartingVisit] = useState(false);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -101,6 +107,8 @@ export function AppointmentDetailPage() {
   const assistant = appt.assistant_id ? users.find((u) => u.id === appt.assistant_id) : null;
   const chair = appt.chair_id ? chairs.find((item) => item.id === appt.chair_id) : null;
   const endTime = new Date(new Date(appt.scheduled_at).getTime() + appt.duration_min * 60 * 1000);
+  const canStartVisit = appt.status === "arrived" && Boolean(appt.chair_id)
+    && new Date(appt.scheduled_at) <= now && now < endTime;
 
   function closeEdit() {
     setEditOpen(false);
@@ -162,9 +170,9 @@ export function AppointmentDetailPage() {
             {APPOINTMENT_STATUS_LABELS[appt.status]}
           </Badge>
            <Button variant="outline" onClick={() => setEditOpen(true)}>Sửa</Button>
-           {appt.status !== "cancelled" && appt.status !== "no_show" && appt.status !== "completed" && appt.chair_id && (
-             <Button onClick={() => void startVisit()} disabled={startingVisit}>{startingVisit ? "Đang bắt đầu…" : "Bắt đầu khám"}</Button>
-           )}
+            {canStartVisit && (
+              <Button onClick={() => void startVisit()} disabled={startingVisit}>{startingVisit ? "Đang bắt đầu…" : "Bắt đầu khám"}</Button>
+            )}
           {appt.status !== "cancelled" && appt.status !== "completed" && (
             <Button variant="destructive" onClick={() => setCancelOpen(true)}>Hủy lịch</Button>
           )}

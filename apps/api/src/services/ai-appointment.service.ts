@@ -22,6 +22,7 @@ import { createPatientsRepository } from "../repositories/patients.repo";
 import { createUsersRepository } from "../repositories/users.repo";
 import { NotFoundError } from "../lib/errors";
 import { isDoctorRole } from "@shared/constants";
+import { aiModelConfigService } from "./ai-model-config.service";
 
 // ─── Result types ────────────────────────────────────────────
 
@@ -100,10 +101,11 @@ export const aiAppointmentService = {
       .map((d) => `  - ${d.name}`)
       .join("\n");
 
-    if (AI && typeof (AI as { run?: unknown }).run === "function") {
+    const model = await aiModelConfigService.resolve(db, "appointment_chat_parse");
+    if (model.is_enabled && AI && typeof (AI as { run?: unknown }).run === "function") {
       try {
         const result = await (AI as { run: (model: string, inputs: object) => Promise<{ response?: string }> }).run(
-          "@cf/meta/llama-4-scout-17b-16e-instruct",
+          model.model_id,
           {
             messages: [
               {
@@ -158,7 +160,7 @@ Trả CHÍNH XÁC JSON, KHÔNG thêm text khác:
         if (parsed) {
           return {
             appointment: parsed,
-            ai_model: "llama-4-scout-17b",
+            ai_model: model.model_id,
             generated_at: new Date().toISOString(),
           };
         }
@@ -234,10 +236,11 @@ Trả CHÍNH XÁC JSON, KHÔNG thêm text khác:
 
     const today = new Date().toISOString().slice(0, 10);
 
-    if (AI && typeof (AI as { run?: unknown }).run === "function") {
+    const model = await aiModelConfigService.resolve(db, "next_appointment_suggestion");
+    if (model.is_enabled && AI && typeof (AI as { run?: unknown }).run === "function") {
       try {
         const result = await (AI as { run: (model: string, inputs: object) => Promise<{ response?: string }> }).run(
-          "@cf/meta/llama-4-scout-17b-16e-instruct",
+          model.model_id,
           {
             messages: [
               {
@@ -291,7 +294,7 @@ Hãy đề xuất lịch hẹn tiếp theo:`,
         if (parsed) {
           return {
             suggestion: parsed,
-            ai_model: "llama-4-scout-17b",
+            ai_model: model.model_id,
             generated_at: new Date().toISOString(),
           };
         }

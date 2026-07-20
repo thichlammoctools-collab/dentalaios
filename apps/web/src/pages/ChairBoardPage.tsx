@@ -59,6 +59,7 @@ export function ChairBoardPage() {
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [startingAppointmentId, setStartingAppointmentId] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
   const canManage = Boolean(
     session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.MANAGE_USERS),
   );
@@ -100,6 +101,11 @@ export function ChairBoardPage() {
     const stream = createDashboardStream({ onInvalidate: () => setRefreshKey((value) => value + 1) });
     return () => stream.stop();
   }, [canViewRevenue, date, session?.branch?.id]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const patientsById = useMemo(() => new Map(patients.map((patient) => [patient.id, patient])), [patients]);
   const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
@@ -196,12 +202,12 @@ export function ChairBoardPage() {
                 </CardHeader>
                 <CardContent className="space-y-4 pt-4">
                   {item.current_appointment ? (
-                    <AppointmentSummary title="Đang diễn ra" appointment={item.current_appointment} patients={patientsById} users={usersById} canEdit={canEditAppointments} onStart={startVisit} starting={startingAppointmentId === item.current_appointment.id} />
+                    <AppointmentSummary title="Đang diễn ra" appointment={item.current_appointment} patients={patientsById} users={usersById} canEdit={canEditAppointments} onStart={startVisit} starting={startingAppointmentId === item.current_appointment.id} now={now} />
                   ) : (
                     <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">Không có lịch đang diễn ra</p>
                   )}
                   {item.next_appointment && item.next_appointment.id !== item.current_appointment?.id && (
-                    <AppointmentSummary title="Lịch tiếp theo" appointment={item.next_appointment} patients={patientsById} users={usersById} compact canEdit={canEditAppointments} onStart={startVisit} starting={startingAppointmentId === item.next_appointment.id} />
+                    <AppointmentSummary title="Lịch tiếp theo" appointment={item.next_appointment} patients={patientsById} users={usersById} compact canEdit={canEditAppointments} onStart={startVisit} starting={startingAppointmentId === item.next_appointment.id} now={now} />
                   )}
                   {canViewRevenue && item.revenue && (
                     <div className="grid grid-cols-3 gap-2 rounded-lg bg-emerald-50 p-3 text-xs dark:bg-emerald-950/30">
@@ -237,7 +243,7 @@ function Metric({ label, value }: { label: string; value: string }) {
   return <div><p className="text-[11px] text-muted-foreground">{label}</p><p className="mt-0.5 font-semibold tabular-nums">{value}</p></div>;
 }
 
-function AppointmentSummary({ title, appointment, patients, users, compact = false, canEdit = false, onStart, starting }: {
+function AppointmentSummary({ title, appointment, patients, users, compact = false, canEdit = false, onStart, starting, now }: {
   title: string;
   appointment: Appointment;
   patients: Map<string, Patient>;
@@ -246,6 +252,7 @@ function AppointmentSummary({ title, appointment, patients, users, compact = fal
   canEdit?: boolean;
   onStart: (appointment: Appointment) => void;
   starting: boolean;
+  now: Date;
 }) {
   const end = new Date(new Date(appointment.scheduled_at).getTime() + appointment.duration_min * 60_000);
   const patient = patients.get(appointment.patient_id);
@@ -256,7 +263,7 @@ function AppointmentSummary({ title, appointment, patients, users, compact = fal
        <div className="mt-1 flex items-center gap-2"><ProfileAvatar subject="patients" entityId={patient?.id} name={patient?.name ?? appointment.patient_id} avatarFileId={patient?.avatar_file_id} size="sm" /><p className="font-medium">{patient?.name ?? appointment.patient_id.slice(0, 8)}</p></div>
        <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">{clinician && <ProfileAvatar subject="users" entityId={clinician.id} name={clinician.name} avatarFileId={clinician.avatar_file_id} size="sm" />}{formatTime(appointment.scheduled_at)} - {formatTime(end.toISOString())} · {clinician?.name ?? "Chưa rõ bác sĩ"}</p>
       {!compact && appointment.procedure && <p className="mt-1 text-xs text-muted-foreground">{appointment.procedure}</p>}
-      {!compact && appointment.chair_id && !["cancelled", "no_show", "completed"].includes(appointment.status) && <Button size="sm" className="mt-3" onClick={() => onStart(appointment)} disabled={starting}>{starting ? "Đang bắt đầu..." : "Bắt đầu khám"}</Button>}
+      {!compact && appointment.status === "arrived" && appointment.chair_id && new Date(appointment.scheduled_at) <= now && now < end && <Button size="sm" className="mt-3" onClick={() => onStart(appointment)} disabled={starting}>{starting ? "Đang bắt đầu..." : "Bắt đầu khám"}</Button>}
       {canEdit && <Button size="sm" variant="outline" className="mt-3" asChild><Link to={`/appointments/${appointment.id}?edit=1`}>Sửa lịch</Link></Button>}
     </div>
   );

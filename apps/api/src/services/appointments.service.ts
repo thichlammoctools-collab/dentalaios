@@ -136,6 +136,10 @@ export const appointmentsService = {
     const existing = await repo.getById(tenantId, id);
     if (!existing) throw new NotFoundError("Appointment not found");
 
+    if (existing.status === "cancelled") {
+      throw new ConflictError("Không thể cập nhật lịch hẹn đã hủy");
+    }
+
     await assertAllInTenant(db, tenantId, [
       { table: "users", id: input.clinician_id ?? undefined },
       { table: "users", id: input.assistant_id ?? undefined },
@@ -154,9 +158,8 @@ export const appointmentsService = {
 
     if (rescheduling) {
       const { start, end } = interval(newScheduledAt, newDuration);
-      // Don't conflict-check a cancelled or no_show appointment against itself
-      const skipSelf =
-        existing.status === "cancelled" || existing.status === "no_show";
+      // A no-show appointment does not reserve a slot.
+      const skipSelf = existing.status === "no_show";
       await assertNoConflict(
         db,
         tenantId,

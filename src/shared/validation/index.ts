@@ -12,6 +12,7 @@
  */
 
 import { z } from "zod";
+import { PLATFORM_AI_APPLICATION, PLATFORM_AI_MODEL_CONFIG_CATALOG } from "@shared/constants";
 import { isValidFdiTooth } from "../constants";
 
 /** Non-empty string (after trim) with reasonable max length */
@@ -658,6 +659,16 @@ export const platformLimitsSchema = z.object({
   max_users: z.number().int().min(0).max(100000),
   max_branches: z.number().int().min(0).max(10000),
   storage_quota_bytes: z.number().int().min(0).max(10_000_000_000_000),
+}).strict();
+
+const platformAiUseCases = PLATFORM_AI_MODEL_CONFIG_CATALOG.map((item) => item.use_case) as [string, ...string[]];
+const platformAiModelIds = [...new Set(PLATFORM_AI_MODEL_CONFIG_CATALOG.flatMap((item) => item.allowed_models.map((model) => model.id)))] as [string, ...string[]];
+
+export const platformAiModelConfigSchema = z.object({
+  application_key: z.literal(PLATFORM_AI_APPLICATION),
+  use_case: z.enum(platformAiUseCases),
+  model_id: z.enum(platformAiModelIds),
+  is_enabled: z.boolean(),
 }).strict();
 
 export const procedureCatalogCreateSchema = z.object({

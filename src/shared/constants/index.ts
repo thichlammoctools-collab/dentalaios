@@ -209,8 +209,76 @@ export const PLATFORM_PERMISSIONS = {
   ADMINS_WRITE: "platform_admins.write",
   PROCEDURES_READ: "platform_procedures.read",
   PROCEDURES_WRITE: "platform_procedures.write",
+  AI_CONFIG_READ: "platform_ai_config.read",
+  AI_CONFIG_WRITE: "platform_ai_config.write",
   AUDIT_READ: "platform_audit.read",
 } as const;
+
+export const PLATFORM_AI_APPLICATION = "clinic_web" as const;
+
+export const PLATFORM_AI_MODEL_CONFIG_CATALOG = [
+  {
+    use_case: "visit_summary",
+    name: "Tóm tắt lượt khám",
+    modality: "text",
+    default_model_id: "@cf/meta/llama-4-scout-17b-16e-instruct",
+    allowed_models: [
+      { id: "@cf/meta/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B" },
+      { id: "@cf/meta/llama-3.1-8b-instruct", name: "Llama 3.1 8B" },
+    ],
+  },
+  {
+    use_case: "treatment_plan_draft",
+    name: "Gợi ý kế hoạch điều trị",
+    modality: "text",
+    default_model_id: "@cf/meta/llama-4-scout-17b-16e-instruct",
+    allowed_models: [
+      { id: "@cf/meta/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B" },
+      { id: "@cf/meta/llama-3.1-8b-instruct", name: "Llama 3.1 8B" },
+    ],
+  },
+  {
+    use_case: "clinical_image_analysis",
+    name: "Phân tích hình ảnh lâm sàng",
+    modality: "vision",
+    default_model_id: "@cf/meta/llama-3.2-11b-vision-instruct",
+    allowed_models: [
+      { id: "@cf/meta/llama-3.2-11b-vision-instruct", name: "Llama 3.2 Vision 11B" },
+    ],
+  },
+  {
+    use_case: "voice_findings_parse",
+    name: "Trích xuất phát hiện từ ghi âm",
+    modality: "text",
+    default_model_id: "@cf/meta/llama-4-scout-17b-16e-instruct",
+    allowed_models: [
+      { id: "@cf/meta/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B" },
+      { id: "@cf/meta/llama-3.1-8b-instruct", name: "Llama 3.1 8B" },
+    ],
+  },
+  {
+    use_case: "appointment_chat_parse",
+    name: "Phân tích hội thoại đặt lịch",
+    modality: "text",
+    default_model_id: "@cf/meta/llama-4-scout-17b-16e-instruct",
+    allowed_models: [
+      { id: "@cf/meta/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B" },
+      { id: "@cf/meta/llama-3.1-8b-instruct", name: "Llama 3.1 8B" },
+    ],
+  },
+  {
+    use_case: "next_appointment_suggestion",
+    name: "Gợi ý lịch hẹn tiếp theo",
+    modality: "text",
+    default_model_id: "@cf/meta/llama-4-scout-17b-16e-instruct",
+    allowed_models: [
+      { id: "@cf/meta/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B" },
+      { id: "@cf/meta/llama-3.1-8b-instruct", name: "Llama 3.1 8B" },
+    ],
+  },
+] as const;
+
+export type PlatformAiUseCase = (typeof PLATFORM_AI_MODEL_CONFIG_CATALOG)[number]["use_case"];
 
 export type PlatformPermission = (typeof PLATFORM_PERMISSIONS)[keyof typeof PLATFORM_PERMISSIONS];
 

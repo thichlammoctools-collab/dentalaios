@@ -10,6 +10,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import { createVisitsRepository } from "../repositories/visits.repo";
 import { NotFoundError } from "../lib/errors";
+import { aiModelConfigService } from "./ai-model-config.service";
 
 export interface ParsedFinding {
   scope: "tooth" | "full_mouth" | "soft_tissue";
@@ -60,10 +61,11 @@ export const voiceFindingsService = {
       : "không rõ";
 
     // Try Cloudflare AI
-    if (AI && typeof (AI as { run?: unknown }).run === "function") {
+    const model = await aiModelConfigService.resolve(db, "voice_findings_parse");
+    if (model.is_enabled && AI && typeof (AI as { run?: unknown }).run === "function") {
       try {
         const result = await (AI as { run: (model: string, inputs: object) => Promise<{ response?: string }> }).run(
-          "@cf/meta/llama-4-scout-17b-16e-instruct",
+          model.model_id,
           {
             messages: [
               {
@@ -107,7 +109,7 @@ Format:
         if (parsed && parsed.findings.length > 0) {
           return {
             findings: parsed.findings,
-            ai_model: "llama-4-scout-17b",
+            ai_model: model.model_id,
             generated_at: new Date().toISOString(),
           };
         }
