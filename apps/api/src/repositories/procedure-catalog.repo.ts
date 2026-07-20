@@ -32,6 +32,16 @@ export function createProcedureCatalogRepository(db: D1Database) {
       return row ? map(row) : null;
     },
 
+    async backfillExisting(): Promise<number> {
+      const result = await db.prepare(`INSERT OR IGNORE INTO procedure_catalog (code, name, sort_order)
+        SELECT procedure, procedure, 9000 FROM (
+          SELECT DISTINCT trim(procedure) AS procedure FROM treatment_services WHERE length(trim(procedure)) >= 2
+          UNION
+          SELECT DISTINCT trim(procedure) AS procedure FROM treatment_plan_items WHERE length(trim(procedure)) >= 2
+        ) ORDER BY procedure`).bind().run();
+      return result.meta.changes;
+    },
+
     async create(data: Pick<ProcedureCatalogItem, "code" | "name" | "is_active" | "sort_order">): Promise<ProcedureCatalogItem> {
       await db.prepare("INSERT INTO procedure_catalog (code, name, is_active, sort_order) VALUES (?, ?, ?, ?)")
         .bind(data.code, data.name, data.is_active ? 1 : 0, data.sort_order).run();

@@ -342,6 +342,20 @@ export const paymentUpdateSchema = z
 
 export type PaymentUpdateInput = z.infer<typeof paymentUpdateSchema>;
 
+export const paymentAdjustmentSchema = z.object({
+  amount: z.number().finite().refine((value) => value !== 0, "Số tiền điều chỉnh không được bằng 0"),
+  reason: nonEmpty(500),
+  notes: optionalText(500),
+});
+export type PaymentAdjustmentInput = z.infer<typeof paymentAdjustmentSchema>;
+
+export const paymentAttachmentCreateSchema = z.object({
+  file_id: z.string().min(1),
+  kind: z.enum(["transfer_receipt", "receipt", "invoice", "other"]),
+  description: optionalText(500),
+});
+export type PaymentAttachmentCreateInput = z.infer<typeof paymentAttachmentCreateSchema>;
+
 /** Tenant-configurable payment code prefix (e.g. "TT", "PK1"). */
 export const paymentPrefixSchema = z.object({
   prefix: z

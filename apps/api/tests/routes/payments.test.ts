@@ -17,6 +17,7 @@ const paymentRow = (overrides: Record<string, unknown> = {}) => ({
   status: "pending",
   reference: null,
   notes: null,
+  code: "TT-20260101-0001",
   created_at: "2026-01-01",
   ...overrides,
 });
@@ -213,7 +214,7 @@ describe("POST /api/payments", () => {
 describe("POST /api/payments/:id/confirm", () => {
   it("returns 200 + confirmed payment", async () => {
     const app = mountRoute("/api/payments", paymentsRoutes);
-    const confirmed = paymentRow({ status: "confirmed" });
+    const confirmed = paymentRow({ status: "pending" });
     const res = await authedRequestWithDB(
       app,
       "POST",
@@ -238,5 +239,53 @@ describe("POST /api/payments/:id/confirm", () => {
       { permissions: ["write_payments"] },
     );
     expect(res.status).toBe(404);
+  });
+});
+
+describe("confirmed payment protections", () => {
+  it("rejects edits to a confirmed payment", async () => {
+    const app = mountRoute("/api/payments", paymentsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "PATCH",
+      "/api/payments/payment-1",
+      new Map([["FROM payments", [paymentRow({ status: "confirmed" })]]]),
+      { permissions: ["write_payments"], body: { amount: 100000 } },
+    );
+    expect(res.status).toBe(409);
+  });
+
+  it("creates a linked confirmed adjustment with a mandatory reason", async () => {
+    const app = mountRoute("/api/payments", paymentsRoutes);
+    const adjusted = paymentRow({ id: "adjustment-1", amount: -50000, status: "confirmed", original_payment_id: "payment-1", adjustment_reason: "Nhập dư" });
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/payments/payment-1/adjust",
+      new Map<string, unknown[]>([
+        ["FROM tenant_settings", []],
+        ["INSERT INTO payment_code_counters", [{ last_seq: 2 }]],
+        ["FROM payments WHERE code =", []],
+        ["FROM payments", (_sql, callIndex) => callIndex === 0 ? [paymentRow({ status: "confirmed" })] : [adjusted]],
+      ]),
+      { permissions: ["write_payments"], body: { amount: -50000, reason: "Nhập dư" } },
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { status: string; original_payment_id: string; amount: number };
+    expect(body.status).toBe("confirmed");
+    expect(body.original_payment_id).toBe("payment-1");
+    expect(body.amount).toBe(-50000);
+  });
+
+  it("requires a reason for an adjustment", async () => {
+    const app = mountRoute("/api/payments", paymentsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/payments/payment-1/adjust",
+      new Map(),
+      { permissions: ["write_payments"], body: { amount: -50000 } },
+    );
+    expect(res.status).toBe(400);
   });
 });

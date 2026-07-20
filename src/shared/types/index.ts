@@ -348,7 +348,24 @@ export interface Payment {
   reference?: string; // bank txn ref / receipt number
   notes?: string;
   code: string;       // immutable human-readable code, e.g. "TT-20260713-0001"
+  /** Set only for a correcting entry; the original payment is never overwritten. */
+  original_payment_id?: string;
+  adjustment_reason?: string;
   created_at: string;
+}
+
+export type PaymentAttachmentKind = "transfer_receipt" | "receipt" | "invoice" | "other";
+
+export interface PaymentAttachment {
+  id: string;
+  tenant_id: string;
+  payment_id: string;
+  file_id: string;
+  kind: PaymentAttachmentKind;
+  description?: string;
+  created_by: string;
+  created_at: string;
+  file: FileObject;
 }
 
 // ───────────────────────── Files & Audit ─────────────────────────

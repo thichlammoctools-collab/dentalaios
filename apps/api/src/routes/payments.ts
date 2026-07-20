@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { paymentCreateSchema, paymentUpdateSchema } from "@shared/validation";
+import { z } from "zod";
+import { paymentAdjustmentSchema, paymentAttachmentCreateSchema, paymentCreateSchema, paymentUpdateSchema } from "@shared/validation";
 import { PERMISSIONS } from "@shared/constants";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
@@ -8,6 +9,7 @@ import { requirePermission } from "../middleware/rbac";
 import { auditLog } from "../middleware/audit";
 import type { AuthContext } from "../middleware/auth";
 import { paymentService } from "../services/payment.service";
+import { filesService } from "../services/files.service";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -65,6 +67,62 @@ router.patch(
     const patch = c.req.valid("json");
     const updated = await paymentService.update(c.env.DB, jwt.tenant_id, c.req.param("id"), patch);
     return c.json(updated);
+  },
+);
+
+// POST /api/payments/:id/adjust — append a confirmed correcting entry; never overwrite a confirmed payment.
+router.post(
+  "/:id/adjust",
+  requirePermission(PERMISSIONS.WRITE_PAYMENTS),
+  auditLog("adjust", "payment"),
+  zValidator("json", paymentAdjustmentSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const adjusted = await paymentService.adjust(c.env.DB, jwt.tenant_id, c.req.param("id"), c.req.valid("json"));
+    return c.json(adjusted, 201);
+  },
+);
+
+router.get(
+  "/:id/attachments",
+  requirePermission(PERMISSIONS.WRITE_PAYMENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    return c.json({ items: await paymentService.listAttachments(c.env.DB, jwt.tenant_id, c.req.param("id")) });
+  },
+);
+
+const paymentProofPresignSchema = z.object({
+  filename: z.string().trim().min(1).max(200),
+  content_type: z.string().min(1).max(100).refine((value) => value.startsWith("image/") || value === "application/pdf", "Chỉ hỗ trợ ảnh hoặc PDF"),
+  size: z.number().int().positive().max(20 * 1024 * 1024),
+});
+
+// POST /api/payments/:id/attachments/presign — upload proof to a payment-scoped private key.
+router.post(
+  "/:id/attachments/presign",
+  requirePermission(PERMISSIONS.WRITE_PAYMENTS),
+  zValidator("json", paymentProofPresignSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    await paymentService.get(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    const input = c.req.valid("json");
+    return c.json(await filesService.presign(c.env, jwt.tenant_id, { ...input, prefix: "payments" }, {
+      db: c.env.DB,
+      userId: jwt.sub,
+    }), 200);
+  },
+);
+
+router.post(
+  "/:id/attachments",
+  requirePermission(PERMISSIONS.WRITE_PAYMENTS),
+  auditLog("attach_proof", "payment", { entityIdFrom: (body) => typeof body === "object" && body !== null && "payment_id" in body ? String(body.payment_id) : undefined }),
+  zValidator("json", paymentAttachmentCreateSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const attachment = await paymentService.addAttachment(c.env.DB, jwt.tenant_id, c.req.param("id"), c.req.valid("json"), jwt.sub);
+    return c.json(attachment, 201);
   },
 );
 

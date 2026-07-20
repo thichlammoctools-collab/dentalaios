@@ -82,6 +82,22 @@ router.post(
     return c.json(item, 201);
   },
 );
+router.post(
+  "/procedures/backfill",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.PROCEDURES_WRITE),
+  requireRecentPlatformMfa(),
+  async (c) => {
+    const imported = await createProcedureCatalogRepository(c.env.DB).backfillExisting();
+    await platformAudit(c.env.DB, {
+      ...actor(c),
+      action: "procedure.backfilled",
+      entity_type: "procedure_catalog",
+      entity_id: "existing-procedures",
+      details: { imported },
+    });
+    return c.json({ imported });
+  },
+);
 router.patch(
   "/procedures/:code",
   requirePlatformPermission(PLATFORM_PERMISSIONS.PROCEDURES_WRITE),

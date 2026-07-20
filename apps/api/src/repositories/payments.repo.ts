@@ -6,6 +6,10 @@ export interface PaymentsRepository {
   list(tenantId: string, opts?: { patientId?: string; treatmentPlanId?: string; status?: Payment["status"] }): Promise<Payment[]>;
   getById(tenantId: string, id: string): Promise<Payment | null>;
   create(tenantId: string, data: Omit<Payment, "id" | "tenant_id" | "created_at" | "status">): Promise<Payment>;
+  createAdjustment(
+    tenantId: string,
+    data: Omit<Payment, "id" | "tenant_id" | "created_at" | "status"> & { original_payment_id: string; adjustment_reason: string },
+  ): Promise<Payment>;
   updateStatus(tenantId: string, id: string, status: Payment["status"]): Promise<Payment | null>;
   /**
    * Patch a subset of editable fields (amount, method, reference, notes).
@@ -83,6 +87,35 @@ export function createPaymentsRepository(db: D1Database): PaymentsRepository {
       return created;
     },
 
+    async createAdjustment(tenantId, data) {
+      const id = crypto.randomUUID();
+      await db
+        .prepare(
+          `INSERT INTO payments
+             (id, tenant_id, treatment_plan_id, patient_id, amount, currency,
+              method, reference, notes, code, status, original_payment_id, adjustment_reason)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`,
+        )
+        .bind(
+          id,
+          tenantId,
+          data.treatment_plan_id,
+          data.patient_id,
+          data.amount,
+          data.currency,
+          data.method,
+          data.reference ?? null,
+          data.notes ?? null,
+          data.code,
+          data.original_payment_id,
+          data.adjustment_reason,
+        )
+        .run();
+      const created = await this.getById(tenantId, id);
+      if (!created) throw new Error("Insert succeeded but read failed");
+      return created;
+    },
+
     async updateStatus(tenantId, id, status) {
       await db
         .prepare("UPDATE payments SET status = ? WHERE tenant_id = ? AND id = ?")
@@ -139,6 +172,8 @@ function mapPayment(row: D1Row): Payment {
     reference: (row.reference as string | null) ?? undefined,
     notes: (row.notes as string | null) ?? undefined,
     code: row.code as string,
+    original_payment_id: (row.original_payment_id as string | null) ?? undefined,
+    adjustment_reason: (row.adjustment_reason as string | null) ?? undefined,
     created_at: row.created_at as string,
   };
 }
