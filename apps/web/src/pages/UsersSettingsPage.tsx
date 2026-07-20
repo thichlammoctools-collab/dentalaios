@@ -10,6 +10,7 @@ import type { Branch, Role, User } from "@shared/types";
 import { getRoleLabel } from "@shared/constants";
 import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/pagination";
 
 interface EditForm {
   name: string;
@@ -29,6 +30,8 @@ export function UsersSettingsPage() {
   const [editUser, setEditUser] = useState<User | null>(null);
   const [editForm, setEditForm] = useState<EditForm>({ name: "", role_id: "", branch_id: "", is_active: true });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [page, setPage] = useState(1);
+  const visibleMembers = members.slice((page - 1) * DEFAULT_PAGE_SIZE, page * DEFAULT_PAGE_SIZE);
 
   useEffect(() => {
     loadAll();
@@ -42,6 +45,7 @@ export function UsersSettingsPage() {
         apiGet<{ branches: Branch[] }>("/api/clinic"),
       ]);
       setMembers(usersRes.items);
+      setPage((current) => Math.min(current, Math.max(1, Math.ceil(usersRes.items.length / DEFAULT_PAGE_SIZE))));
       setRoles(rolesRes.items);
       setBranches(clinicRes.branches);
     } catch {
@@ -238,7 +242,7 @@ export function UsersSettingsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {members.map((u) => (
+                {visibleMembers.map((u) => (
                   <tr key={u.id} className="hover:bg-accent/50 transition-colors">
                     <td className="px-4 py-3 text-sm font-medium text-foreground"><div className="flex items-center gap-2"><ProfileAvatar subject="users" entityId={u.id} name={u.name} avatarFileId={u.avatar_file_id} size="sm" />{u.name}</div></td>
                     <td className="px-4 py-3 text-sm text-muted-foreground font-mono">{u.email}</td>
@@ -268,6 +272,7 @@ export function UsersSettingsPage() {
               </tbody>
             </table>
           </div>
+          <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={members.length} onPageChange={setPage} />
         </div>
       )}
 

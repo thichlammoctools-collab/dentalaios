@@ -146,8 +146,9 @@ export function PatientsPage() {
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
+            <>
+              <div className="overflow-x-auto">
+                <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Họ tên</TableHead>
@@ -227,9 +228,10 @@ export function PatientsPage() {
                     ))
                   )}
                 </TableBody>
-              </Table>
-            </div>
-            <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={total} disabled={loading} onPageChange={setPage} />
+                </Table>
+              </div>
+              <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={total} disabled={loading} onPageChange={setPage} />
+            </>
           )}
         </CardContent>
       </Card>

@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/auth-context";
 import { toast } from "@/lib/toast";
 import { PERMISSIONS, ROUTES } from "@shared/constants";
 import type { ChairOperationalStatus, DentalChair, DentalChairType, DentalRoom } from "@shared/types";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/pagination";
 
 interface ChairsResponse {
   items: DentalChair[];
@@ -88,11 +89,13 @@ export function ChairSettingsPage() {
   const [roomDialogOpen, setRoomDialogOpen] = useState(false);
   const [roomName, setRoomName] = useState("");
   const [savingRoom, setSavingRoom] = useState(false);
+  const [page, setPage] = useState(1);
   const canManage = Boolean(
     session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.MANAGE_USERS),
   );
 
   const branchId = session?.branch?.id;
+  const visibleChairs = chairs.slice((page - 1) * DEFAULT_PAGE_SIZE, page * DEFAULT_PAGE_SIZE);
 
   useEffect(() => {
     if (!branchId) return;
@@ -108,6 +111,7 @@ export function ChairSettingsPage() {
         apiGet<RoomsResponse>(`/api/chairs/rooms?branch_id=${encodeURIComponent(branchId)}`),
       ]);
       setChairs(chairsResponse.items);
+      setPage((current) => Math.min(current, Math.max(1, Math.ceil(chairsResponse.items.length / DEFAULT_PAGE_SIZE))));
       setRooms(roomsResponse.items);
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Không thể tải danh sách ghế nha");
@@ -241,7 +245,7 @@ export function ChairSettingsPage() {
                 <tr><th className="px-5 py-3 font-medium">Ghế</th><th className="px-4 py-3 font-medium">Phòng / loại</th><th className="px-4 py-3 font-medium">Chuẩn bị</th><th className="px-4 py-3 font-medium">Trạng thái</th><th className="px-4 py-3 font-medium">Hoạt động</th><th className="px-5 py-3 text-right font-medium">Thao tác</th></tr>
               </thead>
               <tbody className="divide-y">
-                {chairs.map((chair) => (
+                {visibleChairs.map((chair) => (
                   <tr key={chair.id}>
                     <td className="px-5 py-4"><div className="flex items-center gap-3"><span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: chair.color ?? "#2563EB" }} /><div><p className="font-medium">{chair.name}</p><p className="font-mono text-xs text-muted-foreground">{chair.code}</p></div></div></td>
                     <td className="px-4 py-4"><p>{chair.room_name ?? "Chưa gán phòng"}</p><p className="text-xs text-muted-foreground">{CHAIR_TYPES.find((type) => type.value === chair.chair_type)?.label}</p></td>
@@ -254,6 +258,7 @@ export function ChairSettingsPage() {
               </tbody>
             </table>
           </CardContent>
+          <CardContent className="pt-4"><Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={chairs.length} onPageChange={setPage} /></CardContent>
         </Card>
       )}
 

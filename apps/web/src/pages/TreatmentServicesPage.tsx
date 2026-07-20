@@ -6,6 +6,7 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Dialog, DialogBody, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { ProcedureCatalogItem, TreatmentService } from "@shared/types";
 import { PERMISSIONS } from "@shared/constants";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/pagination";
 
 const EMPTY_SERVICE = {
   code: "",
@@ -25,6 +26,8 @@ export function TreatmentServicesPage() {
   const [editingCode, setEditingCode] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [removingCode, setRemovingCode] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const visibleServices = services.slice((page - 1) * DEFAULT_PAGE_SIZE, page * DEFAULT_PAGE_SIZE);
   const isAdmin = Boolean(
     session?.role.permissions.includes(PERMISSIONS.ALL) ||
       session?.role.permissions.includes(PERMISSIONS.MANAGE_USERS),
@@ -42,6 +45,7 @@ export function TreatmentServicesPage() {
         apiGet<{ items: ProcedureCatalogItem[] }>("/api/clinic/procedures"),
       ]);
       setServices(servicesResponse.items);
+      setPage((current) => Math.min(current, Math.max(1, Math.ceil(servicesResponse.items.length / DEFAULT_PAGE_SIZE))));
       setProcedures(proceduresResponse.items);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi tải dịch vụ điều trị");
@@ -146,7 +150,7 @@ export function TreatmentServicesPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {services.map((service) => (
+              {visibleServices.map((service) => (
                 <tr key={service.code}>
                   <td className="px-4 py-3 font-mono text-xs">{service.code}</td>
                   <td className="px-4 py-3 font-medium">{service.name}</td>
@@ -167,6 +171,7 @@ export function TreatmentServicesPage() {
           </table>
         )}
       </div>
+      <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={services.length} onPageChange={setPage} />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogHeader>

@@ -19,6 +19,7 @@ import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
 import type { Role } from "@shared/types";
 import { getRoleLabel } from "@shared/constants";
+import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/pagination";
 
 export function RolesSettingsPage() {
   const [roles, setRoles] = useState<Role[]>([]);
@@ -27,10 +28,13 @@ export function RolesSettingsPage() {
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  const [page, setPage] = useState(1);
+  const visibleRoles = roles.slice((page - 1) * DEFAULT_PAGE_SIZE, page * DEFAULT_PAGE_SIZE);
 
   async function loadRoles() {
     const data = await apiGet<{ items: Role[]; total: number }>("/api/roles");
     setRoles(data.items);
+    setPage((current) => Math.min(current, Math.max(1, Math.ceil(data.items.length / DEFAULT_PAGE_SIZE))));
   }
 
   useEffect(() => {
@@ -84,7 +88,7 @@ export function RolesSettingsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {roles.map((r) => (
+                {visibleRoles.map((r) => (
                 <TableRow key={r.id}>
                   <TableCell className="font-medium">{getRoleLabel(r.name)}</TableCell>
                   <TableCell className="text-muted-foreground">{r.description ?? "—"}</TableCell>
@@ -105,6 +109,7 @@ export function RolesSettingsPage() {
               )}
             </TableBody>
           </Table>
+          <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={roles.length} onPageChange={setPage} />
         </CardContent>
       </Card>
 
