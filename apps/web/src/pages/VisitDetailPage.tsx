@@ -25,7 +25,9 @@ interface SummarizeResult {
 
 interface EditableItem {
   id: string;
-  tooth: number;
+  tooth: number | null;
+  service_code?: string;
+  service_name?: string;
   procedure: string;
   description: string;
   cost: number;
@@ -421,6 +423,8 @@ export function VisitDetailPage() {
       setEditableItems(result.items.map((item, idx) => ({
         id: `temp-${idx}`,
         tooth: item.tooth,
+        service_code: item.service_code,
+        service_name: item.service_name,
         procedure: item.procedure,
         description: item.description,
         cost: item.cost,
@@ -446,6 +450,7 @@ export function VisitDetailPage() {
       for (const item of editableItems) {
         await apiPost(`/api/treatment-plans/${plan.id}/items`, {
           tooth_number: item.tooth,
+          service_code: item.service_code,
           procedure: item.procedure,
           description: item.description,
           unit_cost: item.cost,
@@ -464,7 +469,7 @@ export function VisitDetailPage() {
   function addItem() {
     setEditableItems((prev) => [
       ...prev,
-      { id: `temp-${Date.now()}`, tooth: 0, procedure: "examination", description: "", cost: 0 },
+        { id: `temp-${Date.now()}`, tooth: null, procedure: "examination", description: "", cost: 0 },
     ]);
   }
 
@@ -472,7 +477,7 @@ export function VisitDetailPage() {
     setEditableItems((prev) => prev.filter((i) => i.id !== id));
   }
 
-  function updateItem(id: string, field: keyof EditableItem, value: string | number) {
+  function updateItem(id: string, field: keyof EditableItem, value: string | number | null) {
     setEditableItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
     );
@@ -797,13 +802,14 @@ export function VisitDetailPage() {
                             <td className="px-3 py-2">
                               <Input
                                 type="number"
-                                value={item.tooth || ""}
-                                onChange={(e) => updateItem(item.id, "tooth", Number(e.target.value))}
+                                value={item.tooth ?? ""}
+                                onChange={(e) => updateItem(item.id, "tooth", e.target.value ? Number(e.target.value) : null)}
                                 className="h-8 w-14 text-center border-slate-200 dark:border-zinc-700 dark:bg-zinc-800 text-sm font-bold"
                                 min={1} max={88}
                               />
                             </td>
                             <td className="px-3 py-2">
+                              {item.service_code && <p className="mb-1 text-[10px] font-semibold text-teal-600 dark:text-teal-400">{item.service_code} · {item.service_name}</p>}
                               <select
                                 value={item.procedure}
                                 onChange={(e) => updateItem(item.id, "procedure", e.target.value)}

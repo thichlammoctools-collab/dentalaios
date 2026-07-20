@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { planCreateSchema, planItemCreateSchema } from "@shared/validation";
+import { planCreateSchema, planItemCreateSchema, planItemUpdateSchema } from "@shared/validation";
 import { PERMISSIONS } from "@shared/constants";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
@@ -75,6 +75,25 @@ router.post(
     const data = c.req.valid("json");
     const created = await planService.addItem(c.env.DB, jwt.tenant_id, c.req.param("id"), data);
     return c.json(created, 201);
+  },
+);
+
+// PATCH /api/treatment-plans/:id/items/:itemId
+router.patch(
+  "/:id/items/:itemId",
+  requirePermission(PERMISSIONS.WRITE_PLANS),
+  auditLog("update", "treatment_plan_item"),
+  zValidator("json", planItemUpdateSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const updated = await planService.updateItem(
+      c.env.DB,
+      jwt.tenant_id,
+      c.req.param("id"),
+      c.req.param("itemId"),
+      c.req.valid("json"),
+    );
+    return c.json(updated, 200);
   },
 );
 

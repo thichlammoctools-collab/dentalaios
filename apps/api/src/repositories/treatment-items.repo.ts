@@ -9,6 +9,11 @@ export interface TreatmentItemsRepository {
     planId: string,
     data: Omit<TreatmentPlanItem, "id" | "tenant_id" | "treatment_plan_id" | "status" | "created_at">,
   ): Promise<TreatmentPlanItem>;
+  update(
+    tenantId: string,
+    id: string,
+    data: Omit<TreatmentPlanItem, "id" | "tenant_id" | "treatment_plan_id" | "status" | "created_at">,
+  ): Promise<TreatmentPlanItem | null>;
   delete(tenantId: string, id: string): Promise<boolean>;
 }
 
@@ -76,6 +81,59 @@ export function createTreatmentItemsRepository(db: D1Database): TreatmentItemsRe
         .first()) as D1Row | null;
       if (!row) throw new Error("Insert succeeded but read failed");
       return mapItem(row);
+    },
+
+    async update(tenantId, id, data) {
+      const itemUpdate = db
+        .prepare(
+          `UPDATE treatment_plan_items
+           SET tooth_number = ?, procedure = ?, description = ?, unit_cost = ?
+           WHERE tenant_id = ? AND id = ?`,
+        )
+        .bind(
+          data.tooth_number ?? null,
+          data.procedure,
+          data.description,
+          data.unit_cost,
+          tenantId,
+          id,
+        );
+      const snapshotUpdate = db
+        .prepare(
+          `INSERT INTO treatment_plan_item_price_snapshots
+             (treatment_plan_item_id, tenant_id, service_code, service_name, price_includes_vat, price_snapshot_at)
+           VALUES (?, ?, ?, ?, ?, datetime('now'))
+           ON CONFLICT(treatment_plan_item_id) DO UPDATE SET
+             tenant_id = excluded.tenant_id,
+             service_code = excluded.service_code,
+             service_name = excluded.service_name,
+             price_includes_vat = excluded.price_includes_vat,
+             price_snapshot_at = excluded.price_snapshot_at`,
+        )
+        .bind(
+          id,
+          tenantId,
+          data.service_code ?? null,
+          data.service_name ?? null,
+          data.price_includes_vat ? 1 : 0,
+        );
+      await db.batch([itemUpdate, snapshotUpdate]);
+      const row = (await db
+        .prepare(
+          `SELECT treatment_plan_items.*,
+                  price_snapshot.service_code AS snapshot_service_code,
+                  price_snapshot.service_name AS snapshot_service_name,
+                  price_snapshot.price_includes_vat AS snapshot_price_includes_vat,
+                  price_snapshot.price_snapshot_at AS snapshot_price_snapshot_at
+           FROM treatment_plan_items
+           LEFT JOIN treatment_plan_item_price_snapshots AS price_snapshot
+             ON price_snapshot.tenant_id = treatment_plan_items.tenant_id
+            AND price_snapshot.treatment_plan_item_id = treatment_plan_items.id
+           WHERE treatment_plan_items.tenant_id = ? AND treatment_plan_items.id = ? LIMIT 1`,
+        )
+        .bind(tenantId, id)
+        .first()) as D1Row | null;
+      return row ? mapItem(row) : null;
     },
 
     async delete(tenantId, id) {

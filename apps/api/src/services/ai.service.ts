@@ -11,6 +11,7 @@ import { createFindingsRepository } from "../repositories/findings.repo";
 import { createTreatmentPlansRepository } from "../repositories/treatment-plans.repo";
 import { createTreatmentItemsRepository } from "../repositories/treatment-items.repo";
 import { createPatientsRepository } from "../repositories/patients.repo";
+import { createTreatmentServicesRepository } from "../repositories/treatment-service-prices.repo";
 import { NotFoundError } from "../lib/errors";
 
 export interface SummarizeResult {
@@ -21,6 +22,8 @@ export interface SummarizeResult {
 
 export interface TreatmentPlanItemDraft {
   tooth: number | null;
+  service_code?: string;
+  service_name?: string;
   procedure: string;
   description: string;
   cost: number;
@@ -131,12 +134,17 @@ export const aiService = {
     const visitsRepo = createVisitsRepository(db);
     const findingsRepo = createFindingsRepository(db);
     const patientsRepo = createPatientsRepository(db);
+    const treatmentServicesRepo = createTreatmentServicesRepository(db);
 
     const visit = await visitsRepo.getById(tenantId, visitId);
     if (!visit) throw new NotFoundError("Visit not found");
 
     const patient = await patientsRepo.getById(tenantId, visit.patient_id);
-    const findings = await findingsRepo.listByVisit(tenantId, visitId);
+    const [findings, services] = await Promise.all([
+      findingsRepo.listByVisit(tenantId, visitId),
+      treatmentServicesRepo.list(tenantId),
+    ]);
+    const activeServices = services.filter((service) => service.is_active);
 
     const patientInfo = patient
       ? `${patient.name}, ${patient.gender === "M" ? "Nam" : patient.gender === "F" ? "Nữ" : "Khác"}, sinh ${patient.date_of_birth}`
@@ -148,6 +156,12 @@ export const aiService = {
         }).join("\n")
       : "  (không có clinical findings)";
 
+    const catalogText = activeServices.length
+      ? activeServices.map((service) =>
+          `- ${service.code} | ${service.name} | thủ thuật=${service.procedure} | giá=${service.price} VND`,
+        ).join("\n")
+      : "(Phòng khám chưa cấu hình danh mục dịch vụ đang hoạt động.)";
+
     const prompt = `Bạn là bác sĩ nha khoa giàu kinh nghiệm. Dựa trên thông tin bệnh nhân và clinical findings, hãy đề xuất kế hoạch điều trị chi tiết.
 
 THÔNG TIN BỆNH NHÂN: ${patientInfo}
@@ -156,14 +170,18 @@ NGÀY KHÁM: ${new Date(visit.date).toLocaleDateString("vi-VN")}
 CLINICAL FINDINGS:
 ${findingsText}
 
+DANH MỤC DỊCH VỤ ĐIỀU TRỊ ĐANG HOẠT ĐỘNG CỦA PHÒNG KHÁM:
+${catalogText}
+
 Hãy trả lời CHÍNH XÁC theo format JSON bên dưới (KHÔNG thêm text gì khác ngoài JSON):
 {
   "items": [
     {
       "tooth": <số răng FDI, hoặc null nếu là thủ thuật toàn hàm (scaling, tẩy trắng toàn hàm)>,
-      "procedure": "<một trong: examination, filling, root_canal, extraction, crown, scaling, implant, bridge, veneer, fluoride, other>",
+      "service_code": "<MÃ dịch vụ chính xác trong danh mục phía trên, hoặc null nếu danh mục trống>",
+      "procedure": "<thủ thuật của dịch vụ đã chọn>",
       "description": "<mô tả ngắn gọn điều trị bằng tiếng Việt, 10-30 từ>",
-      "cost": <chi phí ước tính VND, chỉ là số nguyên, không có dấu phẩy>
+      "cost": <đúng đơn giá VND của dịch vụ đã chọn, chỉ là số nguyên, không có dấu phẩy>
     }
   ],
   "notes": "<ghi chú tổng quát cho bác sĩ bằng tiếng Việt, 1-2 câu hoặc empty string>"
@@ -174,7 +192,8 @@ QUY TẮC QUAN TRỌNG:
 - Mỗi finding chỉ cần 1 item điều trị chính
 - Finding "toàn hàm" → tooth = null, procedure phù hợp (scaling, fluoride…)
 - Finding "mô mềm" → tooth = null, procedure = examination hoặc treatment phù hợp
-- Chi phí tham khảo (VND): examination=200000, filling=500000-2000000 tùy loại, root_canal=3000000-6000000, extraction=500000-1500000, crown=5000000-15000000, scaling=300000-800000, implant=15000000-30000000, bridge=8000000-20000000
+- Khi danh mục có dịch vụ: CHỈ chọn service_code có trong danh mục, giữ nguyên procedure và cost tương ứng. Không tự tạo mã hoặc giá mới.
+- Khi danh mục trống: service_code = null và có thể dùng chi phí tham khảo.
 - Không bào chữa, chỉ trả JSON thuần túy`;
 
     // Try Cloudflare AI
@@ -192,7 +211,7 @@ QUY TẮC QUAN TRỌNG:
           },
         );
         const raw = (result as { response?: string }).response || "{}";
-        const parsed = parseAiPlanResponse(raw);
+        const parsed = parseAiPlanResponse(raw, activeServices);
         if (parsed) {
           return { ...parsed, ai_model: "llama-4-scout-17b", generated_at: new Date().toISOString() };
         }
@@ -202,7 +221,7 @@ QUY TẮC QUAN TRỌNG:
     }
 
     // Fallback: rule-based plan
-    return buildFallbackPlan(findings, visit, patient);
+    return buildFallbackPlan(findings, visit, patient, activeServices);
   },
 
   // ─── Analyze Image ─────────────────────────────────────────────
@@ -516,19 +535,31 @@ function buildStructuredSummary(data: SummaryData): string {
   return lines.join("\n");
 }
 
-function parseAiPlanResponse(raw: string): GeneratePlanResult | null {
+function parseAiPlanResponse(
+  raw: string,
+  services: Awaited<ReturnType<ReturnType<typeof createTreatmentServicesRepository>["list"]>>,
+): GeneratePlanResult | null {
   try {
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
     const parsed = JSON.parse(jsonMatch[0]);
     if (!Array.isArray(parsed.items)) return null;
     return {
-      items: parsed.items.map((item: Record<string, unknown>) => ({
-        tooth: item.tooth == null ? null : (Number(item.tooth) || 0),
-        procedure: String(item.procedure || "other"),
-        description: String(item.description || ""),
-        cost: Number(item.cost) || 0,
-      })),
+      items: parsed.items.flatMap((item: Record<string, unknown>) => {
+        const requestedCode = typeof item.service_code === "string" ? item.service_code : "";
+        const requestedProcedure = String(item.procedure || "other");
+        const service = services.find((candidate) => candidate.code === requestedCode)
+          ?? services.find((candidate) => candidate.procedure === requestedProcedure);
+        if (services.length > 0 && !service) return [];
+        return [{
+          tooth: item.tooth == null ? null : (Number(item.tooth) || 0),
+          service_code: service?.code,
+          service_name: service?.name,
+          procedure: service?.procedure ?? requestedProcedure,
+          description: String(item.description || ""),
+          cost: service?.price ?? (Number(item.cost) || 0),
+        }];
+      }),
       notes: String(parsed.notes || ""),
       ai_model: "llama-4-scout-17b",
       generated_at: new Date().toISOString(),
@@ -624,22 +655,27 @@ function buildFallbackPlan(
   findings: Awaited<ReturnType<ReturnType<typeof createFindingsRepository>["listByVisit"]>>,
   visit: Awaited<ReturnType<ReturnType<typeof createVisitsRepository>["getById"]>>,
   patient: Awaited<ReturnType<ReturnType<typeof createPatientsRepository>["getById"]>>,
+  services: Awaited<ReturnType<ReturnType<typeof createTreatmentServicesRepository>["list"]>>,
 ): GeneratePlanResult {
-  const items: TreatmentPlanItemDraft[] = findings.map((f) => {
+  const items: TreatmentPlanItemDraft[] = findings.flatMap((f) => {
     const found = PROCEDURE_MAP[f.condition];
     const procedure = found?.procedure || "examination";
+    const service = services.find((candidate) => candidate.procedure === procedure);
+    if (services.length > 0 && !service) return [];
     const label = PROCEDURE_LABELS[procedure] || "Điều trị";
     const loc = f.scope === "tooth" && f.tooth_number != null
       ? `răng ${f.tooth_number}`
       : f.scope === "full_mouth"
         ? "toàn hàm"
         : `mô mềm (${f.area ?? f.scope})`;
-    return {
+    return [{
       tooth: f.tooth_number ?? null,
-      procedure,
+      service_code: service?.code,
+      service_name: service?.name,
+      procedure: service?.procedure ?? procedure,
       description: `${label} ${loc}${f.notes ? ` — ${f.notes}` : ""}`,
-      cost: found?.cost || 200000,
-    };
+      cost: service?.price ?? found?.cost ?? 200000,
+    }];
   });
 
   const patientName = patient?.name || "bệnh nhân";

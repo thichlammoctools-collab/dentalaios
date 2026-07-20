@@ -10,7 +10,8 @@ const visitRow = (overrides: Record<string, unknown> = {}) => ({
   id: "visit-1",
   tenant_id: "test-tenant",
   patient_id: "patient-1",
-  branch_id: "test-branch",
+    branch_id: "test-branch",
+    branch_name: "Chi nhánh Trung tâm",
   clinician_id: "test-user",
   date: "2026-01-01T10:00:00Z",
   status: "in_progress",
@@ -29,8 +30,9 @@ describe("GET /api/visits", () => {
       new Map([["FROM visits", [visitRow(), visitRow({ id: "visit-2" })]]]),
     );
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { items: { id: string }[] };
+    const body = (await res.json()) as { items: { id: string; branch_name?: string }[] };
     expect(body.items).toHaveLength(2);
+    expect(body.items[0].branch_name).toBe("Chi nhánh Trung tâm");
   });
 });
 

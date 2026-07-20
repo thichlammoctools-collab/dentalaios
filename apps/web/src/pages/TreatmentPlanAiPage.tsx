@@ -44,6 +44,7 @@ export function TreatmentPlanAiPage() {
       for (const item of items) {
         await apiPost(`/api/treatment-plans/${plan.id}/items`, {
           tooth_number: item.tooth,
+          service_code: item.service_code,
           procedure: item.procedure,
           description: item.description,
           unit_cost: item.cost,
@@ -143,7 +144,7 @@ export function TreatmentPlanAiPage() {
             <p className="font-medium">💡 Lưu ý:</p>
             <ul className="list-disc list-inside space-y-1 ml-2">
               <li>AI phân tích dựa trên clinical findings từ lượt khám</li>
-              <li>Chi phí là ước tính tham khảo, có thể điều chỉnh sau khi thêm</li>
+              <li>Gợi ý ưu tiên danh mục dịch vụ điều trị đang hoạt động và dùng đúng đơn giá của phòng khám</li>
               <li>Bạn có thể bỏ chọn các hạng mục không phù hợp trước khi áp dụng</li>
               <li>Sau khi áp dụng, bạn có thể xem và chỉnh sửa trong trang chi tiết kế hoạch</li>
             </ul>

@@ -40,8 +40,10 @@ export function createVisitsRepository(db: D1Database): VisitsRepository {
                     a.name AS assistant_name,
                     a.avatar_file_id AS assistant_avatar_file_id,
                     dc.name AS chair_name,
-                    dr.name AS chair_room_name
+                    dr.name AS chair_room_name,
+                    b.name AS branch_name
                    FROM visits v
+                   LEFT JOIN branches b ON b.id = v.branch_id AND b.tenant_id = v.tenant_id
                    LEFT JOIN users tc ON tc.id = v.treating_clinician_id
                    LEFT JOIN users a ON a.id = v.assistant_id
                    LEFT JOIN dental_chairs dc ON dc.id = v.chair_id AND dc.tenant_id = v.tenant_id
@@ -60,8 +62,10 @@ export function createVisitsRepository(db: D1Database): VisitsRepository {
                     a.name AS assistant_name,
                     a.avatar_file_id AS assistant_avatar_file_id,
                     dc.name AS chair_name,
-                    dr.name AS chair_room_name
+                    dr.name AS chair_room_name,
+                    b.name AS branch_name
                    FROM visits v
+                   LEFT JOIN branches b ON b.id = v.branch_id AND b.tenant_id = v.tenant_id
                    LEFT JOIN users tc ON tc.id = v.treating_clinician_id
                    LEFT JOIN users a ON a.id = v.assistant_id
                    LEFT JOIN dental_chairs dc ON dc.id = v.chair_id AND dc.tenant_id = v.tenant_id
@@ -76,8 +80,9 @@ export function createVisitsRepository(db: D1Database): VisitsRepository {
       const row = (await db
         .prepare(`SELECT v.*, tc.name AS treating_clinician_name, tc.avatar_file_id AS treating_clinician_avatar_file_id,
                     a.name AS assistant_name, a.avatar_file_id AS assistant_avatar_file_id,
-                    dc.name AS chair_name, dr.name AS chair_room_name
+                    dc.name AS chair_name, dr.name AS chair_room_name, b.name AS branch_name
                   FROM visits v
+                  LEFT JOIN branches b ON b.id = v.branch_id AND b.tenant_id = v.tenant_id
                   LEFT JOIN users tc ON tc.id = v.treating_clinician_id
                   LEFT JOIN users a ON a.id = v.assistant_id
                   LEFT JOIN dental_chairs dc ON dc.id = v.chair_id AND dc.tenant_id = v.tenant_id
@@ -154,6 +159,7 @@ function mapVisit(row: D1Row): Visit {
     tenant_id: row.tenant_id as string,
     patient_id: row.patient_id as string,
     branch_id: row.branch_id as string,
+    branch_name: (row.branch_name as string | null) ?? undefined,
     clinician_id: row.clinician_id as string,
     date: row.date as string,
     status: row.status as Visit["status"],

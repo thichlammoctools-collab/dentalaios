@@ -228,8 +228,12 @@ export const planItemCreateSchema = z.object({
   }
 });
 
+/** Editing a plan item replaces its clinical and pricing selection as one unit. */
+export const planItemUpdateSchema = planItemCreateSchema;
+
 export type PlanCreateInput = z.infer<typeof planCreateSchema>;
 export type PlanItemCreateInput = z.infer<typeof planItemCreateSchema>;
+export type PlanItemUpdateInput = z.infer<typeof planItemUpdateSchema>;
 
 export const treatmentServiceUpsertSchema = z.object({
   code: z.string().trim().min(2, "Mã dịch vụ tối thiểu 2 ký tự").max(40).regex(/^[A-Za-z0-9_-]+$/, "Mã dịch vụ chỉ gồm chữ, số, gạch ngang hoặc gạch dưới").transform((value) => value.toUpperCase()),

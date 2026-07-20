@@ -18,6 +18,7 @@ export function TreatmentPlanDetailPage() {
   const [items, setItems] = useState<TreatmentPlanItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [openForm, setOpenForm] = useState(false);
+  const [editingItem, setEditingItem] = useState<TreatmentPlanItem | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
 
@@ -240,8 +241,19 @@ export function TreatmentPlanDetailPage() {
                     <TableCell className="text-right">
                       {formatCurrency(item.unit_cost, plan.currency)}
                     </TableCell>
-                    {canEdit && (
-                      <TableCell>
+                     {canEdit && (
+                       <TableCell>
+                        <div className="flex items-center justify-end gap-2">
+                         <Button
+                           size="sm"
+                           variant="outline"
+                           onClick={() => {
+                             setEditingItem(item);
+                             setOpenForm(true);
+                           }}
+                         >
+                           Sửa
+                         </Button>
                         <Button
                           size="sm"
                           variant="destructive"
@@ -249,6 +261,7 @@ export function TreatmentPlanDetailPage() {
                         >
                           Xóa
                         </Button>
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
@@ -264,7 +277,7 @@ export function TreatmentPlanDetailPage() {
           <CardTitle>Thao tác</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
-          {canEdit && <Button onClick={() => setOpenForm(true)}>+ Thêm hạng mục</Button>}
+          {canEdit && <Button onClick={() => { setEditingItem(null); setOpenForm(true); }}>+ Thêm hạng mục</Button>}
           {canEdit && plan.visit_id && (
             <Button
               variant="outline"
@@ -308,7 +321,11 @@ export function TreatmentPlanDetailPage() {
         open={openForm}
         onOpenChange={setOpenForm}
         planId={plan.id}
-        onCreated={() => load()}
+        item={editingItem}
+        onCreated={() => {
+          setEditingItem(null);
+          void load();
+        }}
       />
     </div>
   );

@@ -90,6 +90,50 @@ const planItemRow = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+const treatmentServiceRow = (overrides: Record<string, unknown> = {}) => ({
+  id: "service-1",
+  tenant_id: "test-tenant",
+  code: "TRAM-01",
+  name: "Trám composite",
+  procedure: "filling",
+  price: 725000,
+  is_active: 1,
+  created_at: "2026-01-01",
+  updated_at: "2026-01-01",
+  ...overrides,
+});
+
+describe("POST /api/ai/generate-plan", () => {
+  it("uses the active tenant service catalog for fallback recommendations", async () => {
+    const app = mountRoute("/api/ai", aiRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/ai/generate-plan",
+      new Map([
+        ["FROM visits", [visitRow()]],
+        ["FROM clinical_findings", [findingRow({ condition: "caries" })]],
+        ["FROM patients", [patientRow()]],
+        ["FROM treatment_services", [treatmentServiceRow()]],
+      ]),
+      { body: { visit_id: "visit-1" } },
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      items: Array<{ service_code?: string; service_name?: string; procedure: string; cost: number }>;
+      ai_model: string;
+    };
+    expect(body.ai_model).toBe("structured-fallback");
+    expect(body.items[0]).toMatchObject({
+      service_code: "TRAM-01",
+      service_name: "Trám composite",
+      procedure: "filling",
+      cost: 725000,
+    });
+  });
+});
+
 describe("POST /api/ai/parse-appointment-chat", () => {
   it("returns 200 + parsed appointment from chat message", async () => {
     const app = mountRoute("/api/ai", aiRoutes);

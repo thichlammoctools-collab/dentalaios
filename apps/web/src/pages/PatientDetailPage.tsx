@@ -120,6 +120,22 @@ export function PatientDetailPage() {
   const totalPaid = payments
     .filter((p) => p.status === "confirmed")
     .reduce((sum, p) => sum + p.amount, 0);
+  const treatedBranches = [...new Map(
+    visits.map((visit) => [visit.branch_id, {
+      id: visit.branch_id,
+      name: visit.branch_name ?? visit.branch_id,
+      visitCount: 0,
+      latestVisitAt: visit.date,
+    }]),
+  ).values()];
+  for (const branch of treatedBranches) {
+    const branchVisits = visits.filter((visit) => visit.branch_id === branch.id);
+    branch.visitCount = branchVisits.length;
+    branch.latestVisitAt = branchVisits.reduce(
+      (latest, visit) => visit.date > latest ? visit.date : latest,
+      branchVisits[0]?.date ?? "",
+    );
+  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-6 py-6">
@@ -212,6 +228,22 @@ export function PatientDetailPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <div>
+                <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-2">Chi nhánh đã điều trị</p>
+                {treatedBranches.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">Chưa có lượt khám nào được ghi nhận.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {treatedBranches.map((branch) => (
+                      <Badge key={branch.id} variant="outline" className="gap-1.5 px-2.5 py-1.5 font-normal">
+                        <span className="font-medium">{branch.name}</span>
+                        <span className="text-muted-foreground">{branch.visitCount} lượt · gần nhất {formatDate(branch.latestVisitAt)}</span>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* ─── 2. Người nhà ─── */}

@@ -1,6 +1,6 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import type { TreatmentPlan, TreatmentPlanItem } from "@shared/types";
-import type { PlanCreateInput, PlanItemCreateInput } from "@shared/validation";
+import type { PlanCreateInput, PlanItemCreateInput, PlanItemUpdateInput } from "@shared/validation";
 import { createTreatmentPlansRepository } from "../repositories/treatment-plans.repo";
 import { createTreatmentItemsRepository } from "../repositories/treatment-items.repo";
 import { createTreatmentServicesRepository } from "../repositories/treatment-service-prices.repo";
@@ -88,6 +88,44 @@ export const planService = {
     const ok = await createTreatmentItemsRepository(db).delete(tenantId, itemId);
     if (ok) await createTreatmentPlansRepository(db).recomputeTotal(tenantId, planId);
     return ok;
+  },
+
+  async updateItem(
+    db: D1Database,
+    tenantId: string,
+    planId: string,
+    itemId: string,
+    data: PlanItemUpdateInput,
+  ): Promise<TreatmentPlanItem> {
+    const plans = createTreatmentPlansRepository(db);
+    const plan = await plans.getById(tenantId, planId);
+    if (!plan) throw new NotFoundError("Treatment plan not found");
+    if (plan.status !== "draft") {
+      throw new ValidationError("Chỉ có thể sửa item khi plan đang ở trạng thái draft");
+    }
+
+    const items = createTreatmentItemsRepository(db);
+    if (!((await items.listByPlan(tenantId, planId)).some((item) => item.id === itemId))) {
+      throw new NotFoundError("Treatment plan item not found");
+    }
+    const service = data.service_code
+      ? await createTreatmentServicesRepository(db).getActiveByCode(tenantId, data.service_code)
+      : null;
+    if (data.service_code && !service) {
+      throw new ValidationError("Mã dịch vụ không hợp lệ hoặc đã ngừng áp dụng");
+    }
+    const updated = await items.update(tenantId, itemId, {
+      tooth_number: data.tooth_number ?? undefined,
+      service_code: service?.code,
+      service_name: service?.name,
+      procedure: service?.procedure ?? data.procedure,
+      description: data.description,
+      unit_cost: service?.price ?? data.unit_cost,
+      price_includes_vat: true,
+    });
+    if (!updated) throw new NotFoundError("Treatment plan item not found");
+    await plans.recomputeTotal(tenantId, planId);
+    return updated;
   },
 
   async approve(db: D1Database, tenantId: string, planId: string): Promise<TreatmentPlan> {

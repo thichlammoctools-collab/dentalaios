@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { apiGet, apiPost, ApiError } from "@/lib/api";
+import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { isValidFdiTooth } from "@shared/constants";
 import type { TreatmentPlanItem, TreatmentService } from "@shared/types";
@@ -15,6 +15,7 @@ interface TreatmentPlanItemFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   planId: string;
+  item?: TreatmentPlanItem | null;
   onCreated: (item: TreatmentPlanItem) => void;
 }
 
@@ -22,6 +23,7 @@ export function TreatmentPlanItemForm({
   open,
   onOpenChange,
   planId,
+  item,
   onCreated,
 }: TreatmentPlanItemFormProps) {
   const [toothNumber, setToothNumber] = useState<number | "">("");
@@ -38,10 +40,16 @@ export function TreatmentPlanItemForm({
 
   useEffect(() => {
     if (!open) return;
+    setToothNumber(item?.tooth_number ?? "");
+    setProcedure(item?.procedure ?? "filling");
+    setDescription(item?.description ?? "");
+    setUnitCost(item?.unit_cost ?? "");
+    setServiceCode(item?.service_code ?? "");
+    setFullMouth(item?.tooth_number == null && Boolean(item));
     void apiGet<{ items: TreatmentService[] }>("/api/clinic/treatment-services")
       .then((response) => setServices(response.items.filter((service) => service.is_active)))
       .catch(() => setServices([]));
-  }, [open]);
+  }, [open, item]);
 
   function selectService(code: string) {
     setServiceCode(code);
@@ -63,17 +71,17 @@ export function TreatmentPlanItemForm({
     }
     setSaving(true);
     try {
-      const created = await apiPost<TreatmentPlanItem>(
-        `/api/treatment-plans/${planId}/items`,
-        {
-          tooth_number: fullMouth ? null : toothNumber,
-          procedure,
-          service_code: serviceCode || undefined,
-          description,
-          unit_cost: unitCost,
-        },
-      );
-      toast.success("Đã thêm hạng mục");
+      const payload = {
+        tooth_number: fullMouth ? null : toothNumber,
+        procedure,
+        service_code: serviceCode || undefined,
+        description,
+        unit_cost: unitCost,
+      };
+      const created = item
+        ? await apiPatch<TreatmentPlanItem>(`/api/treatment-plans/${planId}/items/${item.id}`, payload)
+        : await apiPost<TreatmentPlanItem>(`/api/treatment-plans/${planId}/items`, payload);
+      toast.success(item ? "Đã cập nhật hạng mục" : "Đã thêm hạng mục");
       onCreated(created);
       onOpenChange(false);
       setToothNumber("");
@@ -92,7 +100,7 @@ export function TreatmentPlanItemForm({
     <Dialog open={open} onOpenChange={onOpenChange} className="sm:max-w-2xl">
       <form onSubmit={onSubmit}>
         <DialogHeader>
-          <DialogTitle>Thêm hạng mục điều trị</DialogTitle>
+          <DialogTitle>{item ? "Sửa hạng mục điều trị" : "Thêm hạng mục điều trị"}</DialogTitle>
         </DialogHeader>
         <DialogBody className="grid gap-4">
 
@@ -209,7 +217,7 @@ export function TreatmentPlanItemForm({
             Hủy
           </Button>
           <Button type="submit" disabled={saving || !validTooth}>
-            {saving ? "Đang thêm…" : "Thêm hạng mục"}
+            {saving ? "Đang lưu…" : item ? "Lưu thay đổi" : "Thêm hạng mục"}
           </Button>
         </DialogFooter>
       </form>

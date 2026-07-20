@@ -213,6 +213,62 @@ describe("POST /api/treatment-plans/:id/items", () => {
   });
 });
 
+describe("PATCH /api/treatment-plans/:id/items/:itemId", () => {
+  it("updates a draft-plan item and returns the edited item", async () => {
+    const app = mountRoute("/api/treatment-plans", treatmentPlansRoutes);
+    const updated = itemRow({
+      id: "item-1",
+      tooth_number: 21,
+      procedure: "root_canal",
+      description: "Điều trị tủy răng 21",
+      unit_cost: 900000,
+    });
+    const res = await authedRequestWithDB(
+      app,
+      "PATCH",
+      "/api/treatment-plans/plan-1/items/item-1",
+      new Map([
+        ["FROM treatment_plans", [planRow()]],
+        ["WHERE treatment_plan_items.tenant_id = ? AND treatment_plan_items.id = ?", [updated]],
+        ["FROM treatment_plan_items", [itemRow({ id: "item-1" })]],
+        ["SELECT total_cost", [{ total_cost: 900000 }]],
+      ]),
+      {
+        body: {
+          tooth_number: 21,
+          procedure: "root_canal",
+          description: "Điều trị tủy răng 21",
+          unit_cost: 900000,
+        },
+      },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { id: string; tooth_number: number; unit_cost: number };
+    expect(body.id).toBe(updated.id);
+    expect(body.tooth_number).toBe(21);
+    expect(body.unit_cost).toBe(900000);
+  });
+
+  it("rejects an edit after the plan is approved", async () => {
+    const app = mountRoute("/api/treatment-plans", treatmentPlansRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "PATCH",
+      "/api/treatment-plans/plan-1/items/item-1",
+      new Map([["FROM treatment_plans", [planRow({ status: "approved" })]]]),
+      {
+        body: {
+          tooth_number: 21,
+          procedure: "root_canal",
+          description: "Điều trị tủy răng 21",
+          unit_cost: 900000,
+        },
+      },
+    );
+    expect(res.status).toBe(422);
+  });
+});
+
 describe("POST /api/treatment-plans/:id/approve", () => {
   it("approves a draft plan with items", async () => {
     const app = mountRoute("/api/treatment-plans", treatmentPlansRoutes);

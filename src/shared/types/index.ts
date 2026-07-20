@@ -125,6 +125,7 @@ export interface Visit {
   tenant_id: string;
   patient_id: string;
   branch_id: string;
+  branch_name?: string;
   clinician_id: string; // FK to User — bác sĩ khám
   date: string; // ISO datetime
   status: VisitStatus;
@@ -495,6 +496,8 @@ export interface VoiceFindingsResult {
 
 export interface GeneratePlanItemDraft {
   tooth: number | null; // null = full-mouth procedure
+  service_code?: string;
+  service_name?: string;
   procedure: string;
   description: string;
   cost: number;

@@ -9,6 +9,8 @@ import { formatCurrency } from "@/lib/utils";
 
 export interface TreatmentPlanItemDraft {
   tooth: number | null;
+  service_code?: string;
+  service_name?: string;
   procedure: string;
   description: string;
   cost: number;
@@ -160,7 +162,10 @@ export function AiTreatmentPlanSuggest({ visitId, onApply }: AiTreatmentPlanSugg
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{item.procedure}</Badge>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {item.service_code && <Badge variant="outline">{item.service_code}</Badge>}
+                          <span>{item.service_name ?? item.procedure}</span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {item.description}
