@@ -69,9 +69,12 @@ export const planService = {
     }
     const item = await createTreatmentItemsRepository(db).create(tenantId, planId, {
       tooth_number: data.tooth_number ?? undefined,
+      service_code: service?.code,
+      service_name: service?.name,
       procedure: service?.procedure ?? data.procedure,
       description: data.description,
       unit_cost: service?.price ?? data.unit_cost,
+      price_includes_vat: true,
     });
     // Recompute total in same tenant scope
     await plans.recomputeTotal(tenantId, planId);

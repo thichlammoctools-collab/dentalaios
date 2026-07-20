@@ -1,0 +1,79 @@
+import type { PlatformSession } from "@shared/types";
+
+const BASE_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
+
+let token: string | null = null;
+
+export class PlatformApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly code?: string,
+  ) {
+    super(message);
+    this.name = "PlatformApiError";
+  }
+}
+
+export function setPlatformToken(next: string | null): void {
+  token = next;
+}
+
+export function getPlatformToken(): string | null {
+  return token;
+}
+
+export async function platformApi<T = unknown>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
+  const response = await fetch(`${BASE_URL}${path}`, {
+    ...init,
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init.headers ?? {}),
+    },
+  });
+
+  if (!response.ok) {
+    let message = `HTTP ${response.status}`;
+    let code: string | undefined;
+    try {
+      const body = (await response.json()) as { error?: string; code?: string };
+      message = body.error ?? message;
+      code = body.code;
+    } catch {
+      // Retain the generic message when the Worker did not return JSON.
+    }
+    throw new PlatformApiError(message, response.status, code);
+  }
+
+  if (response.status === 204) return undefined as T;
+  return (await response.json()) as T;
+}
+
+export const platformGet = <T = unknown>(path: string) =>
+  platformApi<T>(path, { method: "GET" });
+
+export const platformPost = <T = unknown>(path: string, body?: unknown) =>
+  platformApi<T>(path, {
+    method: "POST",
+    body: JSON.stringify(body ?? {}),
+  });
+
+export const platformPut = <T = unknown>(path: string, body?: unknown) =>
+  platformApi<T>(path, {
+    method: "PUT",
+    body: JSON.stringify(body ?? {}),
+  });
+
+export const platformPatch = <T = unknown>(path: string, body?: unknown) =>
+  platformApi<T>(path, {
+    method: "PATCH",
+    body: JSON.stringify(body ?? {}),
+  });
+
+export type PlatformLoginChallenge = { mfa_required: true; challenge_id: string };
+export type PlatformMfaResponse = { session: PlatformSession };

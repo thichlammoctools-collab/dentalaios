@@ -1,1 +1,136 @@
-import { Hono } from "hono"; import { zValidator } from "@hono/zod-validator"; import { platformLoginSchema, platformMfaVerifySchema, platformReauthSchema } from "@shared/validation"; import type { Env } from "../index"; import { rateLimit } from "../middleware/rate-limit"; import { getPlatformJwt, requirePlatformAuth, requireRecentPlatformMfa, type PlatformAuthContext } from "../middleware/platform-auth"; import { platformAuthService } from "../services/platform-auth.service"; import { createPlatformSessionsRepository } from "../repositories/platform-sessions.repo"; import { createPlatformUsersRepository } from "../repositories/platform-users.repo"; import { decryptSecret } from "../lib/crypto"; import { verifyPassword } from "../lib/password"; import { verifyTotp } from "../lib/platform-totp"; import { UnauthorizedError } from "../lib/errors"; const router = new Hono<{ Bindings: Env; Variables: PlatformAuthContext }>(); const deps = (env: Env) => ({ db: env.DB, jwtSecret: env.PLATFORM_JWT_SECRET, mfaEncryptionKey: env.PLATFORM_MFA_ENCRYPTION_KEY }); const metadata = (c: { req: { header(name: string): string | undefined } }) => ({ ip_hash: c.req.header("cf-connecting-ip") ?? "", user_agent_hash: c.req.header("user-agent") ?? "" }); router.post("/login", rateLimit({ windowSeconds: 60, maxRequests: 5 }), zValidator("json", platformLoginSchema), async (c) => { const data = c.req.valid("json"); const result = await platformAuthService.login(deps(c.env), data.email, data.password); return c.json({ mfa_required: true, ...result }, 200, { "Cache-Control": "no-store" }); }); router.post("/mfa/verify", rateLimit({ windowSeconds: 60, maxRequests: 5 }), zValidator("json", platformMfaVerifySchema), async (c) => { const data = c.req.valid("json"); const session = await platformAuthService.verifyMfa(deps(c.env), data.challenge_id, data.code, metadata(c)); return c.json({ session }, 200, { "Cache-Control": "no-store" }); }); router.use("*", requirePlatformAuth()); router.get("/me", async (c) => { const context = await createPlatformUsersRepository(c.env.DB).findById(getPlatformJwt(c).sub); if (!context) throw new UnauthorizedError(); return c.json({ user: context.user, role: context.role }, 200, { "Cache-Control": "no-store" }); }); router.post("/logout", async (c) => { await createPlatformSessionsRepository(c.env.DB).revoke(getPlatformJwt(c).sid); return c.json({ ok: true }, 200, { "Cache-Control": "no-store" }); }); router.post("/reauth", zValidator("json", platformReauthSchema), async (c) => { const data = c.req.valid("json"); const jwt = getPlatformJwt(c); const context = await createPlatformUsersRepository(c.env.DB).findById(jwt.sub); if (!context?.mfa_secret_encrypted || !(await verifyPassword(data.password, context.password_hash))) throw new UnauthorizedError("Xác thực lại không thành công"); const [ciphertext, iv] = context.mfa_secret_encrypted.split("."); if (!(await verifyTotp(await decryptSecret(ciphertext, iv, c.env.PLATFORM_MFA_ENCRYPTION_KEY!), data.code))) throw new UnauthorizedError("Xác thực lại không thành công"); await createPlatformSessionsRepository(c.env.DB).reauth(jwt.sid, new Date().toISOString()); return c.json({ ok: true }, 200, { "Cache-Control": "no-store" }); }); router.post("/mfa/provision", requireRecentPlatformMfa(), async (c) => c.json(await platformAuthService.provisionMfa(deps(c.env), (await createPlatformUsersRepository(c.env.DB).findById(getPlatformJwt(c).sub))!.user), 200, { "Cache-Control": "no-store" })); router.post("/mfa/confirm", requireRecentPlatformMfa(), zValidator("json", platformMfaVerifySchema.omit({ challenge_id: true })), async (c) => { const context = await createPlatformUsersRepository(c.env.DB).findById(getPlatformJwt(c).sub); if (!context) throw new UnauthorizedError(); await platformAuthService.confirmMfa(deps(c.env), context.user, c.req.valid("json").code); return c.json({ ok: true }, 200, { "Cache-Control": "no-store" }); }); export default router;
+import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import {
+  platformLoginSchema,
+  platformMfaVerifySchema,
+  platformReauthSchema,
+} from "@shared/validation";
+import type { Env } from "../index";
+import { rateLimit } from "../middleware/rate-limit";
+import {
+  getPlatformJwt,
+  requirePlatformAuth,
+  requireRecentPlatformMfa,
+  type PlatformAuthContext,
+} from "../middleware/platform-auth";
+import { platformAuthService } from "../services/platform-auth.service";
+import { createPlatformSessionsRepository } from "../repositories/platform-sessions.repo";
+import { createPlatformUsersRepository } from "../repositories/platform-users.repo";
+import { decryptSecret } from "../lib/crypto";
+import { verifyPassword } from "../lib/password";
+import { verifyTotp } from "../lib/platform-totp";
+import { UnauthorizedError } from "../lib/errors";
+const router = new Hono<{ Bindings: Env; Variables: PlatformAuthContext }>();
+const deps = (env: Env) => ({
+  db: env.DB,
+  jwtSecret: env.PLATFORM_JWT_SECRET,
+  mfaEncryptionKey: env.PLATFORM_MFA_ENCRYPTION_KEY,
+});
+const metadata = (c: {
+  req: { header(name: string): string | undefined };
+}) => ({
+  ip: c.req.header("cf-connecting-ip") ?? "",
+  userAgent: c.req.header("user-agent") ?? "",
+});
+router.post(
+  "/login",
+  rateLimit({ windowSeconds: 60, maxRequests: 5 }),
+  zValidator("json", platformLoginSchema),
+  async (c) => {
+    const data = c.req.valid("json");
+    const result = await platformAuthService.login(
+      deps(c.env),
+      data.email,
+      data.password,
+    );
+    return c.json({ mfa_required: true, ...result }, 200, {
+      "Cache-Control": "no-store",
+    });
+  },
+);
+router.post(
+  "/mfa/verify",
+  rateLimit({ windowSeconds: 60, maxRequests: 5 }),
+  zValidator("json", platformMfaVerifySchema),
+  async (c) => {
+    const data = c.req.valid("json");
+    const session = await platformAuthService.verifyMfa(
+      deps(c.env),
+      data.challenge_id,
+      data.code,
+      metadata(c),
+    );
+    return c.json({ session }, 200, { "Cache-Control": "no-store" });
+  },
+);
+router.use("*", requirePlatformAuth());
+router.get("/me", async (c) => {
+  const context = await createPlatformUsersRepository(c.env.DB).findById(
+    getPlatformJwt(c).sub,
+  );
+  if (!context) throw new UnauthorizedError();
+  return c.json({ user: context.user, role: context.role }, 200, {
+    "Cache-Control": "no-store",
+  });
+});
+router.post("/logout", async (c) => {
+  await createPlatformSessionsRepository(c.env.DB).revoke(
+    getPlatformJwt(c).sid,
+  );
+  return c.json({ ok: true }, 200, { "Cache-Control": "no-store" });
+});
+router.post("/reauth", zValidator("json", platformReauthSchema), async (c) => {
+  const data = c.req.valid("json");
+  const jwt = getPlatformJwt(c);
+  const context = await createPlatformUsersRepository(c.env.DB).findById(
+    jwt.sub,
+  );
+  if (
+    !context?.mfa_secret_encrypted ||
+    !(await verifyPassword(data.password, context.password_hash))
+  )
+    throw new UnauthorizedError("Xác thực lại không thành công");
+  const [ciphertext, iv] = context.mfa_secret_encrypted.split(".");
+  if (
+    !(await verifyTotp(
+      await decryptSecret(ciphertext, iv, c.env.PLATFORM_MFA_ENCRYPTION_KEY!),
+      data.code,
+    ))
+  )
+    throw new UnauthorizedError("Xác thực lại không thành công");
+  await createPlatformSessionsRepository(c.env.DB).reauth(
+    jwt.sid,
+    new Date().toISOString(),
+  );
+  return c.json({ ok: true }, 200, { "Cache-Control": "no-store" });
+});
+router.post("/mfa/provision", requireRecentPlatformMfa(), async (c) =>
+  c.json(
+    await platformAuthService.provisionMfa(
+      deps(c.env),
+      (await createPlatformUsersRepository(c.env.DB).findById(
+        getPlatformJwt(c).sub,
+      ))!.user,
+    ),
+    200,
+    { "Cache-Control": "no-store" },
+  ),
+);
+router.post(
+  "/mfa/confirm",
+  requireRecentPlatformMfa(),
+  zValidator("json", platformMfaVerifySchema.omit({ challenge_id: true })),
+  async (c) => {
+    const context = await createPlatformUsersRepository(c.env.DB).findById(
+      getPlatformJwt(c).sub,
+    );
+    if (!context) throw new UnauthorizedError();
+    await platformAuthService.confirmMfa(
+      deps(c.env),
+      context.user,
+      c.req.valid("json").code,
+    );
+    return c.json({ ok: true }, 200, { "Cache-Control": "no-store" });
+  },
+);
+export default router;

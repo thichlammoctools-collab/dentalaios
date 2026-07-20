@@ -611,7 +611,7 @@ export const platformContentUpdateSchema = z.object({
   body_markdown: nonEmpty(50_000).optional(),
   status: z.enum(["draft", "scheduled", "published", "archived"]).optional(),
   audience: z.enum(["global", "tenant"]).optional(),
-  tenant_id: z.string().min(1).nullable().optional(),
+  tenant_id: z.string().min(1).optional(),
   publish_at: platformIsoDate.nullable().optional(),
   expire_at: platformIsoDate.nullable().optional(),
 }).strict().refine((data) => Object.keys(data).length > 0, "Cần ít nhất một trường để cập nhật");

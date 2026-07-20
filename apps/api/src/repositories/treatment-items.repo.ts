@@ -31,17 +31,21 @@ export function createTreatmentItemsRepository(db: D1Database): TreatmentItemsRe
       await db
         .prepare(
           `INSERT INTO treatment_plan_items
-              (id, tenant_id, treatment_plan_id, tooth_number, procedure, description, unit_cost)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              (id, tenant_id, treatment_plan_id, tooth_number, service_code, service_name,
+               procedure, description, unit_cost, price_includes_vat, price_snapshot_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
         )
         .bind(
           id,
           tenantId,
           planId,
           data.tooth_number ?? null,
+          data.service_code ?? null,
+          data.service_name ?? null,
           data.procedure,
           data.description,
           data.unit_cost,
+          data.price_includes_vat ? 1 : 0,
         )
         .run();
       const row = (await db
@@ -69,9 +73,12 @@ function mapItem(row: D1Row): TreatmentPlanItem {
     treatment_plan_id: row.treatment_plan_id as string,
     tooth_number: row.tooth_number as number | undefined,
     service_code: (row.service_code as string | null) ?? undefined,
+    service_name: (row.service_name as string | null) ?? undefined,
     procedure: row.procedure as string,
     description: row.description as string,
     unit_cost: Number(row.unit_cost ?? 0),
+    price_includes_vat: row.price_includes_vat === undefined ? true : Boolean(row.price_includes_vat),
+    price_snapshot_at: (row.price_snapshot_at as string | null) ?? undefined,
     status: row.status as TreatmentPlanItem["status"],
     created_at: row.created_at as string,
   };

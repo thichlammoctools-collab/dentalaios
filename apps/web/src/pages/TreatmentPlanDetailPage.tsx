@@ -219,7 +219,7 @@ export function TreatmentPlanDetailPage() {
                   <TableHead>Răng</TableHead>
                     <TableHead>Dịch vụ</TableHead>
                   <TableHead>Mô tả</TableHead>
-                  <TableHead className="text-right">Đơn giá</TableHead>
+                  <TableHead className="text-right">Đơn giá (gồm VAT)</TableHead>
                   {canEdit && <TableHead></TableHead>}
                 </TableRow>
               </TableHeader>
@@ -232,7 +232,8 @@ export function TreatmentPlanDetailPage() {
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-2">
                         {item.service_code && <Badge variant="outline">{item.service_code}</Badge>}
-                        <span>{item.procedure}</span>
+                        <span>{item.service_name ?? item.procedure}</span>
+                        {item.service_name && <span className="text-xs text-muted-foreground">{item.procedure}</span>}
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{item.description}</TableCell>

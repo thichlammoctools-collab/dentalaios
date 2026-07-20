@@ -96,7 +96,16 @@ export async function buildProposalPdf(input: {
     approved_at?: string | null;
     created_at: string;
   };
-  items: { tooth_number?: number; procedure: string; description: string; unit_cost: number; status: string }[];
+  items: {
+    tooth_number?: number;
+    service_code?: string;
+    service_name?: string;
+    procedure: string;
+    description: string;
+    unit_cost: number;
+    price_includes_vat: boolean;
+    status: string;
+  }[];
   approverName: string;
 }): Promise<Uint8Array> {
   const { tenant, branch, patient, plan, items, approverName } = input;
@@ -149,7 +158,7 @@ export async function buildProposalPdf(input: {
     const TH = 22;
     page.drawRectangle({ x: L, y: y - TH, width: CW, height: TH, color: C.blue });
     txt(bold, "#", COL_TOOTH + 4, y - 15, 9, C.white);
-    txt(bold, "Thu thuat", COL_PROC, y - 15, 9, C.white);
+    txt(bold, "Dich vu", COL_PROC, y - 15, 9, C.white);
     txt(bold, "Mo ta", COL_DESC, y - 15, 9, C.white);
     txt(bold, "Don gia", COL_UNIT, y - 15, 8, C.white, "right");
     txt(bold, "Thanh tien", COL_TOTAL, y - 15, 8, C.white, "right");
@@ -244,8 +253,9 @@ export async function buildProposalPdf(input: {
     page.drawRectangle({ x: COL_TOOTH + 2, y: cy - 8, width: toothW, height: 16, color: C.blueLight });
     txt(bold, toothStr, COL_TOOTH + 5, cy - 2, 9, C.blue);
 
-    const procLabel = PROC_LABELS[item.procedure] || item.procedure;
-    txt(font, strip(procLabel), COL_PROC, cy - 2, 9, C.dark);
+    const procLabel = item.service_name ?? PROC_LABELS[item.procedure] ?? item.procedure;
+    const serviceLabel = item.service_code ? `${item.service_code} ${procLabel}` : procLabel;
+    txt(font, strip(serviceLabel), COL_PROC, cy - 2, 9, C.dark);
     descriptionLines.forEach((descriptionLine, index) => {
       txt(font, descriptionLine, COL_DESC, y - 12 - index * 10, 8, C.gray);
     });
@@ -262,7 +272,7 @@ export async function buildProposalPdf(input: {
   // ── Total ───────────────────────────────────────────────────
   checkPage(60);
   page.drawRectangle({ x: L, y: y - 44, width: CW, height: 44, color: C.blueLight });
-  txt(bold, "TONG CONG (VAT CHUA) / SUBTOTAL", L + 12, y - 16, 10, C.blue);
+  txt(bold, "TONG CONG (DA GOM VAT) / TOTAL", L + 12, y - 16, 10, C.blue);
   txt(bold, formatAmount(plan.total_cost, plan.currency), R, y - 16, 14, C.blue, "right");
   const count = items.length;
   const uniqProc = new Set(items.map((i) => i.procedure)).size;

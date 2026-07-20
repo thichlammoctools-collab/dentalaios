@@ -123,7 +123,7 @@ export const dashboardService = {
         FROM payments p
         JOIN treatment_plans tp ON tp.id = p.treatment_plan_id AND tp.tenant_id = p.tenant_id
         JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = p.tenant_id
-        WHERE ${paymentWhere} AND p.status = 'confirmed' AND p.created_at >= ? AND p.created_at < ?`,
+        WHERE ${paymentWhere} AND p.status = 'confirmed' AND datetime(p.created_at) >= datetime(?) AND datetime(p.created_at) < datetime(?)`,
       [tenantId, branchId, bounds.todayStart, bounds.todayEnd]),
       first(db, `SELECT COUNT(*) AS appointments,
           SUM(CASE WHEN a.status = 'completed' THEN 1 ELSE 0 END) AS completed,
@@ -139,7 +139,7 @@ export const dashboardService = {
         WHERE ${visitWhere} AND v.date >= ? AND v.date < ?`,
       [tenantId, branchId, bounds.previousStart, bounds.previousEnd]),
       first(db, `SELECT COUNT(*) AS new_patients FROM patients p
-        WHERE p.tenant_id = ? AND p.branch_id = ? AND p.created_at >= ? AND p.created_at < ?`,
+        WHERE p.tenant_id = ? AND p.branch_id = ? AND datetime(p.created_at) >= datetime(?) AND datetime(p.created_at) < datetime(?)`,
       [tenantId, branchId, bounds.rangeStart, bounds.rangeEnd]),
       first(db, `SELECT COUNT(*) AS pending_plans FROM treatment_plans tp
         JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = tp.tenant_id
@@ -147,12 +147,12 @@ export const dashboardService = {
       first(db, `SELECT COALESCE(SUM(p.amount), 0) AS confirmed_revenue FROM payments p
         JOIN treatment_plans tp ON tp.id = p.treatment_plan_id AND tp.tenant_id = p.tenant_id
         JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = p.tenant_id
-        WHERE ${paymentWhere} AND p.status = 'confirmed' AND p.created_at >= ? AND p.created_at < ?`,
+        WHERE ${paymentWhere} AND p.status = 'confirmed' AND datetime(p.created_at) >= datetime(?) AND datetime(p.created_at) < datetime(?)`,
       [tenantId, branchId, bounds.rangeStart, bounds.rangeEnd]),
       first(db, `SELECT COALESCE(SUM(p.amount), 0) AS confirmed_revenue FROM payments p
         JOIN treatment_plans tp ON tp.id = p.treatment_plan_id AND tp.tenant_id = p.tenant_id
         JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = p.tenant_id
-        WHERE ${paymentWhere} AND p.status = 'confirmed' AND p.created_at >= ? AND p.created_at < ?`,
+        WHERE ${paymentWhere} AND p.status = 'confirmed' AND datetime(p.created_at) >= datetime(?) AND datetime(p.created_at) < datetime(?)`,
       [tenantId, branchId, bounds.previousStart, bounds.previousEnd]),
       rows(db, `SELECT date(datetime(v.date), '+7 hours') AS date, COUNT(*) AS visits FROM visits v
         WHERE ${visitWhere} AND v.date >= ? AND v.date < ? GROUP BY date ORDER BY date`,
@@ -160,7 +160,7 @@ export const dashboardService = {
       rows(db, `SELECT date(datetime(p.created_at), '+7 hours') AS date, COALESCE(SUM(p.amount), 0) AS revenue FROM payments p
         JOIN treatment_plans tp ON tp.id = p.treatment_plan_id AND tp.tenant_id = p.tenant_id
         JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = p.tenant_id
-        WHERE ${paymentWhere} AND p.status = 'confirmed' AND p.created_at >= ? AND p.created_at < ? GROUP BY date ORDER BY date`,
+        WHERE ${paymentWhere} AND p.status = 'confirmed' AND datetime(p.created_at) >= datetime(?) AND datetime(p.created_at) < datetime(?) GROUP BY date ORDER BY date`,
       [tenantId, branchId, bounds.rangeStart, bounds.rangeEnd]),
       first(db, `SELECT COUNT(*) AS count FROM appointments a WHERE ${appointmentWhere}
         AND a.status IN ('booked', 'confirmed', 'arrived')
@@ -301,12 +301,12 @@ export const dashboardService = {
           SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancellations,
           SUM(CASE WHEN status = 'no_show' THEN 1 ELSE 0 END) AS no_shows
         FROM appointments a
-        WHERE a.tenant_id = ? AND datetime(a.scheduled_at) >= datetime(?) AND datetime(a.scheduled_at) < datetime(?)${appointmentBranch.sql}`,
+        WHERE a.tenant_id = ? AND a.scheduled_at >= ? AND a.scheduled_at < ?${appointmentBranch.sql}`,
       [tenantId, bounds.todayStart, bounds.todayEnd, ...appointmentBranch.binds]),
       first(db, `SELECT
           SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress_visits
         FROM visits v
-        WHERE v.tenant_id = ? AND datetime(v.date) >= datetime(?) AND datetime(v.date) < datetime(?)${visitBranch.sql}`,
+        WHERE v.tenant_id = ? AND v.date >= ? AND v.date < ?${visitBranch.sql}`,
       [tenantId, bounds.todayStart, bounds.todayEnd, ...visitBranch.binds]),
       first(db, `SELECT COALESCE(SUM(p.amount), 0) AS confirmed_revenue
         FROM payments p
@@ -320,13 +320,13 @@ export const dashboardService = {
           SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancellations,
           SUM(CASE WHEN status = 'no_show' THEN 1 ELSE 0 END) AS no_shows
         FROM appointments a
-        WHERE a.tenant_id = ? AND datetime(a.scheduled_at) >= datetime(?) AND datetime(a.scheduled_at) < datetime(?)${appointmentBranch.sql}`,
+        WHERE a.tenant_id = ? AND a.scheduled_at >= ? AND a.scheduled_at < ?${appointmentBranch.sql}`,
       [tenantId, bounds.rangeStart, bounds.rangeEnd, ...appointmentBranch.binds]),
       first(db, `SELECT COUNT(*) AS visits FROM visits v
-        WHERE v.tenant_id = ? AND datetime(v.date) >= datetime(?) AND datetime(v.date) < datetime(?)${visitBranch.sql}`,
+        WHERE v.tenant_id = ? AND v.date >= ? AND v.date < ?${visitBranch.sql}`,
       [tenantId, bounds.rangeStart, bounds.rangeEnd, ...visitBranch.binds]),
       first(db, `SELECT COUNT(*) AS visits FROM visits v
-        WHERE v.tenant_id = ? AND datetime(v.date) >= datetime(?) AND datetime(v.date) < datetime(?)${visitBranch.sql}`,
+        WHERE v.tenant_id = ? AND v.date >= ? AND v.date < ?${visitBranch.sql}`,
       [tenantId, bounds.previousStart, bounds.previousEnd, ...visitBranch.binds]),
       first(db, `SELECT COUNT(*) AS new_patients FROM patients p
         WHERE p.tenant_id = ? AND datetime(p.created_at) >= datetime(?) AND datetime(p.created_at) < datetime(?)${patientBranch.sql}`,
@@ -346,7 +346,7 @@ export const dashboardService = {
         WHERE p.tenant_id = ? AND p.status = 'confirmed' AND datetime(p.created_at) >= datetime(?) AND datetime(p.created_at) < datetime(?)${paymentBranch.sql}`,
       [tenantId, bounds.previousStart, bounds.previousEnd, ...paymentBranch.binds]),
       rows(db, `SELECT date(datetime(v.date), '+7 hours') AS date, COUNT(*) AS visits FROM visits v
-        WHERE v.tenant_id = ? AND datetime(v.date) >= datetime(?) AND datetime(v.date) < datetime(?)${visitBranch.sql}
+        WHERE v.tenant_id = ? AND v.date >= ? AND v.date < ?${visitBranch.sql}
         GROUP BY date ORDER BY date`, [tenantId, bounds.rangeStart, bounds.rangeEnd, ...visitBranch.binds]),
       rows(db, `SELECT date(datetime(p.created_at), '+7 hours') AS date, COALESCE(SUM(p.amount), 0) AS revenue FROM payments p
         JOIN treatment_plans tp ON tp.id = p.treatment_plan_id AND tp.tenant_id = p.tenant_id
@@ -355,28 +355,28 @@ export const dashboardService = {
         GROUP BY date ORDER BY date`, [tenantId, bounds.rangeStart, bounds.rangeEnd, ...paymentBranch.binds]),
       rows(db, `SELECT a.branch_id, COUNT(*) AS appointments, SUM(CASE WHEN a.status = 'completed' THEN 1 ELSE 0 END) AS completed,
           SUM(CASE WHEN a.status = 'cancelled' THEN 1 ELSE 0 END) AS cancellations, SUM(CASE WHEN a.status = 'no_show' THEN 1 ELSE 0 END) AS no_shows
-        FROM appointments a WHERE a.tenant_id = ? AND datetime(a.scheduled_at) >= datetime(?) AND datetime(a.scheduled_at) < datetime(?)${appointmentBranch.sql} GROUP BY a.branch_id`,
+        FROM appointments a WHERE a.tenant_id = ? AND a.scheduled_at >= ? AND a.scheduled_at < ?${appointmentBranch.sql} GROUP BY a.branch_id`,
       [tenantId, bounds.rangeStart, bounds.rangeEnd, ...appointmentBranch.binds]),
-      rows(db, `SELECT v.branch_id, COUNT(*) AS visits FROM visits v WHERE v.tenant_id = ? AND datetime(v.date) >= datetime(?) AND datetime(v.date) < datetime(?)${visitBranch.sql} GROUP BY v.branch_id`,
+       rows(db, `SELECT v.branch_id, COUNT(*) AS visits FROM visits v WHERE v.tenant_id = ? AND v.date >= ? AND v.date < ?${visitBranch.sql} GROUP BY v.branch_id`,
       [tenantId, bounds.rangeStart, bounds.rangeEnd, ...visitBranch.binds]),
-      rows(db, `SELECT p.branch_id, COUNT(*) AS new_patients FROM patients p WHERE p.tenant_id = ? AND datetime(p.created_at) >= datetime(?) AND datetime(p.created_at) < datetime(?)${patientBranch.sql} GROUP BY p.branch_id`,
+       rows(db, `SELECT p.branch_id, COUNT(*) AS new_patients FROM patients p WHERE p.tenant_id = ? AND datetime(p.created_at) >= datetime(?) AND datetime(p.created_at) < datetime(?)${patientBranch.sql} GROUP BY p.branch_id`,
       [tenantId, bounds.rangeStart, bounds.rangeEnd, ...patientBranch.binds]),
       rows(db, `SELECT v.branch_id, COUNT(*) AS pending_plans FROM treatment_plans tp JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = tp.tenant_id
         WHERE tp.tenant_id = ? AND tp.status = 'draft'${planBranch.sql} GROUP BY v.branch_id`,
       [tenantId, ...planBranch.binds]),
       rows(db, `SELECT v.branch_id, COALESCE(SUM(p.amount), 0) AS confirmed_revenue FROM payments p JOIN treatment_plans tp ON tp.id = p.treatment_plan_id AND tp.tenant_id = p.tenant_id JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = p.tenant_id
-        WHERE p.tenant_id = ? AND p.status = 'confirmed' AND datetime(p.created_at) >= datetime(?) AND datetime(p.created_at) < datetime(?)${paymentBranch.sql} GROUP BY v.branch_id`,
+         WHERE p.tenant_id = ? AND p.status = 'confirmed' AND datetime(p.created_at) >= datetime(?) AND datetime(p.created_at) < datetime(?)${paymentBranch.sql} GROUP BY v.branch_id`,
       [tenantId, bounds.rangeStart, bounds.rangeEnd, ...paymentBranch.binds]),
       rows(db, `SELECT v.branch_id, COALESCE(SUM(p.amount), 0) AS confirmed_revenue FROM payments p JOIN treatment_plans tp ON tp.id = p.treatment_plan_id AND tp.tenant_id = p.tenant_id JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = p.tenant_id
-        WHERE p.tenant_id = ? AND p.status = 'confirmed' AND datetime(p.created_at) >= datetime(?) AND datetime(p.created_at) < datetime(?)${paymentBranch.sql} GROUP BY v.branch_id`,
+         WHERE p.tenant_id = ? AND p.status = 'confirmed' AND datetime(p.created_at) >= datetime(?) AND datetime(p.created_at) < datetime(?)${paymentBranch.sql} GROUP BY v.branch_id`,
       [tenantId, bounds.previousStart, bounds.previousEnd, ...paymentBranch.binds]),
-      rows(db, `SELECT v.branch_id, COUNT(*) AS visits FROM visits v WHERE v.tenant_id = ? AND datetime(v.date) >= datetime(?) AND datetime(v.date) < datetime(?)${visitBranch.sql} GROUP BY v.branch_id`,
+       rows(db, `SELECT v.branch_id, COUNT(*) AS visits FROM visits v WHERE v.tenant_id = ? AND v.date >= ? AND v.date < ?${visitBranch.sql} GROUP BY v.branch_id`,
       [tenantId, bounds.previousStart, bounds.previousEnd, ...visitBranch.binds]),
       rows(db, `SELECT a.branch_id, COUNT(*) AS count FROM appointments a WHERE a.tenant_id = ? AND a.status IN ('booked', 'confirmed', 'arrived')
-        AND datetime(a.scheduled_at, '+' || a.duration_min || ' minutes') < datetime(?) AND datetime(a.scheduled_at) >= datetime(?) AND datetime(a.scheduled_at) < datetime(?)${appointmentBranch.sql} GROUP BY a.branch_id`,
+        AND datetime(a.scheduled_at, '+' || a.duration_min || ' minutes') < datetime(?) AND a.scheduled_at >= ? AND a.scheduled_at < ?${appointmentBranch.sql} GROUP BY a.branch_id`,
       [tenantId, now.toISOString(), bounds.todayStart, bounds.todayEnd, ...appointmentBranch.binds]),
       rows(db, `SELECT a.branch_id, COUNT(*) AS count FROM appointments a WHERE a.tenant_id = ? AND a.status IN ('cancelled', 'no_show')
-        AND datetime(a.scheduled_at) >= datetime(?) AND datetime(a.scheduled_at) < datetime(?)${appointmentBranch.sql} GROUP BY a.branch_id`,
+        AND a.scheduled_at >= ? AND a.scheduled_at < ?${appointmentBranch.sql} GROUP BY a.branch_id`,
       [tenantId, bounds.todayStart, bounds.todayEnd, ...appointmentBranch.binds]),
       rows(db, `SELECT v.branch_id, COUNT(*) AS count FROM treatment_plans tp JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = tp.tenant_id
         WHERE tp.tenant_id = ? AND tp.status = 'draft'${planBranch.sql} GROUP BY v.branch_id`,

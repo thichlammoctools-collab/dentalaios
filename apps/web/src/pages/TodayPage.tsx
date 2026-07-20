@@ -249,12 +249,22 @@ function ActionCenter({ groups, branchId }: { groups: BranchDashboardActionGroup
 }
 
 function ActionGroupCard({ group, branchId }: { group: BranchDashboardActionGroup; branchId: string }) {
-  return <Card className={actionClass(group.kind)}><CardHeader className="pb-3"><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">{actionLabel(group.kind)}</CardTitle><CardDescription>{actionDescription(group.kind)}</CardDescription></div><span className="rounded-full bg-card px-2.5 py-1 text-sm font-semibold shadow-sm">{formatNumber(group.count)}</span></div></CardHeader><CardContent>{group.items.length > 0 && <ul className="divide-y divide-border/70">{group.items.map((item) => <ActionItem key={item.id} item={item} kind={group.kind} branchId={branchId} />)}</ul>}{group.remaining_count > 0 && <p className="mt-3 text-xs text-muted-foreground">Còn {formatNumber(group.remaining_count)} mục cùng loại cần theo dõi.</p>}</CardContent></Card>;
+  const scheduleStatus = group.kind === "appointment_outcome"
+    ? "cancelled,no_show"
+    : group.kind === "unconfirmed_appointment"
+      ? "booked"
+      : group.kind === "overdue_appointment"
+        ? "booked,confirmed,arrived"
+        : undefined;
+  const moreHref = scheduleStatus
+    ? `${ROUTES.SCHEDULE}?branch_id=${encodeURIComponent(branchId)}&status=${encodeURIComponent(scheduleStatus)}`
+    : undefined;
+  return <Card className={actionClass(group.kind)}><CardHeader className="pb-3"><div className="flex items-start justify-between gap-3"><div><CardTitle className="text-base">{actionLabel(group.kind)}</CardTitle><CardDescription>{actionDescription(group.kind)}</CardDescription></div><span className="rounded-full bg-card px-2.5 py-1 text-sm font-semibold shadow-sm">{formatNumber(group.count)}</span></div></CardHeader><CardContent>{group.items.length > 0 && <ul className="divide-y divide-border/70">{group.items.map((item) => <ActionItem key={item.id} item={item} kind={group.kind} />)}</ul>}{group.remaining_count > 0 && <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground"><span>Còn {formatNumber(group.remaining_count)} mục cùng loại.</span>{moreHref && <Link className="font-medium text-primary hover:underline" to={moreHref}>Xem thêm →</Link>}</div>}</CardContent></Card>;
 }
 
-function ActionItem({ item, kind, branchId }: { item: BranchDashboardActionItem; kind: BranchDashboardActionKind; branchId: string }) {
+function ActionItem({ item, kind }: { item: BranchDashboardActionItem; kind: BranchDashboardActionKind }) {
   const href = item.entity_type === "appointment"
-    ? `${ROUTES.SCHEDULE}?branch_id=${encodeURIComponent(branchId)}&status=${encodeURIComponent(item.status)}`
+    ? `/appointments/${encodeURIComponent(item.id)}`
     : `/treatment-plans/${encodeURIComponent(item.id)}`;
   const timestamp = item.scheduled_at ?? item.created_at;
   const meta = timestamp ? hcmTime(timestamp) : "";

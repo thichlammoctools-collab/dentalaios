@@ -30,7 +30,8 @@ export function SchedulePage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const selectedBranchId = searchParams.get("branch_id") ?? "";
-  const requestedStatuses = searchParams.get("status")?.split(",").filter(Boolean) ?? [];
+  const requestedStatusValue = searchParams.get("status") ?? "";
+  const requestedStatuses = requestedStatusValue.split(",").filter(Boolean);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [users, setUsers] = useState<UserWithDetails[]>([]);
@@ -49,7 +50,7 @@ export function SchedulePage() {
 
   useEffect(() => {
     setFilterStatuses(new Set(requestedStatuses));
-  }, [searchParams]);
+  }, [requestedStatusValue]);
 
   // Compute week range from selectedDate
   const weekDays = useMemo(() => getWeekDays(selectedDate), [selectedDate]);

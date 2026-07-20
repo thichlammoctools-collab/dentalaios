@@ -26,6 +26,18 @@ import { ChairSettingsPage } from "@/pages/ChairSettingsPage";
 import { ChairRevenueReportPage } from "@/pages/ChairRevenueReportPage";
 import { RequireAuth } from "@/components/RequireAuth";
 import { AppShell } from "@/components/AppShell";
+import { PlatformGuard } from "@/components/platform/PlatformGuard";
+import { PlatformShell } from "@/components/platform/PlatformShell";
+import { PlatformLoginPage } from "@/pages/platform/PlatformLoginPage";
+import {
+  PlatformAdminsPage,
+  PlatformAuditLogsPage,
+  PlatformConfigurationPage,
+  PlatformContentPage,
+  PlatformDashboardPage,
+  PlatformTenantDetailPage,
+  PlatformTenantsPage,
+} from "@/pages/platform/PlatformPages";
 
 const PATTERNS = {
   PATIENT_DETAIL: "/patients/:id",
@@ -53,6 +65,18 @@ export function AppRoutes() {
       <Route path={ROUTES.LOGIN} element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
+
+      {/* Platform administration uses an independent identity and route shell. */}
+      <Route path="/platform/login" element={<PlatformLoginPage />} />
+      <Route element={<PlatformGuard><PlatformShell /></PlatformGuard>}>
+        <Route path="/platform/dashboard" element={<PlatformDashboardPage />} />
+        <Route path="/platform/tenants" element={<PlatformTenantsPage />} />
+        <Route path="/platform/tenants/:id" element={<PlatformTenantDetailPage />} />
+        <Route path="/platform/content" element={<PlatformContentPage />} />
+        <Route path="/platform/configuration" element={<PlatformConfigurationPage />} />
+        <Route path="/platform/admins" element={<PlatformAdminsPage />} />
+        <Route path="/platform/audit-logs" element={<PlatformAuditLogsPage />} />
+      </Route>
 
       {/* Protected */}
       <Route

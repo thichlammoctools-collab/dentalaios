@@ -224,9 +224,12 @@ export interface TreatmentPlanItem {
   treatment_plan_id: string;
   tooth_number?: number; // present for per-tooth items; absent for full-mouth procedures
   service_code?: string;
+  service_name?: string;
   procedure: string; // e.g. "root_canal", "crown", "implant", "filling"
   description: string;
   unit_cost: number;
+  price_includes_vat: boolean;
+  price_snapshot_at?: string;
   status: TreatmentItemStatus;
   created_at: string;
 }
@@ -853,8 +856,8 @@ export interface PlatformContent {
   status: "draft" | "scheduled" | "published" | "archived";
   audience: "global" | "tenant";
   tenant_id?: string | null;
-  publish_at?: string;
-  expire_at?: string;
+  publish_at?: string | null;
+  expire_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -870,15 +873,6 @@ export interface PlatformAuditLog {
   created_at: string;
 }
 
-export interface PlatformDashboardSnapshot {
-  generated_at: string;
-  active_tenants: number;
-  suspended_tenants: number;
-  new_tenants: number;
-  active_users: number;
-  branches: number;
-  unhealthy_integrations: number;
-}
 
 export interface PlatformDashboardSnapshot {
   generated_at: string;

@@ -1,1 +1,39 @@
-import { newId } from "../lib/ids"; import { createPlatformAuditLogsRepository } from "../repositories/platform-audit-logs.repo"; export async function platformAudit(db: D1Database, input: { user_id?: string; action: string; entity_type: string; entity_id: string; tenant_id?: string | null; reason?: string; request_id?: string; ip?: string; user_agent?: string; details?: Record<string, unknown> }): Promise<void> { const hash = async (value: string) => { const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value))); return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(""); }; await createPlatformAuditLogsRepository(db).write({ id: newId(), user_id: input.user_id, action: input.action, entity_type: input.entity_type, entity_id: input.entity_id, tenant_id: input.tenant_id ?? undefined, reason: input.reason, request_id: input.request_id ?? newId(), ip_hash: await hash(input.ip ?? ""), user_agent_hash: await hash(input.user_agent ?? ""), details: input.details }); }
+import { newId } from "../lib/ids";
+import { createPlatformAuditLogsRepository } from "../repositories/platform-audit-logs.repo";
+export async function platformAudit(
+  db: D1Database,
+  input: {
+    user_id?: string;
+    action: string;
+    entity_type: string;
+    entity_id: string;
+    tenant_id?: string | null;
+    reason?: string;
+    request_id?: string;
+    ip?: string;
+    user_agent?: string;
+    details?: Record<string, unknown>;
+  },
+): Promise<void> {
+  const hash = async (value: string) => {
+    const bytes = new Uint8Array(
+      await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)),
+    );
+    return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
+      "",
+    );
+  };
+  await createPlatformAuditLogsRepository(db).write({
+    id: newId(),
+    user_id: input.user_id,
+    action: input.action,
+    entity_type: input.entity_type,
+    entity_id: input.entity_id,
+    tenant_id: input.tenant_id ?? undefined,
+    reason: input.reason,
+    request_id: input.request_id ?? newId(),
+    ip_hash: await hash(input.ip ?? ""),
+    user_agent_hash: await hash(input.user_agent ?? ""),
+    details: input.details,
+  });
+}

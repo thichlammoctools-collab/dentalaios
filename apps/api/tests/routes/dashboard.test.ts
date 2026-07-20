@@ -42,6 +42,27 @@ describe("GET /api/dashboard/branch", () => {
   });
 });
 
+describe("POST /api/dashboard/stream-ticket", () => {
+  it("allows a branch dashboard reader to reach the stream service", async () => {
+    const app = mountRoute("/api/dashboard", dashboardRoutes);
+    const response = await authedRequest(app, "POST", "/api/dashboard/stream-ticket", {
+      permissions: ["read_patients"],
+    });
+
+    // The test environment intentionally has no Durable Object binding. A 503
+    // proves authorization passed before the live-update capability check.
+    expect(response.status).toBe(503);
+  });
+
+  it("rejects users that have neither dashboard permission", async () => {
+    const app = mountRoute("/api/dashboard", dashboardRoutes);
+    const response = await authedRequest(app, "POST", "/api/dashboard/stream-ticket", {
+      permissions: [],
+    });
+    expect(response.status).toBe(403);
+  });
+});
+
 describe("GET /api/dashboard/management", () => {
   it("rejects users without the management dashboard permission", async () => {
     const app = mountRoute("/api/dashboard", dashboardRoutes);
