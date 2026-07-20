@@ -45,6 +45,10 @@ describe("POST /api/visits", () => {
         ["FROM patients", [{ id: "patient-1", tenant_id: "test-tenant" }]],
         ["FROM branches", [{ id: "test-branch", tenant_id: "test-tenant" }]],
         ["FROM users", [{ id: "test-user", tenant_id: "test-tenant" }]],
+        ["FROM dental_chairs", [{
+          id: "chair-1", tenant_id: "test-tenant", branch_id: "test-branch",
+          is_active: 1, operational_status: "available",
+        }]],
         ["FROM visits", [visitRow()]],
       ]),
       {
@@ -52,6 +56,7 @@ describe("POST /api/visits", () => {
           patient_id: "patient-1",
           branch_id: "test-branch",
           clinician_id: "test-user",
+          chair_id: "chair-1",
           notes: "Khám tổng quát",
         },
       },
