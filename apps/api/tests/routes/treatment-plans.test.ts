@@ -329,6 +329,25 @@ describe("POST /api/treatment-plans/:id/approve", () => {
   });
 });
 
+describe("DELETE /api/treatment-plans/:id", () => {
+  it("rejects deletion when the plan has an operational treatment case", async () => {
+    const app = mountRoute("/api/treatment-plans", treatmentPlansRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "DELETE",
+      "/api/treatment-plans/plan-1",
+      new Map([
+        ["FROM treatment_plans", [planRow({ status: "approved" })]],
+        ["FROM treatment_cases", [{ id: "case-1" }]],
+      ]),
+      { permissions: ["write_plans"] },
+    );
+
+    expect(res.status).toBe(422);
+    expect((await res.json() as { error: string }).error).toContain("ca điều trị");
+  });
+});
+
 describe("GET /api/treatment-plans/:id", () => {
   it("returns plan", async () => {
     const app = mountRoute("/api/treatment-plans", treatmentPlansRoutes);

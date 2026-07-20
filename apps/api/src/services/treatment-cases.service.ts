@@ -5,6 +5,7 @@ import { createTreatmentPlansRepository } from "../repositories/treatment-plans.
 import { createTreatmentCasesRepository } from "../repositories/treatment-cases.repo";
 import { assertAllInTenant } from "../lib/tenant-scope";
 import { ConflictError, NotFoundError, ValidationError } from "../lib/errors";
+import { isUniqueConstraintError } from "../lib/db-errors";
 
 const CASE_LABELS = {
   general: "Ca điều trị tổng quát",
@@ -43,20 +44,27 @@ export const treatmentCasesService = {
     ]);
     const caseNumber = await allocateCaseNumber(db, tenantId);
     const caseType = data.case_type;
-    return cases.create({
-      tenantId,
-      treatmentPlanId: planId,
-      patientId: plan.patient_id,
-      caseNumber,
-      caseType,
-      branchId: actor.branchId,
-      clinicianId: actor.userId,
-      title: data.title ?? CASE_LABELS[caseType],
-      clinicalSummary: data.clinical_summary,
-      treatmentGoal: data.treatment_goal,
-      targetCompletedAt: data.target_completed_at,
-      createdBy: actor.userId,
-    });
+    try {
+      return await cases.create({
+        tenantId,
+        treatmentPlanId: planId,
+        patientId: plan.patient_id,
+        caseNumber,
+        caseType,
+        branchId: actor.branchId,
+        clinicianId: actor.userId,
+        title: data.title ?? CASE_LABELS[caseType],
+        clinicalSummary: data.clinical_summary,
+        treatmentGoal: data.treatment_goal,
+        targetCompletedAt: data.target_completed_at,
+        createdBy: actor.userId,
+      });
+    } catch (err) {
+      if (isUniqueConstraintError(err)) {
+        throw new ConflictError("Kế hoạch này đã có ca điều trị");
+      }
+      throw err;
+    }
   },
 
   async transition(

@@ -147,6 +147,13 @@ export const planService = {
     if (plan.status === "completed") {
       throw new ValidationError("Không thể xóa kế hoạch đã hoàn thành");
     }
+    const treatmentCase = await db
+      .prepare("SELECT 1 FROM treatment_cases WHERE tenant_id = ? AND treatment_plan_id = ? LIMIT 1")
+      .bind(tenantId, planId)
+      .first();
+    if (treatmentCase) {
+      throw new ValidationError("Không thể xóa kế hoạch đã có ca điều trị");
+    }
     return createTreatmentPlansRepository(db).delete(tenantId, planId);
   },
 };
