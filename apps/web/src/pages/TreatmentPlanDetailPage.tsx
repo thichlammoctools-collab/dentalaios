@@ -264,7 +264,7 @@ export function TreatmentPlanDetailPage() {
           {canEdit && plan.visit_id && (
             <Button
               variant="outline"
-              className="bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200 hover:from-purple-100 hover:to-blue-100"
+              className="border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50 text-slate-900 hover:from-purple-100 hover:to-blue-100 dark:border-purple-800 dark:from-purple-950/50 dark:to-blue-950/50 dark:text-purple-100 dark:hover:from-purple-900/60 dark:hover:to-blue-900/60"
               onClick={() => navigate(`/treatment-plans/${plan.id}/ai-suggest`)}
             >
               <span className="mr-1">✨</span>
