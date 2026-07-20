@@ -7,11 +7,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { TreatmentPlanItemForm } from "@/components/TreatmentPlanItemForm";
 import { Select } from "@/components/ui/select";
+import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { apiDelete, apiGet, apiPatch, apiPost, getToken, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
-import type { TreatmentCase, TreatmentCaseMilestone, TreatmentCaseMilestoneStatus, TreatmentCaseType, TreatmentPlan, TreatmentPlanItem } from "@shared/types";
+import type { TreatmentCase, TreatmentCaseFinancialSummary, TreatmentCaseMilestone, TreatmentCaseMilestoneStatus, TreatmentCaseType, TreatmentMilestoneAppointment, TreatmentPlan, TreatmentPlanItem, UserWithDetails } from "@shared/types";
 
 const CASE_TYPE_LABELS: Record<TreatmentCaseType, string> = {
   general: "Điều trị tổng quát",
@@ -50,6 +53,10 @@ export function TreatmentPlanDetailPage() {
   const [items, setItems] = useState<TreatmentPlanItem[]>([]);
   const [treatmentCase, setTreatmentCase] = useState<TreatmentCase | null>(null);
   const [milestones, setMilestones] = useState<TreatmentCaseMilestone[]>([]);
+  const [milestoneAppointments, setMilestoneAppointments] = useState<Record<string, TreatmentMilestoneAppointment[]>>({});
+  const [financials, setFinancials] = useState<TreatmentCaseFinancialSummary | null>(null);
+  const [caseUsers, setCaseUsers] = useState<UserWithDetails[]>([]);
+  const [scheduleMilestone, setScheduleMilestone] = useState<TreatmentCaseMilestone | null>(null);
   const [caseType, setCaseType] = useState<TreatmentCaseType>("general");
   const [caseSaving, setCaseSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -72,10 +79,23 @@ export function TreatmentPlanDetailPage() {
       setItems(its.items);
       setTreatmentCase(caseResult.case);
       if (caseResult.case) {
-        const milestoneResult = await apiGet<{ items: TreatmentCaseMilestone[] }>(`/api/treatment-plans/${id}/case/milestones`);
+        const [milestoneResult, financialResult, usersResult] = await Promise.all([
+          apiGet<{ items: TreatmentCaseMilestone[] }>(`/api/treatment-plans/${id}/case/milestones`),
+          apiGet<TreatmentCaseFinancialSummary>(`/api/treatment-plans/${id}/case/financial-summary`),
+          apiGet<{ items: UserWithDetails[] }>(`/api/users/branch/${caseResult.case.primary_branch_id}`),
+        ]);
         setMilestones(milestoneResult.items);
+        setFinancials(financialResult);
+        setCaseUsers(usersResult.items);
+        const links = await Promise.all(milestoneResult.items.map(async (milestone) => [
+          milestone.id,
+          await apiGet<{ items: TreatmentMilestoneAppointment[] }>(`/api/treatment-plans/${id}/case/milestones/${milestone.id}/appointments`),
+        ] as const));
+        setMilestoneAppointments(Object.fromEntries(links.map(([milestoneId, result]) => [milestoneId, result.items])));
       } else {
         setMilestones([]);
+        setMilestoneAppointments({});
+        setFinancials(null);
       }
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : "Lỗi tải plan";
@@ -88,6 +108,18 @@ export function TreatmentPlanDetailPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function recordExecution(link: TreatmentMilestoneAppointment, milestone: TreatmentCaseMilestone, execution_status: "partially_completed" | "completed" | "not_performed") {
+    if (!plan) return;
+    setCaseSaving(true);
+    try {
+      await apiPatch(`/api/treatment-plans/${plan.id}/case/milestones/${milestone.id}/appointments/${link.appointment_id}/execution`, { execution_status });
+      await load();
+      toast.success("Đã ghi nhận kết quả buổi hẹn. Xác nhận milestone lâm sàng riêng khi phù hợp.");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Không thể ghi nhận kết quả buổi hẹn");
+    } finally { setCaseSaving(false); }
   }
 
   useEffect(() => {
@@ -351,6 +383,30 @@ export function TreatmentPlanDetailPage() {
         </CardContent>
       </Card>
 
+      {treatmentCase && (
+        <Card>
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <CardTitle>Lịch hẹn và tài chính theo ca</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">Lịch hẹn hỗ trợ theo dõi milestone; chỉ xác nhận lâm sàng mới thay đổi tiến độ điều trị.</p>
+              </div>
+              {financials && <Badge variant={financials.outstanding_amount > 0 ? "warning" : "success"}>{financials.outstanding_amount > 0 ? `Còn thu ${formatCurrency(financials.outstanding_amount, plan.currency)}` : "Đã thu đủ"}</Badge>}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {financials && <div className="grid gap-3 text-sm sm:grid-cols-3"><div className="rounded-lg border p-3"><p className="text-muted-foreground">Giá trị kế hoạch</p><p className="mt-1 font-semibold">{formatCurrency(financials.plan_total, plan.currency)}</p></div><div className="rounded-lg border p-3"><p className="text-muted-foreground">Đã thu xác nhận</p><p className="mt-1 font-semibold text-emerald-700 dark:text-emerald-300">{formatCurrency(financials.confirmed_paid, plan.currency)}</p></div><div className="rounded-lg border p-3"><p className="text-muted-foreground">Còn phải thu</p><p className="mt-1 font-semibold">{formatCurrency(financials.outstanding_amount, plan.currency)}</p></div></div>}
+            <div className="space-y-3">
+              {milestones.map((milestone) => {
+                const links = milestoneAppointments[milestone.id] ?? [];
+                const next = links.find((link) => !["cancelled", "no_show", "completed"].includes(link.appointment.status));
+                return <div key={milestone.id} className="rounded-lg border p-3"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><p className="font-medium">{milestone.item.service_name ?? milestone.item.procedure}{milestone.item.tooth_number != null ? ` · Răng #${milestone.item.tooth_number}` : " · Toàn hàm"}</p><p className="text-sm text-muted-foreground">{next ? `Lịch tiếp theo: ${formatDateTime(next.appointment.scheduled_at)}` : "Chưa có lịch hẹn"}</p></div>{treatmentCase.status === "active" && !["completed", "skipped"].includes(milestone.status) && <Button size="sm" variant="outline" onClick={() => setScheduleMilestone(milestone)}>Đặt lịch</Button>}</div>{links.length > 0 && <div className="mt-3 space-y-2 border-t pt-3">{links.map((link) => <div key={link.id} className="flex flex-col gap-2 rounded-md bg-muted/30 p-2 text-sm sm:flex-row sm:items-center sm:justify-between"><div><p>{formatDateTime(link.appointment.scheduled_at)} · {link.appointment.duration_min} phút</p><p className="text-xs text-muted-foreground">Lịch: {link.appointment.status} · Kết quả: {link.execution_status}</p></div><div className="flex gap-2">{link.appointment.status === "completed" && link.execution_status === "planned" && <><Button size="sm" variant="outline" disabled={caseSaving} onClick={() => void recordExecution(link, milestone, "partially_completed")}>Một phần</Button><Button size="sm" variant="outline" disabled={caseSaving} onClick={() => void recordExecution(link, milestone, "completed")}>Đã thực hiện</Button><Button size="sm" variant="ghost" disabled={caseSaving} onClick={() => void recordExecution(link, milestone, "not_performed")}>Chưa thực hiện</Button></>}</div></div>)}</div>}</div>;
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -484,6 +540,46 @@ export function TreatmentPlanDetailPage() {
           void load();
         }}
       />
+      {scheduleMilestone && treatmentCase && <ScheduleMilestoneDialog
+        milestone={scheduleMilestone}
+        clinicians={caseUsers}
+        onClose={() => setScheduleMilestone(null)}
+        onCreated={() => { setScheduleMilestone(null); void load(); }}
+        planId={plan.id}
+      />}
     </div>
   );
+}
+
+function ScheduleMilestoneDialog({ milestone, clinicians, planId, onClose, onCreated }: {
+  milestone: TreatmentCaseMilestone;
+  clinicians: UserWithDetails[];
+  planId: string;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [clinicianId, setClinicianId] = useState("");
+  const [scheduledAt, setScheduledAt] = useState(() => new Date().toISOString().slice(0, 16));
+  const [durationMin, setDurationMin] = useState(30);
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const activeClinicians = clinicians.filter((user) => user.is_active);
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!clinicianId) return;
+    setSaving(true);
+    try {
+      await apiPost(`/api/treatment-plans/${planId}/case/milestones/${milestone.id}/appointments`, {
+        clinician_id: clinicianId,
+        scheduled_at: new Date(scheduledAt).toISOString(),
+        duration_min: durationMin,
+        notes: notes || undefined,
+      });
+      toast.success("Đã tạo lịch hẹn từ milestone");
+      onCreated();
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Không thể tạo lịch hẹn");
+    } finally { setSaving(false); }
+  }
+  return <Dialog open onOpenChange={(open) => !open && onClose()}><DialogHeader><DialogTitle>Đặt lịch từ milestone</DialogTitle></DialogHeader><form onSubmit={submit}><DialogBody className="space-y-4"><p className="rounded-md bg-muted p-3 text-sm">{milestone.item.service_name ?? milestone.item.procedure}{milestone.item.tooth_number != null ? ` · Răng #${milestone.item.tooth_number}` : " · Toàn hàm"}</p><div className="space-y-1.5"><Label>Bác sĩ</Label><Select value={clinicianId} onChange={(event) => setClinicianId(event.target.value)} required><option value="">Chọn bác sĩ</option>{activeClinicians.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</Select></div><div className="space-y-1.5"><Label>Thời gian</Label><Input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} required /></div><div className="space-y-1.5"><Label>Thời lượng</Label><Select value={String(durationMin)} onChange={(event) => setDurationMin(Number(event.target.value))}><option value="30">30 phút</option><option value="45">45 phút</option><option value="60">60 phút</option><option value="90">90 phút</option><option value="120">120 phút</option></Select></div><div className="space-y-1.5"><Label>Ghi chú</Label><Input value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Ghi chú vận hành cho lịch hẹn" /></div></DialogBody><DialogFooter><Button type="button" variant="outline" onClick={onClose}>Hủy</Button><Button type="submit" disabled={saving || !clinicianId}>{saving ? "Đang tạo..." : "Tạo lịch hẹn"}</Button></DialogFooter></form></Dialog>;
 }

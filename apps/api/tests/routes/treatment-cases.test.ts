@@ -59,6 +59,21 @@ const milestone = {
   item_status: "planned",
 };
 
+const appointment = {
+  id: "appointment-1",
+  tenant_id: "test-tenant",
+  branch_id: "test-branch",
+  clinician_id: "test-user",
+  patient_id: "patient-1",
+  scheduled_at: "2026-07-22T09:00:00.000Z",
+  duration_min: 30,
+  status: "confirmed",
+  source: "manual",
+  created_by: "test-user",
+  created_at: "2026-07-20T08:00:00.000Z",
+  updated_at: "2026-07-20T08:00:00.000Z",
+};
+
 describe("treatment case lifecycle", () => {
   it("activates an approved plan as an operational case", async () => {
     const app = mountRoute("/api/treatment-plans", treatmentPlansRoutes);
@@ -157,6 +172,48 @@ describe("treatment case lifecycle", () => {
     );
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ id: "milestone-1", status: "in_progress" });
+  });
+
+  it("rejects linking an appointment for another patient", async () => {
+    const app = mountRoute("/api/treatment-plans", treatmentPlansRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/treatment-plans/plan-1/case/milestones/milestone-1/link-appointment",
+      new Map([
+        ["FROM treatment_cases", [activeCase]],
+        ["AND m.id = ? LIMIT 1", [milestone]],
+        ["SELECT * FROM appointments", [{ ...appointment, patient_id: "other-patient" }]],
+      ]),
+      { permissions: ["write_appointments"], body: { appointment_id: "appointment-1" } },
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it("summarizes confirmed, pending, and failed payments for a case plan", async () => {
+    const app = mountRoute("/api/treatment-plans", treatmentPlansRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "GET",
+      "/api/treatment-plans/plan-1/case/financial-summary",
+      new Map([
+        ["FROM treatment_plans", [approvedPlan]],
+        ["FROM payments", [
+          { id: "payment-1", tenant_id: "test-tenant", treatment_plan_id: "plan-1", patient_id: "patient-1", amount: 10000000, currency: "VND", method: "cash", status: "confirmed", code: "TT-1", created_at: "2026-07-20" },
+          { id: "payment-2", tenant_id: "test-tenant", treatment_plan_id: "plan-1", patient_id: "patient-1", amount: 2000000, currency: "VND", method: "cash", status: "pending", code: "TT-2", created_at: "2026-07-20" },
+          { id: "payment-3", tenant_id: "test-tenant", treatment_plan_id: "plan-1", patient_id: "patient-1", amount: 1000000, currency: "VND", method: "cash", status: "failed", code: "TT-3", created_at: "2026-07-20" },
+        ]],
+      ]),
+      { permissions: ["read_patients"] },
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      plan_total: 30000000,
+      confirmed_paid: 10000000,
+      pending_amount: 2000000,
+      failed_amount: 1000000,
+      outstanding_amount: 20000000,
+    });
   });
 
   it("returns null when an approved plan has no case yet", async () => {

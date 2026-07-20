@@ -8,6 +8,9 @@ import {
   treatmentCaseCancelSchema,
   treatmentCasePauseSchema,
   treatmentCaseMilestoneUpdateSchema,
+  milestoneAppointmentCreateSchema,
+  milestoneAppointmentExecutionSchema,
+  milestoneAppointmentLinkSchema,
 } from "@shared/validation";
 import { PERMISSIONS } from "@shared/constants";
 import type { Env } from "../index";
@@ -59,6 +62,85 @@ router.patch(
       c.env.DB, jwt.tenant_id, c.req.param("id"), c.req.param("milestoneId"), jwt.sub, c.req.valid("json"),
     );
     return c.json(milestone);
+  },
+);
+
+router.get(
+  "/:id/case/financial-summary",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    return c.json(await treatmentCasesService.financialSummary(c.env.DB, jwt.tenant_id, c.req.param("id")));
+  },
+);
+
+router.get(
+  "/:id/case/milestones/:milestoneId/appointments",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const items = await treatmentCasesService.listMilestoneAppointments(
+      c.env.DB, jwt.tenant_id, c.req.param("id"), c.req.param("milestoneId"),
+    );
+    return c.json({ items, total: items.length });
+  },
+);
+
+router.post(
+  "/:id/case/milestones/:milestoneId/appointments",
+  requirePermission(PERMISSIONS.WRITE_APPOINTMENTS),
+  auditLog("milestone_appointment_created", "treatment_milestone_appointment"),
+  zValidator("json", milestoneAppointmentCreateSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const items = await treatmentCasesService.createMilestoneAppointment(
+      c.env.DB, jwt.tenant_id, c.req.param("id"), c.req.param("milestoneId"),
+      { userId: jwt.sub, branchId: jwt.branch_id }, c.req.valid("json"), c.env.ENCRYPTION_KEY ?? undefined,
+    );
+    return c.json({ items, total: items.length }, 201);
+  },
+);
+
+router.post(
+  "/:id/case/milestones/:milestoneId/link-appointment",
+  requirePermission(PERMISSIONS.WRITE_APPOINTMENTS),
+  auditLog("milestone_appointment_linked", "treatment_milestone_appointment"),
+  zValidator("json", milestoneAppointmentLinkSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const items = await treatmentCasesService.linkMilestoneAppointment(
+      c.env.DB, jwt.tenant_id, c.req.param("id"), c.req.param("milestoneId"), jwt.sub, c.req.valid("json"),
+    );
+    return c.json({ items, total: items.length }, 201);
+  },
+);
+
+router.patch(
+  "/:id/case/milestones/:milestoneId/appointments/:appointmentId/execution",
+  requirePermission(PERMISSIONS.APPROVE_PLANS),
+  auditLog("milestone_appointment_execution_updated", "treatment_milestone_appointment"),
+  zValidator("json", milestoneAppointmentExecutionSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    return c.json(await treatmentCasesService.updateMilestoneAppointmentExecution(
+      c.env.DB, jwt.tenant_id, c.req.param("id"), c.req.param("milestoneId"), c.req.param("appointmentId"), c.req.valid("json"),
+    ));
+  },
+);
+
+router.delete(
+  "/:id/case/milestones/:milestoneId/appointments/:appointmentId",
+  requirePermission(PERMISSIONS.WRITE_APPOINTMENTS),
+  auditLog("milestone_appointment_unlinked", "treatment_milestone_appointment"),
+  async (c) => {
+    const jwt = getJwt(c);
+    const removed = await treatmentCasesService.unlinkMilestoneAppointment(
+      c.env.DB, jwt.tenant_id, c.req.param("id"), c.req.param("milestoneId"), c.req.param("appointmentId"),
+    );
+    if (!removed) {
+      return c.json({ error: "Liên kết lịch hẹn không tồn tại", code: "not_found" }, 404);
+    }
+    return c.json({ ok: true });
   },
 );
 

@@ -403,12 +403,12 @@ export function SchedulePage() {
                             <div className="mt-2 space-y-1.5 text-[11px] text-muted-foreground">
                               <div className="flex items-center gap-1.5">
                                 {doctor && <ProfileAvatar subject="users" entityId={doctor.id} name={doctor.name} avatarFileId={doctor.avatar_file_id} size="sm" />}
-                                <span className="truncate font-medium text-foreground">{doctor?.name ?? "—"} (Dr)</span>
+                                <span className="truncate font-semibold text-sky-700 dark:text-sky-300">{doctor?.name ?? "—"} (Dr)</span>
                               </div>
                               {assistant && (
                                 <div className="flex items-center gap-1.5">
                                   <ProfileAvatar subject="users" entityId={assistant.id} name={assistant.name} avatarFileId={assistant.avatar_file_id} size="sm" />
-                                  <span className="truncate font-medium text-foreground">{assistant.name} (As)</span>
+                                  <span className="truncate font-semibold text-emerald-700 dark:text-emerald-300">{assistant.name} (As)</span>
                                 </div>
                               )}
                             </div>
@@ -576,6 +576,7 @@ export function SchedulePage() {
         <EditAppointmentDialog
           appointment={editing}
           doctors={users}
+          chairs={chairs}
           onClose={() => {
             setEditing(null);
             setRefreshTick((t) => t + 1);
@@ -639,12 +640,14 @@ function statusLabelVi(status: string): string {
 function EditAppointmentDialog({
   appointment,
   doctors,
+  chairs,
   onClose,
   onSaved,
   onCancelled,
 }: {
   appointment: Appointment;
   doctors: UserWithDetails[];
+  chairs: DentalChair[];
   onClose: () => void;
   onSaved: (appt: Appointment) => void;
   onCancelled: (appt: Appointment) => Promise<boolean>;
@@ -660,6 +663,7 @@ function EditAppointmentDialog({
   const [status, setStatus] = useState(appointment.status);
   const [clinicianId, setClinicianId] = useState(appointment.clinician_id);
   const [assistantId, setAssistantId] = useState(appointment.assistant_id ?? "");
+  const [chairId, setChairId] = useState(appointment.chair_id ?? "");
   const [saving, setSaving] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
@@ -680,6 +684,7 @@ function EditAppointmentDialog({
         status,
         clinician_id: clinicianId,
         assistant_id: assistantId || null,
+        chair_id: chairId || null,
         procedure: procedure || undefined,
         notes: notes || undefined,
       });
@@ -735,6 +740,18 @@ function EditAppointmentDialog({
             </Select>
           </div>
         )}
+
+        <div className="grid gap-1.5">
+          <Label>Ghế nha</Label>
+          <Select value={chairId} onChange={(e) => setChairId(e.target.value)}>
+            <option value="">— Chưa gán ghế —</option>
+            {chairs.filter((chair) => chair.is_active || chair.id === appointment.chair_id).map((chair) => (
+              <option key={chair.id} value={chair.id}>
+                {chair.name}{chair.room_name ? ` · ${chair.room_name}` : ""}
+              </option>
+            ))}
+          </Select>
+        </div>
 
         {/* Trạng thái */}
         <div className="grid gap-1.5">

@@ -114,6 +114,7 @@ export const appointmentService = {
       duration_min: data.duration_min,
       clinician_id: data.clinician_id,
       assistant_id: data.assistant_id ?? undefined,
+      chair_id: data.chair_id ?? undefined,
       status: data.status,
       procedure: data.procedure,
       notes: data.notes,

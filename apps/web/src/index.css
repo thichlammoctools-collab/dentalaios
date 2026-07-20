@@ -58,6 +58,53 @@ html[data-theme="dark"] {
   --color-ring: oklch(60% 0.2 265);
 }
 
+/* Platform Control is an operations console: keep its high-contrast dark
+   workspace stable regardless of the clinic application's selected theme. */
+.platform-control {
+  --color-background: #090f1d;
+  --color-foreground: #f1f5f9;
+  --color-card: #111b2e;
+  --color-card-foreground: #f1f5f9;
+  --color-popover: #16233a;
+  --color-popover-foreground: #f1f5f9;
+  --color-primary: #16c7e5;
+  --color-primary-foreground: #06202a;
+  --color-secondary: #16233a;
+  --color-secondary-foreground: #f1f5f9;
+  --color-muted: #16233a;
+  --color-muted-foreground: #aabbd0;
+  --color-accent: #1d2d47;
+  --color-accent-foreground: #f1f5f9;
+  --color-destructive: #e5486d;
+  --color-destructive-foreground: #fff1f4;
+  --color-border: #263650;
+  --color-input: #263650;
+  --color-ring: #22d3ee;
+  background: #090f1d;
+}
+
+.platform-control .shadow {
+  box-shadow: 0 6px 16px rgb(0 0 0 / 18%);
+}
+
+/* Platform pages created before semantic tokens used slate utility colors.
+   Keep their existing markup readable in the dark operations workspace. */
+.platform-control .bg-slate-50 { background-color: #0d1526; }
+.platform-control .bg-slate-200 { background-color: #233044; }
+.platform-control .text-slate-950 { color: #f1f5f9; }
+.platform-control .text-slate-400,
+.platform-control .text-slate-500,
+.platform-control .text-slate-600 { color: #aabbd0; }
+.platform-control .text-slate-700 { color: #c9d5e5; }
+.platform-control .bg-red-50 { background-color: #401e29; }
+.platform-control .border-red-200 { border-color: #7f3448; }
+.platform-control .text-red-700,
+.platform-control .text-red-800 { color: #fda4af; }
+.platform-control .bg-emerald-100 { background-color: #10382d; }
+.platform-control .text-emerald-700,
+.platform-control .text-emerald-800 { color: #86efac; }
+.platform-control .text-cyan-700 { color: #67e8f9; }
+
 /* ─── Map CSS variables → Tailwind utility classes via @theme ─── */
 @theme inline {
   --color-background: var(--color-background);

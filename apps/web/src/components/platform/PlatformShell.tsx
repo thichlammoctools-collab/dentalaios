@@ -37,25 +37,25 @@ export function PlatformShell() {
   });
 
   return (
-    <div className="min-h-svh bg-slate-950 text-slate-100 lg:flex">
-      <aside className="border-b border-white/10 bg-slate-950 p-4 lg:min-h-svh lg:w-64 lg:border-b-0 lg:border-r">
-        <Link to="/platform/dashboard" className="flex items-center gap-3 px-2 py-2">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-cyan-400 font-bold text-slate-950">D</span>
-          <span><strong className="block text-sm">Dental Empire</strong><small className="text-[10px] uppercase tracking-[0.16em] text-cyan-300">Platform Control</small></span>
+    <div className="platform-control min-h-svh bg-background text-foreground lg:flex">
+      <aside className="relative border-b border-[#263650] bg-[#070d1a] p-4 lg:min-h-svh lg:w-64 lg:shrink-0 lg:border-b-0 lg:border-r">
+        <Link to="/platform/dashboard" className="flex items-center gap-3 rounded-lg px-2 py-2 outline-none focus-visible:ring-2 focus-visible:ring-[#22d3ee] focus-visible:ring-offset-2 focus-visible:ring-offset-[#070d1a]">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#16c7e5] font-bold text-[#06202a] shadow-[0_6px_16px_rgb(0_0_0_/_18%)]">D</span>
+          <span><strong className="block text-sm text-[#f1f5f9]">Dental Empire</strong><small className="text-[10px] uppercase tracking-[0.16em] text-[#67e8f9]">Platform Control</small></span>
         </Link>
         <nav className="mt-6 grid grid-cols-2 gap-1 lg:block lg:space-y-1">
           {visible.map((item) => {
             const active = pathname === item.href || (item.href.endsWith("/tenants") && pathname.startsWith("/platform/tenants/"));
-            return <Link key={item.href} to={item.href} className={cn("flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors", active ? "bg-cyan-400 text-slate-950" : "text-slate-400 hover:bg-white/10 hover:text-white")}><Icon name={item.icon} />{item.label}</Link>;
+            return <Link key={item.href} to={item.href} className={cn("flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#22d3ee] focus-visible:ring-offset-2 focus-visible:ring-offset-[#070d1a]", active ? "bg-[#12364a] text-[#f1f5f9] shadow-[inset_3px_0_0_#16c7e5]" : "text-[#aabbd0] hover:bg-[#16233a] hover:text-[#f1f5f9]")}><Icon name={item.icon} />{item.label}</Link>;
           })}
         </nav>
-        <div className="mt-6 border-t border-white/10 pt-4 lg:absolute lg:bottom-4 lg:w-56">
-          <p className="truncate px-2 text-sm font-medium">{currentUser?.name}</p>
-          <p className="px-2 text-xs text-slate-400">{currentRole?.name}</p>
-          <button type="button" onClick={() => void logout().finally(() => navigate("/platform/login"))} className="mt-3 px-2 text-xs text-slate-400 hover:text-white">Đăng xuất</button>
+        <div className="mt-6 border-t border-[#263650] pt-4 lg:absolute lg:bottom-4 lg:w-56">
+          <p className="truncate px-2 text-sm font-medium text-[#f1f5f9]">{currentUser?.name}</p>
+          <p className="px-2 text-xs text-[#aabbd0]">{currentRole?.name}</p>
+          <button type="button" onClick={() => void logout().finally(() => navigate("/platform/login"))} className="mt-3 rounded px-2 py-1 text-xs text-[#aabbd0] outline-none hover:text-[#f1f5f9] focus-visible:ring-2 focus-visible:ring-[#22d3ee]">Đăng xuất</button>
         </div>
       </aside>
-      <main className="min-w-0 flex-1 bg-slate-50 text-slate-950"><Outlet /></main>
+      <main className="min-w-0 flex-1 bg-background text-foreground"><Outlet /></main>
     </div>
   );
 }
