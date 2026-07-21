@@ -16,6 +16,7 @@ import { combineDateTime, ymd, isoToYmd, isoToTime } from "@/lib/utils";
 import { getMinimumAppointmentTime, getNextAppointmentSlot, isAppointmentTimeInPast } from "@/lib/appointment-time";
 import { AiChatInput, type ParsedAppointment } from "@/components/schedule/AiChatInput";
 import type { Appointment, Patient, UserWithDetails } from "@shared/types";
+import { PageContainer } from "@/components/PageContainer";
 
 interface PatientsResponse { items: Patient[]; total: number }
 interface UsersResponse { items: UserWithDetails[]; total: number }
@@ -122,7 +123,7 @@ export function ScheduleNewPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl p-4 sm:p-6">
+    <PageContainer size="compact">
       <Tabs value={aiTab} onValueChange={(v) => setAiTab(v as "manual" | "ai")}>
         <TabsList className="mb-4">
           <TabsTrigger value="manual">Thủ công</TabsTrigger>
@@ -248,6 +249,6 @@ export function ScheduleNewPage() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </PageContainer>
   );
 }

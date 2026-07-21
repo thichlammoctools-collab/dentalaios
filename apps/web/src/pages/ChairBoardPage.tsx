@@ -12,6 +12,7 @@ import { createDashboardStream } from "@/lib/dashboard-stream";
 import type { Appointment, ChairRevenueMetrics, DentalChair, Patient, UserWithDetails, Visit } from "@shared/types";
 import { PERMISSIONS, ROUTES } from "@shared/constants";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
+import { PageContainer } from "@/components/PageContainer";
 
 interface ChairBoardItem {
   chair: DentalChair;
@@ -151,7 +152,7 @@ export function ChairBoardPage() {
   const statusCount = (status: ChairBoardItem["current_status"]) => board?.chairs.filter((item) => item.current_status === status).length ?? 0;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
+    <PageContainer size="wide">
       <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-600 via-blue-600 to-indigo-700 p-5 text-white shadow-lg sm:p-8">
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Điều hành ghế nha</h1>
         <p className="mt-1 text-sm text-blue-100">Theo dõi trạng thái ghế, lịch đang diễn ra và lịch tiếp theo theo thời gian thực.</p>
@@ -227,7 +228,7 @@ export function ChairBoardPage() {
           })}
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }
 

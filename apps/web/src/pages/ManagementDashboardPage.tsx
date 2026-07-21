@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/utils";
 import { PERMISSIONS, ROUTES } from "@shared/constants";
+import { PageContainer } from "@/components/PageContainer";
 import type {
   ManagementDashboardBranch,
   ManagementDashboardBranchPerformance,
@@ -98,7 +99,7 @@ export function ManagementDashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasPermission, range, branchId]);
 
-  if (!hasPermission) return <div className="mx-auto max-w-3xl p-4 sm:p-6"><Card><CardHeader><CardTitle>Quyền truy cập cần thiết</CardTitle><CardDescription>Trang tổng quan quản trị chỉ dành cho vai trò được cấp quyền xem báo cáo vận hành.</CardDescription></CardHeader><CardContent><p className="text-sm text-muted-foreground">Liên hệ quản trị viên để được cấp quyền phù hợp. Máy chủ vẫn kiểm tra quyền truy cập cho mọi yêu cầu.</p></CardContent></Card></div>;
+  if (!hasPermission) return <PageContainer size="reading"><Card><CardHeader><CardTitle>Quyền truy cập cần thiết</CardTitle><CardDescription>Trang tổng quan quản trị chỉ dành cho vai trò được cấp quyền xem báo cáo vận hành.</CardDescription></CardHeader><CardContent><p className="text-sm text-muted-foreground">Liên hệ quản trị viên để được cấp quyền phù hợp. Máy chủ vẫn kiểm tra quyền truy cập cho mọi yêu cầu.</p></CardContent></Card></PageContainer>;
 
   const branches = snapshot?.branches ?? [];
   const daily = snapshot?.daily ?? [];
@@ -109,7 +110,7 @@ export function ManagementDashboardPage() {
     : undefined;
   const noActivity = !loading && !error && !!snapshot && daily.every((point) => !point.visits && !(point.revenue ?? point.confirmed_revenue));
 
-  return <div className="mx-auto max-w-7xl space-y-5 p-4 sm:space-y-6 sm:p-6">
+  return <PageContainer size="wide" className="space-y-5 sm:space-y-6">
     <section className="overflow-hidden rounded-2xl bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-900 p-5 text-white shadow-lg sm:p-7">
       <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end"><div><p className="text-sm font-medium text-blue-200">{session?.tenant.name}</p><h2 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Quản trị tổng quan</h2><p className="mt-2 text-sm text-blue-100">Vận hành toàn hệ thống · {hcmDate(snapshot?.today_start)}</p></div>
         <div className="grid gap-2 sm:grid-cols-[140px_minmax(190px,1fr)_auto]"><label className="text-xs font-medium text-blue-100">Kỳ báo cáo<Select value={range} onChange={(event) => setFilters(Number(event.target.value) as DashboardRange, branchId)} className="mt-1 border-white/20 bg-white/10 text-white"><option className="text-foreground" value="7">7 ngày hoàn tất</option><option className="text-foreground" value="30">30 ngày hoàn tất</option><option className="text-foreground" value="90">90 ngày hoàn tất</option></Select></label>
@@ -124,7 +125,7 @@ export function ManagementDashboardPage() {
       <section className="grid gap-5 lg:grid-cols-3"><Card className="lg:col-span-2"><CardHeader><CardTitle>Xu hướng lượt khám và doanh thu</CardTitle><CardDescription>Dữ liệu từng ngày trong kỳ đã chọn.</CardDescription></CardHeader><CardContent><DailyChart data={daily} /></CardContent></Card><AttentionList items={attention} range={range} onSelect={(id) => setFilters(range, id)} /></section>
       <BranchComparison rows={comparisons} onSelect={(id) => setFilters(range, id)} />
     </>}
-  </div>;
+  </PageContainer>;
 }
 
 function MetricCard({ label, value, delta, money, alert, primary }: { label: string; value: string; delta?: number; money?: boolean; alert?: boolean; primary?: boolean }) { return <Card className={alert ? "border-amber-200 dark:border-amber-900" : primary ? "border-primary/30 bg-primary/[0.03] dark:bg-primary/10" : ""}><CardContent className="p-4"><p className="text-xs font-medium text-muted-foreground">{label}</p><p className={`mt-2 truncate font-semibold ${money ? "text-lg" : "text-2xl"}`}>{value}</p>{typeof delta === "number" ? <p className={`mt-1 text-xs ${delta >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>{delta >= 0 ? "+" : ""}{new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(delta)}% so với kỳ trước</p> : primary ? <p className="mt-1 text-xs text-muted-foreground">Chưa có kỳ đối chiếu</p> : null}</CardContent></Card>; }

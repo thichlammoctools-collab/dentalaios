@@ -13,6 +13,7 @@ import { apiDelete, apiGet, apiPatch, apiPost, getToken, ApiError } from "@/lib/
 import { toast } from "@/lib/toast";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { patientReturnPath } from "@/lib/patient-navigation";
+import { PageContainer } from "@/components/PageContainer";
 import type { TreatmentCase, TreatmentCaseFinancialSummary, TreatmentCaseMilestone, TreatmentCaseMilestoneStatus, TreatmentCaseType, TreatmentMilestoneAppointment, TreatmentPlan, TreatmentPlanItem } from "@shared/types";
 
 const CASE_TYPE_LABELS: Record<TreatmentCaseType, string> = {
@@ -261,7 +262,7 @@ export function TreatmentPlanDetailPage() {
 
   if (loading || !plan) {
     return (
-      <div className="mx-auto max-w-5xl p-6">
+      <PageContainer size="detail">
         {error ? (
           <Card>
             <CardContent className="p-6">
@@ -274,7 +275,7 @@ export function TreatmentPlanDetailPage() {
         ) : (
           <p className="text-sm text-muted-foreground">Đang tải…</p>
         )}
-      </div>
+      </PageContainer>
     );
   }
 
@@ -285,7 +286,7 @@ export function TreatmentPlanDetailPage() {
   const returnPath = patientReturnPath(searchParams.get("return_to"), plan.patient_id, "plans");
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-6 py-6">
+    <PageContainer size="detail">
       <Breadcrumbs
         items={[
           { label: "Bệnh nhân", href: "/patients" },
@@ -548,6 +549,6 @@ export function TreatmentPlanDetailPage() {
         }}
         onCreated={() => { setScheduleMilestone(null); void load(); }}
       />}
-    </div>
+    </PageContainer>
   );
 }

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import { ROUTES } from "@shared/constants";
+import { PageContainer } from "@/components/PageContainer";
 import type {
   BranchDashboardActionGroup,
   BranchDashboardActionItem,
@@ -134,7 +135,7 @@ export function TodayPage() {
   const hasActions = actions.some((group) => group.count > 0);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5 p-4 sm:space-y-6 sm:p-6">
+    <PageContainer size="wide" className="space-y-5 sm:space-y-6">
       <section className="overflow-hidden rounded-2xl bg-gradient-to-br from-blue-700 via-indigo-700 to-violet-800 p-5 text-white shadow-lg sm:p-7">
         <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
           <div>
@@ -219,7 +220,7 @@ export function TodayPage() {
           {hasActions && <ActionCenter groups={actions} branchId={snapshot.branch.id} />}
         </>
       ) : null}
-    </div>
+    </PageContainer>
   );
 }
 

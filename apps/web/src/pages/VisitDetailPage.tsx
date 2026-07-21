@@ -16,6 +16,7 @@ import { toast } from "@/lib/toast";
 import { formatDateTime } from "@/lib/utils";
 import { patientReturnPath, withPatientReturnContext } from "@/lib/patient-navigation";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { PageContainer } from "@/components/PageContainer";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import type { Visit, ClinicalFinding, TreatmentPlan, GeneratePlanResult, GeneratePlanItemDraft, ProcedureCatalogItem } from "@shared/types";
 
@@ -512,7 +513,7 @@ export function VisitDetailPage() {
   const returnPath = patientReturnPath(searchParams.get("return_to"), visit.patient_id, "visits");
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-6 py-6">
+    <PageContainer size="detail">
       {/* Header */}
       <div>
         <Breadcrumbs items={[
@@ -1021,6 +1022,6 @@ export function VisitDetailPage() {
           )}
         </DialogBody>
       </Dialog>
-    </div>
+    </PageContainer>
   );
 }

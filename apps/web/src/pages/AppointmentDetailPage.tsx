@@ -25,6 +25,7 @@ import { formatDateTime, formatTime, ymd, combineDateTime, isoToYmd, isoToTime }
 import { getMinimumAppointmentTime, isAppointmentTimeInPast } from "@/lib/appointment-time";
 import { patientReturnPath, withPatientReturnContext } from "@/lib/patient-navigation";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
+import { PageContainer } from "@/components/PageContainer";
 
 interface PatientsResponse { items: Patient[]; total: number }
 interface UsersResponse { items: UserWithDetails[]; total: number }
@@ -152,7 +153,7 @@ export function AppointmentDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-6 py-6">
+    <PageContainer size="reading">
       <Breadcrumbs
         items={[
           { label: "Bệnh nhân", href: "/patients" },
@@ -243,7 +244,7 @@ export function AppointmentDetailPage() {
           <CancelForm onCancel={handleCancel} onClose={() => setCancelOpen(false)} />
         </Dialog>
       )}
-    </div>
+    </PageContainer>
   );
 }
 

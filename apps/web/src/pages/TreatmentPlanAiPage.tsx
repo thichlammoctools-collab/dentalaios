@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { PageContainer } from "@/components/PageContainer";
 import { AiTreatmentPlanSuggest, type TreatmentPlanItemDraft } from "@/components/AiTreatmentPlanSuggest";
 import { apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
@@ -62,15 +63,15 @@ export function TreatmentPlanAiPage() {
 
   if (loading || !plan) {
     return (
-      <div className="mx-auto max-w-4xl p-6">
+      <PageContainer size="detail">
         <p className="text-sm text-muted-foreground">Đang tải…</p>
-      </div>
+      </PageContainer>
     );
   }
 
   if (!plan.visit_id) {
     return (
-      <div className="mx-auto max-w-4xl space-y-6 px-6 py-6">
+      <PageContainer size="detail">
         <Breadcrumbs
           items={[
             { label: "Bệnh nhân", href: `/patients/${plan.patient_id}` },
@@ -92,12 +93,12 @@ export function TreatmentPlanAiPage() {
             </Button>
           </CardContent>
         </Card>
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 px-6 py-6">
+    <PageContainer size="detail">
       <Breadcrumbs
         items={[
           { label: "Bệnh nhân", href: `/patients/${plan.patient_id}` },
@@ -151,6 +152,6 @@ export function TreatmentPlanAiPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </PageContainer>
   );
 }
