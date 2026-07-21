@@ -85,6 +85,9 @@ export interface Patient {
   notes?: string;
   avatar_file_id?: string;
   created_at: string;
+  archived_at?: string;
+  archived_by?: string;
+  archive_reason?: string;
   // Family contact
   family_name?: string;
   family_phone?: string;

@@ -29,8 +29,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { apiGet, apiDelete, ApiError } from "@/lib/api";
+import { apiGet, apiPost, apiDelete, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
+import { useAuth } from "@/lib/auth-context";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import {
   isPatientWorkspaceSection,
@@ -56,6 +57,7 @@ interface ListResponse<T> {
 export function PatientDetailPage() {
   const { id, section } = useParams();
   const navigate = useNavigate();
+  const { session } = useAuth();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [alerts, setAlerts] = useState<MedicalAlert[]>([]);
   const [visits, setVisits] = useState<Visit[]>([]);
@@ -70,6 +72,14 @@ export function PatientDetailPage() {
   const [viewingPaymentId, setViewingPaymentId] = useState<string | null>(null);
   const [planToDelete, setPlanToDelete] = useState<TreatmentPlan | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showPastAppointments, setShowPastAppointments] = useState(false);
+  const [startingAppointmentId, setStartingAppointmentId] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   async function load() {
     if (!id) return;

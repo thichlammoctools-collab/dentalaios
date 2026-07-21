@@ -8,11 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { PatientForm } from "@/components/PatientForm";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/pagination";
-import { apiDelete, apiGet, ApiError } from "@/lib/api";
+import { apiDelete, apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
 import { PageContainer } from "@/components/PageContainer";
 import type { Patient } from "@shared/types";
+import { PERMISSIONS } from "@shared/constants";
+import { useAuth } from "@/lib/auth-context";
 
 interface PatientsResponse {
   items: Patient[];
@@ -33,6 +35,7 @@ function PatientRowSkeleton() {
 }
 
 export function PatientsPage() {
+  const { session } = useAuth();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
@@ -40,12 +43,17 @@ export function PatientsPage() {
   const [loading, setLoading] = useState(true);
   const [openForm, setOpenForm] = useState(false);
   const [editPatient, setEditPatient] = useState<Patient | undefined>(undefined);
+  const [showArchived, setShowArchived] = useState(false);
+  const canManagePatients = Boolean(
+    session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.MANAGE_PATIENTS),
+  );
 
-  const load = useCallback(async (q: string, currentPage: number) => {
+  const load = useCallback(async (q: string, currentPage: number, archived = showArchived) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (q) params.set("search", q);
+      if (archived) params.set("archived", "true");
       params.set("limit", String(DEFAULT_PAGE_SIZE));
       params.set("offset", String((currentPage - 1) * DEFAULT_PAGE_SIZE));
       const res = await apiGet<PatientsResponse>(`/api/patients?${params}`);
@@ -56,12 +64,12 @@ export function PatientsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [showArchived]);
 
   useEffect(() => {
-    load("", 1);
+    load("", 1, showArchived);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [load, showArchived]);
 
   // Debounced search: auto-load after 400ms of no typing
   useEffect(() => {
@@ -76,14 +84,30 @@ export function PatientsPage() {
     if (page > 1) void load(search, page);
   }, [page, search, load]);
 
-  async function onDelete(p: Patient) {
-    if (!confirm(`Xóa bệnh nhân "${p.name}"?`)) return;
+  async function onArchive(p: Patient) {
+    const reason = prompt(`Lý do lưu trữ hồ sơ bệnh nhân "${p.name}" (tối thiểu 3 ký tự):`);
+    if (reason === null) return;
+    if (reason.trim().length < 3) {
+      toast.error("Vui lòng nhập lý do lưu trữ ít nhất 3 ký tự");
+      return;
+    }
     try {
-      await apiDelete(`/api/patients/${p.id}`);
-      toast.success("Đã xóa bệnh nhân");
+      await apiDelete(`/api/patients/${p.id}`, { reason: reason.trim() });
+      toast.success("Đã lưu trữ hồ sơ bệnh nhân");
       load(search, page);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Lỗi xóa");
+      toast.error(err instanceof ApiError ? err.message : "Lỗi lưu trữ hồ sơ");
+    }
+  }
+
+  async function onRestore(p: Patient) {
+    if (!confirm(`Khôi phục hồ sơ bệnh nhân "${p.name}"?`)) return;
+    try {
+      await apiPost(`/api/patients/${p.id}/restore`);
+      toast.success("Đã khôi phục hồ sơ bệnh nhân");
+      load(search, page);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi khôi phục hồ sơ");
     }
   }
 
@@ -93,7 +117,7 @@ export function PatientsPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Bệnh nhân</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {loading ? "Đang tải…" : `${total} bệnh nhân`}
+            {loading ? "Đang tải…" : `${total} bệnh nhân ${showArchived ? "đã lưu trữ" : "đang hoạt động"}`}
           </p>
         </div>
         <Button onClick={() => { setEditPatient(undefined); setOpenForm(true); }} className="gap-1.5">
@@ -125,6 +149,19 @@ export function PatientsPage() {
               </div>
             )}
           </div>
+          {canManagePatients && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3"
+              onClick={() => {
+                setShowArchived((value) => !value);
+                setPage(1);
+              }}
+            >
+              {showArchived ? "Xem hồ sơ đang hoạt động" : "Xem hồ sơ đã lưu trữ"}
+            </Button>
+          )}
         </CardHeader>
         <CardContent className="pt-4">
           {!loading && patients.length === 0 ? (
@@ -200,7 +237,7 @@ export function PatientsPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                            <Button
+                            {!showArchived && <Button
                               size="sm"
                               variant="ghost"
                               className="h-7 px-2 text-xs"
@@ -212,17 +249,28 @@ export function PatientsPage() {
                               <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
                               </svg>
-                            </Button>
-                            <Button
+                            </Button>}
+                            {canManagePatients && (showArchived ? <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => onRestore(p)}
+                              title="Khôi phục hồ sơ"
+                            >
+                              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 12a9 9 0 101.76-5.37M3 4v5h5" />
+                              </svg>
+                            </Button> : <Button
                               size="sm"
                               variant="ghost"
                               className="h-7 px-2 text-xs text-destructive hover:text-destructive"
-                              onClick={() => onDelete(p)}
+                              onClick={() => onArchive(p)}
+                              title="Lưu trữ hồ sơ"
                             >
                               <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                               </svg>
-                            </Button>
+                            </Button>)}
                           </div>
                         </TableCell>
                       </TableRow>

@@ -124,7 +124,11 @@ export const patientService = {
     })();
   },
 
-  remove(db: D1Database, tenantId: string, id: string): Promise<boolean> {
-    return createPatientsRepository(db).delete(tenantId, id);
+  archive(db: D1Database, tenantId: string, id: string, userId: string, reason: string): Promise<boolean> {
+    return createPatientsRepository(db).archive(tenantId, id, userId, reason);
+  },
+
+  restore(db: D1Database, tenantId: string, id: string): Promise<boolean> {
+    return createPatientsRepository(db).restore(tenantId, id);
   },
 };

@@ -9,12 +9,13 @@ import type { Patient } from "@shared/types";
 import type { D1Row, Pagination } from "./base";
 
 export interface PatientsRepository {
-  list(tenantId: string, opts?: Pagination & { branchId?: string; search?: string }): Promise<Patient[]>;
-  count(tenantId: string, opts?: { branchId?: string; search?: string }): Promise<number>;
+  list(tenantId: string, opts?: Pagination & { branchId?: string; search?: string; archived?: boolean }): Promise<Patient[]>;
+  count(tenantId: string, opts?: { branchId?: string; search?: string; archived?: boolean }): Promise<number>;
   getById(tenantId: string, id: string): Promise<Patient | null>;
   create(tenantId: string, data: Omit<Patient, "id" | "tenant_id" | "created_at">): Promise<Patient>;
   update(tenantId: string, id: string, data: Omit<Partial<Patient>, "avatar_file_id"> & { avatar_file_id?: string | null }): Promise<Patient | null>;
-  delete(tenantId: string, id: string): Promise<boolean>;
+  archive(tenantId: string, id: string, userId: string, reason: string): Promise<boolean>;
+  restore(tenantId: string, id: string): Promise<boolean>;
 }
 
 export function createPatientsRepository(db: D1Database): PatientsRepository {
@@ -34,6 +35,8 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
         const like = `%${opts.search}%`;
         binds.push(like, like, like);
       }
+      if (opts.archived === true) conditions.push("p.archived_at IS NOT NULL");
+      else conditions.push("p.archived_at IS NULL");
 
       binds.push(limit, offset);
       const sql = `SELECT p.*,
@@ -59,6 +62,8 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
         const like = `%${opts.search}%`;
         binds.push(like, like, like);
       }
+      if (opts.archived === true) conditions.push("archived_at IS NOT NULL");
+      else conditions.push("archived_at IS NULL");
       const row = await db.prepare(`SELECT COUNT(*) AS total FROM patients WHERE ${conditions.join(" AND ")}`).bind(...binds).first<D1Row>();
       return Number(row?.total ?? 0);
     },
@@ -170,23 +175,20 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
       return this.getById(tenantId, id);
     },
 
-    async delete(tenantId, id) {
-      // The patient FK is restrictive on appointments, payments, treatment plans,
-      // and visits. Remove dependents in FK order in one atomic D1 batch.
-      const results = await db.batch([
-        db.prepare("DELETE FROM appointments WHERE tenant_id = ? AND patient_id = ?").bind(tenantId, id),
-        db.prepare("DELETE FROM payments WHERE tenant_id = ? AND patient_id = ?").bind(tenantId, id),
-        db.prepare("DELETE FROM treatment_plan_items WHERE tenant_id = ? AND treatment_plan_id IN (SELECT id FROM treatment_plans WHERE tenant_id = ? AND patient_id = ?)").bind(tenantId, tenantId, id),
-        db.prepare("DELETE FROM treatment_plans WHERE tenant_id = ? AND patient_id = ?").bind(tenantId, id),
-        db.prepare("DELETE FROM patient_images WHERE tenant_id = ? AND patient_id = ?").bind(tenantId, id),
-        db.prepare("DELETE FROM medical_alerts WHERE tenant_id = ? AND patient_id = ?").bind(tenantId, id),
-        db.prepare("DELETE FROM patient_notes WHERE tenant_id = ? AND patient_id = ?").bind(tenantId, id),
-        db.prepare("DELETE FROM clinical_findings WHERE tenant_id = ? AND visit_id IN (SELECT id FROM visits WHERE tenant_id = ? AND patient_id = ?)").bind(tenantId, tenantId, id),
-        db.prepare("DELETE FROM visits WHERE tenant_id = ? AND patient_id = ?").bind(tenantId, id),
-        db.prepare("DELETE FROM patients WHERE tenant_id = ? AND id = ?").bind(tenantId, id),
-      ]);
-      const patientResult = results.at(-1);
-      return patientResult !== undefined && patientResult.meta.changes > 0;
+    async archive(tenantId, id, userId, reason) {
+      const result = await db
+        .prepare("UPDATE patients SET archived_at = datetime('now'), archived_by = ?, archive_reason = ? WHERE tenant_id = ? AND id = ? AND archived_at IS NULL")
+        .bind(userId, reason, tenantId, id)
+        .run();
+      return result.meta.changes > 0;
+    },
+
+    async restore(tenantId, id) {
+      const result = await db
+        .prepare("UPDATE patients SET archived_at = NULL, archived_by = NULL, archive_reason = NULL WHERE tenant_id = ? AND id = ? AND archived_at IS NOT NULL")
+        .bind(tenantId, id)
+        .run();
+      return result.meta.changes > 0;
     },
   };
 }
@@ -213,6 +215,9 @@ function mapPatient(row: D1Row): Patient {
     country_name: (row.country_name as string | null) ?? undefined,
     country_code: (row.country_code as string | null) ?? undefined,
     created_at: row.created_at as string,
+    archived_at: (row.archived_at as string | null) ?? undefined,
+    archived_by: (row.archived_by as string | null) ?? undefined,
+    archive_reason: (row.archive_reason as string | null) ?? undefined,
     family_name: (row.family_name as string | null) ?? undefined,
     family_phone: (row.family_phone as string | null) ?? undefined,
     family_relation: (row.family_relation as string | null) ?? undefined,

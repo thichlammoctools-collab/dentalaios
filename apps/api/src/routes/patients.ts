@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 import { patientCreateSchema, patientUpdateSchema } from "@shared/validation";
 import { PERMISSIONS } from "@shared/constants";
 import type { Env } from "../index";
@@ -7,6 +8,7 @@ import { requireAuth, getJwt } from "../middleware/auth";
 import { requirePermission } from "../middleware/rbac";
 import { auditLog } from "../middleware/audit";
 import type { AuthContext } from "../middleware/auth";
+import { ForbiddenError } from "../lib/errors";
 import { patientService } from "../services/patient.service";
 import { treatmentCasesService } from "../services/treatment-cases.service";
 
@@ -23,11 +25,16 @@ router.get(
     const url = new URL(c.req.url);
     const branchId = url.searchParams.get("branch_id") ?? undefined;
     const search = url.searchParams.get("search") ?? undefined;
+    const archived = url.searchParams.get("archived") === "true";
+    if (archived && !jwt.permissions.includes(PERMISSIONS.ALL) && !jwt.permissions.includes(PERMISSIONS.MANAGE_PATIENTS)) {
+      throw new ForbiddenError(`Missing permission: ${PERMISSIONS.MANAGE_PATIENTS}`);
+    }
     const limit = Number(url.searchParams.get("limit") ?? 100);
     const offset = Number(url.searchParams.get("offset") ?? 0);
     const pagination = {
       branchId,
       search,
+      archived,
     };
     const [items, total] = await Promise.all([
       patientService.list(c.env.DB, jwt.tenant_id, { ...pagination, limit, offset }),
@@ -92,16 +99,33 @@ router.put(
   },
 );
 
-// DELETE /api/patients/:id
-router.delete(
-  "/:id",
-  requirePermission(PERMISSIONS.WRITE_PATIENTS),
-  auditLog("delete", "patient"),
+// POST /api/patients/:id/restore
+router.post(
+  "/:id/restore",
+  requirePermission(PERMISSIONS.MANAGE_PATIENTS),
+  auditLog("restore", "patient"),
   async (c) => {
     const jwt = getJwt(c);
-    const ok = await patientService.remove(c.env.DB, jwt.tenant_id, c.req.param("id"));
-    if (!ok) return c.json({ error: "Patient not found", code: "not_found" }, 404);
-    return c.json({ ok: true }, 200);
+    const id = c.req.param("id");
+    const ok = await patientService.restore(c.env.DB, jwt.tenant_id, id);
+    if (!ok) return c.json({ error: "Archived patient not found", code: "not_found" }, 404);
+    return c.json({ id, ok: true }, 200);
+  },
+);
+
+// DELETE /api/patients/:id archives the record without removing clinical history.
+router.delete(
+  "/:id",
+  requirePermission(PERMISSIONS.MANAGE_PATIENTS),
+  auditLog("archive", "patient"),
+  zValidator("json", z.object({ reason: z.string().trim().min(3).max(500) })),
+  async (c) => {
+    const jwt = getJwt(c);
+    const { reason } = c.req.valid("json");
+    const id = c.req.param("id");
+    const ok = await patientService.archive(c.env.DB, jwt.tenant_id, id, jwt.sub, reason);
+    if (!ok) return c.json({ error: "Active patient not found", code: "not_found" }, 404);
+    return c.json({ id, ok: true }, 200);
   },
 );
 

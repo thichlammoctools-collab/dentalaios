@@ -65,6 +65,12 @@ describe("GET /api/patients", () => {
     const res = await authedRequest(app, "GET", "/api/patients", { permissions: ["write_payments"] });
     expect(res.status).toBe(403);
   });
+
+  it("requires manager permission to list archived patients", async () => {
+    const app = mountRoute("/api/patients", patientsRoutes);
+    const res = await authedRequest(app, "GET", "/api/patients?archived=true", { permissions: ["read_patients"] });
+    expect(res.status).toBe(403);
+  });
 });
 
 describe("GET /api/patients/:id/open-treatment-milestones", () => {
@@ -371,36 +377,62 @@ describe("patient note history", () => {
 });
 
 describe("DELETE /api/patients/:id", () => {
-  it("returns 200 for successful delete", async () => {
+  it("archives an active patient with a reason", async () => {
     const app = mountRoute("/api/patients", patientsRoutes);
     const res = await authedRequestWithDB(
       app,
       "DELETE",
       "/api/patients/patient-1",
       new Map(),
+      {
+        permissions: ["manage_patients"],
+        body: { reason: "Bệnh nhân không còn điều trị tại phòng khám" },
+      },
     );
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { ok: boolean };
+    const body = (await res.json()) as { id: string; ok: boolean };
     expect(body.ok).toBe(true);
+    expect(body.id).toBe("patient-1");
   });
 
-  it("deletes clinical records before deleting the patient", async () => {
+  it("preserves clinical records while archiving", async () => {
     const db = createMockD1();
-    const ok = await createPatientsRepository(db as unknown as D1Database).delete("test-tenant", "patient-1");
+    const ok = await createPatientsRepository(db as unknown as D1Database).archive("test-tenant", "patient-1", "user-1", "Chuyển cơ sở điều trị");
 
     expect(ok).toBe(true);
     expect(db.__calls.map((call) => call.sql)).toEqual([
-      "DELETE FROM appointments WHERE tenant_id = ? AND patient_id = ?",
-      "DELETE FROM payments WHERE tenant_id = ? AND patient_id = ?",
-      "DELETE FROM treatment_plan_items WHERE tenant_id = ? AND treatment_plan_id IN (SELECT id FROM treatment_plans WHERE tenant_id = ? AND patient_id = ?)",
-      "DELETE FROM treatment_plans WHERE tenant_id = ? AND patient_id = ?",
-       "DELETE FROM patient_images WHERE tenant_id = ? AND patient_id = ?",
-       "DELETE FROM medical_alerts WHERE tenant_id = ? AND patient_id = ?",
-       "DELETE FROM patient_notes WHERE tenant_id = ? AND patient_id = ?",
-       "DELETE FROM clinical_findings WHERE tenant_id = ? AND visit_id IN (SELECT id FROM visits WHERE tenant_id = ? AND patient_id = ?)",
-      "DELETE FROM visits WHERE tenant_id = ? AND patient_id = ?",
-      "DELETE FROM patients WHERE tenant_id = ? AND id = ?",
+      "UPDATE patients SET archived_at = datetime('now'), archived_by = ?, archive_reason = ? WHERE tenant_id = ? AND id = ? AND archived_at IS NULL",
     ]);
-    expect(db.__calls.at(-1)?.binds).toEqual(["test-tenant", "patient-1"]);
+    expect(db.__calls.at(-1)?.binds).toEqual(["user-1", "Chuyển cơ sở điều trị", "test-tenant", "patient-1"]);
+  });
+
+  it("requires a manager permission and archive reason", async () => {
+    const app = mountRoute("/api/patients", patientsRoutes);
+    const denied = await authedRequest(app, "DELETE", "/api/patients/patient-1", {
+      permissions: ["write_patients"],
+      body: { reason: "Không cần nữa" },
+    });
+    expect(denied.status).toBe(403);
+
+    const invalid = await authedRequest(app, "DELETE", "/api/patients/patient-1", {
+      permissions: ["manage_patients"],
+      body: { reason: "x" },
+    });
+    expect(invalid.status).toBe(400);
+  });
+});
+
+describe("POST /api/patients/:id/restore", () => {
+  it("restores an archived patient for managers", async () => {
+    const app = mountRoute("/api/patients", patientsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/patients/patient-1/restore",
+      new Map(),
+      { permissions: ["manage_patients"] },
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id: "patient-1", ok: true });
   });
 });
