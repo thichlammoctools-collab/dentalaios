@@ -701,16 +701,15 @@ function EditAppointmentDialog({
     }
     setSaving(true);
     try {
-      const scheduled_at = combineDateTime(date, time);
       const updated = await apiPatch<Appointment>(`/api/appointments/${appointment.id}`, {
-        scheduled_at,
-        duration_min: durationMin,
+        ...(isRescheduling ? { scheduled_at: combineDateTime(date, time) } : {}),
+        ...(durationMin !== appointment.duration_min ? { duration_min: durationMin } : {}),
         status,
-        clinician_id: clinicianId,
-        assistant_id: assistantId || null,
-        chair_id: chairId || null,
-        procedure: procedure || undefined,
-        notes: notes || undefined,
+        ...(clinicianId !== appointment.clinician_id ? { clinician_id: clinicianId } : {}),
+        ...(assistantId !== (appointment.assistant_id ?? "") ? { assistant_id: assistantId || null } : {}),
+        ...(chairId !== (appointment.chair_id ?? "") ? { chair_id: chairId || null } : {}),
+        ...(procedure !== (appointment.procedure ?? "") ? { procedure: procedure || undefined } : {}),
+        ...(notes !== (appointment.notes ?? "") ? { notes: notes || undefined } : {}),
       });
       onSaved(updated);
       toast.success("Đã cập nhật lịch hẹn");
@@ -801,13 +800,13 @@ function EditAppointmentDialog({
                 const minimum = getMinimumAppointmentTime(nextDate);
                 if (minimum && time < minimum) setTime(minimum);
               }}
-              min={ymd(new Date())}
+              min={apptDate >= new Date() ? ymd(new Date()) : undefined}
               disabled={isCancelled}
             />
           </div>
           <div className="grid gap-1.5">
             <Label>Giờ</Label>
-            <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} min={getMinimumAppointmentTime(date)} disabled={isCancelled} />
+            <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} min={apptDate >= new Date() ? getMinimumAppointmentTime(date) : undefined} disabled={isCancelled} />
           </div>
         </div>
 

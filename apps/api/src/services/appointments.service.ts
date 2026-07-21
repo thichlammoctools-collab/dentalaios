@@ -154,9 +154,9 @@ export const appointmentsService = {
     const newScheduledAt = input.scheduled_at ?? existing.scheduled_at;
     const newChairId = input.chair_id === undefined ? existing.chair_id : input.chair_id ?? undefined;
     const rescheduling =
-      input.scheduled_at !== undefined ||
-      input.duration_min !== undefined ||
-      input.clinician_id !== undefined;
+      (input.scheduled_at !== undefined && input.scheduled_at !== existing.scheduled_at) ||
+      (input.duration_min !== undefined && input.duration_min !== existing.duration_min) ||
+      (input.clinician_id !== undefined && input.clinician_id !== existing.clinician_id);
 
     if (rescheduling) {
       assertAppointmentIsSchedulable(newScheduledAt);
