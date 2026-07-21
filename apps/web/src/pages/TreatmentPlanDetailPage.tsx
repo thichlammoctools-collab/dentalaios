@@ -304,7 +304,12 @@ export function TreatmentPlanDetailPage() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Kế hoạch điều trị</h1>
             <p className="text-sm text-muted-foreground">
-              {plan.code && <span className="font-mono">{plan.code} · </span>}Tạo {formatDateTime(plan.created_at)}
+              {plan.code && (
+                <span className="mr-1 inline-flex rounded-md border border-primary/40 bg-primary/10 px-2 py-0.5 font-mono text-sm font-semibold tracking-wide text-primary">
+                  {plan.code}
+                </span>
+              )}
+              Tạo {formatDateTime(plan.created_at)}
               {plan.approved_at && ` · Duyệt ${formatDateTime(plan.approved_at)}`}
             </p>
           </div>

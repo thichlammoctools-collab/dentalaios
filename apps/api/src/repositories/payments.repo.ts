@@ -106,9 +106,12 @@ export function createPaymentsRepository(db: D1Database): PaymentsRepository {
         ),
         ...allocations.map((allocation) => db.prepare(
           `INSERT INTO payment_item_allocations
-             (id, tenant_id, payment_id, treatment_plan_item_id, amount)
-           VALUES (?, ?, ?, ?, ?)`,
-        ).bind(crypto.randomUUID(), tenantId, id, allocation.treatment_plan_item_id, allocation.amount)),
+             (id, tenant_id, payment_id, treatment_plan_item_id, amount, discount_amount, discount_reason)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        ).bind(
+          crypto.randomUUID(), tenantId, id, allocation.treatment_plan_item_id, allocation.amount,
+          allocation.discount_amount ?? 0, allocation.discount_reason ?? null,
+        )),
       ];
       await db.batch(statements);
       const created = await this.getById(tenantId, id);

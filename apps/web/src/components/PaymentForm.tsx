@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
@@ -32,22 +33,31 @@ export function PaymentForm({ open, onOpenChange, patientId, plans, onCreated }:
   const [amount, setAmount] = useState<number | "">("");
   const [items, setItems] = useState<PaymentableTreatmentPlanItem[]>([]);
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [discounts, setDiscounts] = useState<Record<string, { amount: number | ""; reason: string }>>({});
   const [method, setMethod] = useState<"cash" | "transfer" | "card" | "other">("cash");
   const [reference, setReference] = useState("");
+  const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
   const selectedItems = items.filter((item) => selectedItemIds.includes(item.id));
   const selectedOutstanding = selectedItems.reduce((total, item) => total + item.outstanding_amount, 0);
+  const selectedDiscount = selectedItems.reduce((total, item) => {
+    const discount = discounts[item.id]?.amount;
+    return total + (typeof discount === "number" ? discount : 0);
+  }, 0);
+  const selectedNetOutstanding = selectedOutstanding - selectedDiscount;
 
   useEffect(() => {
     if (!open || !planId) {
       setItems([]);
       setSelectedItemIds([]);
+      setDiscounts({});
       return;
     }
     let active = true;
     setItems([]);
     setSelectedItemIds([]);
+    setDiscounts({});
     void apiGet<{ items: PaymentableTreatmentPlanItem[] }>(`/api/payments/paymentable-items?treatment_plan_id=${planId}`)
       .then((response) => {
         if (!active) return;
@@ -64,15 +74,35 @@ export function PaymentForm({ open, onOpenChange, patientId, plans, onCreated }:
     setSelectedItemIds((current) => current.includes(id)
       ? current.filter((itemId) => itemId !== id)
       : [...current, id]);
+    setDiscounts((current) => {
+      if (!(id in current)) return current;
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  }
+
+  function updateDiscount(id: string, patch: Partial<{ amount: number | ""; reason: string }>) {
+    setDiscounts((current) => ({
+      ...current,
+      [id]: { amount: current[id]?.amount ?? "", reason: current[id]?.reason ?? "", ...patch },
+    }));
   }
 
   function allocationsForAmount(paymentAmount: number) {
     let remaining = paymentAmount;
     return selectedItems.map((item) => {
-      const allocation = Math.min(item.outstanding_amount, remaining);
+      const discount = discounts[item.id];
+      const discountAmount = typeof discount?.amount === "number" ? discount.amount : 0;
+      const allocation = Math.min(item.outstanding_amount - discountAmount, remaining);
       remaining -= allocation;
-      return { treatment_plan_item_id: item.id, amount: allocation };
-    }).filter((allocation) => allocation.amount > 0);
+      return {
+        treatment_plan_item_id: item.id,
+        amount: allocation,
+        discount_amount: discountAmount,
+        discount_reason: discount?.reason.trim() || undefined,
+      };
+    }).filter((allocation) => allocation.amount > 0 || allocation.discount_amount > 0);
   }
 
   async function onSubmit(e: FormEvent) {
@@ -89,8 +119,20 @@ export function PaymentForm({ open, onOpenChange, patientId, plans, onCreated }:
       toast.error("Chọn ít nhất một dịch vụ chưa thanh toán");
       return;
     }
-    if (amount > selectedOutstanding) {
-      toast.error("Số tiền không được vượt số tiền chưa thanh toán của các dịch vụ đã chọn");
+    for (const item of selectedItems) {
+      const discount = discounts[item.id];
+      const discountAmount = typeof discount?.amount === "number" ? discount.amount : 0;
+      if (discountAmount > item.outstanding_amount) {
+        toast.error("Giảm giá không được vượt số tiền chưa thanh toán của dịch vụ");
+        return;
+      }
+      if (discountAmount > 0 && !discount?.reason.trim()) {
+        toast.error("Cần ghi lý do giảm giá cho từng dịch vụ");
+        return;
+      }
+    }
+    if (amount > selectedNetOutstanding) {
+      toast.error("Số tiền không được vượt số tiền còn lại sau giảm giá của các dịch vụ đã chọn");
       return;
     }
     setSaving(true);
@@ -103,13 +145,16 @@ export function PaymentForm({ open, onOpenChange, patientId, plans, onCreated }:
         currency: "VND",
         method,
         reference: reference || undefined,
+        notes: notes.trim() || undefined,
       });
       toast.success("Đã ghi nhận thanh toán");
       onCreated(created);
       onOpenChange(false);
       setAmount("");
       setReference("");
+      setNotes("");
       setSelectedItemIds([]);
+      setDiscounts({});
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi tạo payment");
     } finally {
@@ -157,26 +202,50 @@ export function PaymentForm({ open, onOpenChange, patientId, plans, onCreated }:
                 const selectable = item.outstanding_amount > 0;
                 const itemLabel = item.service_name || item.description || item.procedure;
                 return (
-                  <label key={item.id} className={`flex cursor-pointer items-start gap-3 px-3 py-2.5 text-sm ${!selectable ? "cursor-not-allowed opacity-60" : ""}`}>
-                    <input
-                      type="checkbox"
-                      className="mt-1 h-4 w-4 accent-primary"
-                      checked={selectedItemIds.includes(item.id)}
-                      disabled={!selectable}
-                      onChange={() => toggleItem(item.id)}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block font-medium">{item.tooth_number ? `Răng ${item.tooth_number}: ` : ""}{itemLabel}</span>
-                      <span className="block text-xs text-muted-foreground">
-                        Giá {item.unit_cost.toLocaleString("vi-VN")} VND · Đã thanh toán {item.paid_amount.toLocaleString("vi-VN")} VND · Chờ xác nhận {item.pending_amount.toLocaleString("vi-VN")} VND · Có thể thanh toán {item.outstanding_amount.toLocaleString("vi-VN")} VND
+                  <div key={item.id} className={`px-3 py-2.5 text-sm ${!selectable ? "opacity-60" : ""}`}>
+                    <label className={`flex cursor-pointer items-start gap-3 ${!selectable ? "cursor-not-allowed" : ""}`}>
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4 accent-primary"
+                        checked={selectedItemIds.includes(item.id)}
+                        disabled={!selectable}
+                        onChange={() => toggleItem(item.id)}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-medium">{item.tooth_number ? `Răng ${item.tooth_number}: ` : ""}{itemLabel}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          Giá dịch vụ {item.unit_cost.toLocaleString("vi-VN")} VND · Đã thanh toán {item.paid_amount.toLocaleString("vi-VN")} VND · Chờ xác nhận {item.pending_amount.toLocaleString("vi-VN")} VND · Còn lại {item.outstanding_amount.toLocaleString("vi-VN")} VND
+                        </span>
                       </span>
-                    </span>
-                  </label>
+                    </label>
+                    {selectedItemIds.includes(item.id) && (
+                      <div className="mt-2 grid gap-2 pl-7 sm:grid-cols-[180px_1fr]">
+                        <div className="grid gap-1">
+                          <Label htmlFor={`discount-${item.id}`} className="text-xs">Giảm giá (VND)</Label>
+                          <CurrencyInput
+                            id={`discount-${item.id}`}
+                            value={discounts[item.id]?.amount ?? ""}
+                            onChange={(value) => updateDiscount(item.id, { amount: value })}
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className="grid gap-1">
+                          <Label htmlFor={`discount-reason-${item.id}`} className="text-xs">Lý do giảm giá</Label>
+                          <Input
+                            id={`discount-reason-${item.id}`}
+                            value={discounts[item.id]?.reason ?? ""}
+                            onChange={(event) => updateDiscount(item.id, { reason: event.target.value })}
+                            placeholder="Bắt buộc khi có giảm giá"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
             {selectedItems.length > 0 && (
-              <p className="text-xs text-muted-foreground">Tổng chưa thanh toán của dịch vụ đã chọn: {selectedOutstanding.toLocaleString("vi-VN")} VND</p>
+              <p className="text-xs text-muted-foreground">Giá còn lại: {selectedOutstanding.toLocaleString("vi-VN")} VND · Giảm giá: {selectedDiscount.toLocaleString("vi-VN")} VND · Cần thu tối đa: {selectedNetOutstanding.toLocaleString("vi-VN")} VND</p>
             )}
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -215,6 +284,15 @@ export function PaymentForm({ open, onOpenChange, patientId, plans, onCreated }:
               value={reference}
               onChange={(e) => setReference(e.target.value)}
               placeholder="VD: mã giao dịch, số biên nhận…"
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="payment-notes">Ghi chú thanh toán</Label>
+            <Textarea
+              id="payment-notes"
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="VD: nội dung trao đổi, điều kiện áp dụng khuyến mãi..."
             />
           </div>
         </DialogBody>

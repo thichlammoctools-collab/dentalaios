@@ -384,6 +384,8 @@ export interface Payment {
 export interface PaymentItemAllocationInput {
   treatment_plan_item_id: string;
   amount: number;
+  discount_amount?: number;
+  discount_reason?: string;
 }
 
 export interface PaymentableTreatmentPlanItem extends TreatmentPlanItem {

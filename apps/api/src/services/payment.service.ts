@@ -51,8 +51,12 @@ export const paymentService = {
     for (const allocation of data.allocations) {
       const item = itemById.get(allocation.treatment_plan_item_id);
       if (!item) throw new ValidationError("Dịch vụ không thuộc kế hoạch điều trị");
-      if (allocation.amount > item.outstanding_amount) {
-        throw new ValidationError("Số tiền phân bổ vượt số tiền chưa thanh toán của dịch vụ");
+      const discountAmount = allocation.discount_amount ?? 0;
+      if (discountAmount > 0 && !allocation.discount_reason?.trim()) {
+        throw new ValidationError("Cần ghi rõ lý do giảm giá cho từng dịch vụ");
+      }
+      if (allocation.amount + discountAmount > item.outstanding_amount) {
+        throw new ValidationError("Tiền thu và giảm giá vượt số tiền chưa thanh toán của dịch vụ");
       }
     }
 
@@ -80,8 +84,9 @@ export const paymentService = {
     if (!plan) throw new NotFoundError("Treatment plan not found");
     const result = await db.prepare(
       `SELECT treatment_plan_items.*,
-              COALESCE(SUM(CASE WHEN payments.status = 'confirmed' THEN payment_item_allocations.amount ELSE 0 END), 0) AS paid_amount,
-              COALESCE(SUM(CASE WHEN payments.status = 'pending' THEN payment_item_allocations.amount ELSE 0 END), 0) AS pending_amount
+               COALESCE(SUM(CASE WHEN payments.status = 'confirmed' THEN payment_item_allocations.amount ELSE 0 END), 0) AS paid_amount,
+               COALESCE(SUM(CASE WHEN payments.status = 'pending' THEN payment_item_allocations.amount ELSE 0 END), 0) AS pending_amount,
+               COALESCE(SUM(CASE WHEN payments.status IN ('confirmed', 'pending') THEN payment_item_allocations.discount_amount ELSE 0 END), 0) AS discount_amount
          FROM treatment_plan_items
          LEFT JOIN payment_item_allocations
            ON payment_item_allocations.tenant_id = treatment_plan_items.tenant_id
@@ -97,6 +102,7 @@ export const paymentService = {
     return result.results.map((row) => {
       const paidAmount = Number(row.paid_amount ?? 0);
       const pendingAmount = Number(row.pending_amount ?? 0);
+      const discountAmount = Number(row.discount_amount ?? 0);
       const unitCost = Number(row.unit_cost ?? 0);
       return {
         id: row.id as string,
@@ -111,7 +117,7 @@ export const paymentService = {
         created_at: row.created_at as string,
         paid_amount: paidAmount,
         pending_amount: pendingAmount,
-        outstanding_amount: Math.max(0, unitCost - paidAmount - pendingAmount),
+        outstanding_amount: Math.max(0, unitCost - paidAmount - pendingAmount - discountAmount),
       };
     });
   },

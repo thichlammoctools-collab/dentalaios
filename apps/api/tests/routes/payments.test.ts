@@ -140,6 +140,74 @@ describe("POST /api/payments", () => {
     expect(body.status).toBe("pending");
   });
 
+  it("accepts a service discount when it includes a reason", async () => {
+    const app = mountRoute("/api/payments", paymentsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/payments",
+      new Map([
+        ["FROM treatment_plans", [{
+          id: "plan-1", tenant_id: "test-tenant", patient_id: "patient-1", status: "approved",
+          visit_id: "v1", total_cost: 1000000, currency: "VND", notes: null, approved_at: null, created_at: "2026-01-01",
+        }]],
+        ["FROM treatment_plan_items", [{
+          id: "item-1", tenant_id: "test-tenant", treatment_plan_id: "plan-1", procedure: "filling",
+          description: "Trám răng", unit_cost: 1000000, status: "planned", created_at: "2026-01-01",
+          paid_amount: 0, pending_amount: 0, discount_amount: 0,
+        }]],
+        ["FROM tenant_settings", []],
+        ["INSERT INTO payment_code_counters", [{ last_seq: 1 }]],
+        ["FROM payments WHERE code =", []],
+        ["FROM payments", [paymentRow({ amount: 900000 })]],
+      ]),
+      {
+        permissions: ["write_payments"],
+        body: {
+          treatment_plan_id: "plan-1",
+          patient_id: "patient-1",
+          amount: 900000,
+          allocations: [{ treatment_plan_item_id: "item-1", amount: 900000, discount_amount: 100000, discount_reason: "Khuyến mãi khai trương" }],
+          currency: "VND",
+          method: "cash",
+        },
+      },
+    );
+    expect(res.status).toBe(201);
+  });
+
+  it("rejects a discount without a reason", async () => {
+    const app = mountRoute("/api/payments", paymentsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/payments",
+      new Map([
+        ["FROM treatment_plans", [{
+          id: "plan-1", tenant_id: "test-tenant", patient_id: "patient-1", status: "approved",
+          visit_id: "v1", total_cost: 1000000, currency: "VND", notes: null, approved_at: null, created_at: "2026-01-01",
+        }]],
+        ["FROM treatment_plan_items", [{
+          id: "item-1", tenant_id: "test-tenant", treatment_plan_id: "plan-1", procedure: "filling",
+          description: "Trám răng", unit_cost: 1000000, status: "planned", created_at: "2026-01-01",
+          paid_amount: 0, pending_amount: 0, discount_amount: 0,
+        }]],
+      ]),
+      {
+        permissions: ["write_payments"],
+        body: {
+          treatment_plan_id: "plan-1",
+          patient_id: "patient-1",
+          amount: 900000,
+          allocations: [{ treatment_plan_item_id: "item-1", amount: 900000, discount_amount: 100000 }],
+          currency: "VND",
+          method: "cash",
+        },
+      },
+    );
+    expect(res.status).toBe(422);
+  });
+
   it("returns 400 for missing required fields", async () => {
     const app = mountRoute("/api/payments", paymentsRoutes);
     const res = await authedRequestWithDB(
