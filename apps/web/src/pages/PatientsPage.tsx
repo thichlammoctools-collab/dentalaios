@@ -11,6 +11,7 @@ import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/pagination";
 import { apiDelete, apiGet, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
+import { PageContainer } from "@/components/PageContainer";
 import type { Patient } from "@shared/types";
 
 interface PatientsResponse {
@@ -87,7 +88,7 @@ export function PatientsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-4 sm:p-6">
+    <PageContainer className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Bệnh nhân</h1>
@@ -237,6 +238,6 @@ export function PatientsPage() {
       </Card>
 
       <PatientForm open={openForm} onOpenChange={(v) => { if (!v) setEditPatient(undefined); setOpenForm(v); }} patient={editPatient} onSaved={() => load(search, page)} />
-    </div>
+    </PageContainer>
   );
 }

@@ -14,6 +14,7 @@ import { apiGet, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { formatDateTime } from "@/lib/utils";
 import type { AuditLog } from "@shared/types";
+import { PageContainer } from "@/components/PageContainer";
 
 interface AuditResponse {
   items: AuditLog[];
@@ -49,7 +50,7 @@ export function AuditLogsPage() {
   }, [page]);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 px-6 py-6">
+    <PageContainer className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Audit logs</h1>
         <p className="text-sm text-muted-foreground">
@@ -106,6 +107,6 @@ export function AuditLogsPage() {
           <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={total} disabled={loading} onPageChange={setPage} />
         </CardContent>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

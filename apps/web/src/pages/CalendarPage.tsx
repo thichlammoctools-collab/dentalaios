@@ -11,6 +11,7 @@ import { apiGet, apiPost, apiPatch, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { getMinimumAppointmentTime, getNextAppointmentSlot, isAppointmentTimeInPast } from "@/lib/appointment-time";
 import type { Appointment, Patient, User } from "@shared/types";
+import { PageContainer } from "@/components/PageContainer";
 
 interface AppointmentsResponse { items: Appointment[]; total: number }
 interface PatientsResponse { items: Patient[]; total: number }
@@ -299,7 +300,7 @@ export function CalendarPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-4 sm:space-y-4 sm:p-6">
+    <PageContainer className="space-y-4">
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -580,6 +581,6 @@ export function CalendarPage() {
           </div>
         </form>
       </Dialog>
-    </div>
+    </PageContainer>
   );
 }

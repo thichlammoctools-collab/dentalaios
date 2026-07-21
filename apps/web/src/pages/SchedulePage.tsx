@@ -20,6 +20,7 @@ import type { Appointment, DentalChair, Patient, UserWithDetails, Visit } from "
 import { isAssistantRole, isDoctorRole, ROUTES } from "@shared/constants";
 import { formatDate, formatTime, getWeekDays, isoToTime, isoToYmd, weekdayLabel, ymd, combineDateTime } from "@/lib/utils";
 import { getMinimumAppointmentTime, isAppointmentTimeInPast } from "@/lib/appointment-time";
+import { PageContainer } from "@/components/PageContainer";
 
 interface AppointmentsResponse { items: Appointment[]; total: number }
 interface PatientsResponse { items: Patient[]; total: number }
@@ -207,7 +208,7 @@ export function SchedulePage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+    <PageContainer>
       {/* Header */}
       <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-700 p-5 text-white shadow-lg sm:p-8">
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Lịch hẹn</h1>
@@ -594,7 +595,7 @@ export function SchedulePage() {
           onCancelled={handleCancel}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }
 

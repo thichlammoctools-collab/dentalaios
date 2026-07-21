@@ -9,6 +9,7 @@ import { toast } from "@/lib/toast";
 import { PERMISSIONS, ROUTES } from "@shared/constants";
 import type { ChairOperationalStatus, DentalChair, DentalChairType, DentalRoom } from "@shared/types";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/pagination";
+import { PageContainer } from "@/components/PageContainer";
 
 interface ChairsResponse {
   items: DentalChair[];
@@ -217,7 +218,7 @@ export function ChairSettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+    <PageContainer>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Cấu hình ghế nha</h1>
@@ -285,7 +286,7 @@ export function ChairSettingsPage() {
         <DialogBody><Field label="Tên phòng" required><input value={roomName} onChange={(event) => setRoomName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void createRoom(); }} placeholder="Phòng 01" autoFocus className={INPUT_CLASS} /></Field></DialogBody>
         <DialogFooter><Button variant="outline" onClick={() => setRoomDialogOpen(false)}>Hủy</Button><Button disabled={savingRoom} onClick={() => void createRoom()}>{savingRoom ? "Đang tạo..." : "Tạo phòng"}</Button></DialogFooter>
       </Dialog>
-    </div>
+    </PageContainer>
   );
 }
 
