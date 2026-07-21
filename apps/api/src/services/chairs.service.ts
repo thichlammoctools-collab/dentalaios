@@ -35,6 +35,15 @@ export interface ChairUtilization {
   appointment_count: number;
 }
 
+export interface ChairScheduleAppointment {
+  id: string;
+  chair_id: string;
+  scheduled_at: string;
+  duration_min: number;
+  patient_name: string;
+  clinician_name: string;
+}
+
 function endOf(start: string, durationMin: number): string {
   const end = new Date(start);
   end.setMinutes(end.getMinutes() + durationMin);
@@ -257,6 +266,33 @@ export const chairsService = {
       ...bounds,
       items: chairs.map((chair) => ({ chair, appointment_count: metrics.get(chair.id)?.appointment_count ?? 0, scheduled_minutes: metrics.get(chair.id)?.scheduled_minutes ?? 0 })),
     };
+  },
+
+  async schedule(
+    db: D1Database,
+    tenantId: string,
+    branchId: string,
+    date: string,
+  ): Promise<ChairScheduleAppointment[]> {
+    await assertAllInTenant(db, tenantId, [{ table: "branches", id: branchId }]);
+    const bounds = localDayBounds(date);
+    const result = await db.prepare(`SELECT a.id, a.chair_id, a.scheduled_at, a.duration_min,
+        p.name AS patient_name, u.name AS clinician_name
+      FROM appointments a
+      JOIN patients p ON p.id = a.patient_id AND p.tenant_id = a.tenant_id
+      JOIN users u ON u.id = a.clinician_id AND u.tenant_id = a.tenant_id
+      WHERE a.tenant_id = ? AND a.branch_id = ? AND a.chair_id IS NOT NULL
+        AND a.status NOT IN ('cancelled', 'no_show')
+        AND datetime(a.scheduled_at) >= datetime(?) AND datetime(a.scheduled_at) < datetime(?)
+      ORDER BY a.scheduled_at ASC`).bind(tenantId, branchId, bounds.start, bounds.end).all<D1Row>();
+    return (result.results ?? []).map((row) => ({
+      id: row.id as string,
+      chair_id: row.chair_id as string,
+      scheduled_at: row.scheduled_at as string,
+      duration_min: Number(row.duration_min),
+      patient_name: row.patient_name as string,
+      clinician_name: row.clinician_name as string,
+    }));
   },
 
   async revenueReport(db: D1Database, tenantId: string, branchId: string, range: 7 | 30 | 90) {

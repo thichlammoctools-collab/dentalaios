@@ -11,7 +11,7 @@ import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import type { Appointment, DentalChair, Patient, PatientOpenTreatmentMilestone, TreatmentCaseMilestone, UserWithDetails } from "@shared/types";
 import { isAssistantRole, isDoctorRole } from "@shared/constants";
-import { combineDateTime, ymd } from "@/lib/utils";
+import { combineDateTime, isoToTime, ymd } from "@/lib/utils";
 import { getMinimumAppointmentTime, getNextAppointmentSlot, isAppointmentTimeInPast } from "@/lib/appointment-time";
 import { PatientCombobox } from "./PatientCombobox";
 
@@ -42,6 +42,9 @@ interface ChairUtilizationMetrics {
   today: { appointment_count: number; scheduled_minutes: number };
   week: { appointment_count: number; scheduled_minutes: number };
 }
+interface ChairScheduleResponse {
+  items: Array<{ id: string; chair_id: string; scheduled_at: string; duration_min: number; patient_name: string; clinician_name: string }>;
+}
 interface OpenMilestonesResponse { items: PatientOpenTreatmentMilestone[]; total: number }
 
 export function AppointmentForm({
@@ -61,6 +64,8 @@ export function AppointmentForm({
   const [chairId, setChairId] = useState("");
   const [chairAvailability, setChairAvailability] = useState<ChairAvailabilityResponse["items"]>([]);
   const [chairUtilization, setChairUtilization] = useState<ChairUtilizationMetrics | null>(null);
+  const [chairSchedule, setChairSchedule] = useState<ChairScheduleResponse["items"]>([]);
+  const [showChairSchedule, setShowChairSchedule] = useState(false);
   const defaultSlot = getNextAppointmentSlot();
   const [date, setDate] = useState(initialDate ?? defaultSlot.date);
   const [time, setTime] = useState(initialHour != null ? `${String(initialHour).padStart(2, "0")}:00` : defaultSlot.time);
@@ -166,6 +171,22 @@ export function AppointmentForm({
     });
     return () => { cancelled = true; };
   }, [open, chairId, session?.branch?.id]);
+
+  useEffect(() => {
+    if (!open || !chairId || !session?.branch?.id) {
+      setChairSchedule([]);
+      return;
+    }
+    let cancelled = false;
+    apiGet<ChairScheduleResponse>(`/api/chairs/schedule?branch_id=${session.branch.id}&date=${date}`)
+      .then((response) => {
+        if (!cancelled) setChairSchedule(response.items.filter((item) => item.chair_id === chairId));
+      })
+      .catch(() => {
+        if (!cancelled) setChairSchedule([]);
+      });
+    return () => { cancelled = true; };
+  }, [open, chairId, date, session?.branch?.id]);
 
   // Default clinician = currently logged-in user if doctor, else first doctor in branch
   useEffect(() => {
@@ -302,6 +323,10 @@ export function AppointmentForm({
       .map((candidate) => candidate.item.service_name ?? candidate.item.procedure);
     setProcedure([...new Set(names)].join("; "));
   }
+
+  const selectedChairAvailability = chairAvailability.find((item) => item.chair.id === chairId);
+  const chairHasConflict = chairId !== "" && selectedChairAvailability?.available === false && selectedChairAvailability.reason === "reserved";
+  const suggestedTimes = getSuggestedChairTimes(date, time, durationMin, chairSchedule);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -461,6 +486,34 @@ export function AppointmentForm({
                   <div><p className="text-xs text-muted-foreground">Công suất tuần này</p><p className="mt-0.5 font-medium">{chairUtilization.week.appointment_count} lịch · {chairUtilization.week.scheduled_minutes} phút</p></div>
                 </div>
               )}
+              {chairId && (
+                <>
+                  <div className={`rounded-md border px-3 py-2 text-sm ${chairHasConflict ? "border-destructive/50 bg-destructive/10 text-destructive" : "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"}`}>
+                    {chairHasConflict ? "Trùng lịch ghế với khung giờ đang chọn. Vui lòng chọn giờ hoặc ghế khác." : "Ghế trống cho khung giờ đang chọn, bao gồm khoảng đệm chuẩn bị 5 phút."}
+                  </div>
+                  {chairHasConflict && suggestedTimes.length > 0 && (
+                    <div className="rounded-md border border-border p-3">
+                      <p className="text-xs font-medium text-muted-foreground">Giờ phù hợp gần nhất</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {suggestedTimes.map((suggestedTime) => <Button key={suggestedTime} type="button" size="sm" variant="outline" onClick={() => setTime(suggestedTime)}>{suggestedTime}</Button>)}
+                      </div>
+                    </div>
+                  )}
+                  <Button type="button" variant="ghost" size="sm" className="w-fit px-0" onClick={() => setShowChairSchedule((value) => !value)}>
+                    {showChairSchedule ? "Ẩn lịch ghế" : `Xem lịch ghế ngày ${date}`}
+                  </Button>
+                  {showChairSchedule && (
+                    <div className="max-h-44 space-y-2 overflow-y-auto rounded-md border border-border p-2">
+                      {chairSchedule.length === 0 ? <p className="p-1 text-sm text-muted-foreground">Ghế chưa có lịch trong ngày này.</p> : chairSchedule.map((appointment) => (
+                        <div key={appointment.id} className="rounded bg-muted/50 px-3 py-2 text-sm">
+                          <p className="font-medium">{isoToTime(appointment.scheduled_at)} · {appointment.duration_min} phút</p>
+                          <p className="text-xs text-muted-foreground">{appointment.patient_name} · BS. {appointment.clinician_name}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 
@@ -511,6 +564,28 @@ export function AppointmentForm({
       </form>
     </Dialog>
   );
+}
+
+function getSuggestedChairTimes(
+  date: string,
+  currentTime: string,
+  durationMin: number,
+  appointments: ChairScheduleResponse["items"],
+): string[] {
+  const current = new Date(`${date}T${currentTime}:00`).getTime();
+  const candidates: string[] = [];
+  for (let offset = 5; offset <= 180 && candidates.length < 3; offset += 5) {
+    const candidate = new Date(current + offset * 60_000);
+    const start = candidate.getTime();
+    const end = start + durationMin * 60_000;
+    const available = appointments.every((appointment) => {
+      const appointmentStart = new Date(appointment.scheduled_at).getTime();
+      const appointmentEnd = appointmentStart + appointment.duration_min * 60_000;
+      return start >= appointmentEnd + 5 * 60_000 || end + 5 * 60_000 <= appointmentStart;
+    });
+    if (available) candidates.push(`${String(candidate.getHours()).padStart(2, "0")}:${String(candidate.getMinutes()).padStart(2, "0")}`);
+  }
+  return candidates;
 }
 
 function AppointmentSteps({ step }: { step: 1 | 2 }) {

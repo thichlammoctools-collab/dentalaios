@@ -567,6 +567,11 @@ export const chairUtilizationQuerySchema = z.object({
   period: z.enum(["today", "week"]).default("today"),
 });
 
+export const chairScheduleQuerySchema = z.object({
+  branch_id: z.string().min(1),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
 export const chairRevenueReportQuerySchema = z.object({
   branch_id: z.string().min(1),
   range: z.coerce.number().int().refine((value): value is 7 | 30 | 90 => [7, 30, 90].includes(value), {

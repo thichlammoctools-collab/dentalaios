@@ -154,6 +154,28 @@ describe("GET /api/chairs/utilization", () => {
   });
 });
 
+describe("GET /api/chairs/schedule", () => {
+  it("returns chair appointments with only patient and clinician display names", async () => {
+    const app = mountRoute("/api/chairs", chairsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "GET",
+      "/api/chairs/schedule?branch_id=test-branch&date=2026-07-21",
+      new Map([
+        ["FROM branches", [{ id: "test-branch" }]],
+        ["FROM appointments a", [{
+          id: "appt-1", chair_id: "chair-1", scheduled_at: "2026-07-21T02:00:00.000Z", duration_min: 30,
+          patient_name: "Nguyễn Văn A", clinician_name: "Bác sĩ B",
+        }]],
+      ]),
+      { permissions: ["read_patients"] },
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as { items: Array<{ patient_name: string; clinician_name: string }> };
+    expect(body.items).toEqual([expect.objectContaining({ patient_name: "Nguyễn Văn A", clinician_name: "Bác sĩ B" })]);
+  });
+});
+
 describe("PATCH /api/chairs/:id/status", () => {
   it("requires appointment write permission", async () => {
     const app = mountRoute("/api/chairs", chairsRoutes);
