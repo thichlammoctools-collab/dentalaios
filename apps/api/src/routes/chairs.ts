@@ -3,6 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import {
   chairAvailabilityQuerySchema,
   chairBoardQuerySchema,
+  chairUtilizationQuerySchema,
   chairRevenueReportQuerySchema,
   chairCreateSchema,
   roomCreateSchema,
@@ -43,6 +44,13 @@ router.get("/board", requirePermission(PERMISSIONS.READ_PATIENTS), zValidator("q
     chairs: board.chairs,
     ...(canViewRevenue ? { unallocated_revenue: board.unallocated_revenue ?? 0 } : {}),
   });
+});
+
+router.get("/utilization", requirePermission(PERMISSIONS.READ_PATIENTS), zValidator("query", chairUtilizationQuerySchema), async (c) => {
+  const jwt = getJwt(c);
+  const query = c.req.valid("query");
+  const result = await chairsService.utilization(c.env.DB, jwt.tenant_id, query.branch_id, query.period);
+  return c.json({ branch_id: query.branch_id, period: query.period, ...result });
 });
 
 router.get("/revenue-report", requirePermission(PERMISSIONS.VIEW_MANAGEMENT_DASHBOARD), zValidator("query", chairRevenueReportQuerySchema), async (c) => {

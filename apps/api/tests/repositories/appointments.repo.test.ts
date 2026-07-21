@@ -14,4 +14,17 @@ describe("appointments repository", () => {
     expect(update?.sql).toContain("assistant_id = ?");
     expect(update?.binds).toEqual([null, "tenant-1", "appointment-1"]);
   });
+
+  it("reserves five preparation minutes before and after chair appointments", async () => {
+    const db = createMockD1();
+
+    await createAppointmentsRepository(db as any).findChairConflicts(
+      "tenant-1", "chair-1", "2099-07-15T08:00:00.000Z", "2099-07-15T08:30:00.000Z",
+    );
+
+    const query = db.__sqlContaining("chair_id = ?")[0];
+    expect(query.sql).toContain("datetime(?, '+' || ? || ' minutes')");
+    expect(query.sql).toContain("duration_min + ?");
+    expect(query.binds).toEqual(expect.arrayContaining([5]));
+  });
 });

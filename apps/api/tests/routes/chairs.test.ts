@@ -124,6 +124,36 @@ describe("GET /api/chairs/revenue-report", () => {
   });
 });
 
+describe("GET /api/chairs/utilization", () => {
+  it("returns today utilization for every chair", async () => {
+    const app = mountRoute("/api/chairs", chairsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "GET",
+      "/api/chairs/utilization?branch_id=test-branch&period=today",
+      new Map([
+        ["FROM branches", [{ id: "test-branch" }]],
+        ["FROM dental_chairs", [chairRow(), chairRow({ id: "chair-2", code: "CHAIR-02" })]],
+        ["GROUP BY chair_id", [{ chair_id: "chair-1", appointment_count: 2, scheduled_minutes: 75 }]],
+      ]),
+      { permissions: ["read_patients"] },
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as { period: string; items: Array<{ chair: { id: string }; appointment_count: number; scheduled_minutes: number }> };
+    expect(body.period).toBe("today");
+    expect(body.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ chair: expect.objectContaining({ id: "chair-1" }), appointment_count: 2, scheduled_minutes: 75 }),
+      expect.objectContaining({ chair: expect.objectContaining({ id: "chair-2" }), appointment_count: 0, scheduled_minutes: 0 }),
+    ]));
+  });
+
+  it("rejects an unsupported utilization period", async () => {
+    const app = mountRoute("/api/chairs", chairsRoutes);
+    const res = await authedRequestWithDB(app, "GET", "/api/chairs/utilization?branch_id=test-branch&period=month", new Map(), { permissions: ["read_patients"] });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("PATCH /api/chairs/:id/status", () => {
   it("requires appointment write permission", async () => {
     const app = mountRoute("/api/chairs", chairsRoutes);

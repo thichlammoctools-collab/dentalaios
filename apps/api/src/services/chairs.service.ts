@@ -29,6 +29,12 @@ export interface ChairBoardResult {
   unallocated_revenue?: number;
 }
 
+export interface ChairUtilization {
+  chair: DentalChair;
+  scheduled_minutes: number;
+  appointment_count: number;
+}
+
 function endOf(start: string, durationMin: number): string {
   const end = new Date(start);
   end.setMinutes(end.getMinutes() + durationMin);
@@ -55,6 +61,13 @@ function localDateKey(date: Date): string {
 function addLocalDays(date: string, days: number): string {
   const [year, month, day] = date.split("-").map(Number);
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+function localWeekBounds(today: string): { start: string; end: string } {
+  const current = new Date(`${today}T00:00:00+07:00`);
+  const mondayOffset = (current.getUTCDay() + 6) % 7;
+  const monday = addLocalDays(today, -mondayOffset);
+  return { start: localDayBounds(monday).start, end: localDayBounds(addLocalDays(monday, 7)).start };
 }
 
 export const chairsService = {
@@ -216,6 +229,34 @@ export const chairsService = {
       }
     }
     return { chairs: items, unallocated_revenue: revenue?.unallocatedRevenue };
+  },
+
+  async utilization(
+    db: D1Database,
+    tenantId: string,
+    branchId: string,
+    period: "today" | "week",
+  ): Promise<{ start: string; end: string; items: ChairUtilization[] }> {
+    await assertAllInTenant(db, tenantId, [{ table: "branches", id: branchId }]);
+    const today = localDateKey(new Date());
+    const bounds = period === "today" ? localDayBounds(today) : localWeekBounds(today);
+    const [chairs, result] = await Promise.all([
+      createChairsRepository(db).list(tenantId, { branchId }),
+      db.prepare(`SELECT chair_id, COUNT(*) AS appointment_count, COALESCE(SUM(duration_min), 0) AS scheduled_minutes
+        FROM appointments
+        WHERE tenant_id = ? AND branch_id = ? AND chair_id IS NOT NULL
+          AND status NOT IN ('cancelled', 'no_show')
+          AND datetime(scheduled_at) >= datetime(?) AND datetime(scheduled_at) < datetime(?)
+        GROUP BY chair_id`).bind(tenantId, branchId, bounds.start, bounds.end).all<D1Row>(),
+    ]);
+    const metrics = new Map((result.results ?? []).map((row) => [row.chair_id as string, {
+      appointment_count: Number(row.appointment_count ?? 0),
+      scheduled_minutes: Number(row.scheduled_minutes ?? 0),
+    }]));
+    return {
+      ...bounds,
+      items: chairs.map((chair) => ({ chair, appointment_count: metrics.get(chair.id)?.appointment_count ?? 0, scheduled_minutes: metrics.get(chair.id)?.scheduled_minutes ?? 0 })),
+    };
   },
 
   async revenueReport(db: D1Database, tenantId: string, branchId: string, range: 7 | 30 | 90) {

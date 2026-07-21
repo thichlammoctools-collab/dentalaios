@@ -112,7 +112,10 @@ export function AppointmentDetailPage() {
   const endTime = new Date(new Date(appt.scheduled_at).getTime() + appt.duration_min * 60 * 1000);
   const canStartVisit = appt.status === "arrived" && Boolean(appt.chair_id)
     && new Date(appt.scheduled_at) <= now && now < endTime;
-  const returnPath = patientReturnPath(searchParams.get("return_to"), appt.patient_id, "appointments");
+  const requestedReturnPath = searchParams.get("return_to");
+  const returnPath = requestedReturnPath === "/calendar"
+    ? requestedReturnPath
+    : patientReturnPath(requestedReturnPath, appt.patient_id, "appointments");
 
   function closeEdit() {
     setEditOpen(false);

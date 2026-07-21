@@ -1,6 +1,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import type { Appointment } from "@shared/types";
 import type { D1Row, Pagination } from "./base";
+import { CHAIR_PREPARATION_MINUTES } from "../lib/appointment-time";
 
 export interface AppointmentListOpts extends Pagination {
   branchId?: string;
@@ -125,8 +126,8 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
                 WHERE tenant_id = ?
                   AND chair_id = ?
                   AND status NOT IN ('cancelled', 'no_show')
-                  AND scheduled_at < ?
-                  AND datetime(scheduled_at, '+' || duration_min || ' minutes') > ?
+                  AND scheduled_at < datetime(?, '+' || ? || ' minutes')
+                  AND datetime(scheduled_at, '+' || (duration_min + ?) || ' minutes') > ?
               )
             )`,
         )
@@ -158,6 +159,8 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
           tenantId,
           data.chair_id ?? null,
           end.toISOString(),
+          CHAIR_PREPARATION_MINUTES,
+          CHAIR_PREPARATION_MINUTES,
           start,
         )
         .run();
@@ -226,10 +229,10 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
         "tenant_id = ?",
         "chair_id = ?",
         "status NOT IN ('cancelled', 'no_show')",
-        "scheduled_at < ?",
-        `datetime(scheduled_at, '+' || duration_min || ' minutes') > ?`,
+        "scheduled_at < datetime(?, '+' || ? || ' minutes')",
+        `datetime(scheduled_at, '+' || (duration_min + ?) || ' minutes') > ?`,
       ];
-      const binds: unknown[] = [tenantId, chairId, endISO, startISO];
+      const binds: unknown[] = [tenantId, chairId, endISO, CHAIR_PREPARATION_MINUTES, CHAIR_PREPARATION_MINUTES, startISO];
       if (excludeId) {
         conditions.push("id != ?");
         binds.push(excludeId);

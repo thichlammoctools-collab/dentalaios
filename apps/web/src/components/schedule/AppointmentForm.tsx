@@ -35,6 +35,13 @@ interface UsersResponse { items: UserWithDetails[]; total: number }
 interface ChairAvailabilityResponse {
   items: Array<{ chair: DentalChair; available: boolean; reason?: string }>;
 }
+interface ChairUtilizationResponse {
+  items: Array<{ chair: DentalChair; appointment_count: number; scheduled_minutes: number }>;
+}
+interface ChairUtilizationMetrics {
+  today: { appointment_count: number; scheduled_minutes: number };
+  week: { appointment_count: number; scheduled_minutes: number };
+}
 interface OpenMilestonesResponse { items: PatientOpenTreatmentMilestone[]; total: number }
 
 export function AppointmentForm({
@@ -53,6 +60,7 @@ export function AppointmentForm({
   const [assistantId, setAssistantId] = useState("");
   const [chairId, setChairId] = useState("");
   const [chairAvailability, setChairAvailability] = useState<ChairAvailabilityResponse["items"]>([]);
+  const [chairUtilization, setChairUtilization] = useState<ChairUtilizationMetrics | null>(null);
   const defaultSlot = getNextAppointmentSlot();
   const [date, setDate] = useState(initialDate ?? defaultSlot.date);
   const [time, setTime] = useState(initialHour != null ? `${String(initialHour).padStart(2, "0")}:00` : defaultSlot.time);
@@ -136,6 +144,28 @@ export function AppointmentForm({
       .then((response) => setChairAvailability(response.items))
       .catch(() => setChairAvailability([]));
   }, [open, session?.branch?.id, date, time, durationMin]);
+
+  useEffect(() => {
+    if (!open || !chairId || !session?.branch?.id) {
+      setChairUtilization(null);
+      return;
+    }
+    let cancelled = false;
+    Promise.all(["today", "week"].map((period) =>
+      apiGet<ChairUtilizationResponse>(`/api/chairs/utilization?branch_id=${session.branch.id}&period=${period}`),
+    )).then(([today, week]) => {
+      if (cancelled) return;
+      const todayMetrics = today.items.find((item) => item.chair.id === chairId);
+      const weekMetrics = week.items.find((item) => item.chair.id === chairId);
+      setChairUtilization({
+        today: { appointment_count: todayMetrics?.appointment_count ?? 0, scheduled_minutes: todayMetrics?.scheduled_minutes ?? 0 },
+        week: { appointment_count: weekMetrics?.appointment_count ?? 0, scheduled_minutes: weekMetrics?.scheduled_minutes ?? 0 },
+      });
+    }).catch(() => {
+      if (!cancelled) setChairUtilization(null);
+    });
+    return () => { cancelled = true; };
+  }, [open, chairId, session?.branch?.id]);
 
   // Default clinician = currently logged-in user if doctor, else first doctor in branch
   useEffect(() => {
@@ -423,8 +453,14 @@ export function AppointmentForm({
                 ))}
               </Select>
               <p className="text-xs text-muted-foreground">
-                Ghế không khả dụng được hiển thị để tham khảo và không thể chọn.
+                Ghế không khả dụng được hiển thị để tham khảo và không thể chọn. Mỗi lịch hẹn cần tối thiểu 5 phút chuẩn bị trước và sau ca.
               </p>
+              {chairUtilization && (
+                <div className="grid grid-cols-2 gap-2 rounded-md border border-border bg-muted/30 p-3 text-sm">
+                  <div><p className="text-xs text-muted-foreground">Công suất hôm nay</p><p className="mt-0.5 font-medium">{chairUtilization.today.appointment_count} lịch · {chairUtilization.today.scheduled_minutes} phút</p></div>
+                  <div><p className="text-xs text-muted-foreground">Công suất tuần này</p><p className="mt-0.5 font-medium">{chairUtilization.week.appointment_count} lịch · {chairUtilization.week.scheduled_minutes} phút</p></div>
+                </div>
+              )}
             </div>
           )}
 

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -82,6 +83,7 @@ const DAY_NAMES = ["CN","T2","T3","T4","T5","T6","T7"];
 // ─── CalendarPage ──────────────────────────────────────────────────────────────
 
 export function CalendarPage() {
+  const navigate = useNavigate();
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -90,6 +92,7 @@ export function CalendarPage() {
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const weekStart = selectedDate ? startOfWeek(selectedDate) : null;
+  const [threeDayStart, setThreeDayStart] = useState<Date | null>(null);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editAppt, setEditAppt] = useState<Appointment | null>(null);
@@ -177,6 +180,19 @@ export function CalendarPage() {
       })
     : null;
 
+  const threeDayDates = threeDayStart
+    ? Array.from({ length: 3 }, (_, i) => {
+        const date = addDays(threeDayStart, i);
+        const iso = isoDate(date);
+        return {
+          date,
+          iso,
+          isToday: iso === isoDate(today),
+          appointments: appointments.filter((appointment) => appointment.scheduled_at.slice(0, 10) === iso),
+        };
+      })
+    : null;
+
   // ─── Navigate ────────────────────────────────────────────────────────────
   function prevMonth() {
     if (viewMonth === 0) { setViewMonth(11); setViewYear((y) => y - 1); }
@@ -231,6 +247,10 @@ export function CalendarPage() {
     // Pre-populate with this appointment's patient + all users
     setPatients([{ id: appt.patient_id, tenant_id: "", branch_id: "", name: appt.patient_name ?? "", date_of_birth: "", gender: "M", phone: appt.patient_phone ?? "", created_at: "" } as Patient]);
     apiGet<UsersResponse>("/api/users?limit=100").then((u) => setDoctors(u.items)).catch(() => {});
+  }
+
+  function openAppointment(appt: Appointment) {
+    navigate(`/appointments/${appt.id}?return_to=${encodeURIComponent("/calendar")}`);
   }
 
   // ─── Submit ───────────────────────────────────────────────────────────────
@@ -300,7 +320,7 @@ export function CalendarPage() {
   }
 
   return (
-    <PageContainer className="space-y-4">
+    <PageContainer size="wide" className="space-y-4">
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -309,21 +329,66 @@ export function CalendarPage() {
       </div>
 
       {/* Month navigation */}
-      <div className="flex items-center gap-3">
-        <Button variant="outline" size="sm" onClick={prevMonth}>‹</Button>
-        <span className="min-w-[140px] text-center font-semibold">
-          {MONTH_NAMES[viewMonth]} {viewYear}
-        </span>
-        <Button variant="outline" size="sm" onClick={nextMonth}>›</Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => { setViewYear(today.getFullYear()); setViewMonth(today.getMonth()); }}
-          className="ml-2"
-        >
-          Hôm nay
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="sm" onClick={prevMonth}>‹</Button>
+          <span className="min-w-[140px] text-center font-semibold">
+            {MONTH_NAMES[viewMonth]} {viewYear}
+          </span>
+          <Button variant="outline" size="sm" onClick={nextMonth}>›</Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { setViewYear(today.getFullYear()); setViewMonth(today.getMonth()); }}
+          >
+            Hôm nay
+          </Button>
+        </div>
+        <Button variant={threeDayDates ? "default" : "outline"} size="sm" onClick={() => setThreeDayStart(new Date(today.getFullYear(), today.getMonth(), today.getDate()))}>
+          Xem 3 ngày
         </Button>
       </div>
+
+      {/* Three-day detail */}
+      {threeDayDates && (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle className="text-base">
+                {threeDayDates[0].date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })} - {threeDayDates[2].date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })}
+              </CardTitle>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="sm" onClick={() => setThreeDayStart((date) => date && addDays(date, -3))}>‹ 3 ngày</Button>
+                <Button variant="ghost" size="sm" onClick={() => setThreeDayStart(new Date(today.getFullYear(), today.getMonth(), today.getDate()))}>Hôm nay</Button>
+                <Button variant="ghost" size="sm" onClick={() => setThreeDayStart((date) => date && addDays(date, 3))}>3 ngày ›</Button>
+                <Button variant="ghost" size="sm" onClick={() => setThreeDayStart(null)}>Đóng</Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 md:grid-cols-3">
+              {threeDayDates.map((day) => (
+                <div key={day.iso} className={`min-h-[180px] rounded-md border p-3 ${day.isToday ? "border-primary bg-primary/5" : ""}`}>
+                  <div className={`mb-3 text-sm font-semibold ${day.isToday ? "text-primary" : ""}`}>
+                    {day.isToday ? "Hôm nay · " : ""}{DAY_NAMES[day.date.getDay()]}, {day.date.getDate()}/{day.date.getMonth() + 1}
+                  </div>
+                  {day.appointments.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">Không có lịch hẹn</p> : (
+                    <div className="space-y-2">
+                      {day.appointments.map((appointment) => (
+                        <button key={appointment.id} onClick={() => openAppointment(appointment)} className="w-full rounded-md border p-2 text-left text-sm hover:bg-accent">
+                          <p className="font-medium"><span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${apptDot(appointment.status)}`} />{new Date(appointment.scheduled_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })} · {appointment.patient_name}</p>
+                          {appointment.procedure && <p className="mt-0.5 truncate text-xs text-muted-foreground">{appointment.procedure}</p>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <button onClick={() => openCreateForm(day.date)} className="mt-3 w-full rounded border border-dashed border-border py-1 text-xs text-muted-foreground hover:border-primary hover:text-primary">+ Tạo lịch hẹn</button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Week detail */}
       {weekDays && (
@@ -353,7 +418,7 @@ export function CalendarPage() {
                       {day.appointments.slice(0, 4).map((a) => (
                         <button
                           key={a.id}
-                          onClick={() => openEditForm(a)}
+                          onClick={() => openAppointment(a)}
                           className="w-full truncate rounded px-1.5 py-0.5 text-left text-xs font-medium cursor-pointer hover:opacity-80"
                           title={`${a.patient_name} ${a.scheduled_at ? new Date(a.scheduled_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : ""}`}
                         >
