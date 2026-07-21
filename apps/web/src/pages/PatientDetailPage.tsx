@@ -465,13 +465,15 @@ export function PatientDetailPage() {
                       <TableHead>Ngày</TableHead>
                       <TableHead>Bác sĩ điều trị</TableHead>
                       <TableHead>Phụ tá</TableHead>
+                      <TableHead>Kế hoạch điều trị</TableHead>
                       <TableHead>Trạng thái</TableHead>
                       <TableHead>Ghi chú</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {visits.map((v) => (
-                      <TableRow
+                    {visits.map((v) => {
+                      const visitPlans = plans.filter((plan) => plan.visit_id === v.id);
+                      return <TableRow
                         key={v.id}
                         className="cursor-pointer"
                         onClick={() => navigate(withPatientReturnContext(`/visits/${v.id}`, patient.id, "visits"))}
@@ -494,6 +496,27 @@ export function PatientDetailPage() {
                           ) : "—"}
                         </TableCell>
                         <TableCell>
+                          {visitPlans.length > 0 ? (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-xs text-muted-foreground">{visitPlans.length} kế hoạch</span>
+                              {visitPlans.map((plan, index) => (
+                                <Button
+                                  key={plan.id}
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    navigate(withPatientReturnContext(`/treatment-plans/${plan.id}`, patient.id, "plans"));
+                                  }}
+                                >
+                                  KH {index + 1}
+                                </Button>
+                              ))}
+                            </div>
+                          ) : "—"}
+                        </TableCell>
+                        <TableCell>
                           <Badge
                             variant={
                               v.status === "completed"
@@ -509,8 +532,8 @@ export function PatientDetailPage() {
                         <TableCell className="text-muted-foreground">
                           {v.notes ?? "—"}
                         </TableCell>
-                      </TableRow>
-                    ))}
+                      </TableRow>;
+                    })}
                   </TableBody>
                 </Table>
               )}

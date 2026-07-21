@@ -22,10 +22,15 @@ import { PageContainer } from "@/components/PageContainer";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { useAuth } from "@/lib/auth-context";
 import { isAssistantRole, isDoctorRole } from "@shared/constants";
-import type { Visit, ClinicalFinding, TreatmentPlan, GeneratePlanResult, GeneratePlanItemDraft, ProcedureCatalogItem, UserWithDetails } from "@shared/types";
+import type { Patient, MedicalAlert, Visit, ClinicalFinding, TreatmentPlan, GeneratePlanResult, GeneratePlanItemDraft, ProcedureCatalogItem, UserWithDetails } from "@shared/types";
 
 interface UsersResponse {
   items: UserWithDetails[];
+  total: number;
+}
+
+interface ListResponse<T> {
+  items: T[];
   total: number;
 }
 
@@ -289,6 +294,10 @@ export function VisitDetailPage() {
   const [searchParams] = useSearchParams();
   const { session } = useAuth();
   const [visit, setVisit] = useState<Visit | null>(null);
+  const [patient, setPatient] = useState<Patient | null>(null);
+  const [alerts, setAlerts] = useState<MedicalAlert[]>([]);
+  const [previousVisits, setPreviousVisits] = useState<Visit[]>([]);
+  const [treatmentHistory, setTreatmentHistory] = useState<TreatmentPlan[]>([]);
   const [findings, setFindings] = useState<ClinicalFinding[]>([]);
   const [procedures, setProcedures] = useState<ProcedureCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -326,12 +335,20 @@ export function VisitDetailPage() {
     if (!id) return;
     setLoading(true);
     try {
-      const [v, f, procedureResponse] = await Promise.all([
-        apiGet<Visit>(`/api/visits/${id}`),
+      const v = await apiGet<Visit>(`/api/visits/${id}`);
+      const [f, procedureResponse, p, a, visitsResponse, plansResponse] = await Promise.all([
         apiGet<{ items: ClinicalFinding[] }>(`/api/visits/${id}/findings`),
         apiGet<{ items: ProcedureCatalogItem[] }>("/api/clinic/procedures"),
+        apiGet<Patient>(`/api/patients/${v.patient_id}`),
+        apiGet<ListResponse<MedicalAlert>>(`/api/patients/${v.patient_id}/alerts`),
+        apiGet<ListResponse<Visit>>(`/api/visits?patient_id=${v.patient_id}`),
+        apiGet<ListResponse<TreatmentPlan>>(`/api/treatment-plans?patient_id=${v.patient_id}`),
       ]);
       setVisit(v);
+      setPatient(p);
+      setAlerts(a.items);
+      setPreviousVisits(visitsResponse.items.filter((item) => item.id !== v.id));
+      setTreatmentHistory(plansResponse.items);
       setFindings(f.items);
       setProcedures(procedureResponse.items);
     } catch (err) {
@@ -566,6 +583,16 @@ export function VisitDetailPage() {
   }
 
   const returnPath = patientReturnPath(searchParams.get("return_to"), visit.patient_id, "visits");
+  const bmi = patient?.height_cm && patient.weight_kg
+    ? Number((patient.weight_kg / ((patient.height_cm / 100) ** 2)).toFixed(1))
+    : null;
+  const bmiLabel = bmi === null ? null : bmi < 18.5 ? "Gầy" : bmi < 23 ? "Bình thường" : bmi < 25 ? "Thừa cân" : "Béo phì";
+  const sortedPreviousVisits = [...previousVisits].sort(
+    (left, right) => new Date(right.date).getTime() - new Date(left.date).getTime(),
+  );
+  const sortedTreatmentHistory = [...treatmentHistory].sort(
+    (left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime(),
+  );
 
   return (
     <PageContainer size="detail">
@@ -656,6 +683,98 @@ export function VisitDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Patient safety context */}
+      <Card className={alerts.length > 0 ? "border-amber-300 dark:border-amber-800" : undefined}>
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <CardTitle>Thông tin cần lưu ý</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">Cảnh báo y khoa và chỉ số cơ thể của bệnh nhân</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => navigate(`/patients/${visit.patient_id}/alerts`)}>
+              Xem hồ sơ bệnh nhân
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {alerts.length > 0 ? (
+            <div className="space-y-2">
+              {alerts.map((alert) => (
+                <div key={alert.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm dark:border-amber-900 dark:bg-amber-950/30">
+                  <Badge variant={alert.severity === "high" ? "destructive" : alert.severity === "medium" ? "warning" : "secondary"}>
+                    {alert.type === "allergy" ? "Dị ứng" : alert.type === "chronic" ? "Bệnh mãn tính" : alert.type === "medication" ? "Thuốc đang dùng" : "Khác"}
+                  </Badge>
+                  <span className="font-medium">{alert.description}</span>
+                  <span className="text-xs text-muted-foreground">Mức độ: {alert.severity === "high" ? "Cao" : alert.severity === "medium" ? "Trung bình" : "Thấp"}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Chưa ghi nhận cảnh báo y khoa.</p>
+          )}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
+              <p className="text-xs text-muted-foreground">Chiều cao</p>
+              <p className="mt-1 font-semibold">{patient?.height_cm ? `${patient.height_cm} cm` : "Chưa cập nhật"}</p>
+            </div>
+            <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
+              <p className="text-xs text-muted-foreground">Cân nặng</p>
+              <p className="mt-1 font-semibold">{patient?.weight_kg ? `${patient.weight_kg} kg` : "Chưa cập nhật"}</p>
+            </div>
+            <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
+              <p className="text-xs text-muted-foreground">BMI</p>
+              <p className="mt-1 font-semibold">{bmi === null ? "Chưa đủ dữ liệu" : `${bmi} · ${bmiLabel}`}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Previous clinical history */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle>Lịch sử khám và điều trị</CardTitle>
+          <p className="text-sm text-muted-foreground">Xem lại các lượt khám và kế hoạch điều trị trước đó của bệnh nhân.</p>
+        </CardHeader>
+        <CardContent className="grid gap-5 lg:grid-cols-2">
+          <div>
+            <p className="mb-2 text-sm font-medium">Lượt khám trước ({sortedPreviousVisits.length})</p>
+            {sortedPreviousVisits.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Chưa có lượt khám trước đó.</p>
+            ) : (
+              <div className="space-y-2">
+                {sortedPreviousVisits.slice(0, 5).map((previousVisit) => (
+                  <button key={previousVisit.id} type="button" onClick={() => navigate(withPatientReturnContext(`/visits/${previousVisit.id}`, visit.patient_id, "visits"))} className="flex w-full items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5 text-left transition-colors hover:bg-muted/50">
+                    <div>
+                      <p className="text-sm font-medium">{formatDateTime(previousVisit.date)}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{previousVisit.treating_clinician_name ?? "Chưa phân công bác sĩ điều trị"}</p>
+                    </div>
+                    <Badge variant={previousVisit.status === "completed" ? "success" : previousVisit.status === "cancelled" ? "destructive" : "warning"}>{previousVisit.status}</Badge>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <p className="mb-2 text-sm font-medium">Kế hoạch điều trị ({sortedTreatmentHistory.length})</p>
+            {sortedTreatmentHistory.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Chưa có kế hoạch điều trị.</p>
+            ) : (
+              <div className="space-y-2">
+                {sortedTreatmentHistory.slice(0, 5).map((plan) => (
+                  <button key={plan.id} type="button" onClick={() => navigate(withPatientReturnContext(`/treatment-plans/${plan.id}`, visit.patient_id, "plans"))} className="flex w-full items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5 text-left transition-colors hover:bg-muted/50">
+                    <div>
+                      <p className="text-sm font-medium">Tạo lúc {formatDateTime(plan.created_at)}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{plan.total_cost.toLocaleString("vi-VN")} {plan.currency}</p>
+                    </div>
+                    <Badge variant={plan.status === "approved" || plan.status === "completed" ? "success" : plan.status === "cancelled" ? "destructive" : "warning"}>{plan.status}</Badge>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* FDI Chart */}
       <Card>
