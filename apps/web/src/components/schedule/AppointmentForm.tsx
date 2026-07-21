@@ -9,7 +9,7 @@ import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/c
 import { apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
-import type { Appointment, DentalChair, Patient, TreatmentCaseMilestone, UserWithDetails } from "@shared/types";
+import type { Appointment, DentalChair, Patient, PatientOpenTreatmentMilestone, TreatmentCaseMilestone, UserWithDetails } from "@shared/types";
 import { isAssistantRole, isDoctorRole } from "@shared/constants";
 import { combineDateTime, ymd } from "@/lib/utils";
 import { getMinimumAppointmentTime, getNextAppointmentSlot, isAppointmentTimeInPast } from "@/lib/appointment-time";
@@ -35,6 +35,7 @@ interface UsersResponse { items: UserWithDetails[]; total: number }
 interface ChairAvailabilityResponse {
   items: Array<{ chair: DentalChair; available: boolean; reason?: string }>;
 }
+interface OpenMilestonesResponse { items: PatientOpenTreatmentMilestone[]; total: number }
 
 export function AppointmentForm({
   open,
@@ -60,6 +61,9 @@ export function AppointmentForm({
   const [selectedMilestoneIds, setSelectedMilestoneIds] = useState<string[]>(
     milestone ? [milestone.milestoneId] : [],
   );
+  const [patientMilestones, setPatientMilestones] = useState<PatientOpenTreatmentMilestone[]>([]);
+  const [selectedCaseId, setSelectedCaseId] = useState("");
+  const [loadingPatientMilestones, setLoadingPatientMilestones] = useState(false);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -79,6 +83,31 @@ export function AppointmentForm({
       .then(setMilestonePatient)
       .catch(() => setMilestonePatient(null));
   }, [open, milestone]);
+
+  useEffect(() => {
+    if (!open || milestone || !patientId) {
+      setPatientMilestones([]);
+      setSelectedCaseId("");
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingPatientMilestones(true);
+    setSelectedMilestoneIds([]);
+    setSelectedCaseId("");
+    setProcedure("");
+    apiGet<OpenMilestonesResponse>(`/api/patients/${patientId}/open-treatment-milestones`)
+      .then((response) => {
+        if (!cancelled) setPatientMilestones(response.items);
+      })
+      .catch(() => {
+        if (!cancelled) setPatientMilestones([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingPatientMilestones(false);
+      });
+    return () => { cancelled = true; };
+  }, [open, milestone, patientId]);
 
   useEffect(() => {
     if (!open) return;
@@ -121,6 +150,9 @@ export function AppointmentForm({
     setAssistantId("");
     setChairId("");
     setProcedure(milestone?.procedure ?? "");
+    setSelectedMilestoneIds(milestone ? [milestone.milestoneId] : []);
+    setPatientMilestones([]);
+    setSelectedCaseId("");
     setNotes("");
   }
 
@@ -147,8 +179,14 @@ export function AppointmentForm({
         notes: notes || undefined,
         source: "manual",
       };
-      if (milestone) {
-        await apiPost(`/api/treatment-plans/${milestone.planId}/case/milestones/${milestone.milestoneId}/appointments`, {
+      const selectedPatientMilestones = patientMilestones.filter((item) => selectedMilestoneIds.includes(item.milestone_id));
+      const milestoneContext = milestone
+        ? { planId: milestone.planId, milestoneId: milestone.milestoneId }
+        : selectedPatientMilestones[0]
+          ? { planId: selectedPatientMilestones[0].treatment_plan_id, milestoneId: selectedPatientMilestones[0].milestone_id }
+          : undefined;
+      if (milestoneContext) {
+        await apiPost(`/api/treatment-plans/${milestoneContext.planId}/case/milestones/${milestoneContext.milestoneId}/appointments`, {
           milestone_ids: selectedMilestoneIds,
           clinician_id: clinicianId,
           assistant_id: assistantId || undefined,
@@ -174,6 +212,9 @@ export function AppointmentForm({
   const doctors = users.filter((u) => isDoctorRole(u.role_key, u.role_id, u.role_name));
   const assistants = users.filter((u) => isAssistantRole(u.role_key, u.role_id, u.role_name));
   const milestoneOptions = milestone?.availableMilestones ?? [];
+  const availablePatientCases = [...new Map(patientMilestones.map((item) => [item.treatment_case_id, item])).values()];
+  const selectedPatientMilestones = patientMilestones.filter((item) => item.treatment_case_id === selectedCaseId);
+  const hasLinkedMilestones = Boolean(milestone) || selectedMilestoneIds.length > 0;
   const minimumTime = getMinimumAppointmentTime(date);
 
   function handleDateChange(nextDate: string) {
@@ -192,6 +233,25 @@ export function AppointmentForm({
     setSelectedMilestoneIds(next);
     const names = milestoneOptions
       .filter((candidate) => next.includes(candidate.id))
+      .map((candidate) => candidate.item.service_name ?? candidate.item.procedure);
+    setProcedure([...new Set(names)].join("; "));
+  }
+
+  function selectPatientCase(caseId: string) {
+    setSelectedCaseId(caseId);
+    setSelectedMilestoneIds([]);
+    setProcedure("");
+  }
+
+  function togglePatientMilestone(option: PatientOpenTreatmentMilestone) {
+    const isSelected = selectedMilestoneIds.includes(option.milestone_id);
+    const next = isSelected
+      ? selectedMilestoneIds.filter((id) => id !== option.milestone_id)
+      : [...selectedMilestoneIds, option.milestone_id];
+    setSelectedMilestoneIds(next);
+    const choices = availablePatientCases.length === 1 ? patientMilestones : selectedPatientMilestones;
+    const names = choices
+      .filter((candidate) => next.includes(candidate.milestone_id))
       .map((candidate) => candidate.item.service_name ?? candidate.item.procedure);
     setProcedure([...new Set(names)].join("; "));
   }
@@ -221,6 +281,36 @@ export function AppointmentForm({
                 })}
               </div>
               <p className="text-xs text-muted-foreground">Một lịch hẹn có thể liên kết với nhiều milestone của cùng ca.</p>
+            </div>
+          )}
+
+          {!milestone && patientId && (
+            <div className="grid gap-1.5">
+              <Label>Thủ thuật từ kế hoạch điều trị</Label>
+              {loadingPatientMilestones ? (
+                <p className="text-sm text-muted-foreground">Đang tải thủ thuật đang thực hiện...</p>
+              ) : availablePatientCases.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Bệnh nhân chưa có thủ thuật đang thực hiện trong ca điều trị.</p>
+              ) : (
+                <>
+                  {availablePatientCases.length > 1 && (
+                    <Select value={selectedCaseId} onChange={(event) => selectPatientCase(event.target.value)}>
+                      <option value="">— Chọn ca điều trị —</option>
+                      {availablePatientCases.map((item) => <option key={item.treatment_case_id} value={item.treatment_case_id}>{item.case_number} · {item.case_title}</option>)}
+                    </Select>
+                  )}
+                  {(availablePatientCases.length === 1 || selectedCaseId) && (
+                    <div className="max-h-44 space-y-2 overflow-y-auto rounded-md border p-2">
+                      {(availablePatientCases.length === 1 ? patientMilestones : selectedPatientMilestones).map((option) => {
+                        const checked = selectedMilestoneIds.includes(option.milestone_id);
+                        const label = `${option.item.service_name ?? option.item.procedure}${option.item.tooth_number != null ? ` · Răng #${option.item.tooth_number}` : " · Toàn hàm"}`;
+                        return <label key={option.milestone_id} className="flex cursor-pointer items-start gap-2 rounded px-1 py-1 text-sm hover:bg-muted/60"><input type="checkbox" checked={checked} onChange={() => togglePatientMilestone(option)} className="mt-0.5" /><span><span className="font-medium">{label}</span><span className="block text-xs text-muted-foreground">{option.case_number} · {option.status === "in_progress" ? "Đang thực hiện" : "Chưa bắt đầu"}</span></span></label>;
+                      })}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">Chọn một hoặc nhiều thủ thuật của cùng ca để liên kết vào lịch hẹn.</p>
+                </>
+              )}
             </div>
           )}
 
@@ -325,10 +415,11 @@ export function AppointmentForm({
               value={procedure}
               onChange={(e) => setProcedure(e.target.value)}
               placeholder="VD: scaling, filling, root_canal…"
-              readOnly={Boolean(milestone)}
-              className={milestone ? "bg-muted" : undefined}
+              readOnly={hasLinkedMilestones}
+              className={hasLinkedMilestones ? "bg-muted" : undefined}
             />
             {milestone && <p className="text-xs text-muted-foreground">Được lấy từ hạng mục kế hoạch: {milestone.label}</p>}
+            {!milestone && selectedMilestoneIds.length > 0 && <p className="text-xs text-muted-foreground">Được lấy từ các thủ thuật đã chọn trong kế hoạch điều trị.</p>}
           </div>
 
           {/* Notes */}

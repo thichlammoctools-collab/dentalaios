@@ -8,6 +8,7 @@ import { requirePermission } from "../middleware/rbac";
 import { auditLog } from "../middleware/audit";
 import type { AuthContext } from "../middleware/auth";
 import { patientService } from "../services/patient.service";
+import { treatmentCasesService } from "../services/treatment-cases.service";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -51,6 +52,20 @@ router.post(
 );
 
 // GET /api/patients/:id
+router.get(
+  "/:id/open-treatment-milestones",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const items = await treatmentCasesService.listOpenMilestonesByPatient(
+      c.env.DB,
+      jwt.tenant_id,
+      c.req.param("id"),
+    );
+    return c.json({ items, total: items.length });
+  },
+);
+
 router.get(
   "/:id",
   requirePermission(PERMISSIONS.READ_PATIENTS),

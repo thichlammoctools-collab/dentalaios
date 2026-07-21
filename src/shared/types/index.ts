@@ -315,6 +315,18 @@ export interface TreatmentCaseMilestone {
   item: TreatmentPlanItem;
 }
 
+/** A schedulable milestone exposed from a patient's active treatment cases. */
+export interface PatientOpenTreatmentMilestone {
+  treatment_case_id: string;
+  treatment_plan_id: string;
+  case_number: string;
+  case_title: string;
+  milestone_id: string;
+  sort_order: number;
+  status: Extract<TreatmentCaseMilestoneStatus, "not_started" | "in_progress">;
+  item: TreatmentPlanItem;
+}
+
 export type TreatmentMilestoneAppointmentLinkType = "primary" | "follow_up" | "consultation" | "preparation" | "delivery";
 export type TreatmentMilestoneAppointmentExecutionStatus = "planned" | "partially_completed" | "completed" | "not_performed";
 

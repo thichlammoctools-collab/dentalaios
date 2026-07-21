@@ -1,5 +1,5 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import type { TreatmentCase, TreatmentCaseMilestone, TreatmentCaseMilestoneStatus, TreatmentCaseStatus, TreatmentCaseStatusHistory, TreatmentCaseType } from "@shared/types";
+import type { PatientOpenTreatmentMilestone, TreatmentCase, TreatmentCaseMilestone, TreatmentCaseMilestoneStatus, TreatmentCaseStatus, TreatmentCaseStatusHistory, TreatmentCaseType } from "@shared/types";
 import type { D1Row } from "./base";
 
 export function createTreatmentCasesRepository(db: D1Database) {
@@ -138,6 +138,24 @@ export function createTreatmentCasesRepository(db: D1Database) {
       return (result.results as D1Row[]).map(mapMilestone);
     },
 
+    async listOpenMilestonesByPatient(tenantId: string, patientId: string): Promise<PatientOpenTreatmentMilestone[]> {
+      const result = await db.prepare(
+        `SELECT tc.id AS treatment_case_id, tc.treatment_plan_id, tc.case_number, tc.title AS case_title,
+                m.id AS milestone_id, m.sort_order, m.status,
+                i.id AS treatment_plan_item_id, i.tooth_number, i.procedure, i.description, i.unit_cost,
+                i.status AS item_status, i.created_at AS item_created_at,
+                s.service_code, s.service_name, s.price_includes_vat, s.price_snapshot_at
+         FROM treatment_cases tc
+         JOIN treatment_case_milestones m ON m.treatment_case_id = tc.id AND m.tenant_id = tc.tenant_id
+         JOIN treatment_plan_items i ON i.id = m.treatment_plan_item_id AND i.tenant_id = m.tenant_id
+         LEFT JOIN treatment_plan_item_price_snapshots s ON s.treatment_plan_item_id = i.id AND s.tenant_id = i.tenant_id
+         WHERE tc.tenant_id = ? AND tc.patient_id = ? AND tc.status = 'active'
+           AND m.status IN ('not_started', 'in_progress')
+         ORDER BY tc.activated_at DESC, m.sort_order ASC, m.created_at ASC`,
+      ).bind(tenantId, patientId).all();
+      return (result.results as D1Row[]).map(mapOpenMilestone);
+    },
+
     async getMilestone(tenantId: string, caseId: string, milestoneId: string): Promise<TreatmentCaseMilestone | null> {
       const row = await db.prepare(
         `SELECT m.*, i.treatment_plan_id AS item_treatment_plan_id, i.tooth_number, i.procedure, i.description, i.unit_cost, i.status AS item_status, i.created_at AS item_created_at,
@@ -261,6 +279,33 @@ function mapMilestone(row: D1Row): TreatmentCaseMilestone {
       price_includes_vat: Boolean(row.price_includes_vat ?? 1),
       price_snapshot_at: (row.price_snapshot_at as string | null) ?? undefined,
       status: row.item_status as TreatmentCaseMilestone["item"]["status"],
+      created_at: row.item_created_at as string,
+    },
+  };
+}
+
+function mapOpenMilestone(row: D1Row): PatientOpenTreatmentMilestone {
+  return {
+    treatment_case_id: row.treatment_case_id as string,
+    treatment_plan_id: row.treatment_plan_id as string,
+    case_number: row.case_number as string,
+    case_title: row.case_title as string,
+    milestone_id: row.milestone_id as string,
+    sort_order: Number(row.sort_order),
+    status: row.status as PatientOpenTreatmentMilestone["status"],
+    item: {
+      id: row.treatment_plan_item_id as string,
+      tenant_id: row.tenant_id as string,
+      treatment_plan_id: row.treatment_plan_id as string,
+      tooth_number: (row.tooth_number as number | null) ?? undefined,
+      service_code: (row.service_code as string | null) ?? undefined,
+      service_name: (row.service_name as string | null) ?? undefined,
+      procedure: row.procedure as string,
+      description: row.description as string,
+      unit_cost: Number(row.unit_cost),
+      price_includes_vat: Boolean(row.price_includes_vat ?? 1),
+      price_snapshot_at: (row.price_snapshot_at as string | null) ?? undefined,
+      status: row.item_status as PatientOpenTreatmentMilestone["item"]["status"],
       created_at: row.item_created_at as string,
     },
   };

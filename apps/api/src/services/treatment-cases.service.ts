@@ -1,5 +1,5 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import type { TreatmentCase, TreatmentCaseFinancialSummary, TreatmentCaseMilestone, TreatmentCaseMilestoneStatus, TreatmentCaseStatus, TreatmentCaseStatusHistory, TreatmentMilestoneAppointment } from "@shared/types";
+import type { PatientOpenTreatmentMilestone, TreatmentCase, TreatmentCaseFinancialSummary, TreatmentCaseMilestone, TreatmentCaseMilestoneStatus, TreatmentCaseStatus, TreatmentCaseStatusHistory, TreatmentMilestoneAppointment } from "@shared/types";
 import type { MilestoneAppointmentCreateInput, MilestoneAppointmentExecutionInput, MilestoneAppointmentLinkInput, TreatmentCaseActivateInput, TreatmentCaseMilestoneUpdateInput } from "@shared/validation";
 import { createTreatmentPlansRepository } from "../repositories/treatment-plans.repo";
 import { createTreatmentItemsRepository } from "../repositories/treatment-items.repo";
@@ -122,6 +122,14 @@ export const treatmentCasesService = {
     const treatmentCase = await createTreatmentCasesRepository(db).getByPlanId(tenantId, planId);
     if (!treatmentCase) throw new NotFoundError("Ca điều trị không tồn tại");
     return createTreatmentCasesRepository(db).listMilestones(tenantId, treatmentCase.id);
+  },
+
+  listOpenMilestonesByPatient(
+    db: D1Database,
+    tenantId: string,
+    patientId: string,
+  ): Promise<PatientOpenTreatmentMilestone[]> {
+    return createTreatmentCasesRepository(db).listOpenMilestonesByPatient(tenantId, patientId);
   },
 
   async updateMilestone(
