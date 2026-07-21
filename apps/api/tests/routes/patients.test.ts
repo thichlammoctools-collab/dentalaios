@@ -30,6 +30,7 @@ describe("GET /api/patients", () => {
     const rows = [patientRow({ name: "Patient A" }), patientRow({ id: "patient-2", name: "Patient B" })];
     const app = mountRoute("/api/patients", patientsRoutes);
     const res = await authedRequestWithDB(app, "GET", "/api/patients", new Map([
+      ["SELECT COUNT(*) AS total FROM patients", [{ total: 2 }]],
       ["FROM patients", rows],
     ]));
     expect(res.status).toBe(200);

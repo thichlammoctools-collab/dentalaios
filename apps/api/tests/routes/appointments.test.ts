@@ -248,6 +248,25 @@ describe("PATCH /api/appointments/:id", () => {
     const body = (await res.json()) as { id: string };
     expect(body.id).toBe("appt-1");
   });
+
+  it("rejects rescheduling an appointment to a past time", async () => {
+    const app = mountRoute("/api/appointments", appointmentsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "PATCH",
+      "/api/appointments/appt-1",
+      new Map([[
+        "FROM appointments",
+        [appointmentRow()],
+      ]]),
+      {
+        permissions: ["write_appointments"],
+        body: { scheduled_at: "2020-01-01T08:00:00.000Z" },
+      },
+    );
+    expect(res.status).toBe(422);
+    expect((await res.json() as { error: string }).error).toContain("ít nhất 5 phút");
+  });
 });
 
 describe("POST /api/appointments", () => {
