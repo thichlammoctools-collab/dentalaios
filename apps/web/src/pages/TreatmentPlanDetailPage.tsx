@@ -561,6 +561,19 @@ export function TreatmentPlanDetailPage() {
         }}
         onCreated={() => { setScheduleAllOpenMilestones(false); void load(); }}
       />}
+      {scheduleAllOpenMilestones && treatmentCase && openMilestones[0] && <AppointmentForm
+        open
+        onOpenChange={(open) => { if (!open) setScheduleAllOpenMilestones(false); }}
+        milestone={{
+          planId: plan.id,
+          milestoneId: openMilestones[0].id,
+          patientId: treatmentCase.patient_id,
+          procedure: openMilestones[0].item.service_name ?? openMilestones[0].item.procedure,
+          label: "Các thủ thuật còn mở trong ca điều trị",
+          availableMilestones: openMilestones,
+        }}
+        onCreated={() => { setScheduleAllOpenMilestones(false); void load(); }}
+      />}
     </div>
   );
 }

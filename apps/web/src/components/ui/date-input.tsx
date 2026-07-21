@@ -64,12 +64,13 @@ export function DateInput({ value, onChange, min, ...props }: DateInputProps) {
         if (parsedValue && (!min || parsedValue >= min)) onChange(parsedValue);
       }}
       onBlur={(event) => {
-        if (parseDateValue(displayValue)) {
+        const parsedValue = parseDateValue(displayValue);
+        if (parsedValue && (!min || parsedValue >= min)) {
           event.currentTarget.setCustomValidity("");
           return;
         }
         setDisplayValue(formattedValue);
-        event.currentTarget.setCustomValidity(displayValue ? "Ngày không hợp lệ" : "");
+        event.currentTarget.setCustomValidity(displayValue ? min ? "Ngày không được trước ngày tối thiểu" : "Ngày không hợp lệ" : "");
       }}
     />
     <button

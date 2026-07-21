@@ -20,7 +20,7 @@ export function getNextAppointmentSlot(now = new Date()): AppointmentSlot {
 
 export function getMinimumAppointmentTime(date: string, now = new Date()): string | undefined {
   const minimum = getNextAppointmentSlot(now);
-  if (date < minimum.date) return minimum.time;
+  if (date < minimum.date) return undefined;
   return date === minimum.date ? minimum.time : undefined;
 }
 
