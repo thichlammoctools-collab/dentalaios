@@ -47,9 +47,6 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
   const [email, setEmail] = useState(patient?.email ?? "");
   const [addressLine, setAddressLine] = useState(patient?.address_line ?? patient?.address ?? "");
   const [wardName, setWardName] = useState(patient?.ward_name ?? "");
-  const [wardCode, setWardCode] = useState(patient?.ward_code ?? "");
-  const [districtName, setDistrictName] = useState(patient?.district_name ?? "");
-  const [districtCode, setDistrictCode] = useState(patient?.district_code ?? "");
   const [provinceName, setProvinceName] = useState(patient?.province_name ?? "");
   const [countryCode, setCountryCode] = useState(patient?.country_code ?? "VN");
   const [initialNote, setInitialNote] = useState("");
@@ -88,9 +85,6 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
       setEmail(patient?.email ?? "");
       setAddressLine(patient?.address_line ?? patient?.address ?? "");
       setWardName(patient?.ward_name ?? "");
-      setWardCode(patient?.ward_code ?? "");
-      setDistrictName(patient?.district_name ?? "");
-      setDistrictCode(patient?.district_code ?? "");
       setProvinceName(patient?.province_name ?? "");
       setCountryCode(patient?.country_code ?? "VN");
       setInitialNote("");
@@ -121,9 +115,6 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
         email: email || undefined,
         address_line: addressLine || undefined,
         ward_name: wardName || undefined,
-        ward_code: wardCode || undefined,
-        district_name: districtName || undefined,
-        district_code: districtCode || undefined,
         province_name: provinceName || undefined,
         country_name: COUNTRY_OPTIONS.find((country) => country.code === countryCode)?.name ?? "Việt Nam",
         country_code: countryCode,
@@ -256,7 +247,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
             </div>
             <div className="grid gap-3">
               <div className="grid gap-1.5">
-                <Label htmlFor="pf-address-line">Số nhà, đường, thôn/ấp, tòa nhà</Label>
+                <Label htmlFor="pf-address-line">Địa chỉ tên đường</Label>
                 <Textarea
                   id="pf-address-line"
                   rows={2}
@@ -265,45 +256,23 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
                   placeholder="VD: 123 Nguyễn Trãi, Chung cư A"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="pf-ward">Phường/Xã</Label>
-                  <Input
-                    id="pf-ward"
-                    value={wardName}
-                    onChange={(e) => setWardName(e.target.value)}
-                    placeholder="VD: Phường Bến Thành"
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="pf-ward-code">Mã phường/xã</Label>
-                  <Input
-                    id="pf-ward-code"
-                    value={wardCode}
-                    onChange={(e) => setWardCode(e.target.value)}
-                    placeholder="Tùy chọn"
-                  />
-                </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="pf-ward">Phường/Xã</Label>
+                <Input
+                  id="pf-ward"
+                  value={wardName}
+                  onChange={(e) => setWardName(e.target.value)}
+                  placeholder="VD: Phường Bến Thành"
+                />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="pf-district">Quận/Huyện</Label>
-                  <Input
-                    id="pf-district"
-                    value={districtName}
-                    onChange={(e) => setDistrictName(e.target.value)}
-                    placeholder="VD: Quận 1"
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="pf-district-code">Mã quận/huyện</Label>
-                  <Input
-                    id="pf-district-code"
-                    value={districtCode}
-                    onChange={(e) => setDistrictCode(e.target.value)}
-                    placeholder="Tùy chọn"
-                  />
-                </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="pf-province">Tỉnh/Thành phố</Label>
+                <Input
+                  id="pf-province"
+                  value={provinceName}
+                  onChange={(e) => setProvinceName(e.target.value)}
+                  placeholder="VD: TP. Hồ Chí Minh"
+                />
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="pf-country">Quốc gia</Label>
@@ -316,15 +285,6 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
                     <option key={country.code} value={country.code}>{country.name}</option>
                   ))}
                 </Select>
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="pf-province">Tỉnh/Thành phố</Label>
-                <Input
-                  id="pf-province"
-                  value={provinceName}
-                  onChange={(e) => setProvinceName(e.target.value)}
-                  placeholder="VD: TP. Hồ Chí Minh"
-                />
               </div>
             </div>
           </div>
