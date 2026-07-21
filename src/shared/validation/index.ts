@@ -174,6 +174,12 @@ export const visitCreateSchema = z.object({
   if (!data.source_appointment_id && !data.chair_id) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["chair_id"], message: "Vui lòng chọn ghế nha" });
   }
+  if (!data.source_appointment_id && !data.treating_clinician_id) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["treating_clinician_id"], message: "Vui lòng chọn bác sĩ điều trị" });
+  }
+  if (!data.source_appointment_id && !data.assistant_id) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["assistant_id"], message: "Vui lòng chọn phụ tá" });
+  }
 });
 
 export const visitUpdateSchema = z.object({

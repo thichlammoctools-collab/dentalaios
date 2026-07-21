@@ -70,6 +70,14 @@ export function VisitForm({ open, onOpenChange, patientId, onCreated }: VisitFor
       toast.error("Vui lòng chọn ghế nha");
       return;
     }
+    if (!treatingClinicianId) {
+      toast.error("Vui lòng chọn bác sĩ điều trị");
+      return;
+    }
+    if (!assistantId) {
+      toast.error("Vui lòng chọn phụ tá");
+      return;
+    }
     setSaving(true);
     try {
       const created = await apiPost<Visit>("/api/visits", {
@@ -82,8 +90,8 @@ export function VisitForm({ open, onOpenChange, patientId, onCreated }: VisitFor
         blood_pressure_diastolic: bpDiastolic ? Number(bpDiastolic) : undefined,
         blood_sugar_mgdl: bloodSugar ? Number(bloodSugar) : undefined,
         vitals_recorded_at: (bpSystolic || bpDiastolic || bloodSugar) ? new Date().toISOString() : undefined,
-        treating_clinician_id: treatingClinicianId || null,
-        assistant_id: assistantId || null,
+        treating_clinician_id: treatingClinicianId,
+        assistant_id: assistantId,
       });
       toast.success("Đã tạo lượt khám");
       onCreated(created);
@@ -136,8 +144,9 @@ export function VisitForm({ open, onOpenChange, patientId, onCreated }: VisitFor
                 id="treatingClinician"
                 value={treatingClinicianId}
                 onChange={(e) => setTreatingClinicianId(e.target.value)}
+                required
               >
-                <option value="">— Chưa chọn —</option>
+                <option value="">— Chọn bác sĩ —</option>
                 {doctors.map((u) => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
@@ -149,8 +158,9 @@ export function VisitForm({ open, onOpenChange, patientId, onCreated }: VisitFor
                 id="assistant"
                 value={assistantId}
                 onChange={(e) => setAssistantId(e.target.value)}
+                required
               >
-                <option value="">— Chưa chọn —</option>
+                <option value="">— Chọn phụ tá —</option>
                 {assistants.map((u) => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}

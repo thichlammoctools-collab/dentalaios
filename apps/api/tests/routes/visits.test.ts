@@ -20,6 +20,33 @@ const visitRow = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+const personnelContextRow = (id: string, role: "doctor" | "assistant") => ({
+  u_id: id,
+  u_tenant_id: "test-tenant",
+  u_branch_id: "test-branch",
+  u_role_id: `role-${role}`,
+  u_email: `${id}@example.test`,
+  u_name: id,
+  u_is_active: 1,
+  u_password_hash: "hash",
+  u_created_at: "2026-01-01T10:00:00Z",
+  r_id: `role-${role}`,
+  r_tenant_id: "test-tenant",
+  r_system_key: role,
+  r_name: role,
+  r_permissions: "[]",
+  r_created_at: "2026-01-01T10:00:00Z",
+  t_id: "test-tenant",
+  t_name: "Test tenant",
+  t_is_active: 1,
+  t_created_at: "2026-01-01T10:00:00Z",
+  b_id: "test-branch",
+  b_tenant_id: "test-tenant",
+  b_name: "Test branch",
+  b_address: "",
+  b_created_at: "2026-01-01T10:00:00Z",
+});
+
 describe("GET /api/visits", () => {
   it("returns visit list filtered by patient_id", async () => {
     const app = mountRoute("/api/visits", visitsRoutes);
@@ -46,7 +73,9 @@ describe("POST /api/visits", () => {
       new Map([
         ["FROM patients", [{ id: "patient-1", tenant_id: "test-tenant" }]],
         ["FROM branches", [{ id: "test-branch", tenant_id: "test-tenant" }]],
-        ["FROM users", [{ id: "test-user", tenant_id: "test-tenant" }]],
+        ["FROM users", (sql, callIndex) => sql.includes("JOIN roles")
+          ? [callIndex === 3 ? personnelContextRow("doctor-1", "doctor") : personnelContextRow("assistant-1", "assistant")]
+          : [{ id: "test-user", tenant_id: "test-tenant" }]],
         ["FROM dental_chairs", [{
           id: "chair-1", tenant_id: "test-tenant", branch_id: "test-branch",
           is_active: 1, operational_status: "available",
@@ -58,6 +87,8 @@ describe("POST /api/visits", () => {
           patient_id: "patient-1",
           branch_id: "test-branch",
           clinician_id: "test-user",
+          treating_clinician_id: "doctor-1",
+          assistant_id: "assistant-1",
           chair_id: "chair-1",
           notes: "Khám tổng quát",
         },
@@ -80,6 +111,25 @@ describe("POST /api/visits", () => {
         body: {
           branch_id: "test-branch",
           clinician_id: "test-user",
+        },
+      },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 when direct visit omits treatment personnel", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/visits",
+      new Map(),
+      {
+        body: {
+          patient_id: "patient-1",
+          branch_id: "test-branch",
+          clinician_id: "test-user",
+          chair_id: "chair-1",
         },
       },
     );

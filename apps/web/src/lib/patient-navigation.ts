@@ -23,8 +23,9 @@ export function withPatientReturnContext(
   patientId: string,
   section: PatientWorkspaceSection,
 ) {
-  const separator = destination.includes("?") ? "&" : "?";
-  return `${destination}${separator}return_to=${encodeURIComponent(patientWorkspacePath(patientId, section))}`;
+  const [path, hash = ""] = destination.split("#", 2);
+  const separator = path.includes("?") ? "&" : "?";
+  return `${path}${separator}return_to=${encodeURIComponent(patientWorkspacePath(patientId, section))}${hash ? `#${hash}` : ""}`;
 }
 
 export function patientReturnPath(

@@ -142,6 +142,25 @@ export function PatientDetailPage() {
     }
   }
 
+  async function startVisit(appointment: Appointment) {
+    if (!session?.user?.id) return;
+    setStartingAppointmentId(appointment.id);
+    try {
+      const visit = await apiPost<Visit>("/api/visits", {
+        patient_id: appointment.patient_id,
+        branch_id: appointment.branch_id,
+        clinician_id: session.user.id,
+        source_appointment_id: appointment.id,
+      });
+      toast.success("Đã bắt đầu lượt khám");
+      navigate(withPatientReturnContext(`/visits/${visit.id}#findings`, patient.id, "appointments"));
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Không thể bắt đầu lượt khám");
+    } finally {
+      setStartingAppointmentId(null);
+    }
+  }
+
   if (loading || !patient) {
     return <p className="px-6 py-6 text-sm text-muted-foreground">Đang tải…</p>;
   }
@@ -149,6 +168,13 @@ export function PatientDetailPage() {
   const totalPaid = payments
     .filter((p) => p.status === "confirmed")
     .reduce((sum, p) => sum + p.amount, 0);
+  const sortedAppointments = [...appointments].sort(
+    (left, right) => new Date(left.scheduled_at).getTime() - new Date(right.scheduled_at).getTime(),
+  );
+  const visibleAppointments = showPastAppointments
+    ? sortedAppointments
+    : sortedAppointments.filter((appointment) => new Date(appointment.scheduled_at) >= now);
+  const pastAppointmentCount = sortedAppointments.length - visibleAppointments.length;
   const treatedBranches = [...new Map(
     visits.map((visit) => [visit.branch_id, {
       id: visit.branch_id,
@@ -623,20 +649,44 @@ export function PatientDetailPage() {
         <TabsContent className="mt-0" value="appointments">
           <Card>
             <CardHeader>
-              <CardTitle>Lịch hẹn</CardTitle>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <CardTitle>Lịch hẹn</CardTitle>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowPastAppointments((show) => !show)}
+                >
+                  {showPastAppointments ? "Ẩn lịch đã qua" : `Hiện lịch đã qua${pastAppointmentCount ? ` (${pastAppointmentCount})` : ""}`}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {appointments.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Chưa có lịch hẹn nào.</p>
+              ) : visibleAppointments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Không có lịch hẹn sắp tới.</p>
               ) : (
                 <div className="space-y-2">
-                  {appointments.map((apt) => (
-                    <AppointmentCard
-                      key={apt.id}
-                      appointment={apt}
-                      patientName={patient.name}
-                      onClick={() => navigate(withPatientReturnContext(`/appointments/${apt.id}`, patient.id, "appointments"))}
-                    />
+                  {visibleAppointments.map((apt) => (
+                    <div key={apt.id} className="space-y-2">
+                      <AppointmentCard
+                        appointment={apt}
+                        patientName={patient.name}
+                        onClick={() => navigate(withPatientReturnContext(`/appointments/${apt.id}`, patient.id, "appointments"))}
+                      />
+                      {canStartAppointmentVisit(apt, now) && (
+                        <div className="flex justify-end">
+                          <Button
+                            size="sm"
+                            onClick={() => void startVisit(apt)}
+                            disabled={startingAppointmentId === apt.id}
+                          >
+                            {startingAppointmentId === apt.id ? "Đang bắt đầu…" : "Bắt đầu khám"}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}
@@ -736,6 +786,13 @@ function Count({ value, urgent = false }: { value: number; urgent?: boolean }) {
   return (
     <span className={className}>{value}</span>
   );
+}
+
+function canStartAppointmentVisit(appointment: Appointment, now: Date): boolean {
+  if (appointment.status !== "arrived" || !appointment.chair_id) return false;
+  const startsAt = new Date(appointment.scheduled_at);
+  const endsAt = new Date(startsAt.getTime() + appointment.duration_min * 60_000);
+  return startsAt <= now && now < endsAt;
 }
 
 function formatPatientAddress(patient: Patient) {

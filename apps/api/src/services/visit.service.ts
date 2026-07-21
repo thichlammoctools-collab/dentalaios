@@ -35,12 +35,10 @@ export const visitService = {
       { table: "users", id: data.treating_clinician_id ?? undefined },
       { table: "users", id: data.assistant_id ?? undefined },
     ]);
-    await assertTreatmentPersonnel(db, tenantId, {
-      treatingClinicianId: data.treating_clinician_id ?? undefined,
-      assistantId: data.assistant_id ?? undefined,
-    });
     const visits = createVisitsRepository(db);
     let chairId = data.chair_id;
+    let treatingClinicianId = data.treating_clinician_id ?? undefined;
+    let assistantId = data.assistant_id ?? undefined;
     if (data.source_appointment_id) {
       const existing = await visits.getBySourceAppointmentId(tenantId, data.source_appointment_id);
       if (existing) return existing;
@@ -56,7 +54,12 @@ export const visitService = {
         throw new ValidationError("Chỉ có thể bắt đầu khám khi bệnh nhân đã đến và đang trong khung giờ hẹn");
       }
       chairId = appointment.chair_id;
+      treatingClinicianId = appointment.clinician_id;
+      assistantId = appointment.assistant_id;
     }
+    if (!treatingClinicianId) throw new ValidationError("Vui lòng chọn bác sĩ điều trị");
+    if (!assistantId) throw new ValidationError("Vui lòng chọn phụ tá");
+    await assertTreatmentPersonnel(db, tenantId, { treatingClinicianId, assistantId });
     await assertVisitChair(db, tenantId, data.branch_id, chairId, !data.source_appointment_id);
     const created = await visits.create(tenantId, {
       patient_id: data.patient_id,

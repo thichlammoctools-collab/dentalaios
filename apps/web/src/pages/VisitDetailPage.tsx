@@ -619,7 +619,7 @@ export function VisitDetailPage() {
       </Card>
 
       {/* Findings */}
-      <Card>
+      <Card id="findings">
         <CardHeader>
           <CardTitle>Clinical Findings ({findings.length})</CardTitle>
         </CardHeader>
