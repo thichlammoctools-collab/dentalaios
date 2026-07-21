@@ -34,8 +34,8 @@ export function Dialog({ open, onOpenChange, children, className }: DialogProps)
     >
       <div
         className={cn(
-          "relative z-[10000] w-full sm:max-w-xl rounded-t-2xl sm:rounded-2xl border border-border bg-card shadow-2xl",
-          "max-h-[92dvh] sm:max-h-[85dvh] flex flex-col",
+          "relative z-[10000] w-full sm:max-w-3xl lg:max-w-4xl rounded-t-2xl sm:rounded-2xl border border-border bg-card shadow-2xl",
+          "max-h-[92dvh] sm:max-h-[90dvh] flex flex-col",
           "transition-all duration-200",
           open
             ? "opacity-100 translate-y-0 sm:scale-100"

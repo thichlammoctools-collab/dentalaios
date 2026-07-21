@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,6 +68,8 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
   const [referralUserId, setReferralUserId] = useState(patient?.referral_user_id ?? "");
   const [referralNotes, setReferralNotes] = useState(patient?.referral_notes ?? "");
   const [users, setUsers] = useState<UserWithDetails[]>([]);
+  const [step, setStep] = useState(1);
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (!open || !branchId) return;
@@ -98,12 +100,17 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
       setReferralType(patient?.referral_type ?? "");
       setReferralUserId(patient?.referral_user_id ?? "");
       setReferralNotes(patient?.referral_notes ?? "");
+      setStep(1);
     }
   }, [open, patient]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!session) return;
+    if (step === 1) {
+      if (formRef.current?.reportValidity()) setStep(2);
+      return;
+    }
     setSaving(true);
     try {
       const payload: PatientCreateInput = {
@@ -164,17 +171,29 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
     ? bmi < 18.5 ? "Gầy" : bmi < 23 ? "Bình thường" : bmi < 25 ? "Thừa cân" : "Béo phì"
     : null;
 
+  function goToNextStep() {
+    if (formRef.current?.reportValidity()) setStep(2);
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange} className="sm:max-w-2xl">
-      <form onSubmit={onSubmit}>
+      <form ref={formRef} onSubmit={onSubmit}>
         <DialogHeader>
           <DialogTitle>{isEdit ? "Sửa bệnh nhân" : "Tạo bệnh nhân mới"}</DialogTitle>
+          <div className="mt-4 flex items-center gap-3" aria-label="Tiến trình biểu mẫu">
+            <StepIndicator active={step === 1} complete={step > 1} number={1} label="Thông tin chính" />
+            <div className="h-px flex-1 bg-border" />
+            <StepIndicator active={step === 2} number={2} label="Bổ sung hồ sơ" />
+          </div>
         </DialogHeader>
 
-        <DialogBody className="grid gap-3 max-h-[70vh] overflow-y-auto pr-1">
+        <DialogBody className="grid gap-3 pr-1">
 
-          {/* ─── 1. Thông tin cơ bản ─── */}
-          <SectionDivider icon={<UserIcon />}>Thông tin cơ bản</SectionDivider>
+          {step === 1 && <>
+          <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
+            Nhập thông tin cần thiết để nhận diện và liên hệ bệnh nhân. Các mục có dấu <span className="font-semibold text-red-500">*</span> là bắt buộc.
+          </div>
+          <SectionDivider icon={<UserIcon />}>Thông tin chính</SectionDivider>
 
           <div className="grid gap-1.5">
             <Label htmlFor="pf-name">
@@ -238,6 +257,26 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
             />
           </div>
 
+          <div className="grid gap-1.5">
+            <Label htmlFor="pf-cccd">Số CCCD</Label>
+            <Input
+              id="pf-cccd"
+              type="text"
+              inputMode="numeric"
+              maxLength={12}
+              pattern="[0-9]*"
+              value={cccd}
+              onChange={(e) => setCccd(e.target.value.replace(/\D/g, "").slice(0, 12))}
+              placeholder="VD: 012345678912"
+            />
+          </div>
+          </>}
+
+          {step === 2 && <>
+          <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+            Hoàn thiện hồ sơ nếu có thông tin. Toàn bộ mục ở bước này đều không bắt buộc và có thể bổ sung sau.
+          </div>
+          <SectionDivider>Địa chỉ</SectionDivider>
           <div className="rounded-lg border border-border bg-muted/20 p-3">
             <div className="mb-3">
               <Label className="text-sm font-semibold">Địa chỉ thường trú</Label>
@@ -287,20 +326,6 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
                 </Select>
               </div>
             </div>
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="pf-cccd">Số CCCD</Label>
-            <Input
-              id="pf-cccd"
-              type="text"
-              inputMode="numeric"
-              maxLength={12}
-              pattern="[0-9]*"
-              value={cccd}
-              onChange={(e) => setCccd(e.target.value.replace(/\D/g, "").slice(0, 12))}
-              placeholder="VD: 012345678912"
-            />
           </div>
 
           {/* ─── 2. Người nhà ─── */}
@@ -440,18 +465,35 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
               </div>
             </>
           )}
+          </>}
         </DialogBody>
 
         <DialogFooter className="mt-4">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Hủy
           </Button>
-          <Button type="submit" disabled={saving}>
-            {saving ? "Đang lưu…" : isEdit ? "Lưu" : "Tạo bệnh nhân"}
-          </Button>
+          {step === 2 && <Button type="button" variant="outline" onClick={() => setStep(1)} disabled={saving}>Quay lại</Button>}
+          {step === 1 ? (
+            <Button type="button" onClick={goToNextStep}>Tiếp tục</Button>
+          ) : (
+            <Button type="submit" disabled={saving}>
+              {saving ? "Đang lưu…" : isEdit ? "Lưu thay đổi" : "Tạo bệnh nhân"}
+            </Button>
+          )}
         </DialogFooter>
       </form>
     </Dialog>
+  );
+}
+
+function StepIndicator({ active, complete, number, label }: { active: boolean; complete?: boolean; number: number; label: string }) {
+  return (
+    <div className="flex items-center gap-2 whitespace-nowrap">
+      <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${active ? "bg-primary text-primary-foreground" : complete ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"}`}>
+        {complete ? "✓" : number}
+      </span>
+      <span className={`text-xs font-medium ${active ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
+    </div>
   );
 }
 

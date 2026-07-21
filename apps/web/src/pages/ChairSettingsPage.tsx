@@ -263,7 +263,7 @@ export function ChairSettingsPage() {
         </Card>
       )}
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen} className="sm:max-w-2xl">
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogHeader><DialogTitle>{editingChair ? "Chỉnh sửa ghế nha" : "Tạo ghế nha"}</DialogTitle><DialogDescription>{editingChair ? "Mã ghế là mã nội bộ và không thể thay đổi sau khi tạo." : "Mã ghế dùng để nhận diện nội bộ, ví dụ: GHE-01 hoặc P1-A."}</DialogDescription></DialogHeader>
         <DialogBody>
           <div className="grid gap-4 sm:grid-cols-2">

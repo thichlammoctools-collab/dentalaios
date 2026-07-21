@@ -86,13 +86,13 @@ export function BranchForm({ open, onOpenChange, branch, onSaved }: BranchFormPr
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} className="sm:max-w-lg">
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <form onSubmit={onSubmit}>
         <DialogHeader>
           <DialogTitle>{isEdit ? "Sửa chi nhánh" : "Thêm chi nhánh mới"}</DialogTitle>
         </DialogHeader>
 
-        <DialogBody className="grid gap-3 max-h-[70vh] overflow-y-auto pr-1">
+        <DialogBody className="grid gap-3 pr-1">
 
           {/* ─── 1. Thông tin cơ bản ─── */}
           <SectionDivider icon={<BuildingIcon />}>Thông tin cơ bản</SectionDivider>

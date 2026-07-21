@@ -558,6 +558,9 @@ export function PatientDetailPage() {
                       <TableHead>Ngày tạo</TableHead>
                       <TableHead>Trạng thái</TableHead>
                       <TableHead className="text-right">Tổng</TableHead>
+                      <TableHead className="text-right">Dịch vụ</TableHead>
+                      <TableHead className="text-right">Doanh thu đã làm</TableHead>
+                      <TableHead className="text-right">Doanh thu chưa làm</TableHead>
                       <TableHead className="w-24"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -585,6 +588,18 @@ export function PatientDetailPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           {formatCurrency(p.total_cost, p.currency)}
+                        </TableCell>
+                        <TableCell className="text-right text-xs leading-5 whitespace-nowrap">
+                          <div>Tổng: {p.service_summary?.total_count ?? 0}</div>
+                          <div className="text-emerald-600 dark:text-emerald-400">Đã làm: {p.service_summary?.completed_count ?? 0}</div>
+                          <div className="text-amber-600 dark:text-amber-400">Chưa làm: {p.service_summary?.remaining_count ?? 0}</div>
+                          <div className="text-muted-foreground">Không làm: {p.service_summary?.skipped_count ?? 0}</div>
+                        </TableCell>
+                        <TableCell className="text-right whitespace-nowrap text-emerald-600 dark:text-emerald-400">
+                          {formatCurrency(p.service_summary?.completed_revenue ?? 0, p.currency)}
+                        </TableCell>
+                        <TableCell className="text-right whitespace-nowrap text-amber-600 dark:text-amber-400">
+                          {formatCurrency(p.service_summary?.remaining_revenue ?? 0, p.currency)}
                         </TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           {p.can_delete && (

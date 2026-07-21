@@ -938,7 +938,7 @@ export function VisitDetailPage() {
       </Dialog>
 
       {/* ─── AI Generate Plan Dialog ──────────────────────── */}
-      <Dialog open={planDialogOpen} onOpenChange={setPlanDialogOpen} className="sm:max-w-3xl">
+      <Dialog open={planDialogOpen} onOpenChange={setPlanDialogOpen}>
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 shadow-lg">

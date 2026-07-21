@@ -220,6 +220,15 @@ export interface TreatmentService {
   updated_at: string;
 }
 
+export interface TreatmentPlanServiceSummary {
+  total_count: number;
+  completed_count: number;
+  remaining_count: number;
+  skipped_count: number;
+  completed_revenue: number;
+  remaining_revenue: number;
+}
+
 export interface TreatmentPlan {
   id: string;
   code?: string;
@@ -233,7 +242,9 @@ export interface TreatmentPlan {
   approved_at?: string;
   created_at: string;
   can_delete?: boolean;
+  service_summary?: TreatmentPlanServiceSummary;
 }
+
 
 export type TreatmentItemStatus = "planned" | "in_progress" | "completed";
 

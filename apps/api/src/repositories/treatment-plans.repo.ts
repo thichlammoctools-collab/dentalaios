@@ -31,28 +31,40 @@ export function createTreatmentPlansRepository(db: D1Database): TreatmentPlansRe
     },
 
     async list(tenantId, opts = {}) {
-      const conditions = ["tenant_id = ?"];
+      const conditions = ["tp.tenant_id = ?"];
       const binds: unknown[] = [tenantId];
       if (opts.patientId) {
-        conditions.push("patient_id = ?");
+        conditions.push("tp.patient_id = ?");
         binds.push(opts.patientId);
       }
       if (opts.status) {
-        conditions.push("status = ?");
+        conditions.push("tp.status = ?");
         binds.push(opts.status);
       }
       if (opts.visitId) {
-        conditions.push("visit_id = ?");
+        conditions.push("tp.visit_id = ?");
         binds.push(opts.visitId);
       }
       const result = await db
-        .prepare(`SELECT treatment_plans.*, CASE
-          WHEN status <> 'completed'
-            AND NOT EXISTS(SELECT 1 FROM treatment_plan_items WHERE tenant_id = treatment_plans.tenant_id AND treatment_plan_id = treatment_plans.id AND status = 'completed')
-            AND NOT EXISTS(SELECT 1 FROM treatment_cases WHERE tenant_id = treatment_plans.tenant_id AND treatment_plan_id = treatment_plans.id)
-            AND NOT EXISTS(SELECT 1 FROM payments WHERE tenant_id = treatment_plans.tenant_id AND treatment_plan_id = treatment_plans.id)
-          THEN 1 ELSE 0 END AS can_delete
-          FROM treatment_plans WHERE ${conditions.join(" AND ")} ORDER BY created_at DESC`)
+        .prepare(`SELECT tp.*, CASE
+          WHEN tp.status <> 'completed'
+            AND NOT EXISTS(SELECT 1 FROM treatment_plan_items WHERE tenant_id = tp.tenant_id AND treatment_plan_id = tp.id AND status = 'completed')
+            AND NOT EXISTS(SELECT 1 FROM treatment_cases WHERE tenant_id = tp.tenant_id AND treatment_plan_id = tp.id)
+            AND NOT EXISTS(SELECT 1 FROM payments WHERE tenant_id = tp.tenant_id AND treatment_plan_id = tp.id)
+          THEN 1 ELSE 0 END AS can_delete,
+          COUNT(i.id) AS service_total_count,
+          COALESCE(SUM(CASE WHEN m.status = 'completed' THEN 1 ELSE 0 END), 0) AS service_completed_count,
+          COALESCE(SUM(CASE WHEN m.status IN ('not_started', 'in_progress') OR m.id IS NULL THEN 1 ELSE 0 END), 0) AS service_remaining_count,
+          COALESCE(SUM(CASE WHEN m.status = 'skipped' THEN 1 ELSE 0 END), 0) AS service_skipped_count,
+          COALESCE(SUM(CASE WHEN m.status = 'completed' THEN i.unit_cost ELSE 0 END), 0) AS completed_revenue,
+          COALESCE(SUM(CASE WHEN m.status IN ('not_started', 'in_progress') OR m.id IS NULL THEN i.unit_cost ELSE 0 END), 0) AS remaining_revenue
+          FROM treatment_plans tp
+          LEFT JOIN treatment_plan_items i ON i.tenant_id = tp.tenant_id AND i.treatment_plan_id = tp.id
+          LEFT JOIN treatment_cases tc ON tc.tenant_id = tp.tenant_id AND tc.treatment_plan_id = tp.id
+          LEFT JOIN treatment_case_milestones m ON m.tenant_id = tc.tenant_id AND m.treatment_case_id = tc.id AND m.treatment_plan_item_id = i.id
+          WHERE ${conditions.join(" AND ")}
+          GROUP BY tp.id
+          ORDER BY tp.created_at DESC`)
         .bind(...binds)
         .all();
       return (result.results as D1Row[]).map(mapPlan);
@@ -134,6 +146,16 @@ function mapPlan(row: D1Row): TreatmentPlan {
     approved_at: (row.approved_at as string | null) ?? undefined,
     created_at: row.created_at as string,
     can_delete: Number(row.can_delete ?? 0) === 1,
+    service_summary: row.service_total_count === undefined
+      ? undefined
+      : {
+        total_count: Number(row.service_total_count ?? 0),
+        completed_count: Number(row.service_completed_count ?? 0),
+        remaining_count: Number(row.service_remaining_count ?? 0),
+        skipped_count: Number(row.service_skipped_count ?? 0),
+        completed_revenue: Number(row.completed_revenue ?? 0),
+        remaining_revenue: Number(row.remaining_revenue ?? 0),
+      },
   };
 }
 

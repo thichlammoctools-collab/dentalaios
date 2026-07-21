@@ -190,7 +190,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose} className="sm:max-w-2xl">
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogHeader>
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-lg">

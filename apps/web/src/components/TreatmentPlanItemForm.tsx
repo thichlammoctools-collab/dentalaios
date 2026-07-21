@@ -120,7 +120,7 @@ export function TreatmentPlanItemForm({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} className="sm:max-w-2xl">
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <form onSubmit={onSubmit}>
         <DialogHeader>
           <DialogTitle>{item ? "Sửa thủ thuật/dịch vụ điều trị" : "Thêm thủ thuật/dịch vụ điều trị"}</DialogTitle>
