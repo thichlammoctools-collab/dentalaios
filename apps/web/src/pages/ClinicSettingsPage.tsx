@@ -6,6 +6,7 @@ import { BranchForm } from "@/components/BranchForm";
 import { Dialog, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogBody } from "@/components/ui/dialog";
 import type { Branch, Tenant } from "@shared/types";
 import { PERMISSIONS } from "@shared/constants";
+import { PageContainer } from "@/components/PageContainer";
 
 interface ClinicData {
   tenant: Tenant;
@@ -223,7 +224,7 @@ export function ClinicSettingsPage() {
   );
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
+    <PageContainer>
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Cài đặt phòng khám</h1>
         <p className="text-sm text-muted-foreground mt-1">
@@ -571,6 +572,6 @@ export function ClinicSettingsPage() {
         </DialogFooter>
       </Dialog>
 
-    </div>
+    </PageContainer>
   );
 }

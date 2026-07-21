@@ -7,6 +7,7 @@ import { Dialog, DialogBody, DialogDescription, DialogFooter, DialogHeader, Dial
 import type { ProcedureCatalogItem, TreatmentService } from "@shared/types";
 import { PERMISSIONS } from "@shared/constants";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/pagination";
+import { PageContainer } from "@/components/PageContainer";
 
 const EMPTY_SERVICE = {
   code: "",
@@ -125,7 +126,7 @@ export function TreatmentServicesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
+    <PageContainer>
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Danh mục dịch vụ điều trị</h1>
@@ -190,6 +191,6 @@ export function TreatmentServicesPage() {
           <button onClick={() => void save()} disabled={saving} className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">{saving ? "Đang lưu..." : "Lưu dịch vụ"}</button>
         </DialogFooter>
       </Dialog>
-    </div>
+    </PageContainer>
   );
 }

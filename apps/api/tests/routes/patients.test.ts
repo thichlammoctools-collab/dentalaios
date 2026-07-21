@@ -67,6 +67,50 @@ describe("GET /api/patients", () => {
   });
 });
 
+describe("GET /api/patients/:id/open-treatment-milestones", () => {
+  it("returns only open milestones from active treatment cases", async () => {
+    const app = mountRoute("/api/patients", patientsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "GET",
+      "/api/patients/patient-1/open-treatment-milestones",
+      new Map([[
+        "FROM treatment_cases tc",
+        [{
+          treatment_case_id: "case-1",
+          treatment_plan_id: "plan-1",
+          case_number: "CA-001",
+          case_title: "Điều trị tổng quát",
+          milestone_id: "milestone-1",
+          sort_order: 1,
+          status: "not_started",
+          treatment_plan_item_id: "item-1",
+          tenant_id: "test-tenant",
+          tooth_number: 36,
+          procedure: "root_canal",
+          description: "Điều trị tủy răng 36",
+          unit_cost: 3000000,
+          item_status: "planned",
+          item_created_at: "2026-01-01T00:00:00.000Z",
+          service_code: "ROOT-CANAL",
+          service_name: "Điều trị tủy",
+          price_includes_vat: 1,
+          price_snapshot_at: "2026-01-01T00:00:00.000Z",
+        }],
+      ]]),
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      total: 1,
+      items: [{
+        treatment_case_id: "case-1",
+        milestone_id: "milestone-1",
+        item: { service_name: "Điều trị tủy", tooth_number: 36 },
+      }],
+    });
+  });
+});
+
 describe("POST /api/patients", () => {
   it("returns 201 + patient for valid data", async () => {
     const app = mountRoute("/api/patients", patientsRoutes);

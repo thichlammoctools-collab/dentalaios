@@ -11,6 +11,7 @@ import { getRoleLabel } from "@shared/constants";
 import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/pagination";
+import { PageContainer } from "@/components/PageContainer";
 
 interface EditForm {
   name: string;
@@ -111,7 +112,7 @@ export function UsersSettingsPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <PageContainer>
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
@@ -229,8 +230,8 @@ export function UsersSettingsPage() {
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-foreground">Người dùng hiện tại ({members.length})</h2>
           </div>
-          <div className="rounded-xl border border-border bg-card overflow-hidden">
-            <table className="w-full">
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
+            <table className="w-full min-w-[760px]">
               <thead>
                 <tr className="border-b border-border bg-muted/40">
                   <th className="text-left text-xs font-semibold text-muted-foreground px-4 py-3">Họ tên</th>
@@ -359,6 +360,6 @@ export function UsersSettingsPage() {
           </DialogFooter>
         </form>
       </Dialog>
-    </div>
+    </PageContainer>
   );
 }

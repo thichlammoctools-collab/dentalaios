@@ -20,6 +20,7 @@ import { formatDate } from "@/lib/utils";
 import type { Role } from "@shared/types";
 import { getRoleLabel } from "@shared/constants";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/pagination";
+import { PageContainer } from "@/components/PageContainer";
 
 export function RolesSettingsPage() {
   const [roles, setRoles] = useState<Role[]>([]);
@@ -65,7 +66,7 @@ export function RolesSettingsPage() {
   }
 
   return (
-    <div className="p-6 space-y-4">
+    <PageContainer className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Vai trò & Phân quyền</h1>
@@ -152,6 +153,6 @@ export function RolesSettingsPage() {
           </DialogFooter>
         </form>
       </Dialog>
-    </div>
+    </PageContainer>
   );
 }
