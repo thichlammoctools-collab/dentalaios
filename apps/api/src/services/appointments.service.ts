@@ -52,6 +52,20 @@ async function assertNoConflict(
   }
 }
 
+async function assertPatientHasNoConflict(
+  db: D1Database,
+  tenantId: string,
+  patientId: string,
+  startISO: string,
+  endISO: string,
+  excludeId?: string,
+): Promise<void> {
+  const conflicts = await createAppointmentsRepository(db).findPatientConflicts(tenantId, patientId, startISO, endISO, excludeId);
+  if (conflicts.length > 0) {
+    throw new ConflictError("Bệnh nhân đã có lịch hẹn trùng khung giờ này. Vui lòng chọn giờ khác.");
+  }
+}
+
 // ─── Public API ───────────────────────────────────────────────
 
 export const appointmentsService = {
@@ -96,6 +110,7 @@ export const appointmentsService = {
 
     // Conflict check: same clinician, overlapping [start, end)
     await assertNoConflict(db, tenantId, input.clinician_id, start, end);
+    await assertPatientHasNoConflict(db, tenantId, input.patient_id, start, end);
     if (input.chair_id) {
       await chairsService.assertAvailable(
         db, tenantId, branchId, input.chair_id, input.scheduled_at, duration,
@@ -167,6 +182,14 @@ export const appointmentsService = {
         db,
         tenantId,
         newClinician,
+        start,
+        end,
+        skipSelf ? undefined : id,
+      );
+      await assertPatientHasNoConflict(
+        db,
+        tenantId,
+        existing.patient_id,
         start,
         end,
         skipSelf ? undefined : id,

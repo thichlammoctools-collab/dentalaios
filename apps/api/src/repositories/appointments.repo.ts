@@ -39,6 +39,13 @@ export interface AppointmentsRepository {
     endISO: string,
     excludeId?: string,
   ): Promise<Appointment[]>;
+  findPatientConflicts(
+    tenantId: string,
+    patientId: string,
+    startISO: string,
+    endISO: string,
+    excludeId?: string,
+  ): Promise<Appointment[]>;
   findChairConflicts(
     tenantId: string,
     chairId: string,
@@ -120,7 +127,14 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
                AND status NOT IN ('cancelled', 'no_show')
                AND scheduled_at < ?
                AND datetime(scheduled_at, '+' || duration_min || ' minutes') > ?
-            ) AND (
+             ) AND NOT EXISTS (
+              SELECT 1 FROM appointments
+              WHERE tenant_id = ?
+                AND patient_id = ?
+                AND status NOT IN ('cancelled', 'no_show')
+                AND scheduled_at < ?
+                AND datetime(scheduled_at, '+' || duration_min || ' minutes') > ?
+             ) AND (
               ? IS NULL OR NOT EXISTS (
                 SELECT 1 FROM appointments
                 WHERE tenant_id = ?
@@ -153,6 +167,10 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
           data.created_by,
           tenantId,
           data.clinician_id,
+          end.toISOString(),
+          start,
+          tenantId,
+          data.patient_id,
           end.toISOString(),
           start,
           data.chair_id ?? null,
@@ -233,6 +251,26 @@ export function createAppointmentsRepository(db: D1Database): AppointmentsReposi
         `datetime(scheduled_at, '+' || (duration_min + ?) || ' minutes') > ?`,
       ];
       const binds: unknown[] = [tenantId, chairId, endISO, CHAIR_PREPARATION_MINUTES, CHAIR_PREPARATION_MINUTES, startISO];
+      if (excludeId) {
+        conditions.push("id != ?");
+        binds.push(excludeId);
+      }
+      const result = await db
+        .prepare(`SELECT * FROM appointments WHERE ${conditions.join(" AND ")} LIMIT 5`)
+        .bind(...binds)
+        .all();
+      return (result.results as D1Row[]).map(mapAppointment);
+    },
+
+    async findPatientConflicts(tenantId, patientId, startISO, endISO, excludeId) {
+      const conditions = [
+        "tenant_id = ?",
+        "patient_id = ?",
+        "status NOT IN ('cancelled', 'no_show')",
+        "scheduled_at < ?",
+        `datetime(scheduled_at, '+' || duration_min || ' minutes') > ?`,
+      ];
+      const binds: unknown[] = [tenantId, patientId, endISO, startISO];
       if (excludeId) {
         conditions.push("id != ?");
         binds.push(excludeId);

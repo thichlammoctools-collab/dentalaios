@@ -18,7 +18,7 @@
   },
   "vars": {
     "ENVIRONMENT": "production",
-    "FRONTEND_ORIGIN": "https://dentalaios-web.pages.dev"
+    "FRONTEND_ORIGIN": "https://*.dentalaios-web.pages.dev"
   },
   "d1_databases": [
     {

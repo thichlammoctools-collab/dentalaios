@@ -82,8 +82,8 @@ describe("POST /api/appointments", () => {
         ["FROM users", [{ id: "doc-1", tenant_id: "test-tenant" }]],
         // Conflict check (findConflicts) returns empty → no overlap
         // Post-insert getById returns the created row
-        ["FROM appointments", (_sql: string, idx: number) =>
-          idx === 0 ? [] : [appointmentRow()]
+        ["FROM appointments", (sql: string) =>
+          sql.startsWith("INSERT INTO appointments") ? [appointmentRow()] : sql.includes("clinician_id = ?") || sql.includes("patient_id = ?") ? [] : [appointmentRow()],
         ],
       ]),
       {
@@ -132,7 +132,7 @@ describe("POST /api/appointments", () => {
         ["FROM patients", [{ id: "patient-1", tenant_id: "test-tenant" }]],
         ["FROM users", [{ id: "doc-1", tenant_id: "test-tenant" }]],
         ["FROM dental_chairs", [{ id: "chair-1", tenant_id: "test-tenant", branch_id: "test-branch", is_active: 1, operational_status: "available" }]],
-        ["FROM appointments", (_sql: string, index: number) => index === 0 ? [] : [appointmentRow({ chair_id: "chair-1" })]],
+        ["FROM appointments", (sql: string) => sql.includes("patient_id = ?") ? [] : sql.includes("chair_id = ?") ? [appointmentRow({ chair_id: "chair-1" })] : []],
       ]),
       {
         permissions: ["write_appointments"],
@@ -148,6 +148,32 @@ describe("POST /api/appointments", () => {
     expect(res.status).toBe(409);
     const body = await res.json() as { error: string };
     expect(body.error).toContain("Ghế nha");
+  });
+
+  it("returns 409 when a patient already has an overlapping appointment", async () => {
+    const app = mountRoute("/api/appointments", appointmentsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/appointments",
+      new Map<string, unknown[]>([
+        ["FROM branches", [{ id: "test-branch", tenant_id: "test-tenant" }]],
+        ["FROM patients", [{ id: "patient-1", tenant_id: "test-tenant" }]],
+        ["FROM users", [{ id: "doc-2", tenant_id: "test-tenant" }]],
+        ["FROM appointments", (sql: string) => sql.includes("patient_id = ?") ? [appointmentRow()] : []],
+      ]),
+      {
+        permissions: ["write_appointments"],
+        body: {
+          patient_id: "patient-1",
+          clinician_id: "doc-2",
+          scheduled_at: "2099-07-15T08:00:00.000Z",
+          duration_min: 30,
+        },
+      },
+    );
+    expect(res.status).toBe(409);
+    expect((await res.json() as { error: string }).error).toContain("Bệnh nhân");
   });
 
   it("returns 400 for missing required field", async () => {

@@ -205,7 +205,7 @@ describe("treatment case lifecycle", () => {
       new Map([
         ["FROM treatment_cases", [activeCase]],
         ["AND m.id = ? LIMIT 1", [milestone, milestone, secondMilestone]],
-        ["FROM appointments WHERE", [appointment]],
+        ["FROM appointments WHERE", [{ ...appointment, scheduled_at: "2099-07-22T07:00:00.000Z" }]],
         ["FROM dental_chairs", []],
         ["FROM users", [{ id: "test-user", tenant_id: "test-tenant" }]],
         ["FROM patients", [{ id: "patient-1", tenant_id: "test-tenant" }]],
