@@ -81,10 +81,10 @@ app.use(
       const matches = (origin: string, pattern: string): boolean => {
         if (origin === pattern) return true;
         if (!pattern.includes("*")) return false;
-        // Escape ALL regex metachars including * itself, then unescape * -> optional subdomain
-        const escaped = pattern.replace(/[.+?^${}()|[\]\\*]/g, "\\$&");
-        // Replace each `\*` with `([a-z0-9-]+\.)?` (optional single subdomain)
-        const final = escaped.replace(/\\\*/g, "([a-z0-9-]+\\.)?");
+        // Treat `*.` as one optional subdomain segment so the root domain also matches.
+        const [prefix, suffix] = pattern.split("*.", 2);
+        const escapeRegex = (value: string) => value.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+        const final = `${escapeRegex(prefix)}([a-z0-9-]+\\.)?${escapeRegex(suffix)}`;
         const regex = new RegExp("^" + final + "$");
         return regex.test(origin);
       };
