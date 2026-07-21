@@ -60,13 +60,14 @@ export function createTreatmentPlansRepository(db: D1Database): TreatmentPlansRe
 
     async create(tenantId, data) {
       const id = crypto.randomUUID();
+      const code = await allocateTreatmentPlanCode(db, tenantId);
       await db
         .prepare(
           `INSERT INTO treatment_plans
-             (id, tenant_id, visit_id, patient_id, currency, notes)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+              (id, code, tenant_id, visit_id, patient_id, currency, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
         )
-        .bind(id, tenantId, data.visit_id, data.patient_id, data.currency, data.notes ?? null)
+        .bind(id, code, tenantId, data.visit_id, data.patient_id, data.currency, data.notes ?? null)
         .run();
       const created = await this.getById(tenantId, id);
       if (!created) throw new Error("Insert succeeded but read failed");
@@ -122,6 +123,7 @@ export function createTreatmentPlansRepository(db: D1Database): TreatmentPlansRe
 function mapPlan(row: D1Row): TreatmentPlan {
   return {
     id: row.id as string,
+    code: (row.code as string | null) ?? undefined,
     tenant_id: row.tenant_id as string,
     visit_id: row.visit_id as string,
     patient_id: row.patient_id as string,
@@ -133,4 +135,15 @@ function mapPlan(row: D1Row): TreatmentPlan {
     created_at: row.created_at as string,
     can_delete: Number(row.can_delete ?? 0) === 1,
   };
+}
+
+async function allocateTreatmentPlanCode(db: D1Database, tenantId: string): Promise<string> {
+  const dateKey = new Date().toISOString().slice(0, 10).replaceAll("-", "");
+  const row = await db.prepare(`INSERT INTO clinical_document_code_counters (tenant_id, document_type, date_key, last_seq)
+    VALUES (?, 'treatment_plan', ?, 1)
+    ON CONFLICT(tenant_id, document_type, date_key) DO UPDATE SET last_seq = last_seq + 1
+    RETURNING last_seq`)
+    .bind(tenantId, dateKey)
+    .first<{ last_seq: number }>();
+  return `KHD-${dateKey}-${String(row?.last_seq ?? 1).padStart(4, "0")}`;
 }

@@ -135,6 +135,7 @@ export type VisitStatus = "in_progress" | "completed" | "cancelled";
 
 export interface Visit {
   id: string;
+  code?: string;
   tenant_id: string;
   patient_id: string;
   branch_id: string;
@@ -221,6 +222,7 @@ export interface TreatmentService {
 
 export interface TreatmentPlan {
   id: string;
+  code?: string;
   tenant_id: string;
   visit_id: string;
   patient_id: string;

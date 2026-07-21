@@ -39,6 +39,7 @@ export function ScheduleNewPage() {
   const [notes, setNotes] = useState("");
   const [patientSearch, setPatientSearch] = useState("");
   const [aiTab, setAiTab] = useState<"manual" | "ai">("manual");
+  const [step, setStep] = useState<1 | 2>(1);
 
   useEffect(() => {
     if (!session?.branch?.id) return;
@@ -122,6 +123,18 @@ export function ScheduleNewPage() {
     }
   }
 
+  function continueToScheduling() {
+    if (!patientId) {
+      toast.error("Vui lòng chọn bệnh nhân");
+      return;
+    }
+    if (!clinicianId) {
+      toast.error("Vui lòng chọn bác sĩ");
+      return;
+    }
+    setStep(2);
+  }
+
   return (
     <PageContainer size="compact">
       <Tabs value={aiTab} onValueChange={(v) => setAiTab(v as "manual" | "ai")}>
@@ -138,10 +151,12 @@ export function ScheduleNewPage() {
           <Card>
             <CardHeader>
               <CardTitle>Tạo lịch hẹn mới</CardTitle>
+              <AppointmentSteps step={step} />
             </CardHeader>
             <CardContent>
               <form onSubmit={onSubmit} className="space-y-4">
 
+                {step === 1 && <>
                 {/* Patient search */}
                 <div className="grid gap-1.5">
                   <Label>Tìm bệnh nhân</Label>
@@ -183,7 +198,9 @@ export function ScheduleNewPage() {
                     </Select>
                   </div>
                 )}
+                </>}
 
+                {step === 2 && <>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="grid gap-1.5">
                     <Label>Ngày *</Label>
@@ -235,14 +252,20 @@ export function ScheduleNewPage() {
                     placeholder="Lưu ý thêm…"
                   />
                 </div>
+                </>}
 
                 <div className="flex justify-end gap-2 pt-2">
                   <Button type="button" variant="outline" onClick={() => navigate(ROUTES.SCHEDULE)}>
                     Hủy
                   </Button>
-                  <Button type="submit" disabled={saving}>
-                    {saving ? "Đang tạo…" : "Tạo lịch hẹn"}
-                  </Button>
+                  {step === 1 ? (
+                    <Button type="button" onClick={continueToScheduling}>Tiếp tục</Button>
+                  ) : <>
+                    <Button type="button" variant="ghost" onClick={() => setStep(1)}>Quay lại</Button>
+                    <Button type="submit" disabled={saving}>
+                      {saving ? "Đang tạo…" : "Tạo lịch hẹn"}
+                    </Button>
+                  </>}
                 </div>
               </form>
             </CardContent>
@@ -250,5 +273,17 @@ export function ScheduleNewPage() {
         </TabsContent>
       </Tabs>
     </PageContainer>
+  );
+}
+
+function AppointmentSteps({ step }: { step: 1 | 2 }) {
+  return (
+    <div className="mt-3 flex items-center gap-2 text-xs" aria-label={`Bước ${step} trên 2`}>
+      <span className={`flex h-5 w-5 items-center justify-center rounded-full font-semibold ${step === 1 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>1</span>
+      <span className={step === 1 ? "font-medium text-foreground" : "text-muted-foreground"}>Bệnh nhân & nhân sự</span>
+      <span className="h-px w-5 bg-border" />
+      <span className={`flex h-5 w-5 items-center justify-center rounded-full font-semibold ${step === 2 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>2</span>
+      <span className={step === 2 ? "font-medium text-foreground" : "text-muted-foreground"}>Thời gian & nội dung</span>
+    </div>
   );
 }

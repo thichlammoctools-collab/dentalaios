@@ -462,6 +462,7 @@ export function PatientDetailPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Mã lượt khám</TableHead>
                       <TableHead>Ngày</TableHead>
                       <TableHead>Bác sĩ điều trị</TableHead>
                       <TableHead>Phụ tá</TableHead>
@@ -478,6 +479,7 @@ export function PatientDetailPage() {
                         className="cursor-pointer"
                         onClick={() => navigate(withPatientReturnContext(`/visits/${v.id}`, patient.id, "visits"))}
                       >
+                        <TableCell className="font-mono text-xs font-medium">{v.code ?? v.id.slice(0, 8)}</TableCell>
                         <TableCell>{formatDateTime(v.date)}</TableCell>
                         <TableCell>
                           {v.treating_clinician_name ? (
@@ -510,7 +512,7 @@ export function PatientDetailPage() {
                                     navigate(withPatientReturnContext(`/treatment-plans/${plan.id}`, patient.id, "plans"));
                                   }}
                                 >
-                                  KH {index + 1}
+                                  {plan.code ?? `KH ${index + 1}`}
                                 </Button>
                               ))}
                             </div>
@@ -552,6 +554,7 @@ export function PatientDetailPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Mã kế hoạch</TableHead>
                       <TableHead>Ngày tạo</TableHead>
                       <TableHead>Trạng thái</TableHead>
                       <TableHead className="text-right">Tổng</TableHead>
@@ -565,6 +568,7 @@ export function PatientDetailPage() {
                         className="cursor-pointer"
                         onClick={() => navigate(withPatientReturnContext(`/treatment-plans/${p.id}`, patient.id, "plans"))}
                       >
+                        <TableCell className="font-mono text-xs font-medium">{p.code ?? p.id.slice(0, 8)}</TableCell>
                         <TableCell>{formatDateTime(p.created_at)}</TableCell>
                         <TableCell>
                           <Badge

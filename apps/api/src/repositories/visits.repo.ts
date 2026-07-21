@@ -96,16 +96,17 @@ export function createVisitsRepository(db: D1Database): VisitsRepository {
     async create(tenantId, data) {
       const id = crypto.randomUUID();
       const date = data.date ?? new Date().toISOString();
+      const code = await allocateClinicalDocumentCode(db, tenantId, "visit", date);
       await db
         .prepare(
           `INSERT INTO visits
-             (id, tenant_id, patient_id, branch_id, clinician_id, date, notes,
+              (id, code, tenant_id, patient_id, branch_id, clinician_id, date, notes,
                treating_clinician_id, assistant_id, chair_id, source_appointment_id,
                blood_pressure_systolic, blood_pressure_diastolic, blood_sugar_mgdl, vitals_recorded_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
-          id, tenantId, data.patient_id, data.branch_id, data.clinician_id, date,
+          id, code, tenantId, data.patient_id, data.branch_id, data.clinician_id, date,
           data.notes ?? null,
           data.treating_clinician_id ?? null,
            data.assistant_id ?? null,
@@ -158,6 +159,7 @@ export function createVisitsRepository(db: D1Database): VisitsRepository {
 function mapVisit(row: D1Row): Visit {
   return {
     id: row.id as string,
+    code: (row.code as string | null) ?? undefined,
     tenant_id: row.tenant_id as string,
     patient_id: row.patient_id as string,
     branch_id: row.branch_id as string,
@@ -184,4 +186,21 @@ function mapVisit(row: D1Row): Visit {
     chair_room_name: (row.chair_room_name as string | null) ?? undefined,
     source_appointment_id: (row.source_appointment_id as string | null) ?? undefined,
   };
+}
+
+async function allocateClinicalDocumentCode(
+  db: D1Database,
+  tenantId: string,
+  documentType: "visit" | "treatment_plan",
+  timestamp: string,
+): Promise<string> {
+  const dateKey = timestamp.slice(0, 10).replaceAll("-", "");
+  const row = await db.prepare(`INSERT INTO clinical_document_code_counters (tenant_id, document_type, date_key, last_seq)
+    VALUES (?, ?, ?, 1)
+    ON CONFLICT(tenant_id, document_type, date_key) DO UPDATE SET last_seq = last_seq + 1
+    RETURNING last_seq`)
+    .bind(tenantId, documentType, dateKey)
+    .first<{ last_seq: number }>();
+  const sequence = row?.last_seq ?? 1;
+  return `${documentType === "visit" ? "LK" : "KHD"}-${dateKey}-${String(sequence).padStart(4, "0")}`;
 }

@@ -609,7 +609,7 @@ export function VisitDetailPage() {
         <div className="mt-1 flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Lượt khám</h1>
-            <p className="text-sm text-muted-foreground">{formatDateTime(visit.date)}</p>
+            <p className="text-sm text-muted-foreground">{visit.code && <span className="font-mono">{visit.code} · </span>}{formatDateTime(visit.date)}</p>
           </div>
           <Badge
             variant={

@@ -66,6 +66,7 @@ export function AppointmentForm({
   const [loadingPatientMilestones, setLoadingPatientMilestones] = useState(false);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [step, setStep] = useState<1 | 2>(1);
 
   useEffect(() => {
     if (!open || !session?.branch?.id) return;
@@ -98,7 +99,9 @@ export function AppointmentForm({
     setProcedure("");
     apiGet<OpenMilestonesResponse>(`/api/patients/${patientId}/open-treatment-milestones`)
       .then((response) => {
-        if (!cancelled) setPatientMilestones(response.items);
+        if (cancelled) return;
+        setPatientMilestones(response.items);
+        if (response.items.length === 0) setProcedure("Khám tư vấn / Tiếp tục điều trị");
       })
       .catch(() => {
         if (!cancelled) setPatientMilestones([]);
@@ -111,6 +114,7 @@ export function AppointmentForm({
 
   useEffect(() => {
     if (!open) return;
+    setStep(1);
     const nextSlot = getNextAppointmentSlot();
     const nextDate = initialDate ?? nextSlot.date;
     const nextTime = initialHour != null
@@ -154,6 +158,19 @@ export function AppointmentForm({
     setPatientMilestones([]);
     setSelectedCaseId("");
     setNotes("");
+    setStep(1);
+  }
+
+  function continueToScheduling() {
+    if (!patientId) {
+      toast.error("Vui lòng chọn bệnh nhân");
+      return;
+    }
+    if (milestone && selectedMilestoneIds.length === 0) {
+      toast.error("Vui lòng chọn ít nhất một milestone");
+      return;
+    }
+    setStep(2);
   }
 
   async function onSubmit(e: FormEvent) {
@@ -261,9 +278,11 @@ export function AppointmentForm({
       <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
         <DialogHeader>
            <DialogTitle>{milestone ? "Đặt lịch từ milestone" : "Tạo lịch hẹn mới"}</DialogTitle>
+           <AppointmentSteps step={step} />
         </DialogHeader>
         <DialogBody className="grid gap-3">
 
+          {step === 1 && <>
           {/* Bệnh nhân */}
           <div className="grid gap-1.5">
             <Label htmlFor="patient">Bệnh nhân</Label>
@@ -313,7 +332,9 @@ export function AppointmentForm({
               )}
             </div>
           )}
+          </>}
 
+          {step === 2 && <>
           {/* Bác sĩ */}
           <div className="grid gap-1.5">
             <Label htmlFor="clinician">Bác sĩ</Label>
@@ -436,17 +457,35 @@ export function AppointmentForm({
               placeholder="Yêu cầu đặc biệt, lưu ý…"
             />
           </div>
+          </>}
         </DialogBody>
         <DialogFooter className="mt-4">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Hủy
           </Button>
-          <Button type="submit" disabled={saving || Boolean(milestone && selectedMilestoneIds.length === 0)}>
-            {saving ? "Đang tạo…" : "Tạo lịch hẹn"}
-          </Button>
+          {step === 1 ? (
+            <Button type="button" onClick={continueToScheduling}>Tiếp tục</Button>
+          ) : <>
+            <Button type="button" variant="ghost" onClick={() => setStep(1)}>Quay lại</Button>
+            <Button type="submit" disabled={saving || Boolean(milestone && selectedMilestoneIds.length === 0)}>
+              {saving ? "Đang tạo…" : "Tạo lịch hẹn"}
+            </Button>
+          </>}
         </DialogFooter>
       </form>
     </Dialog>
+  );
+}
+
+function AppointmentSteps({ step }: { step: 1 | 2 }) {
+  return (
+    <div className="mt-3 flex items-center gap-2 text-xs" aria-label={`Bước ${step} trên 2`}>
+      <span className={`flex h-5 w-5 items-center justify-center rounded-full font-semibold ${step === 1 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>1</span>
+      <span className={step === 1 ? "font-medium text-foreground" : "text-muted-foreground"}>Bệnh nhân & nội dung</span>
+      <span className="h-px w-5 bg-border" />
+      <span className={`flex h-5 w-5 items-center justify-center rounded-full font-semibold ${step === 2 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>2</span>
+      <span className={step === 2 ? "font-medium text-foreground" : "text-muted-foreground"}>Thời gian & xác nhận</span>
+    </div>
   );
 }
 

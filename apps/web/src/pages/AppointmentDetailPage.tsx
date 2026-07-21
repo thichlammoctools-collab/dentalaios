@@ -320,9 +320,18 @@ function EditAppointmentDialog({
   const [assistantId, setAssistantId] = useState(appointment.assistant_id ?? "");
   const [chairId, setChairId] = useState(appointment.chair_id ?? "");
   const [saving, setSaving] = useState(false);
+  const [step, setStep] = useState<1 | 2>(1);
 
   const doctorsOnly = doctors.filter((u) => isDoctorRole(u.role_key, u.role_id, u.role_name));
   const assistantsOnly = doctors.filter((u) => isAssistantRole(u.role_key, u.role_id, u.role_name));
+
+  function continueToSchedule() {
+    if (!clinicianId) {
+      toast.error("Vui lòng chọn bác sĩ");
+      return;
+    }
+    setStep(2);
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -358,12 +367,14 @@ function EditAppointmentDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogHeader>
-        <DialogTitle>Sửa lịch hẹn</DialogTitle>
-      </DialogHeader>
-      <form onSubmit={handleSave}>
-        <DialogBody className="grid gap-3">
-          <div className="grid gap-1.5">
+        <DialogHeader>
+          <DialogTitle>Sửa lịch hẹn</DialogTitle>
+          <AppointmentSteps step={step} />
+        </DialogHeader>
+        <form onSubmit={handleSave}>
+          <DialogBody className="grid gap-3">
+            {step === 1 && <>
+            <div className="grid gap-1.5">
             <Label>Bác sĩ</Label>
             <Select
               value={clinicianId}
@@ -412,10 +423,12 @@ function EditAppointmentDialog({
               <option value="completed">Hoàn thành</option>
               <option value="cancelled">Hủy</option>
               <option value="no_show">Không đến</option>
-            </Select>
-          </div>
+              </Select>
+            </div>
+            </>}
 
-          <div className="grid grid-cols-2 gap-3">
+            {step === 2 && <>
+            <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label>Ngày</Label>
               <DateInput
@@ -453,16 +466,34 @@ function EditAppointmentDialog({
 
           <div className="grid gap-1.5">
             <Label>Ghi chú</Label>
-            <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </div>
-        </DialogBody>
-        <DialogFooter className="mt-4">
-          <Button type="button" variant="outline" onClick={onClose}>Đóng</Button>
-          <Button type="submit" disabled={saving}>
-            {saving ? "Đang lưu…" : "Lưu thay đổi"}
-          </Button>
-        </DialogFooter>
+              <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </div>
+            </>}
+          </DialogBody>
+          <DialogFooter className="mt-4">
+            <Button type="button" variant="outline" onClick={onClose}>Đóng</Button>
+            {step === 1 ? (
+              <Button type="button" onClick={continueToSchedule}>Tiếp tục</Button>
+            ) : <>
+              <Button type="button" variant="ghost" onClick={() => setStep(1)}>Quay lại</Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Đang lưu…" : "Lưu thay đổi"}
+              </Button>
+            </>}
+          </DialogFooter>
       </form>
     </Dialog>
+  );
+}
+
+function AppointmentSteps({ step }: { step: 1 | 2 }) {
+  return (
+    <div className="mt-3 flex items-center gap-2 text-xs" aria-label={`Bước ${step} trên 2`}>
+      <span className={`flex h-5 w-5 items-center justify-center rounded-full font-semibold ${step === 1 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>1</span>
+      <span className={step === 1 ? "font-medium text-foreground" : "text-muted-foreground"}>Nhân sự & trạng thái</span>
+      <span className="h-px w-5 bg-border" />
+      <span className={`flex h-5 w-5 items-center justify-center rounded-full font-semibold ${step === 2 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>2</span>
+      <span className={step === 2 ? "font-medium text-foreground" : "text-muted-foreground"}>Thời gian & nội dung</span>
+    </div>
   );
 }
