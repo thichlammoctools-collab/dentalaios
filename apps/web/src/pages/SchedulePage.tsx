@@ -583,6 +583,7 @@ export function SchedulePage() {
       {editing && (
         <EditAppointmentDialog
           appointment={editing}
+          patientName={patientsById.get(editing.patient_id)?.name ?? editing.patient_id}
           doctors={users}
           chairs={chairs}
           onClose={() => {
@@ -654,6 +655,7 @@ function statusLabelVi(status: string): string {
 
 function EditAppointmentDialog({
   appointment,
+  patientName,
   doctors,
   chairs,
   onClose,
@@ -661,6 +663,7 @@ function EditAppointmentDialog({
   onCancelled,
 }: {
   appointment: Appointment;
+  patientName: string;
   doctors: UserWithDetails[];
   chairs: DentalChair[];
   onClose: () => void;
@@ -731,7 +734,7 @@ function EditAppointmentDialog({
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogHeader>
-        <DialogTitle>Sửa lịch hẹn</DialogTitle>
+        <DialogTitle>Sửa lịch hẹn: {patientName}</DialogTitle>
       </DialogHeader>
       <DialogBody className="grid gap-3">
         {/* Bác sĩ */}
