@@ -22,6 +22,7 @@ import { useAuth } from "@/lib/auth-context";
 import { APPOINTMENT_STATUS_LABELS, isAssistantRole, isDoctorRole } from "@shared/constants";
 import type { Appointment, DentalChair, Patient, UserWithDetails, Visit } from "@shared/types";
 import { formatDateTime, formatTime, ymd, combineDateTime, isoToYmd, isoToTime } from "@/lib/utils";
+import { getMinimumAppointmentTime, isAppointmentTimeInPast } from "@/lib/appointment-time";
 import { patientReturnPath, withPatientReturnContext } from "@/lib/patient-navigation";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 
@@ -328,6 +329,11 @@ function EditAppointmentDialog({
       toast.error("Vui lòng chọn bác sĩ");
       return;
     }
+    const isRescheduling = date !== ymd(apptDate) || time !== isoToTime(appointment.scheduled_at).slice(0, 5);
+    if (isRescheduling && isAppointmentTimeInPast(date, time)) {
+      toast.error("Thời gian lịch hẹn phải sau thời điểm hiện tại ít nhất 5 phút");
+      return;
+    }
     setSaving(true);
     try {
       const scheduled_at = combineDateTime(date, time);
@@ -412,11 +418,19 @@ function EditAppointmentDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label>Ngày</Label>
-              <DateInput value={date} onChange={setDate} />
+              <DateInput
+                value={date}
+                onChange={(nextDate) => {
+                  setDate(nextDate);
+                  const minimum = getMinimumAppointmentTime(nextDate);
+                  if (minimum && time < minimum) setTime(minimum);
+                }}
+                min={ymd(new Date())}
+              />
             </div>
             <div className="grid gap-1.5">
               <Label>Giờ</Label>
-              <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+              <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} min={getMinimumAppointmentTime(date)} />
             </div>
           </div>
 

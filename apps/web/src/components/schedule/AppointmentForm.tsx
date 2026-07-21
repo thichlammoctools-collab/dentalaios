@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth-context";
 import type { Appointment, DentalChair, Patient, TreatmentCaseMilestone, UserWithDetails } from "@shared/types";
 import { isAssistantRole, isDoctorRole } from "@shared/constants";
 import { combineDateTime, ymd } from "@/lib/utils";
+import { getMinimumAppointmentTime, getNextAppointmentSlot, isAppointmentTimeInPast } from "@/lib/appointment-time";
 import { PatientCombobox } from "./PatientCombobox";
 
 interface AppointmentFormProps {
@@ -51,10 +52,9 @@ export function AppointmentForm({
   const [assistantId, setAssistantId] = useState("");
   const [chairId, setChairId] = useState("");
   const [chairAvailability, setChairAvailability] = useState<ChairAvailabilityResponse["items"]>([]);
-  const [date, setDate] = useState(initialDate ?? ymd(new Date()));
-  const [time, setTime] = useState(
-    initialHour != null ? `${String(initialHour).padStart(2, "0")}:00` : "09:00",
-  );
+  const defaultSlot = getNextAppointmentSlot();
+  const [date, setDate] = useState(initialDate ?? defaultSlot.date);
+  const [time, setTime] = useState(initialHour != null ? `${String(initialHour).padStart(2, "0")}:00` : defaultSlot.time);
   const [durationMin, setDurationMin] = useState(30);
   const [procedure, setProcedure] = useState(milestone?.procedure ?? "");
   const [selectedMilestoneIds, setSelectedMilestoneIds] = useState<string[]>(
@@ -79,6 +79,17 @@ export function AppointmentForm({
       .then(setMilestonePatient)
       .catch(() => setMilestonePatient(null));
   }, [open, milestone]);
+
+  useEffect(() => {
+    if (!open) return;
+    const nextSlot = getNextAppointmentSlot();
+    const nextDate = initialDate ?? nextSlot.date;
+    const nextTime = initialHour != null
+      ? `${String(initialHour).padStart(2, "0")}:00`
+      : nextDate === nextSlot.date ? nextSlot.time : "09:00";
+    setDate(nextDate);
+    setTime(nextTime);
+  }, [open, initialDate, initialHour]);
 
   useEffect(() => {
     if (!open || !session?.branch?.id) return;
@@ -117,6 +128,10 @@ export function AppointmentForm({
     e.preventDefault();
     if (!patientId || !clinicianId) {
       toast.error("Vui lòng chọn bệnh nhân và bác sĩ");
+      return;
+    }
+    if (isAppointmentTimeInPast(date, time)) {
+      toast.error("Thời gian lịch hẹn phải sau thời điểm hiện tại ít nhất 5 phút");
       return;
     }
     setSaving(true);
@@ -159,6 +174,13 @@ export function AppointmentForm({
   const doctors = users.filter((u) => isDoctorRole(u.role_key, u.role_id, u.role_name));
   const assistants = users.filter((u) => isAssistantRole(u.role_key, u.role_id, u.role_name));
   const milestoneOptions = milestone?.availableMilestones ?? [];
+  const minimumTime = getMinimumAppointmentTime(date);
+
+  function handleDateChange(nextDate: string) {
+    setDate(nextDate);
+    const minimum = getMinimumAppointmentTime(nextDate);
+    if (minimum && time < minimum) setTime(minimum);
+  }
 
   function toggleMilestone(option: TreatmentCaseMilestone) {
     if (!milestone) return;
@@ -242,7 +264,8 @@ export function AppointmentForm({
               <DateInput
                 id="date"
                 value={date}
-                onChange={setDate}
+                onChange={handleDateChange}
+                min={ymd(new Date())}
                 required
               />
             </div>
@@ -253,6 +276,7 @@ export function AppointmentForm({
                 type="time"
                 value={time}
                 onChange={(e) => setTime(e.target.value)}
+                min={minimumTime}
                 required
               />
             </div>

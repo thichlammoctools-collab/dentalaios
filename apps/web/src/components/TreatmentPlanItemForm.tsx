@@ -123,7 +123,7 @@ export function TreatmentPlanItemForm({
     <Dialog open={open} onOpenChange={onOpenChange} className="sm:max-w-2xl">
       <form onSubmit={onSubmit}>
         <DialogHeader>
-          <DialogTitle>{item ? "Sửa hạng mục điều trị" : "Thêm hạng mục điều trị"}</DialogTitle>
+          <DialogTitle>{item ? "Sửa thủ thuật/dịch vụ điều trị" : "Thêm thủ thuật/dịch vụ điều trị"}</DialogTitle>
         </DialogHeader>
         <DialogBody className="grid gap-4">
 
@@ -154,7 +154,7 @@ export function TreatmentPlanItemForm({
                    <option key={service.code} value={service.code}>{service.code} · {service.name}</option>
                  ))}
                </Select>
-               <p className="text-xs text-muted-foreground">Chọn dịch vụ để áp dụng mã và đơn giá đã gồm VAT của phòng khám.</p>
+                <p className="text-xs text-muted-foreground">Chọn dịch vụ để tự điền thủ thuật, mã và đơn giá đã gồm VAT của phòng khám.</p>
              </div>
              <div className="grid gap-1.5">
               <Label htmlFor="tooth">
@@ -253,7 +253,7 @@ export function TreatmentPlanItemForm({
             Hủy
           </Button>
           <Button type="submit" disabled={saving || !validTooth}>
-            {saving ? "Đang lưu…" : item ? "Lưu thay đổi" : "Thêm hạng mục"}
+            {saving ? "Đang lưu…" : item ? "Lưu thay đổi" : "Thêm thủ thuật/dịch vụ"}
           </Button>
         </DialogFooter>
       </form>

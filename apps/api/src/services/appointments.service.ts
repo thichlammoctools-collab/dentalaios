@@ -22,6 +22,7 @@ import {
 import { ConflictError, NotFoundError } from "../lib/errors";
 import { assertAllInTenant } from "../lib/tenant-scope";
 import { chairsService } from "./chairs.service";
+import { assertAppointmentIsSchedulable } from "../lib/appointment-time";
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -78,6 +79,7 @@ export const appointmentsService = {
   ): Promise<Appointment> {
     const repo = createAppointmentsRepository(db);
     const duration = input.duration_min ?? 30;
+    assertAppointmentIsSchedulable(input.scheduled_at);
     const { start, end } = interval(input.scheduled_at, duration);
 
     // Cross-tenant safety: every referenced ID must belong to this tenant.
@@ -157,6 +159,7 @@ export const appointmentsService = {
       input.clinician_id !== undefined;
 
     if (rescheduling) {
+      assertAppointmentIsSchedulable(newScheduledAt);
       const { start, end } = interval(newScheduledAt, newDuration);
       // A no-show appointment does not reserve a slot.
       const skipSelf = existing.status === "no_show";

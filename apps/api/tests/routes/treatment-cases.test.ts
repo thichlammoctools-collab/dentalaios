@@ -65,7 +65,7 @@ const appointment = {
   branch_id: "test-branch",
   clinician_id: "test-user",
   patient_id: "patient-1",
-  scheduled_at: "2026-07-22T09:00:00.000Z",
+  scheduled_at: "2099-07-22T09:00:00.000Z",
   duration_min: 30,
   status: "confirmed",
   source: "manual",
@@ -216,7 +216,7 @@ describe("treatment case lifecycle", () => {
         body: {
           milestone_ids: ["milestone-1", "milestone-2"],
           clinician_id: "test-user",
-          scheduled_at: "2026-07-22T09:00:00.000Z",
+          scheduled_at: "2099-07-22T09:00:00.000Z",
           duration_min: 60,
         },
       },

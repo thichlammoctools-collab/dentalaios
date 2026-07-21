@@ -9,6 +9,7 @@ import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { apiGet, apiPost, apiPatch, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
+import { getMinimumAppointmentTime, getNextAppointmentSlot, isAppointmentTimeInPast } from "@/lib/appointment-time";
 import type { Appointment, Patient, User } from "@shared/types";
 
 interface AppointmentsResponse { items: Appointment[]; total: number }
@@ -97,11 +98,12 @@ export function CalendarPage() {
   const [doctors, setDoctors] = useState<User[]>([]);
   const [patientSearch, setPatientSearch] = useState("");
 
+  const initialSlot = getNextAppointmentSlot();
   const [form, setForm] = useState({
     patient_id: "",
     clinician_id: "",
-    scheduled_date: "",
-    scheduled_time: "09:00",
+    scheduled_date: initialSlot.date,
+    scheduled_time: initialSlot.time,
     duration_min: 30,
     procedure: "",
     notes: "",
@@ -187,12 +189,14 @@ export function CalendarPage() {
   // ─── Open form ────────────────────────────────────────────────────────────
   async function openCreateForm(date?: Date) {
     setEditAppt(null);
-    const d = date ?? selectedDate ?? today;
+    const slot = getNextAppointmentSlot();
+    const selected = date ?? selectedDate;
+    const selectedDate = selected ? isoDate(selected) : slot.date;
     setForm({
       patient_id: "",
       clinician_id: "",
-      scheduled_date: isoDate(d),
-      scheduled_time: "09:00",
+      scheduled_date: selectedDate,
+      scheduled_time: selectedDate === slot.date ? slot.time : "09:00",
       duration_min: 30,
       procedure: "",
       notes: "",
@@ -233,6 +237,13 @@ export function CalendarPage() {
     e.preventDefault();
     if (!form.patient_id || !form.scheduled_date || !form.scheduled_time || !form.clinician_id) {
       toast.error("Vui lòng điền đầy đủ thông tin bắt buộc");
+      return;
+    }
+    const isRescheduling = editAppt
+      && (form.scheduled_date !== isoDate(new Date(editAppt.scheduled_at))
+        || form.scheduled_time !== `${String(new Date(editAppt.scheduled_at).getHours()).padStart(2, "0")}:${String(new Date(editAppt.scheduled_at).getMinutes()).padStart(2, "0")}`);
+    if ((!editAppt || isRescheduling) && isAppointmentTimeInPast(form.scheduled_date, form.scheduled_time)) {
+      toast.error("Thời gian lịch hẹn phải sau thời điểm hiện tại ít nhất 5 phút");
       return;
     }
     setSaving(true);
@@ -487,7 +498,11 @@ export function CalendarPage() {
               <DateInput
                 id="date"
                 value={form.scheduled_date}
-                onChange={(scheduled_date) => setForm((f) => ({ ...f, scheduled_date }))}
+                onChange={(scheduled_date) => setForm((f) => {
+                  const minimum = getMinimumAppointmentTime(scheduled_date);
+                  return { ...f, scheduled_date, scheduled_time: minimum && f.scheduled_time < minimum ? minimum : f.scheduled_time };
+                })}
+                min={isoDate(new Date())}
                 required
               />
             </div>
@@ -498,6 +513,7 @@ export function CalendarPage() {
                 type="time"
                 value={form.scheduled_time}
                 onChange={(e) => setForm((f) => ({ ...f, scheduled_time: e.target.value }))}
+                min={getMinimumAppointmentTime(form.scheduled_date)}
                 required
               />
             </div>

@@ -18,7 +18,8 @@ import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import type { Appointment, DentalChair, Patient, UserWithDetails, Visit } from "@shared/types";
 import { isAssistantRole, isDoctorRole, ROUTES } from "@shared/constants";
-import { formatDate, formatTime, getWeekDays, isoToYmd, weekdayLabel, ymd, combineDateTime } from "@/lib/utils";
+import { formatDate, formatTime, getWeekDays, isoToTime, isoToYmd, weekdayLabel, ymd, combineDateTime } from "@/lib/utils";
+import { getMinimumAppointmentTime, isAppointmentTimeInPast } from "@/lib/appointment-time";
 
 interface AppointmentsResponse { items: Appointment[]; total: number }
 interface PatientsResponse { items: Patient[]; total: number }
@@ -669,7 +670,7 @@ function EditAppointmentDialog({
   const apptDate = new Date(appointment.scheduled_at);
   const [date, setDate] = useState(ymd(apptDate));
   const [time, setTime] = useState(
-    `${String(apptDate.getUTCHours()).padStart(2, "0")}:${String(apptDate.getUTCMinutes()).padStart(2, "0")}`,
+    isoToTime(appointment.scheduled_at),
   );
   const [durationMin, setDurationMin] = useState(appointment.duration_min);
   const [procedure, setProcedure] = useState(appointment.procedure ?? "");
@@ -687,6 +688,11 @@ function EditAppointmentDialog({
   async function handleSave() {
     if (!clinicianId) {
       toast.error("Vui lòng chọn bác sĩ");
+      return;
+    }
+    const isRescheduling = date !== ymd(apptDate) || time !== isoToTime(appointment.scheduled_at);
+    if (isRescheduling && isAppointmentTimeInPast(date, time)) {
+      toast.error("Thời gian lịch hẹn phải sau thời điểm hiện tại ít nhất 5 phút");
       return;
     }
     setSaving(true);
@@ -784,11 +790,20 @@ function EditAppointmentDialog({
         <div className="grid grid-cols-2 gap-3">
           <div className="grid gap-1.5">
             <Label>Ngày</Label>
-            <DateInput value={date} onChange={setDate} disabled={isCancelled} />
+            <DateInput
+              value={date}
+              onChange={(nextDate) => {
+                setDate(nextDate);
+                const minimum = getMinimumAppointmentTime(nextDate);
+                if (minimum && time < minimum) setTime(minimum);
+              }}
+              min={ymd(new Date())}
+              disabled={isCancelled}
+            />
           </div>
           <div className="grid gap-1.5">
             <Label>Giờ</Label>
-            <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} disabled={isCancelled} />
+            <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} min={getMinimumAppointmentTime(date)} disabled={isCancelled} />
           </div>
         </div>
 

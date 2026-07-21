@@ -13,6 +13,7 @@ import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import { isAssistantRole, isDoctorRole, ROUTES } from "@shared/constants";
 import { combineDateTime, ymd, isoToYmd, isoToTime } from "@/lib/utils";
+import { getMinimumAppointmentTime, getNextAppointmentSlot, isAppointmentTimeInPast } from "@/lib/appointment-time";
 import { AiChatInput, type ParsedAppointment } from "@/components/schedule/AiChatInput";
 import type { Appointment, Patient, UserWithDetails } from "@shared/types";
 
@@ -30,8 +31,8 @@ export function ScheduleNewPage() {
   const [patientId, setPatientId] = useState("");
   const [clinicianId, setClinicianId] = useState("");
   const [assistantId, setAssistantId] = useState("");
-  const [date, setDate] = useState(() => ymd(new Date()));
-  const [time, setTime] = useState("09:00");
+  const [date, setDate] = useState(() => getNextAppointmentSlot().date);
+  const [time, setTime] = useState(() => getNextAppointmentSlot().time);
   const [durationMin, setDurationMin] = useState(30);
   const [procedure, setProcedure] = useState("");
   const [notes, setNotes] = useState("");
@@ -92,6 +93,10 @@ export function ScheduleNewPage() {
     e.preventDefault();
     if (!patientId || !clinicianId) {
       toast.error("Vui lòng chọn bệnh nhân và bác sĩ");
+      return;
+    }
+    if (isAppointmentTimeInPast(date, time)) {
+      toast.error("Thời gian lịch hẹn phải sau thời điểm hiện tại ít nhất 5 phút");
       return;
     }
     setSaving(true);
@@ -181,11 +186,20 @@ export function ScheduleNewPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="grid gap-1.5">
                     <Label>Ngày *</Label>
-                    <DateInput value={date} onChange={setDate} required />
+                    <DateInput
+                      value={date}
+                      onChange={(nextDate) => {
+                        setDate(nextDate);
+                        const minimum = getMinimumAppointmentTime(nextDate);
+                        if (minimum && time < minimum) setTime(minimum);
+                      }}
+                      min={ymd(new Date())}
+                      required
+                    />
                   </div>
                   <div className="grid gap-1.5">
                     <Label>Giờ *</Label>
-                    <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} required />
+                    <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} min={getMinimumAppointmentTime(date)} required />
                   </div>
                 </div>
 

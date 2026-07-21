@@ -2,9 +2,7 @@
  * Integration tests for /api/appointments routes.
  *
  * The active service is `appointmentsService` (from appointments.service.ts).
- * It performs CRUD + Lark Calendar sync — but does NOT enforce conflict detection
- * or schedule validation in V1 (those checks live in appointment.service.ts which
- * is a richer variant kept for reference / future use).
+ * It performs CRUD, time validation, conflict detection, and Lark Calendar sync.
  *
  * Tests cover:
  *   - GET list (with branch filter, status filter)
@@ -26,7 +24,7 @@ const appointmentRow = (overrides: Record<string, unknown> = {}) => ({
   patient_id: "patient-1",
   chair_id: null,
   source_visit_id: null,
-  scheduled_at: "2026-07-15T08:00:00.000Z",
+  scheduled_at: "2099-07-15T08:00:00.000Z",
   duration_min: 30,
   status: "booked",
   procedure: "scaling",
@@ -93,7 +91,7 @@ describe("POST /api/appointments", () => {
         body: {
           patient_id: "patient-1",
           clinician_id: "doc-1",
-          scheduled_at: "2026-07-15T08:00:00.000Z",
+          scheduled_at: "2099-07-15T08:00:00.000Z",
           duration_min: 30,
         },
       },
@@ -116,7 +114,7 @@ describe("POST /api/appointments", () => {
         body: {
           patient_id: "patient-1",
           clinician_id: "doc-1",
-          scheduled_at: "2026-07-15T08:00:00.000Z",
+          scheduled_at: "2099-07-15T08:00:00.000Z",
         },
       },
     );
@@ -142,7 +140,7 @@ describe("POST /api/appointments", () => {
           patient_id: "patient-1",
           clinician_id: "doc-1",
           chair_id: "chair-1",
-          scheduled_at: "2026-07-15T08:00:00.000Z",
+          scheduled_at: "2099-07-15T08:00:00.000Z",
           duration_min: 30,
         },
       },
@@ -166,6 +164,26 @@ describe("POST /api/appointments", () => {
     );
     expect(res.status).toBe(400);
   });
+
+  it("rejects an appointment time in the past", async () => {
+    const app = mountRoute("/api/appointments", appointmentsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/appointments",
+      new Map(),
+      {
+        permissions: ["write_appointments"],
+        body: {
+          patient_id: "patient-1",
+          clinician_id: "doc-1",
+          scheduled_at: "2020-01-01T08:00:00.000Z",
+        },
+      },
+    );
+    expect(res.status).toBe(422);
+    expect((await res.json() as { error: string }).error).toContain("ít nhất 5 phút");
+  });
 });
 
 describe("GET /api/appointments/slots", () => {
@@ -180,7 +198,7 @@ describe("GET /api/appointments/slots", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { items: { scheduled_at: string }[]; total: number };
     expect(body.items).toHaveLength(1);
-    expect(body.items[0].scheduled_at).toBe("2026-07-15T08:00:00.000Z");
+    expect(body.items[0].scheduled_at).toBe("2099-07-15T08:00:00.000Z");
   });
 });
 
@@ -253,7 +271,7 @@ describe("POST /api/appointments", () => {
         body: {
           patient_id: "patient-2",
           clinician_id: "doc-1",
-          scheduled_at: "2026-07-15T08:00:00.000Z",
+          scheduled_at: "2099-07-15T08:00:00.000Z",
           duration_min: 30,
         },
       },
@@ -301,7 +319,7 @@ describe("DELETE /api/appointments/:id", () => {
         permissions: ["write_appointments"],
         body: {
           // Try to reschedule to a time that conflicts
-          scheduled_at: "2026-07-15T08:30:00.000Z", // overlaps with existing 08:00-08:30
+          scheduled_at: "2099-07-15T08:30:00.000Z", // overlaps with existing 08:00-08:30
         },
       },
     );
@@ -353,6 +371,6 @@ describe("GET /api/appointments/slots", () => {
     const body = (await res.json()) as { items: { scheduled_at: string }[]; total: number };
     // cancelled one should be excluded by getBusySlots filter
     expect(body.items).toHaveLength(1);
-    expect(body.items[0].scheduled_at).toBe("2026-07-15T08:00:00.000Z");
+    expect(body.items[0].scheduled_at).toBe("2099-07-15T08:00:00.000Z");
   });
 });

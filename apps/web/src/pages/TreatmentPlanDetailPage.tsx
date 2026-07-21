@@ -98,10 +98,6 @@ export function TreatmentPlanDetailPage() {
       const msg = err instanceof ApiError ? err.message : "Lỗi tải plan";
       setError(msg);
       toast.error(msg);
-      if (err instanceof ApiError && err.status === 401) {
-        // Token expired — prompt re-login
-        setTimeout(() => navigate("/login"), 500);
-      }
     } finally {
       setLoading(false);
     }
@@ -409,7 +405,7 @@ export function TreatmentPlanDetailPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Hạng mục ({items.length})</CardTitle>
+            <CardTitle>Thủ thuật & dịch vụ điều trị ({items.length})</CardTitle>
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Tổng:</span>
               <span className="text-lg font-semibold">
@@ -489,7 +485,7 @@ export function TreatmentPlanDetailPage() {
           <CardTitle>Thao tác</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
-          {canEdit && <Button onClick={() => { setEditingItem(null); setOpenForm(true); }}>+ Thêm hạng mục</Button>}
+          {canEdit && <Button onClick={() => { setEditingItem(null); setOpenForm(true); }}>+ Thêm thủ thuật/dịch vụ</Button>}
           {canEdit && plan.visit_id && (
             <Button
               variant="outline"
@@ -551,6 +547,19 @@ export function TreatmentPlanDetailPage() {
           availableMilestones: milestones.filter((milestone) => !["completed", "skipped"].includes(milestone.status)),
         }}
         onCreated={() => { setScheduleMilestone(null); void load(); }}
+      />}
+      {scheduleAllOpenMilestones && treatmentCase && openMilestones[0] && <AppointmentForm
+        open
+        onOpenChange={(open) => { if (!open) setScheduleAllOpenMilestones(false); }}
+        milestone={{
+          planId: plan.id,
+          milestoneId: openMilestones[0].id,
+          patientId: treatmentCase.patient_id,
+          procedure: openMilestones[0].item.service_name ?? openMilestones[0].item.procedure,
+          label: "Các thủ thuật còn mở trong ca điều trị",
+          availableMilestones: openMilestones,
+        }}
+        onCreated={() => { setScheduleAllOpenMilestones(false); void load(); }}
       />}
     </div>
   );

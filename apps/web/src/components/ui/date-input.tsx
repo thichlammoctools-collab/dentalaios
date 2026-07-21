@@ -36,7 +36,7 @@ function parseDateValue(value: string): string | null {
 }
 
 /** Date input displayed as dd/MM/yyyy while preserving an ISO value for the API. */
-export function DateInput({ value, onChange, ...props }: DateInputProps) {
+export function DateInput({ value, onChange, min, ...props }: DateInputProps) {
   const formattedValue = formatDateValue(value);
   const [displayValue, setDisplayValue] = useState(formattedValue);
   const pickerRef = useRef<HTMLInputElement>(null);
@@ -61,7 +61,7 @@ export function DateInput({ value, onChange, ...props }: DateInputProps) {
         const nextValue = formatTypingValue(event.target.value);
         setDisplayValue(nextValue);
         const parsedValue = parseDateValue(nextValue);
-        if (parsedValue) onChange(parsedValue);
+        if (parsedValue && (!min || parsedValue >= min)) onChange(parsedValue);
       }}
       onBlur={(event) => {
         if (parseDateValue(displayValue)) {
@@ -95,6 +95,7 @@ export function DateInput({ value, onChange, ...props }: DateInputProps) {
       tabIndex={-1}
       aria-hidden="true"
       value={value.slice(0, 10)}
+      min={min}
       onChange={(event) => onChange(event.target.value)}
       className="pointer-events-none absolute h-px w-px opacity-0"
     />

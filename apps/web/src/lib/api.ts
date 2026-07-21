@@ -7,12 +7,12 @@
  * Architecture rule: frontend never talks to D1/R2 directly — only this client.
  * Auth: bearer token attached automatically when present in localStorage.
  *
- * 401 handling: any 401 response (except on login itself) clears the session and
- * redirects to /login. This prevents users from being stuck in a broken authenticated
- * state when their JWT expires mid-session.
+ * 401 handling: a failed request is reported to its caller without clearing the
+ * global session. Auxiliary requests such as image, dashboard, or detail loads
+ * must not force a user out of their active workspace.
  */
 
-import { clearSession, getToken } from "./auth";
+import { getToken } from "./auth";
 
 // Re-export so pages can grab token directly for non-JSON requests (PDF download, etc.)
 export { getToken };
@@ -49,10 +49,6 @@ export async function api<T = unknown>(
   });
 
   if (res.status === 401) {
-    // Clear session but DON'T force-redirect — let the page handle the error
-    // and let the user re-login manually. Forcing redirect on every 401
-    // (including transient ones) is hostile UX.
-    clearSession();
     let message = "Phiên đăng nhập đã hết hạn — vui lòng đăng nhập lại";
     try {
       const body = (await res.json()) as { error?: string };
@@ -121,7 +117,6 @@ export function apiUpload<T = unknown>(
     request.onload = () => {
       const response = request.response as { error?: string; code?: string } | null;
       if (request.status === 401) {
-        clearSession();
         reject(new ApiError(response?.error ?? "Phiên đăng nhập đã hết hạn — vui lòng đăng nhập lại", 401, "unauthorized"));
         return;
       }
