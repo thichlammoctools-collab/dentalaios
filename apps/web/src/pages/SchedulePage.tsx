@@ -484,7 +484,7 @@ export function SchedulePage() {
                     return (
                       <div
                         key={dayYmd}
-                        className={`flex min-h-[200px] flex-col rounded-lg border p-2 transition-colors hover:bg-accent/30 ${isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : isToday ? "border-amber-400 bg-amber-50/30" : "border-border"}`}
+                        className={`flex min-h-[320px] flex-col rounded-lg border p-2 transition-colors hover:bg-accent/30 ${isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : isToday ? "border-amber-400 bg-amber-50/30" : "border-border"}`}
                         onClick={() => setSelectedDate(day)}
                       >
                         <div className="mb-2 flex items-baseline justify-between">
@@ -495,7 +495,7 @@ export function SchedulePage() {
                             {day.getDate()}
                           </div>
                         </div>
-                        <div className="space-y-1 overflow-y-auto pr-1" style={{ maxHeight: "380px" }}>
+                        <div className="space-y-1 overflow-y-auto pr-1" style={{ maxHeight: "600px" }}>
                           {dayAppts.length === 0 ? (
                             <p className="py-3 text-center text-[10px] text-muted-foreground/60">—</p>
                           ) : (
