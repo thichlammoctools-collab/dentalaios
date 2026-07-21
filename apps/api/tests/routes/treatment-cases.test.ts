@@ -205,7 +205,7 @@ describe("treatment case lifecycle", () => {
       new Map([
         ["FROM treatment_cases", [activeCase]],
         ["AND m.id = ? LIMIT 1", [milestone, milestone, secondMilestone]],
-        ["FROM appointments", (sql) => sql.includes("clinician_id = ?") || sql.includes("patient_id = ?") ? [] : [appointment]],
+        ["FROM appointments", (sql) => sql.includes("WHERE tenant_id = ? AND id = ?") ? [appointment] : []],
         ["FROM dental_chairs", []],
         ["FROM users", [{ id: "test-user", tenant_id: "test-tenant" }]],
         ["FROM patients", [{ id: "patient-1", tenant_id: "test-tenant" }]],
