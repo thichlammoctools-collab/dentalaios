@@ -286,7 +286,7 @@ export function AppointmentForm({
           {/* Bệnh nhân */}
           <div className="grid gap-1.5">
             <Label htmlFor="patient">Bệnh nhân</Label>
-            {milestone ? <Input id="patient" value={milestonePatient ? `${milestonePatient.name} · ${milestonePatient.phone}` : milestone.patientId} readOnly className="bg-muted" /> : <PatientCombobox value={patientId} onChange={setPatientId} required />}
+            {milestone ? <Input id="patient" value={milestonePatient ? `${milestonePatient.name} · ${milestonePatient.phone}` : milestone.patientId} readOnly className="bg-muted" /> : <PatientCombobox value={patientId} onChange={setPatientId} required dropdownPosition="static" />}
           </div>
 
           {milestone && milestoneOptions.length > 1 && (

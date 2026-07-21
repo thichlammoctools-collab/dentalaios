@@ -8,6 +8,7 @@ interface PatientComboboxProps {
   value: string; // patient_id
   onChange: (patientId: string) => void;
   required?: boolean;
+  dropdownPosition?: "absolute" | "static";
 }
 
 interface PatientsResponse {
@@ -15,7 +16,7 @@ interface PatientsResponse {
   total: number;
 }
 
-export function PatientCombobox({ value, onChange, required }: PatientComboboxProps) {
+export function PatientCombobox({ value, onChange, required, dropdownPosition = "absolute" }: PatientComboboxProps) {
   const [query, setQuery] = useState("");
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(false);
@@ -139,7 +140,7 @@ export function PatientCombobox({ value, onChange, required }: PatientComboboxPr
       {showDropdown && (loading || patients.length > 0 || query.trim()) && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg"
+          className={`${dropdownPosition === "absolute" ? "absolute z-50" : "relative"} mt-1 max-h-60 w-full overflow-auto rounded-md border border-border bg-popover text-popover-foreground shadow-lg`}
         >
           {patients.map((patient, idx) => (
             <button
