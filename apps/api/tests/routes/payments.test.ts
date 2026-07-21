@@ -101,6 +101,19 @@ describe("POST /api/payments", () => {
           approved_at: null,
           created_at: "2026-01-01",
         }]],
+        ["FROM treatment_plan_items", [{
+          id: "item-1",
+          tenant_id: "test-tenant",
+          treatment_plan_id: "plan-1",
+          tooth_number: 11,
+          procedure: "filling",
+          description: "Trám răng 11",
+          unit_cost: 500000,
+          status: "planned",
+          created_at: "2026-01-01",
+          paid_amount: 0,
+          pending_amount: 0,
+        }]],
         // Code generator: prefix lookup + counter upsert + uniqueness check
         ["FROM tenant_settings", []], // no prefix configured → fallback to "TT"
         ["INSERT INTO payment_code_counters", [{ last_seq: 1 }]],
@@ -113,6 +126,7 @@ describe("POST /api/payments", () => {
           treatment_plan_id: "plan-1",
           patient_id: "patient-1",
           amount: 500000,
+          allocations: [{ treatment_plan_item_id: "item-1", amount: 500000 }],
           currency: "VND",
           method: "cash",
           reference: "TXN-001",
@@ -181,6 +195,7 @@ describe("POST /api/payments", () => {
           treatment_plan_id: "plan-1",
           patient_id: "patient-1",
           amount: 100,
+          allocations: [{ treatment_plan_item_id: "item-1", amount: 100 }],
           currency: "VND",
           method: "crypto", // not in enum
         },
@@ -202,6 +217,7 @@ describe("POST /api/payments", () => {
           treatment_plan_id: "ghost",
           patient_id: "patient-1",
           amount: 100,
+          allocations: [{ treatment_plan_item_id: "item-1", amount: 100 }],
           currency: "VND",
           method: "cash",
         },

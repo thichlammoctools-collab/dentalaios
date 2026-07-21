@@ -207,6 +207,93 @@ export function SchedulePage() {
     }
   }
 
+  function renderDayAppointmentGroup(
+    groupKey: keyof typeof visibleDayAppointmentGroups,
+    label: string,
+    dotClass: string,
+    options: { hideFinishedControl?: boolean } = {},
+  ) {
+    const group = visibleDayAppointmentGroups[groupKey];
+    if (group.length === 0 && !options.hideFinishedControl) return null;
+    return (
+      <section key={groupKey} className="space-y-2">
+        <div className="flex items-center justify-between gap-2 px-1">
+          <div className="flex items-center gap-2">
+            <span className={`h-2 w-2 rounded-full ${dotClass}`} />
+            <h2 className="text-sm font-semibold">{label}</h2>
+            {group.length > 0 && <Badge variant="outline" className="text-[10px]">{group.length}</Badge>}
+          </div>
+          {options.hideFinishedControl && dayAppointmentGroups.finished.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setHideFinishedAppointments((value) => !value)}
+              className="h-7 text-xs"
+            >
+              {hideFinishedAppointments ? "Hiện ca đã xong" : "Ẩn ca đã xong"}
+            </Button>
+          )}
+        </div>
+        {group.length > 0 && (
+          <div className="space-y-2">
+            {group.map((a) => {
+              const patient = patientsById.get(a.patient_id);
+              const doctor = usersById.get(a.clinician_id);
+              const assistant = a.assistant_id ? usersById.get(a.assistant_id) : null;
+              const chair = a.chair_id ? chairsById.get(a.chair_id) : null;
+              const endTime = new Date(new Date(a.scheduled_at).getTime() + a.duration_min * 60 * 1000);
+              const isFinished = appointmentTiming(a) === "finished";
+              return (
+                <div
+                  key={a.id}
+                  onClick={() => setEditing(a)}
+                  className={`cursor-pointer rounded-lg border-l-4 px-3 py-2.5 transition-all hover:bg-accent/40 hover:shadow-md ${statusBorderClass(a.status)} ${isFinished ? "opacity-55 saturate-50" : ""}`}
+                >
+                  <div className="flex items-stretch gap-3">
+                    <div className="min-w-[148px] shrink-0 text-left">
+                      <div className="font-mono text-xl font-bold leading-tight tabular-nums">
+                        {formatTime(a.scheduled_at)} → {formatTime(endTime.toISOString())}
+                      </div>
+                      <div className="font-mono text-sm font-medium tabular-nums text-muted-foreground">{a.duration_min} phút</div>
+                      <div className="mt-2 space-y-1.5 text-[11px] text-muted-foreground">
+                        <div className="flex items-center gap-1.5">
+                          {doctor && <ProfileAvatar subject="users" entityId={doctor.id} name={doctor.name} avatarFileId={doctor.avatar_file_id} size="sm" />}
+                          <span className="truncate font-semibold text-sky-700 dark:text-sky-300">{doctor?.name ?? "—"} (Dr)</span>
+                        </div>
+                        {assistant && (
+                          <div className="flex items-center gap-1.5">
+                            <ProfileAvatar subject="users" entityId={assistant.id} name={assistant.name} avatarFileId={assistant.avatar_file_id} size="sm" />
+                            <span className="truncate font-semibold text-emerald-700 dark:text-emerald-300">{assistant.name} (As)</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="self-stretch border-l border-border/60" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-2"><ProfileAvatar subject="patients" entityId={patient?.id} name={patient?.name ?? a.patient_id} avatarFileId={patient?.avatar_file_id} size="sm" /><p className="truncate font-semibold">{patient?.name ?? <span className="font-mono text-xs text-muted-foreground">{a.patient_id.slice(0, 8)}</span>}</p></div>
+                        <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-medium ${statusBgClass(a.status)}`}>{statusLabelVi(a.status)}</span>
+                      </div>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                        {a.procedure && <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">{a.procedure}</span>}
+                        <span className="ml-auto text-[10px]">{a.source === "ai_chat" && "✨ AI chat"}{a.source === "ai_next_visit" && "🤖 AI suggest"}</span>
+                      </div>
+                      {a.notes && <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground italic">💬 {a.notes}</p>}
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end justify-end gap-2 text-right">
+                      {chair && <div className="rounded-md bg-muted px-2 py-1 text-[11px]"><span className="mr-1 text-[10px] uppercase text-muted-foreground">Ghế</span><span className="font-medium text-foreground">{chair.name}</span></div>}
+                      {canStartAppointmentVisit(a, now) && <Button size="sm" onClick={(event) => { event.stopPropagation(); void startVisit(a); }} disabled={startingAppointmentId === a.id}>{startingAppointmentId === a.id ? "Đang bắt đầu..." : "Bắt đầu khám"}</Button>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    );
+  }
+
   return (
     <PageContainer>
       {/* Header */}
@@ -353,126 +440,14 @@ export function SchedulePage() {
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {dayAppointmentGroups.finished.length > 0 && (
-                    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-muted-foreground/50" />
-                        <span className="text-sm font-semibold text-muted-foreground">Đã xong</span>
-                        <Badge variant="outline" className="text-[10px]">{dayAppointmentGroups.finished.length}</Badge>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setHideFinishedAppointments((value) => !value)}
-                        className="h-7 text-xs"
-                      >
-                        {hideFinishedAppointments ? "Hiện ca đã xong" : "Ẩn ca đã xong"}
-                      </Button>
-                    </div>
-                  )}
-                  {([
-                    ["inProgress", "Đang làm", "bg-amber-500"],
-                    ["upcoming", "Sắp tới", "bg-blue-500"],
-                    ["finished", "Đã xong", "bg-muted-foreground/50"],
-                  ] as const).map(([groupKey, label, dotClass]) => {
-                    const group = visibleDayAppointmentGroups[groupKey];
-                    if (group.length === 0) return null;
-                    return (
-                      <section key={groupKey} className="space-y-2">
-                        <div className="flex items-center gap-2 px-1">
-                          <span className={`h-2 w-2 rounded-full ${dotClass}`} />
-                          <h2 className="text-sm font-semibold">{label}</h2>
-                          <Badge variant="outline" className="text-[10px]">{group.length}</Badge>
-                        </div>
-                        <div className="space-y-2">
-                          {group.map((a) => {
-                     const patient = patientsById.get(a.patient_id);
-                     const doctor = usersById.get(a.clinician_id);
-                     const assistant = a.assistant_id ? usersById.get(a.assistant_id) : null;
-                     const chair = a.chair_id ? chairsById.get(a.chair_id) : null;
-                     const endTime = new Date(new Date(a.scheduled_at).getTime() + a.duration_min * 60 * 1000);
-                     const isFinished = appointmentTiming(a) === "finished";
-                     return (
-                       <div
-                         key={a.id}
-                         onClick={() => setEditing(a)}
-                         className={`cursor-pointer rounded-lg border-l-4 px-3 py-2.5 transition-all hover:shadow-md hover:bg-accent/40 ${statusBorderClass(a.status)} ${isFinished ? "opacity-55 saturate-50" : ""}`}
-                      >
-                        <div className="flex items-stretch gap-3">
-                          {/* Time block */}
-                          <div className="shrink-0 min-w-[148px] text-left">
-                            <div className="font-mono text-xl font-bold leading-tight tabular-nums">
-                              {formatTime(a.scheduled_at)} → {formatTime(endTime.toISOString())}
-                            </div>
-                            <div className="font-mono text-sm font-medium text-muted-foreground tabular-nums">
-                              {a.duration_min} phút
-                            </div>
-                            <div className="mt-2 space-y-1.5 text-[11px] text-muted-foreground">
-                              <div className="flex items-center gap-1.5">
-                                {doctor && <ProfileAvatar subject="users" entityId={doctor.id} name={doctor.name} avatarFileId={doctor.avatar_file_id} size="sm" />}
-                                <span className="truncate font-semibold text-sky-700 dark:text-sky-300">{doctor?.name ?? "—"} (Dr)</span>
-                              </div>
-                              {assistant && (
-                                <div className="flex items-center gap-1.5">
-                                  <ProfileAvatar subject="users" entityId={assistant.id} name={assistant.name} avatarFileId={assistant.avatar_file_id} size="sm" />
-                                  <span className="truncate font-semibold text-emerald-700 dark:text-emerald-300">{assistant.name} (As)</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Vertical divider */}
-                          <div className="self-stretch border-l border-border/60" />
-
-                          {/* Main content */}
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex min-w-0 items-center gap-2"><ProfileAvatar subject="patients" entityId={patient?.id} name={patient?.name ?? a.patient_id} avatarFileId={patient?.avatar_file_id} size="sm" /><p className="truncate font-semibold">
-                                {patient?.name ?? <span className="font-mono text-xs text-muted-foreground">{a.patient_id.slice(0, 8)}</span>}
-                              </p></div>
-                              <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-medium ${statusBgClass(a.status)}`}>
-                                {statusLabelVi(a.status)}
-                              </span>
-                            </div>
-                            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-                              {a.procedure && (
-                                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">
-                                  {a.procedure}
-                                </span>
-                              )}
-                              <span className="ml-auto text-[10px]">
-                                {a.source === "ai_chat" && "✨ AI chat"}
-                                {a.source === "ai_next_visit" && "🤖 AI suggest"}
-                              </span>
-                            </div>
-                              {a.notes && (
-                                <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground italic">
-                                  💬 {a.notes}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex shrink-0 flex-col items-end justify-end gap-2 text-right">
-                              {chair && (
-                                <div className="rounded-md bg-muted px-2 py-1 text-[11px]">
-                                  <span className="mr-1 text-[10px] uppercase text-muted-foreground">Ghế</span>
-                                  <span className="font-medium text-foreground">{chair.name}</span>
-                                </div>
-                              )}
-                              {canStartAppointmentVisit(a, now) && (
-                                <Button size="sm" onClick={(event) => { event.stopPropagation(); void startVisit(a); }} disabled={startingAppointmentId === a.id}>
-                                  {startingAppointmentId === a.id ? "Đang bắt đầu..." : "Bắt đầu khám"}
-                                </Button>
-                              )}
-                            </div>
-                         </div>
-                       </div>
-                     );
-                          })}
-                        </div>
-                      </section>
-                    );
-                  })}
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="space-y-4">
+                    {renderDayAppointmentGroup("inProgress", "Đang làm", "bg-amber-500")}
+                    {renderDayAppointmentGroup("upcoming", "Sắp tới", "bg-blue-500")}
+                  </div>
+                  <div className="space-y-4 border-t border-border pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+                    {renderDayAppointmentGroup("finished", "Đã xong", "bg-muted-foreground/50", { hideFinishedControl: true })}
+                  </div>
                 </div>
               )}
             </CardContent>

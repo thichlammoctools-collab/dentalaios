@@ -1,5 +1,5 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import type { Payment, PaymentAttachment } from "@shared/types";
+import type { Payment, PaymentAttachment, PaymentableTreatmentPlanItem } from "@shared/types";
 import type { PaymentAdjustmentInput, PaymentAttachmentCreateInput, PaymentCreateInput, PaymentUpdateInput } from "@shared/validation";
 import { createPaymentsRepository } from "../repositories/payments.repo";
 import { createPaymentAttachmentsRepository } from "../repositories/payment-attachments.repo";
@@ -34,11 +34,32 @@ export const paymentService = {
     if (plan.patient_id !== data.patient_id) {
       throw new ValidationError("patient_id không khớp với treatment plan");
     }
+    if (plan.status === "draft" || plan.status === "cancelled") {
+      throw new ValidationError("Kế hoạch điều trị chưa sẵn sàng để thanh toán");
+    }
+
+    const allocationIds = data.allocations.map((allocation) => allocation.treatment_plan_item_id);
+    if (new Set(allocationIds).size !== allocationIds.length) {
+      throw new ValidationError("Mỗi dịch vụ chỉ được chọn một lần");
+    }
+    const selectedItems = await this.listPaymentableItems(db, tenantId, plan.id);
+    const itemById = new Map(selectedItems.map((item) => [item.id, item]));
+    const allocationTotal = data.allocations.reduce((total, allocation) => total + allocation.amount, 0);
+    if (allocationTotal !== data.amount) {
+      throw new ValidationError("Tổng phân bổ phải khớp số tiền thanh toán");
+    }
+    for (const allocation of data.allocations) {
+      const item = itemById.get(allocation.treatment_plan_item_id);
+      if (!item) throw new ValidationError("Dịch vụ không thuộc kế hoạch điều trị");
+      if (allocation.amount > item.outstanding_amount) {
+        throw new ValidationError("Số tiền phân bổ vượt số tiền chưa thanh toán của dịch vụ");
+      }
+    }
 
     // Atomically allocate the next human-readable code for this tenant.
     const { code } = await paymentCodeService.allocate(db, tenantId);
 
-    return createPaymentsRepository(db).create(tenantId, {
+    return createPaymentsRepository(db).createWithAllocations(tenantId, {
       treatment_plan_id: data.treatment_plan_id,
       patient_id: data.patient_id,
       amount: data.amount,
@@ -47,6 +68,51 @@ export const paymentService = {
       reference: data.reference,
       notes: data.notes,
       code,
+    }, data.allocations);
+  },
+
+  async listPaymentableItems(
+    db: D1Database,
+    tenantId: string,
+    planId: string,
+  ): Promise<PaymentableTreatmentPlanItem[]> {
+    const plan = await createTreatmentPlansRepository(db).getById(tenantId, planId);
+    if (!plan) throw new NotFoundError("Treatment plan not found");
+    const result = await db.prepare(
+      `SELECT treatment_plan_items.*,
+              COALESCE(SUM(CASE WHEN payments.status = 'confirmed' THEN payment_item_allocations.amount ELSE 0 END), 0) AS paid_amount,
+              COALESCE(SUM(CASE WHEN payments.status = 'pending' THEN payment_item_allocations.amount ELSE 0 END), 0) AS pending_amount
+         FROM treatment_plan_items
+         LEFT JOIN payment_item_allocations
+           ON payment_item_allocations.tenant_id = treatment_plan_items.tenant_id
+          AND payment_item_allocations.treatment_plan_item_id = treatment_plan_items.id
+         LEFT JOIN payments
+           ON payments.tenant_id = payment_item_allocations.tenant_id
+          AND payments.id = payment_item_allocations.payment_id
+        WHERE treatment_plan_items.tenant_id = ?
+          AND treatment_plan_items.treatment_plan_id = ?
+        GROUP BY treatment_plan_items.id
+        ORDER BY treatment_plan_items.tooth_number ASC`,
+    ).bind(tenantId, planId).all<{ [key: string]: unknown }>();
+    return result.results.map((row) => {
+      const paidAmount = Number(row.paid_amount ?? 0);
+      const pendingAmount = Number(row.pending_amount ?? 0);
+      const unitCost = Number(row.unit_cost ?? 0);
+      return {
+        id: row.id as string,
+        tenant_id: row.tenant_id as string,
+        treatment_plan_id: row.treatment_plan_id as string,
+        tooth_number: (row.tooth_number as number | null) ?? undefined,
+        procedure: row.procedure as string,
+        description: row.description as string,
+        unit_cost: unitCost,
+        price_includes_vat: true,
+        status: row.status as PaymentableTreatmentPlanItem["status"],
+        created_at: row.created_at as string,
+        paid_amount: paidAmount,
+        pending_amount: pendingAmount,
+        outstanding_amount: Math.max(0, unitCost - paidAmount - pendingAmount),
+      };
     });
   },
 

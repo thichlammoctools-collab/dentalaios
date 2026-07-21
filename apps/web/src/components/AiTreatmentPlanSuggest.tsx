@@ -72,7 +72,6 @@ export function AiTreatmentPlanSuggest({ visitId, onApply }: AiTreatmentPlanSugg
       return;
     }
     onApply(selected);
-    toast.success(`Đã thêm ${selected.length} hạng mục vào kế hoạch`);
   }
 
   function reset() {

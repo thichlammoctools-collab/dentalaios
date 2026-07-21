@@ -1,11 +1,16 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import type { Payment } from "@shared/types";
+import type { Payment, PaymentItemAllocationInput } from "@shared/types";
 import type { D1Row } from "./base";
 
 export interface PaymentsRepository {
   list(tenantId: string, opts?: { patientId?: string; treatmentPlanId?: string; status?: Payment["status"] }): Promise<Payment[]>;
   getById(tenantId: string, id: string): Promise<Payment | null>;
   create(tenantId: string, data: Omit<Payment, "id" | "tenant_id" | "created_at" | "status">): Promise<Payment>;
+  createWithAllocations(
+    tenantId: string,
+    data: Omit<Payment, "id" | "tenant_id" | "created_at" | "status">,
+    allocations: PaymentItemAllocationInput[],
+  ): Promise<Payment>;
   createAdjustment(
     tenantId: string,
     data: Omit<Payment, "id" | "tenant_id" | "created_at" | "status"> & { original_payment_id: string; adjustment_reason: string },
@@ -82,6 +87,30 @@ export function createPaymentsRepository(db: D1Database): PaymentsRepository {
           data.code,
         )
         .run();
+      const created = await this.getById(tenantId, id);
+      if (!created) throw new Error("Insert succeeded but read failed");
+      return created;
+    },
+
+    async createWithAllocations(tenantId, data, allocations) {
+      const id = crypto.randomUUID();
+      const statements = [
+        db.prepare(
+          `INSERT INTO payments
+             (id, tenant_id, treatment_plan_id, patient_id, amount, currency,
+              method, reference, notes, code)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).bind(
+          id, tenantId, data.treatment_plan_id, data.patient_id, data.amount,
+          data.currency, data.method, data.reference ?? null, data.notes ?? null, data.code,
+        ),
+        ...allocations.map((allocation) => db.prepare(
+          `INSERT INTO payment_item_allocations
+             (id, tenant_id, payment_id, treatment_plan_item_id, amount)
+           VALUES (?, ?, ?, ?, ?)`,
+        ).bind(crypto.randomUUID(), tenantId, id, allocation.treatment_plan_item_id, allocation.amount)),
+      ];
+      await db.batch(statements);
       const created = await this.getById(tenantId, id);
       if (!created) throw new Error("Insert succeeded but read failed");
       return created;

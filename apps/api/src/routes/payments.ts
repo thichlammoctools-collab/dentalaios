@@ -31,6 +31,20 @@ router.get(
   },
 );
 
+// GET /api/payments/paymentable-items?treatment_plan_id=...
+// This must precede /:id so the static path is not treated as a payment ID.
+router.get(
+  "/paymentable-items",
+  requirePermission(PERMISSIONS.WRITE_PAYMENTS),
+  async (c) => {
+    const planId = new URL(c.req.url).searchParams.get("treatment_plan_id");
+    if (!planId) return c.json({ error: "treatment_plan_id là bắt buộc", code: "validation_error" }, 400);
+    const jwt = getJwt(c);
+    const items = await paymentService.listPaymentableItems(c.env.DB, jwt.tenant_id, planId);
+    return c.json({ items, total: items.length });
+  },
+);
+
 // GET /api/payments/:id
 router.get(
   "/:id",

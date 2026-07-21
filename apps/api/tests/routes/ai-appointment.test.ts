@@ -132,6 +132,27 @@ describe("POST /api/ai/generate-plan", () => {
       cost: 725000,
     });
   });
+
+  it("does not recommend inactive services", async () => {
+    const app = mountRoute("/api/ai", aiRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/ai/generate-plan",
+      new Map([
+        ["FROM visits", [visitRow()]],
+        ["FROM clinical_findings", [findingRow({ condition: "caries" })]],
+        ["FROM patients", [patientRow()]],
+        ["FROM treatment_services", [treatmentServiceRow({ is_active: 0 })]],
+      ]),
+      { body: { visit_id: "visit-1" } },
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { items: Array<{ service_code?: string; procedure: string; cost: number }> };
+    expect(body.items[0]).toMatchObject({ procedure: "filling", cost: 800000 });
+    expect(body.items[0].service_code).toBeUndefined();
+  });
 });
 
 describe("POST /api/ai/parse-appointment-chat", () => {

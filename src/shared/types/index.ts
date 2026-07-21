@@ -381,6 +381,17 @@ export interface Payment {
   created_at: string;
 }
 
+export interface PaymentItemAllocationInput {
+  treatment_plan_item_id: string;
+  amount: number;
+}
+
+export interface PaymentableTreatmentPlanItem extends TreatmentPlanItem {
+  paid_amount: number;
+  pending_amount: number;
+  outstanding_amount: number;
+}
+
 export type PaymentAttachmentKind = "transfer_receipt" | "receipt" | "invoice" | "other";
 
 export interface PaymentAttachment {

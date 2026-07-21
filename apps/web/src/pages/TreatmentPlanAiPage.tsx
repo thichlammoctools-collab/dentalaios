@@ -8,6 +8,7 @@ import { AiTreatmentPlanSuggest, type TreatmentPlanItemDraft } from "@/component
 import { apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import type { TreatmentPlan } from "@shared/types";
+import { isValidFdiTooth } from "@shared/constants";
 
 export function TreatmentPlanAiPage() {
   const { id } = useParams();
@@ -39,6 +40,17 @@ export function TreatmentPlanAiPage() {
 
   async function onApply(items: TreatmentPlanItemDraft[]) {
     if (!plan) return;
+    const invalidItem = items.find((item) =>
+      (item.tooth != null && !isValidFdiTooth(item.tooth))
+      || !item.procedure.trim()
+      || !item.description.trim()
+      || !Number.isFinite(item.cost)
+      || item.cost < 0,
+    );
+    if (invalidItem) {
+      toast.error("Một gợi ý AI có dữ liệu không hợp lệ. Vui lòng tạo lại gợi ý.");
+      return;
+    }
     setApplying(true);
     try {
       // Add each item to the plan
@@ -51,7 +63,6 @@ export function TreatmentPlanAiPage() {
           unit_cost: item.cost,
         });
       }
-      toast.success(`Đã thêm ${items.length} hạng mục vào kế hoạch`);
       // Redirect back to plan detail
       navigate(`/treatment-plans/${plan.id}`);
     } catch (err) {

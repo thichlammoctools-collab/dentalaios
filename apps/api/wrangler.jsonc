@@ -18,7 +18,8 @@
   },
   "vars": {
     "ENVIRONMENT": "production",
-    "FRONTEND_ORIGIN": "https://*.dentalaios-web.pages.dev"
+    "FRONTEND_ORIGIN": "https://dentalaios-web.pages.dev",
+    "CORS_ORIGINS": "https://dentalaios-web.pages.dev,https://*.dentalaios-web.pages.dev,https://dentalaios.pages.dev"
   },
   "d1_databases": [
     {

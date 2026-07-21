@@ -14,6 +14,7 @@ import { createPatientsRepository } from "../repositories/patients.repo";
 import { createTreatmentServicesRepository } from "../repositories/treatment-service-prices.repo";
 import { NotFoundError } from "../lib/errors";
 import { aiModelConfigService } from "./ai-model-config.service";
+import { isValidFdiTooth } from "@shared/constants";
 
 export interface SummarizeResult {
   summary: string;
@@ -526,17 +527,23 @@ function parseAiPlanResponse(
     return {
       items: parsed.items.flatMap((item: Record<string, unknown>) => {
         const requestedCode = typeof item.service_code === "string" ? item.service_code : "";
-        const requestedProcedure = String(item.procedure || "other");
+        const requestedProcedure = typeof item.procedure === "string" ? item.procedure.trim() : "";
+        const description = typeof item.description === "string" ? item.description.trim() : "";
+        const tooth = parseFdiTooth(item.tooth);
+        const requestedCost = Number(item.cost);
         const service = services.find((candidate) => candidate.code === requestedCode)
           ?? services.find((candidate) => candidate.procedure === requestedProcedure);
         if (services.length > 0 && !service) return [];
+        if (!requestedProcedure || !description || tooth === undefined || (!service && (!Number.isFinite(requestedCost) || requestedCost < 0))) {
+          return [];
+        }
         return [{
-          tooth: item.tooth == null ? null : (Number(item.tooth) || 0),
+          tooth,
           service_code: service?.code,
           service_name: service?.name,
           procedure: service?.procedure ?? requestedProcedure,
-          description: String(item.description || ""),
-          cost: service?.price ?? (Number(item.cost) || 0),
+          description,
+          cost: service?.price ?? requestedCost,
         }];
       }),
       notes: String(parsed.notes || ""),
@@ -546,6 +553,13 @@ function parseAiPlanResponse(
   } catch {
     return null;
   }
+}
+
+/** Returns undefined for malformed AI tooth values so they are never saved as FDI 0. */
+function parseFdiTooth(value: unknown): number | null | undefined {
+  if (value == null) return null;
+  const tooth = typeof value === "number" ? value : Number(value);
+  return Number.isInteger(tooth) && isValidFdiTooth(tooth) ? tooth : undefined;
 }
 
 function parseAnalyzeImageResponse(raw: string): { analysis: string; findings: ImageAnalysisFinding[] } | null {

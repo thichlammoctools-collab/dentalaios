@@ -338,6 +338,10 @@ export const paymentCreateSchema = z.object({
   treatment_plan_id: z.string().min(1),
   patient_id: z.string().min(1),
   amount: z.number().positive("Số tiền phải > 0"),
+  allocations: z.array(z.object({
+    treatment_plan_item_id: z.string().min(1),
+    amount: z.number().positive("Số tiền phân bổ phải > 0"),
+  })).min(1, "Chọn ít nhất một dịch vụ"),
   currency: z.string().length(3).default("VND"),
   method: z.enum(["cash", "transfer", "card", "other"]),
   reference: optionalText(200),

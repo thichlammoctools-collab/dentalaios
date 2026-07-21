@@ -51,6 +51,7 @@ export type Env = {
   AI: unknown; // Cloudflare Workers AI binding
   ENVIRONMENT: string;
   FRONTEND_ORIGIN: string;
+  CORS_ORIGINS?: string;
   ENCRYPTION_KEY?: string; // 64-char hex (32 bytes) — AES-256-GCM key for encrypting secrets at rest
   LARK_APP_ID?: string;    // DEPRECATED — kept as global fallback; prefer per-tenant lark_configs
   LARK_APP_SECRET?: string;// DEPRECATED — kept as global fallback; prefer per-tenant lark_configs
@@ -71,7 +72,7 @@ app.use(
   "*",
   cors({
     origin: (origin, c) => {
-      const allowed = c.env.FRONTEND_ORIGIN || "";
+      const allowed = c.env.CORS_ORIGINS || c.env.FRONTEND_ORIGIN || "";
       const isProd = c.env.ENVIRONMENT === "production";
 
       // Helper: match origin against allowed pattern.
@@ -89,10 +90,10 @@ app.use(
         return regex.test(origin);
       };
 
-      // Production: must have a valid FRONTEND_ORIGIN
+      // Production: must have at least one explicitly allowed frontend origin.
       if (isProd && (allowed === "" || allowed === "*")) {
         console.error(
-          "[cors] FRONTEND_ORIGIN must be a specific URL in production",
+          "[cors] CORS_ORIGINS or FRONTEND_ORIGIN must be a specific URL in production",
         );
         return ""; // hono/cors treats empty origin as no-CORS
       }
@@ -102,8 +103,13 @@ app.use(
         return origin || "*";
       }
 
-      // Production: check if origin matches allowed (or allowed pattern)
-      if (origin && matches(origin, allowed)) {
+      const allowedOrigins = (allowed as string)
+        .split(",")
+        .map((value: string) => value.trim())
+        .filter(Boolean);
+
+      // Production: check if origin matches an explicit allowed origin or pattern.
+      if (origin && allowedOrigins.some((pattern: string) => matches(origin, pattern))) {
         return origin; // reflect the matched origin
       }
 
