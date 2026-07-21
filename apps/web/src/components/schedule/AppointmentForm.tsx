@@ -258,7 +258,7 @@ export function AppointmentForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <form onSubmit={onSubmit}>
+      <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
         <DialogHeader>
            <DialogTitle>{milestone ? "Đặt lịch từ milestone" : "Tạo lịch hẹn mới"}</DialogTitle>
         </DialogHeader>
@@ -407,20 +407,23 @@ export function AppointmentForm({
             </div>
           )}
 
-          {/* Procedure */}
-          <div className="grid gap-1.5">
-            <Label htmlFor="procedure">Thủ thuật (tuỳ chọn)</Label>
-            <Input
-              id="procedure"
-              value={procedure}
-              onChange={(e) => setProcedure(e.target.value)}
-              placeholder="VD: scaling, filling, root_canal…"
-              readOnly={hasLinkedMilestones}
-              className={hasLinkedMilestones ? "bg-muted" : undefined}
-            />
-            {milestone && <p className="text-xs text-muted-foreground">Được lấy từ hạng mục kế hoạch: {milestone.label}</p>}
-            {!milestone && selectedMilestoneIds.length > 0 && <p className="text-xs text-muted-foreground">Được lấy từ các thủ thuật đã chọn trong kế hoạch điều trị.</p>}
-          </div>
+          {/* Procedure is derived from linked milestones to avoid a duplicate editable field. */}
+          {hasLinkedMilestones ? (
+            <div className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-2">
+              <p className="text-xs font-medium text-muted-foreground">Thủ thuật trong lịch hẹn</p>
+              <p className="mt-0.5 text-sm font-medium">{procedure || milestone?.label}</p>
+            </div>
+          ) : (
+            <div className="grid gap-1.5">
+              <Label htmlFor="procedure">Thủ thuật (tuỳ chọn)</Label>
+              <Input
+                id="procedure"
+                value={procedure}
+                onChange={(e) => setProcedure(e.target.value)}
+                placeholder="VD: scaling, filling, root_canal…"
+              />
+            </div>
+          )}
 
           {/* Notes */}
           <div className="grid gap-1.5">

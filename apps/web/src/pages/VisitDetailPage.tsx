@@ -5,6 +5,8 @@ import { VoiceFindingsDialog } from "@/components/VoiceFindingsDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { VisitForm } from "@/components/VisitForm";
 import { FdiToothChart } from "@/components/FdiToothChart";
@@ -18,7 +20,14 @@ import { patientReturnPath, withPatientReturnContext } from "@/lib/patient-navig
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { PageContainer } from "@/components/PageContainer";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
-import type { Visit, ClinicalFinding, TreatmentPlan, GeneratePlanResult, GeneratePlanItemDraft, ProcedureCatalogItem } from "@shared/types";
+import { useAuth } from "@/lib/auth-context";
+import { isAssistantRole, isDoctorRole } from "@shared/constants";
+import type { Visit, ClinicalFinding, TreatmentPlan, GeneratePlanResult, GeneratePlanItemDraft, ProcedureCatalogItem, UserWithDetails } from "@shared/types";
+
+interface UsersResponse {
+  items: UserWithDetails[];
+  total: number;
+}
 
 interface SummarizeResult {
   summary: string;
@@ -278,6 +287,7 @@ export function VisitDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { session } = useAuth();
   const [visit, setVisit] = useState<Visit | null>(null);
   const [findings, setFindings] = useState<ClinicalFinding[]>([]);
   const [procedures, setProcedures] = useState<ProcedureCatalogItem[]>([]);
@@ -294,6 +304,11 @@ export function VisitDetailPage() {
   const [planNotes, setPlanNotes] = useState("");
   const [savingPlan, setSavingPlan] = useState(false);
   const [voiceDialogOpen, setVoiceDialogOpen] = useState(false);
+  const [personnelDialogOpen, setPersonnelDialogOpen] = useState(false);
+  const [users, setUsers] = useState<UserWithDetails[]>([]);
+  const [treatingClinicianId, setTreatingClinicianId] = useState("");
+  const [assistantId, setAssistantId] = useState("");
+  const [savingPersonnel, setSavingPersonnel] = useState(false);
 
   const [suggestNextLoading, setSuggestNextLoading] = useState(false);
   const [suggestNextResult, setSuggestNextResult] = useState<{
@@ -327,6 +342,13 @@ export function VisitDetailPage() {
   }
 
   useEffect(() => { load(); }, [id]);
+
+  useEffect(() => {
+    if (!personnelDialogOpen || !session?.branch?.id) return;
+    void apiGet<UsersResponse>(`/api/users/branch/${session.branch.id}`)
+      .then((response) => setUsers(response.items))
+      .catch((err) => toast.error(err instanceof ApiError ? err.message : "Không thể tải danh sách nhân sự"));
+  }, [personnelDialogOpen, session?.branch?.id]);
 
   async function onSuggestNext() {
     if (!visit) return;
@@ -405,6 +427,39 @@ export function VisitDetailPage() {
       toast.success("Đã hoàn tất lượt khám");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Không thể hoàn tất lượt khám");
+    }
+  }
+
+  function openPersonnelDialog() {
+    if (!visit) return;
+    setTreatingClinicianId(visit.treating_clinician_id ?? "");
+    setAssistantId(visit.assistant_id ?? "");
+    setPersonnelDialogOpen(true);
+  }
+
+  async function savePersonnel() {
+    if (!visit) return;
+    if (!treatingClinicianId) {
+      toast.error("Vui lòng chọn bác sĩ điều trị");
+      return;
+    }
+    if (!assistantId) {
+      toast.error("Vui lòng chọn phụ tá");
+      return;
+    }
+    setSavingPersonnel(true);
+    try {
+      const updated = await apiPatch<Visit>(`/api/visits/${visit.id}`, {
+        treating_clinician_id: treatingClinicianId,
+        assistant_id: assistantId,
+      });
+      setVisit(updated);
+      setPersonnelDialogOpen(false);
+      toast.success("Đã cập nhật nhân sự lượt khám");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Không thể cập nhật nhân sự lượt khám");
+    } finally {
+      setSavingPersonnel(false);
     }
   }
 
@@ -542,8 +597,7 @@ export function VisitDetailPage() {
             <Button size="sm" onClick={() => void completeVisit()}>Hoàn tất lượt khám</Button>
           </div>
         )}
-        {(visit.treating_clinician_name || visit.assistant_name) && (
-          <div className="mt-2 flex flex-wrap gap-4 text-sm">
+        <div className="mt-2 flex flex-wrap items-center gap-4 text-sm">
             {visit.treating_clinician_name && (
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-muted-foreground">Bs điều trị:</span>
@@ -558,8 +612,8 @@ export function VisitDetailPage() {
                 <span className="font-medium">{visit.assistant_name}</span>
               </div>
             )}
+            <Button variant="outline" size="sm" onClick={openPersonnelDialog}>Cập nhật nhân sự</Button>
           </div>
-        )}
         {visit.chair_id && (
           <div className="mt-2 flex items-center gap-1.5 text-sm">
             <span className="text-xs text-muted-foreground">Ghế ghi nhận:</span>
@@ -1021,6 +1075,38 @@ export function VisitDetailPage() {
             </div>
           )}
         </DialogBody>
+      </Dialog>
+
+      <Dialog open={personnelDialogOpen} onOpenChange={setPersonnelDialogOpen}>
+        <DialogHeader>
+          <DialogTitle>Cập nhật nhân sự lượt khám</DialogTitle>
+        </DialogHeader>
+        <DialogBody className="grid gap-4">
+          <div className="grid gap-1.5">
+            <Label htmlFor="visit-treating-clinician">Bác sĩ điều trị</Label>
+            <Select id="visit-treating-clinician" value={treatingClinicianId} onChange={(event) => setTreatingClinicianId(event.target.value)} required>
+              <option value="">— Chọn bác sĩ —</option>
+              {users.filter((user) => isDoctorRole(user.role_key, user.role_id, user.role_name)).map((user) => (
+                <option key={user.id} value={user.id}>{user.name}</option>
+              ))}
+            </Select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="visit-assistant">Phụ tá</Label>
+            <Select id="visit-assistant" value={assistantId} onChange={(event) => setAssistantId(event.target.value)} required>
+              <option value="">— Chọn phụ tá —</option>
+              {users.filter((user) => isAssistantRole(user.role_key, user.role_id, user.role_name)).map((user) => (
+                <option key={user.id} value={user.id}>{user.name}</option>
+              ))}
+            </Select>
+          </div>
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setPersonnelDialogOpen(false)}>Hủy</Button>
+          <Button onClick={() => void savePersonnel()} disabled={savingPersonnel}>
+            {savingPersonnel ? "Đang lưu…" : "Lưu nhân sự"}
+          </Button>
+        </DialogFooter>
       </Dialog>
     </PageContainer>
   );
