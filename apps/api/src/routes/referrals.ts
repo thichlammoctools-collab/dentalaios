@@ -1,0 +1,21 @@
+import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
+import { referralCashPaidSchema, referralRecoverySchema, referralRewardReviewSchema } from "@shared/validation";
+import { PERMISSIONS } from "@shared/constants";
+import type { Env } from "../index";
+import { auditLog } from "../middleware/audit";
+import { getJwt, requireAuth, type AuthContext } from "../middleware/auth";
+import { requirePermission } from "../middleware/rbac";
+import { referralService } from "../services/referral.service";
+
+const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
+router.use("*", requireAuth());
+router.get("/", requirePermission(PERMISSIONS.READ_REFERRALS), async (c) => { const jwt = getJwt(c); return c.json({ items: await referralService.listCases(c.env.DB, jwt.tenant_id, new URL(c.req.url).searchParams.get("case_status") ?? undefined) }); });
+router.get("/rewards", requirePermission(PERMISSIONS.READ_REFERRALS), async (c) => { const jwt = getJwt(c); return c.json({ items: await referralService.listRewards(c.env.DB, jwt.tenant_id, new URL(c.req.url).searchParams.get("reward_status") ?? undefined) }); });
+router.post("/rewards/:id/review", requirePermission(PERMISSIONS.REVIEW_REFERRAL_REWARDS), auditLog("review", "referral_reward"), zValidator("json", referralRewardReviewSchema), async (c) => { const jwt = getJwt(c); const data = c.req.valid("json"); return c.json(await referralService.reviewReward(c.env.DB, jwt.tenant_id, jwt.sub, c.req.param("id"), data.action, data.reason)); });
+router.post("/rewards/:id/mark-paid", requirePermission(PERMISSIONS.PAY_REFERRAL_REWARDS), auditLog("mark_paid", "referral_reward"), zValidator("json", referralCashPaidSchema), async (c) => { const jwt = getJwt(c); const data = c.req.valid("json"); return c.json(await referralService.markCashPaid(c.env.DB, jwt.tenant_id, jwt.sub, c.req.param("id"), data.payment_method, data.payment_reference)); });
+router.post("/rewards/:id/issue-voucher", requirePermission(PERMISSIONS.REVIEW_REFERRAL_REWARDS), auditLog("issue_voucher", "referral_reward"), async (c) => { const jwt = getJwt(c); return c.json(await referralService.issueVoucher(c.env.DB, jwt.tenant_id, jwt.sub, c.req.param("id"))); });
+router.post("/rewards/:id/recover", requirePermission(PERMISSIONS.REVIEW_REFERRAL_REWARDS), auditLog("recover", "referral_reward"), zValidator("json", referralRecoverySchema), async (c) => { const jwt = getJwt(c); const data = c.req.valid("json"); return c.json(await referralService.recoverReward(c.env.DB, jwt.tenant_id, jwt.sub, c.req.param("id"), data.reason, data.payment_reference)); });
+router.post("/rewards/:id/reopen", requirePermission(PERMISSIONS.REVIEW_REFERRAL_REWARDS), auditLog("reopen", "referral_reward"), zValidator("json", z.object({ reason: z.string().trim().min(3).max(500) })), async (c) => { const jwt = getJwt(c); return c.json(await referralService.reopenReward(c.env.DB, jwt.tenant_id, jwt.sub, c.req.param("id"), c.req.valid("json").reason)); });
+export default router;

@@ -43,6 +43,13 @@ import platformAuthRoutes from "./routes/platform-auth";
 import platformRoutes from "./routes/platform";
 import { TenantDashboardHub } from "./durable-objects/tenant-dashboard-hub";
 import chairsRoutes from "./routes/chairs";
+import referrersRoutes from "./routes/referrers";
+import referralProgramsRoutes from "./routes/referral-programs";
+import referralsRoutes from "./routes/referrals";
+import referralReportsRoutes from "./routes/referral-reports";
+import referrerAuthRoutes from "./routes/referrer-auth";
+import referrerPortalRoutes from "./routes/referrer-portal";
+import { expireReferralWork } from "./services/referral.service";
 
 export type Env = {
   DB: D1Database;
@@ -56,6 +63,9 @@ export type Env = {
   LARK_APP_ID?: string;    // DEPRECATED — kept as global fallback; prefer per-tenant lark_configs
   LARK_APP_SECRET?: string;// DEPRECATED — kept as global fallback; prefer per-tenant lark_configs
   JWT_SECRET?: string;
+  REFERRAL_PORTAL_JWT_SECRET?: string;
+  RESEND_API_KEY?: string;
+  REFERRAL_EMAIL_FROM?: string;
   PLATFORM_JWT_SECRET?: string;
   PLATFORM_MFA_ENCRYPTION_KEY?: string;
   R2_ACCOUNT_ID?: string;
@@ -134,6 +144,8 @@ app.get("/api/health", (c) =>
 
 // Auth
 app.route("/api/auth", authRoutes);
+app.route("/api/referrer-auth", referrerAuthRoutes);
+app.route("/api/referrer-portal", referrerPortalRoutes);
 
 // Registration (public)
 app.route("/api/register", registerRoutes);
@@ -162,6 +174,10 @@ app.route("/api/treatment-plans", treatmentPlansExtras);
 
 // Payments
 app.route("/api/payments", paymentsRoutes);
+app.route("/api/referrers", referrersRoutes);
+app.route("/api/referral-programs", referralProgramsRoutes);
+app.route("/api/referrals", referralsRoutes);
+app.route("/api/referral-reports", referralReportsRoutes);
 
 // Appointments
 app.route("/api/appointments", appointmentsRoutes);
@@ -210,11 +226,16 @@ async function queueHandler(
   await larkRetryConsumer(batch, env);
 }
 
+async function scheduledHandler(_event: ScheduledController, env: Env): Promise<void> {
+  await expireReferralWork(env.DB);
+}
+
 // Default export: fetch + queue
 export default {
   fetch: (request: Request, env: Env, ctx: ExecutionContext) =>
     app.fetch(request, env, ctx),
   queue: queueHandler,
+  scheduled: scheduledHandler,
 };
 
 export { TenantDashboardHub };

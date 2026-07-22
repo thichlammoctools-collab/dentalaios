@@ -10,7 +10,7 @@ import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/c
 import { apiPost, apiPut, apiGet, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
-import type { Patient } from "@shared/types";
+import type { Patient, Referrer } from "@shared/types";
 import type { UserWithDetails } from "@shared/types";
 import type { PatientCreateInput } from "@shared/validation";
 import { getRoleLabel, MARKETING_SOURCES, MARKETING_SOURCE_LABELS } from "@shared/constants";
@@ -67,6 +67,9 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
   const [referralType, setReferralType] = useState(patient?.referral_type ?? "");
   const [referralUserId, setReferralUserId] = useState(patient?.referral_user_id ?? "");
   const [referralNotes, setReferralNotes] = useState(patient?.referral_notes ?? "");
+  const [referralCode, setReferralCode] = useState("");
+  const [resolvedReferrer, setResolvedReferrer] = useState<Pick<Referrer, "id" | "name" | "code" | "type"> | null>(null);
+  const [lookingUpReferral, setLookingUpReferral] = useState(false);
   const [users, setUsers] = useState<UserWithDetails[]>([]);
   const [step, setStep] = useState(1);
   const formRef = useRef<HTMLFormElement>(null);
@@ -100,6 +103,8 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
       setReferralType(patient?.referral_type ?? "");
       setReferralUserId(patient?.referral_user_id ?? "");
       setReferralNotes(patient?.referral_notes ?? "");
+      setReferralCode("");
+      setResolvedReferrer(null);
       setStep(1);
     }
   }, [open, patient]);
@@ -134,6 +139,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
         referral_type: referralType || undefined,
         referral_user_id: referralUserId || undefined,
         referral_notes: referralNotes || undefined,
+        referral_code: !isEdit && resolvedReferrer ? referralCode : undefined,
         cccd,
       };
       if (isEdit && patient) {
@@ -173,6 +179,23 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
 
   function goToNextStep() {
     if (formRef.current?.reportValidity()) setStep(2);
+  }
+
+  async function lookupReferralCode() {
+    const normalized = referralCode.trim().toUpperCase();
+    if (!normalized || isEdit) return;
+    setLookingUpReferral(true);
+    try {
+      const referrer = await apiGet<Pick<Referrer, "id" | "name" | "code" | "type">>(`/api/referrers/lookup/${encodeURIComponent(normalized)}`);
+      setReferralCode(referrer.code);
+      setResolvedReferrer(referrer);
+      toast.success(`Đã nhận mã của ${referrer.name}`);
+    } catch (error) {
+      setResolvedReferrer(null);
+      toast.error(error instanceof ApiError ? error.message : "Mã giới thiệu không hợp lệ");
+    } finally {
+      setLookingUpReferral(false);
+    }
   }
 
   return (
@@ -418,6 +441,20 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
 
           {/* ─── 4. Giới thiệu ─── */}
           <SectionDivider icon={<ReferralIcon />}>Giới thiệu</SectionDivider>
+
+          {!isEdit && (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+              <div className="flex flex-wrap gap-2">
+                <div className="min-w-48 flex-1">
+                  <Label htmlFor="pf-ref-code">Mã Người giới thiệu</Label>
+                  <Input id="pf-ref-code" value={referralCode} disabled={Boolean(resolvedReferrer)} onChange={(e) => setReferralCode(e.target.value.toUpperCase())} placeholder="VD: RF-ABC12345" />
+                </div>
+                <Button type="button" className="self-end" variant="outline" disabled={lookingUpReferral || Boolean(resolvedReferrer) || !referralCode.trim()} onClick={() => void lookupReferralCode()}>{lookingUpReferral ? "Đang kiểm tra..." : "Kiểm tra mã"}</Button>
+                {resolvedReferrer && <Button type="button" className="self-end" variant="ghost" onClick={() => { setResolvedReferrer(null); setReferralCode(""); }}>Bỏ mã</Button>}
+              </div>
+              {resolvedReferrer && <p className="mt-2 text-sm text-primary">Áp dụng cho: <strong>{resolvedReferrer.name}</strong> ({resolvedReferrer.code}). Thông tin này sẽ khóa sau khi có thanh toán xác nhận.</p>}
+            </div>
+          )}
 
           <div className="grid gap-1.5">
             <Label htmlFor="pf-ref-type">Nguồn giới thiệu</Label>

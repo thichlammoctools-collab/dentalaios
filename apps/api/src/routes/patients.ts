@@ -53,7 +53,7 @@ router.post(
   async (c) => {
     const jwt = getJwt(c);
     const data = c.req.valid("json");
-    const created = await patientService.create(c.env.DB, jwt.tenant_id, data);
+    const created = await patientService.create(c.env.DB, jwt.tenant_id, data, jwt.sub);
     return c.json(created, 201);
   },
 );

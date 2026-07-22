@@ -124,9 +124,9 @@ export function createPaymentsRepository(db: D1Database): PaymentsRepository {
       await db
         .prepare(
           `INSERT INTO payments
-             (id, tenant_id, treatment_plan_id, patient_id, amount, currency,
-              method, reference, notes, code, status, original_payment_id, adjustment_reason)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`,
+              (id, tenant_id, treatment_plan_id, patient_id, amount, currency,
+               method, reference, notes, code, status, confirmed_at, original_payment_id, adjustment_reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', datetime('now'), ?, ?)`,
         )
         .bind(
           id,
@@ -150,8 +150,8 @@ export function createPaymentsRepository(db: D1Database): PaymentsRepository {
 
     async updateStatus(tenantId, id, status) {
       await db
-        .prepare("UPDATE payments SET status = ? WHERE tenant_id = ? AND id = ?")
-        .bind(status, tenantId, id)
+        .prepare("UPDATE payments SET status = ?, confirmed_at = CASE WHEN ? = 'confirmed' THEN datetime('now') ELSE confirmed_at END WHERE tenant_id = ? AND id = ?")
+        .bind(status, status, tenantId, id)
         .run();
       return this.getById(tenantId, id);
     },
@@ -206,6 +206,7 @@ function mapPayment(row: D1Row): Payment {
     code: row.code as string,
     original_payment_id: (row.original_payment_id as string | null) ?? undefined,
     adjustment_reason: (row.adjustment_reason as string | null) ?? undefined,
+    confirmed_at: (row.confirmed_at as string | null) ?? undefined,
     created_at: row.created_at as string,
   };
 }

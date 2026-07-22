@@ -7,7 +7,7 @@ interface NavItem {
   label: string;
   href: string;
   match: (path: string) => boolean;
-  icon: "calendar" | "patients" | "settings" | "users" | "clinic" | "roles" | "audit" | "schedule" | "chair" | "dashboard";
+  icon: "calendar" | "patients" | "settings" | "users" | "clinic" | "roles" | "audit" | "schedule" | "chair" | "dashboard" | "referral" | "report";
 }
 
 const ICONS: Record<NavItem["icon"], React.ReactNode> = {
@@ -73,6 +73,15 @@ const ICONS: Record<NavItem["icon"], React.ReactNode> = {
       <rect x="14" y="14" width="7" height="7" rx="1" />
     </svg>
   ),
+  referral: (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <circle cx="8" cy="8" r="3" /><circle cx="17" cy="16" r="3" />
+      <path d="M10.5 9.5l4 4M12.5 14.5l2-1M11 12l2-1" />
+    </svg>
+  ),
+  report: (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M4 20V4M4 20h16M8 16v-4M12 16V8M16 16v-7" /></svg>
+  ),
 };
 
 const NAV: NavItem[] = [
@@ -80,6 +89,7 @@ const NAV: NavItem[] = [
   { label: "Lịch hẹn", href: ROUTES.SCHEDULE, match: (p) => p.startsWith("/schedule"), icon: "schedule" },
   { label: "Ghế nha", href: ROUTES.CHAIRS, match: (p) => p.startsWith(ROUTES.CHAIRS), icon: "chair" },
   { label: "Bệnh nhân", href: ROUTES.PATIENTS, match: (p) => p.startsWith("/patients"), icon: "patients" },
+  { label: "Giới thiệu", href: ROUTES.REFERRALS, match: (p) => p === ROUTES.REFERRALS || p === ROUTES.REFERRERS || p === ROUTES.REFERRAL_REPORTS, icon: "referral" },
   {
     label: "Cài đặt",
     href: ROUTES.SETTINGS_USERS,
@@ -94,6 +104,9 @@ const SUB_NAV: NavItem[] = [
   { label: "Dịch vụ điều trị", href: ROUTES.SETTINGS_TREATMENT_SERVICES, match: (p) => p === ROUTES.SETTINGS_TREATMENT_SERVICES, icon: "clinic" },
   { label: "Vai trò", href: ROUTES.SETTINGS_ROLES, match: (p) => p === ROUTES.SETTINGS_ROLES, icon: "roles" },
   { label: "Audit logs", href: ROUTES.SETTINGS_AUDIT_LOGS, match: (p) => p === ROUTES.SETTINGS_AUDIT_LOGS, icon: "audit" },
+  { label: "Người giới thiệu", href: ROUTES.REFERRERS, match: (p) => p === ROUTES.REFERRERS, icon: "referral" },
+  { label: "Chương trình giới thiệu", href: ROUTES.SETTINGS_REFERRAL_PROGRAMS, match: (p) => p === ROUTES.SETTINGS_REFERRAL_PROGRAMS, icon: "referral" },
+  { label: "Báo cáo giới thiệu", href: ROUTES.REFERRAL_REPORTS, match: (p) => p === ROUTES.REFERRAL_REPORTS, icon: "report" },
 ];
 
 interface SidebarProps {

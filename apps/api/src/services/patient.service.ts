@@ -6,6 +6,7 @@ import { createFindingsRepository } from "../repositories/findings.repo";
 import { assertAllInTenant } from "../lib/tenant-scope";
 import { ConflictError, NotFoundError } from "../lib/errors";
 import { isUniqueConstraintError } from "../lib/db-errors";
+import { referralService } from "./referral.service";
 
 function displayAddress(data: Pick<Patient, "address" | "address_line" | "ward_name" | "district_name" | "province_name" | "country_name">) {
   const structuredParts = [
@@ -40,14 +41,24 @@ export const patientService = {
     return createPatientsRepository(db).getById(tenantId, id);
   },
 
-  create(db: D1Database, tenantId: string, data: PatientCreateInput): Promise<Patient> {
+  create(db: D1Database, tenantId: string, data: PatientCreateInput, userId?: string): Promise<Patient> {
     return (async () => {
       await assertAllInTenant(db, tenantId, [
         { table: "branches", id: data.branch_id },
         { table: "users", id: data.referral_user_id ?? undefined },
       ]);
       try {
-        return await createPatientsRepository(db).create(tenantId, {
+        const referrer = await referralService.resolveReferrer(db, tenantId, {
+          referrerId: data.referrer_id,
+          referralCode: data.referral_code,
+        });
+        if (referrer) {
+          // A referral only applies to the first-ever record in a tenant.
+          // Archived records count as history even though active CCCD uniqueness does not.
+          const historical = await db.prepare("SELECT id FROM patients WHERE tenant_id = ? AND cccd = ? LIMIT 1").bind(tenantId, data.cccd).first();
+          if (historical) throw new ConflictError("Bệnh nhân đã tồn tại trong phòng khám, không thể áp dụng giới thiệu mới");
+        }
+        const created = await createPatientsRepository(db).create(tenantId, {
           branch_id: data.branch_id,
           name: data.name,
           date_of_birth: data.date_of_birth,
@@ -74,6 +85,8 @@ export const patientService = {
           weight_kg: data.weight_kg ?? undefined,
           cccd: data.cccd,
         });
+        if (referrer) await referralService.createCaseForNewPatient(db, tenantId, userId ?? "system", created, referrer, data.referral_code ? "code" : "manual");
+        return created;
       } catch (err) {
         if (isUniqueConstraintError(err)) {
           throw new ConflictError("Số CCCD đã tồn tại trong phòng khám");
@@ -97,6 +110,9 @@ export const patientService = {
       const repository = createPatientsRepository(db);
       const existing = await repository.getById(tenantId, id);
       if (!existing) return null;
+      if (data.referrer_id || data.referral_code) {
+        throw new ConflictError("Chỉ có thể ghi nhận Người giới thiệu khi tạo hồ sơ bệnh nhân");
+      }
       const address = displayAddress({
         address: data.address ?? existing.address,
         address_line: data.address_line ?? existing.address_line,

@@ -8,6 +8,7 @@ import { createTenantSettingsRepository } from "../repositories/tenant-settings.
 import { ConflictError, NotFoundError, ValidationError } from "../lib/errors";
 import { paymentCodeService } from "./payment-code.service";
 import { filesService } from "./files.service";
+import { referralService } from "./referral.service";
 
 const DEFAULT_PREFIX = "TT";
 const PREFIX_RE = /^[A-Z0-9]+$/;
@@ -151,6 +152,7 @@ export const paymentService = {
     }
     const updated = await createPaymentsRepository(db).updateStatus(tenantId, id, "confirmed");
     if (!updated) throw new NotFoundError("Payment not found");
+    await referralService.evaluateCaseForPatient(db, tenantId, updated.patient_id);
     return updated;
   },
 
@@ -181,7 +183,7 @@ export const paymentService = {
     }
 
     const { code } = await paymentCodeService.allocate(db, tenantId);
-    return createPaymentsRepository(db).createAdjustment(tenantId, {
+    const adjusted = await createPaymentsRepository(db).createAdjustment(tenantId, {
       treatment_plan_id: original.treatment_plan_id,
       patient_id: original.patient_id,
       amount: data.amount,
@@ -193,6 +195,8 @@ export const paymentService = {
       original_payment_id: original.id,
       adjustment_reason: data.reason,
     });
+    await referralService.evaluateCaseForPatient(db, tenantId, adjusted.patient_id);
+    return adjusted;
   },
 
   async listAttachments(db: D1Database, tenantId: string, paymentId: string): Promise<PaymentAttachment[]> {

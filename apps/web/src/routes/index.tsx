@@ -74,6 +74,9 @@ export function AppRoutes() {
       <Route path={ROUTES.LOGIN} element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path={ROUTES.REFERRER_LOGIN} element={<ReferrerPortalLoginPage />} />
+      <Route path={ROUTES.REFERRER_ACTIVATE} element={<ReferrerPortalActivatePage />} />
+      <Route path={ROUTES.REFERRER_PORTAL} element={<ReferrerPortalDashboardPage />} />
 
       {/* Platform administration uses an independent identity and route shell. */}
       <Route path="/platform/login" element={<PlatformLoginPage />} />
@@ -237,6 +240,11 @@ export function AppRoutes() {
           </Protected>
         }
       />
+
+      <Route path={ROUTES.REFERRERS} element={<Protected><ReferrersPage /></Protected>} />
+      <Route path={ROUTES.REFERRALS} element={<Protected><ReferralsPage /></Protected>} />
+      <Route path={ROUTES.REFERRAL_REPORTS} element={<Protected><ReferralReportsPage /></Protected>} />
+      <Route path={ROUTES.SETTINGS_REFERRAL_PROGRAMS} element={<Protected><ReferralProgramsPage /></Protected>} />
 
       {/* 404 */}
       <Route path="*" element={<NotFoundPage />} />

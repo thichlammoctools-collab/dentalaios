@@ -132,11 +132,17 @@ export const referrerCreateSchema = z.object({
   linked_user_id: z.string().min(1).optional(),
 }).strict().superRefine((data, ctx) => {
   if (data.linked_patient_id && data.linked_user_id) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["linked_patient_id"], message: "Chỉ được liên kết một hồ sơ" });
-  if (data.type === "patient" && !data.linked_patient_id) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["linked_patient_id"], message: "Bệnh nhân giới thiệu cần liên kết hồ sơ bệnh nhân" });
-  if (["doctor", "assistant"].includes(data.type) && !data.linked_user_id) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["linked_user_id"], message: "Nhân viên giới thiệu cần liên kết tài khoản" });
   if (data.type === "partner" && !data.email && !data.phone) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["email"], message: "Đối tác cần email hoặc số điện thoại" });
 });
-export const referrerUpdateSchema = referrerCreateSchema.partial().extend({ status: z.enum(["active", "inactive"]).optional() }).strict();
+export const referrerUpdateSchema = z.object({
+  type: z.enum(["patient", "doctor", "assistant", "partner"]).optional(),
+  name: nonEmpty(200).optional(),
+  email: optionalText(200).refine((value) => value === undefined || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), "Email không hợp lệ"),
+  phone: optionalText(20),
+  linked_patient_id: z.string().min(1).nullable().optional(),
+  linked_user_id: z.string().min(1).nullable().optional(),
+  status: z.enum(["active", "inactive"]).optional(),
+}).strict().refine((data) => Object.keys(data).length > 0, "Cần ít nhất một trường để cập nhật");
 export const referralProgramSchema = z.object({
   name: nonEmpty(200),
   status: z.enum(["draft", "active", "inactive"]).default("draft"),
@@ -202,6 +208,8 @@ export const patientCreateSchema = z.object({
   referral_type: z.enum(["doctor", "staff", "other", "ad", "none"]).optional(),
   referral_user_id: z.string().min(1).nullable().optional(),
   referral_notes: optionalText(500),
+  referrer_id: z.string().min(1).optional(),
+  referral_code: z.string().trim().min(4).max(64).optional(),
   // Body metrics
   height_cm: z.number().positive().max(300).optional(),
   weight_kg: z.number().positive().max(500).optional(),
