@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiGet, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -9,14 +9,11 @@ import { formatCurrency } from "@/lib/utils";
 import { ROUTES } from "@shared/constants";
 import { PageContainer } from "@/components/PageContainer";
 import type {
-  Appointment,
-  AppointmentStatus,
   BranchDashboardActionGroup,
   BranchDashboardActionItem,
   BranchDashboardActionKind,
   BranchDashboardSnapshot,
   ManagementDashboardDailyPoint,
-  Patient,
 } from "@shared/types";
 
 const actionOrder: BranchDashboardActionKind[] = [
@@ -25,9 +22,6 @@ const actionOrder: BranchDashboardActionKind[] = [
   "appointment_outcome",
   "pending_plan",
 ];
-
-interface AppointmentsResponse { items: Appointment[]; total: number }
-interface PatientsResponse { items: Patient[]; total: number }
 
 function formatNumber(value: number | null | undefined) {
   return typeof value === "number" ? new Intl.NumberFormat("vi-VN").format(value) : "--";
@@ -59,47 +53,6 @@ function hcmTime(value: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
-}
-
-function hcmYmd(value = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Ho_Chi_Minh",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(value);
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
-  return `${part("year")}-${part("month")}-${part("day")}`;
-}
-
-function addDays(date: string, days: number) {
-  const [year, month, day] = date.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
-}
-
-function hcmDayStart(date: string) {
-  return new Date(`${date}T00:00:00+07:00`).toISOString();
-}
-
-function hcmDayLabel(date: string) {
-  return new Intl.DateTimeFormat("vi-VN", {
-    timeZone: "Asia/Ho_Chi_Minh",
-    weekday: "long",
-    day: "2-digit",
-    month: "2-digit",
-  }).format(new Date(`${date}T00:00:00+07:00`));
-}
-
-function appointmentStatusLabel(status: AppointmentStatus) {
-  const labels: Record<AppointmentStatus, string> = {
-    booked: "Đặt",
-    confirmed: "Xác nhận",
-    arrived: "Đến",
-    completed: "Xong",
-    cancelled: "Hủy",
-    no_show: "Vắng",
-  };
-  return labels[status];
 }
 
 function actionLabel(kind: BranchDashboardActionKind) {
@@ -135,8 +88,6 @@ function actionClass(kind: BranchDashboardActionKind) {
 export function TodayPage() {
   const { session } = useAuth();
   const [snapshot, setSnapshot] = useState<BranchDashboardSnapshot | null>(null);
-  const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([]);
-  const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -148,22 +99,9 @@ export function TodayPage() {
     manual ? setRefreshing(true) : setLoading(true);
     setError(null);
     try {
-      const today = hcmYmd();
-      const appointmentQuery = new URLSearchParams({
-        from: hcmDayStart(today),
-        to: hcmDayStart(addDays(today, 3)),
-        limit: "500",
-        ...(session?.branch.id ? { branch_id: session.branch.id } : {}),
-      });
-      const [next, appointmentResponse, patientResponse] = await Promise.all([
-        apiGet<BranchDashboardSnapshot>("/api/dashboard/branch"),
-        apiGet<AppointmentsResponse>(`/api/appointments?${appointmentQuery}`),
-        apiGet<PatientsResponse>("/api/patients?limit=200"),
-      ]);
+      const next = await apiGet<BranchDashboardSnapshot>("/api/dashboard/branch");
       if (currentRequest !== requestId.current) return;
       setSnapshot(next);
-      setUpcomingAppointments(appointmentResponse.items);
-      setPatients(patientResponse.items);
     } catch (cause) {
       if (currentRequest !== requestId.current) return;
       setError(cause instanceof ApiError ? cause.message : "Không thể tải dữ liệu điều hành chi nhánh.");
@@ -191,17 +129,6 @@ export function TodayPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const patientsById = useMemo(() => new Map(patients.map((patient) => [patient.id, patient])), [patients]);
-  const upcomingDays = useMemo(() => {
-    const today = hcmYmd();
-    return Array.from({ length: 3 }, (_, index) => {
-      const date = addDays(today, index);
-      return {
-        date,
-        appointments: upcomingAppointments.filter((appointment) => hcmYmd(new Date(appointment.scheduled_at)) === date),
-      };
-    });
-  }, [upcomingAppointments]);
   const actions = [...(snapshot?.actions ?? [])].sort(
     (left, right) => actionOrder.indexOf(left.kind) - actionOrder.indexOf(right.kind),
   );
@@ -257,30 +184,6 @@ export function TodayPage() {
               <MetricCard label="Đã hủy" value={formatNumber(snapshot.today.cancellations)} risk="warning" />
               <MetricCard label="Không đến" value={formatNumber(snapshot.today.no_shows)} risk="danger" />
               <MetricCard label="Doanh thu xác nhận hôm nay" value={formatCurrency(snapshot.today.confirmed_revenue)} money positive />
-            </div>
-          </section>
-
-          <section>
-            <div className="mb-3 flex items-baseline justify-between gap-3">
-              <div><h3 className="text-lg font-semibold">Lịch hẹn 3 ngày tới</h3><p className="text-sm text-muted-foreground">Hôm nay và hai ngày kế bên tại chi nhánh.</p></div>
-              <Link to={ROUTES.SCHEDULE} className="shrink-0 text-sm font-medium text-primary hover:underline">Xem lịch tuần →</Link>
-            </div>
-            <div className="grid gap-4 lg:grid-cols-3">
-              {upcomingDays.map(({ date, appointments }) => (
-                <Card key={date} className={date === hcmYmd() ? "border-primary/50" : undefined}>
-                  <CardHeader className="pb-3"><CardTitle className="text-base capitalize">{date === hcmYmd() ? "Hôm nay" : hcmDayLabel(date)}</CardTitle><CardDescription>{appointments.length} lịch hẹn</CardDescription></CardHeader>
-                  <CardContent>
-                    {appointments.length === 0 ? <p className="py-5 text-center text-sm text-muted-foreground">Chưa có lịch hẹn</p> : (
-                      <ul className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
-                        {appointments.map((appointment) => {
-                          const patient = patientsById.get(appointment.patient_id);
-                          return <li key={appointment.id} className="rounded-lg border border-border/70 p-3"><div className="flex items-center justify-between gap-2"><span className="font-mono text-sm font-semibold">{hcmTime(appointment.scheduled_at)}</span><span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{appointmentStatusLabel(appointment.status)}</span></div><p className="mt-1 truncate text-sm font-medium">{patient?.name ?? appointment.patient_id.slice(0, 8)}</p>{appointment.procedure && <p className="mt-0.5 truncate text-xs text-muted-foreground">{appointment.procedure}</p>}</li>;
-                        })}
-                      </ul>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
             </div>
           </section>
 

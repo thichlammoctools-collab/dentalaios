@@ -65,12 +65,19 @@ export function SchedulePage() {
   const weekDays = useMemo(() => getWeekDays(selectedDate), [selectedDate]);
   const weekStart = ymd(weekDays[0]);
   const weekEnd = ymd(weekDays[6]);
+  const threeDayDates = useMemo(() => Array.from({ length: 3 }, (_, index) => {
+    const date = new Date(selectedDate);
+    date.setDate(date.getDate() + index);
+    return date;
+  }), [selectedDate]);
 
   useEffect(() => {
     let mounted = true;
     const from = new Date(weekDays[0]);
     from.setHours(0, 0, 0, 0);
     const to = new Date(weekDays[6]);
+    const threeDayEnd = threeDayDates[2];
+    if (threeDayEnd > to) to.setTime(threeDayEnd.getTime());
     to.setHours(23, 59, 59, 999);
 
     const appointmentQuery = new URLSearchParams({
@@ -98,7 +105,7 @@ export function SchedulePage() {
       .finally(() => mounted && setLoading(false));
 
     return () => { mounted = false; };
-  }, [weekDays, refreshTick, selectedBranchId, session?.branch?.id]);
+  }, [weekDays, threeDayDates, refreshTick, selectedBranchId, session?.branch?.id]);
 
   const patientsById = useMemo(() => {
     const m = new Map<string, Patient>();
@@ -323,6 +330,7 @@ export function SchedulePage() {
       <Tabs defaultValue="day">
         <TabsList>
           <TabsTrigger value="day">Ngày</TabsTrigger>
+          <TabsTrigger value="three-days">3 ngày</TabsTrigger>
           <TabsTrigger value="week">Tuần</TabsTrigger>
         </TabsList>
 
@@ -448,6 +456,74 @@ export function SchedulePage() {
                   <div className="space-y-4 border-t border-border pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
                     {renderDayAppointmentGroup("finished", "Đã xong", "bg-muted-foreground/50", { hideFinishedControl: true })}
                   </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Three-day view */}
+        <TabsContent value="three-days">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <span>3 ngày từ {formatDate(threeDayDates[0].toISOString())}</span>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => shiftDay(-3)}>← 3 ngày trước</Button>
+                  <Button variant="outline" size="sm" onClick={() => setSelectedDate(new Date())}>Hôm nay</Button>
+                  <Button variant="outline" size="sm" onClick={() => shiftDay(3)}>3 ngày sau →</Button>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="h-40 flex items-center justify-center">
+                  <div className="h-6 w-6 animate-spin rounded-full border-3 border-muted border-t-primary" />
+                </div>
+              ) : (
+                <div className="grid gap-4 lg:grid-cols-3">
+                  {threeDayDates.map((day) => {
+                    const dayYmd = ymd(day);
+                    const dayAppts = filteredAppointments
+                      .filter((appointment) => isoToYmd(appointment.scheduled_at) === dayYmd)
+                      .sort((left, right) => left.scheduled_at.localeCompare(right.scheduled_at));
+                    const isToday = dayYmd === ymd(new Date());
+                    return (
+                      <div key={dayYmd} className={`min-h-[280px] rounded-lg border p-3 ${isToday ? "border-primary bg-primary/5" : "border-border"}`}>
+                        <div className="mb-3 flex items-baseline justify-between gap-2">
+                          <div>
+                            <p className="text-sm font-semibold">{isToday ? "Hôm nay" : weekdayLabel(day.getDay() === 0 ? 7 : day.getDay())}</p>
+                            <p className="text-xs text-muted-foreground">{formatDate(day.toISOString())}</p>
+                          </div>
+                          <Badge variant="outline" className="text-[10px]">{dayAppts.length} lịch</Badge>
+                        </div>
+                        {dayAppts.length === 0 ? (
+                          <p className="py-10 text-center text-sm text-muted-foreground">Chưa có lịch hẹn</p>
+                        ) : (
+                          <div className="max-h-[600px] space-y-2 overflow-y-auto pr-1">
+                            {dayAppts.map((appointment) => {
+                              const patient = patientsById.get(appointment.patient_id);
+                              return (
+                                <button
+                                  key={appointment.id}
+                                  type="button"
+                                  onClick={() => setEditing(appointment)}
+                                  className={`w-full rounded-lg border-l-2 px-3 py-2 text-left transition-colors hover:bg-accent/50 ${statusBorderClass(appointment.status)}`}
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="font-mono text-sm font-semibold">{formatTime(appointment.scheduled_at)}</span>
+                                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${statusBgClass(appointment.status)}`}>{statusLabelVi(appointment.status)}</span>
+                                  </div>
+                                  <p className="mt-1 truncate text-sm font-medium">{patient?.name ?? appointment.patient_id.slice(0, 8)}</p>
+                                  {appointment.procedure && <p className="mt-0.5 truncate text-xs text-muted-foreground">{appointment.procedure}</p>}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
