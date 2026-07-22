@@ -780,55 +780,38 @@ export function VisitDetailPage() {
          </details>
        </Card>
 
-      {/* FDI Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Khám răng hàm mặt</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <FdiToothChart
-            visitId={visit.id}
-            findings={findings}
-            onCreated={(f) => setFindings((prev) => [...prev, f])}
-            onCreatedBatch={onFindingsBatchCreated}
-          />
-        </CardContent>
-      </Card>
+       <div className="grid items-start gap-6 lg:grid-cols-3">
+         <div className="space-y-6 lg:col-span-2">
+           <Card>
+             <CardHeader className="pb-3"><CardTitle>Khám răng hàm mặt</CardTitle></CardHeader>
+             <CardContent>
+               <FdiToothChart visitId={visit.id} findings={findings} onCreated={(f) => setFindings((prev) => [...prev, f])} onCreatedBatch={onFindingsBatchCreated} />
+             </CardContent>
+           </Card>
+           <Card id="findings">
+             <CardHeader className="pb-3"><CardTitle>Ghi nhận theo răng ({toothFindings.length})</CardTitle></CardHeader>
+             <CardContent>
+               <FindingsList visitId={visit.id} findings={toothFindings} onUpdate={(updated) => setFindings((prev) => prev.map((f) => (f.id === updated.id ? updated : f)))} onDeleted={(findingId) => setFindings((prev) => prev.filter((finding) => finding.id !== findingId))} />
+             </CardContent>
+           </Card>
+         </div>
+         <aside className="space-y-6 lg:sticky lg:top-4">
+           <ClinicalDiagnosesCard visitId={visit.id} findings={findings} />
+           <Card>
+             <CardContent className="pt-4">
+               <PatientImageGallery patientId={visit.patient_id} visitId={visit.id} />
+             </CardContent>
+           </Card>
+         </aside>
+       </div>
 
-      {/* Findings */}
-      <Card id="findings">
-        <CardHeader>
-          <CardTitle>Ghi nhận theo răng ({toothFindings.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <FindingsList
-            visitId={visit.id}
-            findings={toothFindings}
-            onUpdate={(updated) =>
-              setFindings((prev) => prev.map((f) => (f.id === updated.id ? updated : f)))
-            }
-            onDeleted={(id) => setFindings((prev) => prev.filter((finding) => finding.id !== id))}
-          />
-        </CardContent>
-      </Card>
-
-      <ClinicalDiagnosesCard visitId={visit.id} findings={findings} />
-
-      {/* Images */}
-      <Card>
-        <CardContent className="pt-4">
-          <PatientImageGallery patientId={visit.patient_id} visitId={visit.id} />
-        </CardContent>
-      </Card>
-
-      {/* Action bar */}
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-4">
-        <p className="text-sm font-medium text-muted-foreground w-full sm:w-auto">Thao tác:</p>
+       {/* Action bar */}
+       <div className="sticky bottom-3 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card/95 p-3 shadow-lg backdrop-blur">
         <Button size="sm" onClick={() => setVoiceDialogOpen(true)} className="gap-1.5">
           <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
           </svg>
-          Ghi âm Findings
+           Ghi âm findings
         </Button>
         <Button size="sm" variant="outline" onClick={onSummarize} disabled={summarizing} className="gap-1.5">
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -849,7 +832,7 @@ export function VisitDetailPage() {
           disabled={suggestNextLoading}
           className="gap-1.5"
         >
-          {suggestNextLoading ? "Đang gợi ý…" : "📅 Tạo lịch tái khám"}
+           {suggestNextLoading ? "Đang gợi ý…" : "Tạo lịch tái khám"}
         </Button>
         <div className="ml-auto">
           <Button size="sm" onClick={onCreatePlan} className="gap-1.5">
