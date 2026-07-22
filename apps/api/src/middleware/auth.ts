@@ -30,37 +30,37 @@ export function requireAuth(): MiddlewareHandler<{ Bindings: Env; Variables: Aut
     const token = header.slice("Bearer ".length).trim();
     if (!token) throw new UnauthorizedError("Empty token");
 
+    let jwt;
     try {
-      const jwt = await verifyJwt(token, c.env.JWT_SECRET);
-
-      // JWT signatures and expirations alone cannot revoke a token. Resolve
-      // the current user context in production so a disabled user, changed
-      // branch/role, or changed role permissions takes effect immediately
-      // rather than after the 24-hour JWT TTL. Test apps deliberately use a
-      // lightweight mock DB and exercise this behaviour in production-mode
-      // middleware tests instead.
-      if (c.env.ENVIRONMENT !== "test") {
-        const current = await createUsersRepository(c.env.DB).findContextById(
-          jwt.sub,
-          jwt.tenant_id,
-        );
-        if (!current || !current.user.is_active || !current.tenant.is_active) {
-          throw new UnauthorizedError("Tài khoản không còn hoạt động");
-        }
-        c.set("jwt", {
-          ...jwt,
-          branch_id: current.user.branch_id,
-          role_id: current.user.role_id,
-          permissions: current.role.permissions,
-        });
-      } else {
-        c.set("jwt", jwt);
-      }
-      await next();
-    } catch (err) {
-      if (err instanceof UnauthorizedError) throw err;
+      jwt = await verifyJwt(token, c.env.JWT_SECRET);
+    } catch {
       throw new UnauthorizedError("Invalid or expired token");
     }
+
+    // JWT signatures and expirations alone cannot revoke a token. Resolve
+    // the current user context in production so a disabled user, changed
+    // branch/role, or changed role permissions takes effect immediately
+    // rather than after the 24-hour JWT TTL. Test apps deliberately use a
+    // lightweight mock DB and exercise this behaviour in production-mode
+    // middleware tests instead.
+    if (c.env.ENVIRONMENT !== "test") {
+      const current = await createUsersRepository(c.env.DB).findContextById(
+        jwt.sub,
+        jwt.tenant_id,
+      );
+      if (!current || !current.user.is_active || !current.tenant.is_active) {
+        throw new UnauthorizedError("Tài khoản không còn hoạt động");
+      }
+      c.set("jwt", {
+        ...jwt,
+        branch_id: current.user.branch_id,
+        role_id: current.user.role_id,
+        permissions: current.role.permissions,
+      });
+    } else {
+      c.set("jwt", jwt);
+    }
+    await next();
   };
 }
 

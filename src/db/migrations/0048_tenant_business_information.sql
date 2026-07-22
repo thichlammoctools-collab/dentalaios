@@ -1,4 +1,4 @@
--- Migration 0020 — Tenant business information for invoices and payments.
+-- Tenant business information used for invoices and payment instructions.
 
 ALTER TABLE tenants ADD COLUMN tax_code TEXT NOT NULL DEFAULT '';
 ALTER TABLE tenants ADD COLUMN tax_address TEXT NOT NULL DEFAULT '';
