@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -45,6 +45,7 @@ export function SchedulePage() {
   const [refreshTick, setRefreshTick] = useState(0);
   const [startingAppointmentId, setStartingAppointmentId] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
+  const [expandedWeekDay, setExpandedWeekDay] = useState<string | null>(null);
 
   // Filters apply to both schedule views.
   const [filterStatuses, setFilterStatuses] = useState<Set<string>>(() => new Set(requestedStatuses));
@@ -165,6 +166,11 @@ export function SchedulePage() {
     });
     return m;
   }, [filteredAppointments]);
+
+  const hasExpandedWeekDay = expandedWeekDay !== null && weekDays.some((day) => ymd(day) === expandedWeekDay);
+  const weekGridColumns = hasExpandedWeekDay
+    ? weekDays.map((day) => ymd(day) === expandedWeekDay ? "minmax(280px, 2.6fr)" : "minmax(120px, 1fr)").join(" ")
+    : "repeat(7, minmax(0, 1fr))";
 
   function shiftDay(days: number) {
     const d = new Date(selectedDate);
@@ -549,26 +555,46 @@ export function SchedulePage() {
                   <div className="h-6 w-6 animate-spin rounded-full border-3 border-muted border-t-primary" />
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-7">
-                  {weekDays.map((day) => {
+                <div className="overflow-x-auto pb-1">
+                  <div
+                    className="grid grid-cols-1 gap-3 md:min-w-[960px] md:[grid-template-columns:var(--week-grid-columns)]"
+                    style={{ "--week-grid-columns": weekGridColumns } as CSSProperties}
+                  >
+                    {weekDays.map((day) => {
                     const dayYmd = ymd(day);
                     const dayAppts = (weekByDate.get(dayYmd) ?? []).sort((a, b) =>
                       a.scheduled_at.localeCompare(b.scheduled_at),
                     );
                     const isToday = dayYmd === ymd(new Date());
                     const isSelected = dayYmd === ymd(selectedDate);
+                    const isExpanded = dayYmd === expandedWeekDay;
                     return (
                       <div
                         key={dayYmd}
-                        className={`flex min-h-[320px] flex-col rounded-lg border p-2 transition-colors hover:bg-accent/30 ${isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : isToday ? "border-amber-400 bg-amber-50/30" : "border-border"}`}
+                        className={`flex min-h-[320px] flex-col rounded-lg border p-2 transition-colors hover:bg-accent/30 ${isExpanded ? "border-primary bg-primary/5 ring-1 ring-primary/20" : isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : isToday ? "border-amber-400 bg-amber-50/30" : "border-border"}`}
                         onClick={() => setSelectedDate(day)}
                       >
                         <div className="mb-2 flex items-baseline justify-between">
                           <div className="text-xs font-medium text-muted-foreground">
                             {weekdayLabel(day.getDay() === 0 ? 7 : day.getDay())}
                           </div>
-                          <div className={`text-lg font-bold ${isToday ? "text-amber-600" : ""}`}>
-                            {day.getDate()}
+                          <div className="flex items-center gap-1">
+                            <div className={`text-lg font-bold ${isToday ? "text-amber-600" : ""}`}>
+                              {day.getDate()}
+                            </div>
+                            <button
+                              type="button"
+                              className="hidden rounded p-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:inline-flex"
+                              aria-label={`${isExpanded ? "Thu gọn" : "Mở rộng"} cột ${weekdayLabel(day.getDay() === 0 ? 7 : day.getDay())}, ngày ${day.getDate()}`}
+                              aria-pressed={isExpanded}
+                              title={isExpanded ? "Thu gọn cột ngày" : "Mở rộng cột ngày"}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setExpandedWeekDay((current) => current === dayYmd ? null : dayYmd);
+                              }}
+                            >
+                              {isExpanded ? "−" : "+"}
+                            </button>
                           </div>
                         </div>
                         <div className="space-y-1 overflow-y-auto pr-1" style={{ maxHeight: "600px" }}>
@@ -593,10 +619,15 @@ export function SchedulePage() {
                                       {statusLabelVi(a.status)}
                                     </span>
                                   </div>
-                                   <div className="mt-0.5 flex min-w-0 items-center gap-1.5"><ProfileAvatar subject="patients" entityId={patient?.id} name={patient?.name ?? a.patient_id} avatarFileId={patient?.avatar_file_id} size="sm" /><span className="truncate font-medium">{patient?.name ?? a.patient_id.slice(0, 8)}</span></div>
+                                  <div className="mt-0.5 flex min-w-0 items-center gap-1.5"><ProfileAvatar subject="patients" entityId={patient?.id} name={patient?.name ?? a.patient_id} avatarFileId={patient?.avatar_file_id} size="sm" /><span className={isExpanded ? "font-medium leading-4" : "truncate font-medium"}>{patient?.name ?? a.patient_id.slice(0, 8)}</span></div>
                                   {a.procedure && (
-                                    <div className="truncate text-[10px] text-muted-foreground">
+                                    <div className={isExpanded ? "mt-0.5 text-[10px] leading-4 text-muted-foreground" : "truncate text-[10px] text-muted-foreground"}>
                                       {a.procedure}
+                                    </div>
+                                  )}
+                                  {isExpanded && doctor && (
+                                    <div className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                                      BS: {doctor.name}
                                     </div>
                                   )}
                                 </div>
@@ -612,6 +643,7 @@ export function SchedulePage() {
                       </div>
                     );
                   })}
+                  </div>
                 </div>
               )}
               <p className="mt-3 text-[10px] text-muted-foreground">
