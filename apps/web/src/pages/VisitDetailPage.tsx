@@ -594,6 +594,7 @@ export function VisitDetailPage() {
   const sortedTreatmentHistory = [...treatmentHistory].sort(
     (left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime(),
   );
+  const toothFindings = findings.filter((finding) => finding.category === "tooth_hard_tissue" || finding.category === "periodontal");
 
   return (
     <PageContainer size="detail">
@@ -795,12 +796,12 @@ export function VisitDetailPage() {
       {/* Findings */}
       <Card id="findings">
         <CardHeader>
-          <CardTitle>Ghi nhận lâm sàng ({findings.length})</CardTitle>
+          <CardTitle>Ghi nhận theo răng ({toothFindings.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <FindingsList
             visitId={visit.id}
-            findings={findings}
+            findings={toothFindings}
             onUpdate={(updated) =>
               setFindings((prev) => prev.map((f) => (f.id === updated.id ? updated : f)))
             }

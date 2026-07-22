@@ -124,6 +124,17 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
     return [];
   }
 
+  function findingLocation(finding: ClinicalFinding) {
+    if (finding.scope !== "region") return "Toàn miệng";
+    const details = [
+      getAnatomicalSiteLabel(finding.anatomical_site),
+      finding.location_details?.laterality === "right" ? "phải" : finding.location_details?.laterality === "left" ? "trái" : finding.location_details?.laterality === "bilateral" ? "hai bên" : finding.location_details?.laterality === "midline" ? "đường giữa" : "",
+      finding.location_details?.vertical_position === "upper" ? "trên" : finding.location_details?.vertical_position === "lower" ? "dưới" : "",
+      finding.location_details?.surface_orientation === "internal" ? "trong" : finding.location_details?.surface_orientation === "external" ? "ngoài" : "",
+    ].filter(Boolean);
+    return details.join(" · ");
+  }
+
   function ExistingFindingsNotice({ items, location }: { items: ClinicalFinding[]; location: string }) {
     if (!items.length) return null;
     return <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"><p className="text-sm font-medium">Đã ghi nhận tại {location}</p><p className="mt-1 text-xs">Kiểm tra các finding bên dưới trước khi lưu để tránh thông tin mâu thuẫn.</p><div className="mt-2 flex flex-wrap gap-1.5">{items.map((finding) => <span key={finding.id} className="rounded-md bg-amber-100 px-2 py-1 text-xs dark:bg-amber-900/60">{getFindingCategory(finding.category).label}: {getFindingConditionLabel(finding.category, finding.condition)}</span>)}</div></div>;
@@ -221,9 +232,10 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
   return <div className="space-y-4">
     <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
       {CLINICAL_FINDING_CATEGORIES.map((item) => {
-        const count = findings.filter((finding) => finding.category === item.value).length;
+        const categoryFindings = findings.filter((finding) => finding.category === item.value);
+        const count = categoryFindings.length;
         const isToothCategory = item.value === "tooth_hard_tissue" || item.value === "periodontal";
-        return <div key={item.value} className="rounded-lg border border-border p-3"><div className="flex items-center justify-between gap-2"><span className="text-sm font-semibold">{item.label}</span><span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">{count}</span></div><p className="mt-1 min-h-8 text-xs text-muted-foreground">{item.description}</p>{isToothCategory ? <p className="mt-2 text-xs font-medium text-primary">Chọn răng trên sơ đồ</p> : <Button size="sm" variant="outline" className="mt-2 h-8 text-xs" onClick={() => openOther(item.value)}>Thêm ghi nhận</Button>}</div>;
+        return <div key={item.value} className="rounded-lg border border-border p-3"><div className="flex items-center justify-between gap-2"><span className="text-sm font-semibold">{item.label}</span><span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">{count}</span></div><p className="mt-1 min-h-8 text-xs text-muted-foreground">{item.description}</p>{isToothCategory ? <p className="mt-2 text-xs font-medium text-primary">Chọn răng trên sơ đồ</p> : <><div className="mt-2 space-y-1.5">{categoryFindings.map((finding) => <div key={finding.id} className="rounded-md bg-muted/50 px-2 py-1.5 text-xs"><p className="font-medium text-foreground">{getFindingConditionLabel(finding.category, finding.condition)}</p><p className="mt-0.5 text-muted-foreground">{findingLocation(finding)}</p>{finding.notes && <p className="mt-1 text-muted-foreground">{finding.notes}</p>}</div>)}</div><Button size="sm" variant="outline" className="mt-2 h-8 text-xs" onClick={() => openOther(item.value)}>Thêm ghi nhận</Button></>}</div>;
       })}
     </div>
 
