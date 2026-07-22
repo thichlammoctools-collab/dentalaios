@@ -14,6 +14,7 @@ const planRow = (overrides: Record<string, unknown> = {}) => ({
   patient_id: "patient-1",
   status: "draft",
   total_cost: 0,
+  estimated_duration_min: 0,
   currency: "VND",
   notes: null,
   approved_at: null,
@@ -31,6 +32,7 @@ const itemRow = (overrides: Record<string, unknown> = {}) => ({
     procedure: "filling",
     description: "Trám răng cửa trên",
     unit_cost: 500000,
+    estimated_duration_min: 30,
     price_includes_vat: 1,
     price_snapshot_at: "2026-01-01",
   status: "planned",
@@ -122,13 +124,15 @@ describe("POST /api/treatment-plans/:id/items", () => {
           procedure: "filling",
           description: "Trám răng cửa trên",
           unit_cost: 500000,
+          estimated_duration_min: 30,
         },
       },
     );
     expect(res.status).toBe(201);
-    const body = (await res.json()) as { tooth_number: number; unit_cost: number; price_includes_vat: boolean };
+    const body = (await res.json()) as { tooth_number: number; unit_cost: number; estimated_duration_min: number; price_includes_vat: boolean };
     expect(body.tooth_number).toBe(11);
     expect(body.unit_cost).toBe(500000);
+    expect(body.estimated_duration_min).toBe(30);
     expect(body.price_includes_vat).toBe(true);
   });
 
