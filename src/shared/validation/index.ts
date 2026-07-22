@@ -104,6 +104,72 @@ export const inviteAcceptSchema = z.object({
 
 export type InviteAcceptInput = z.infer<typeof inviteAcceptSchema>;
 
+// ──────────────── Referral ────────────────
+
+const referralPassword = z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự");
+const referralRuleSchema = z.object({
+  referrer_type: z.enum(["patient", "doctor", "assistant", "partner"]),
+  min_net_revenue: z.number().min(0).max(1_000_000_000),
+  reward_kind: z.enum(["cash", "voucher"]),
+  calculation_type: z.enum(["fixed", "percentage"]),
+  value: z.number().positive().max(1_000_000_000),
+  voucher_valid_days: z.number().int().min(1).max(3650).optional(),
+}).superRefine((data, ctx) => {
+  if (data.reward_kind === "voucher" && !data.voucher_valid_days) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["voucher_valid_days"], message: "Voucher cần có hạn dùng" });
+  }
+  if (data.calculation_type === "percentage" && data.value > 100) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["value"], message: "Phần trăm không vượt quá 100" });
+  }
+});
+
+export const referrerCreateSchema = z.object({
+  type: z.enum(["patient", "doctor", "assistant", "partner"]),
+  name: nonEmpty(200),
+  email: optionalText(200).refine((value) => value === undefined || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), "Email không hợp lệ"),
+  phone: optionalText(20),
+  linked_patient_id: z.string().min(1).optional(),
+  linked_user_id: z.string().min(1).optional(),
+}).strict().superRefine((data, ctx) => {
+  if (data.linked_patient_id && data.linked_user_id) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["linked_patient_id"], message: "Chỉ được liên kết một hồ sơ" });
+  if (data.type === "patient" && !data.linked_patient_id) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["linked_patient_id"], message: "Bệnh nhân giới thiệu cần liên kết hồ sơ bệnh nhân" });
+  if (["doctor", "assistant"].includes(data.type) && !data.linked_user_id) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["linked_user_id"], message: "Nhân viên giới thiệu cần liên kết tài khoản" });
+  if (data.type === "partner" && !data.email && !data.phone) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["email"], message: "Đối tác cần email hoặc số điện thoại" });
+});
+export const referrerUpdateSchema = referrerCreateSchema.partial().extend({ status: z.enum(["active", "inactive"]).optional() }).strict();
+export const referralProgramSchema = z.object({
+  name: nonEmpty(200),
+  status: z.enum(["draft", "active", "inactive"]).default("draft"),
+  starts_at: z.string().datetime({ offset: true }),
+  ends_at: z.string().datetime({ offset: true }).optional(),
+  priority: z.number().int().min(0).max(10_000).default(0),
+  conversion_window_days: z.number().int().min(1).max(3650).default(90),
+  review_window_days: z.number().int().min(1).max(365).default(30),
+  branch_ids: z.array(z.string().min(1)).max(100).default([]),
+  rules: z.array(referralRuleSchema).min(1).max(100),
+}).strict().superRefine((data, ctx) => {
+  if (data.ends_at && data.ends_at <= data.starts_at) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["ends_at"], message: "Ngày kết thúc phải sau ngày bắt đầu" });
+});
+export const referralCaseCreateSchema = z.object({
+  referrer_id: z.string().min(1).optional(),
+  referral_code: z.string().trim().min(4).max(64).optional(),
+}).strict().refine((data) => Boolean(data.referrer_id) !== Boolean(data.referral_code), "Chọn Người giới thiệu hoặc nhập mã giới thiệu");
+export const referralRewardReviewSchema = z.object({ action: z.enum(["approve", "reject"]), reason: optionalText(500) }).strict().superRefine((data, ctx) => {
+  if (data.action === "reject" && !data.reason) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["reason"], message: "Cần lý do từ chối" });
+});
+export const referralCashPaidSchema = z.object({ payment_method: nonEmpty(100), payment_reference: optionalText(200) }).strict();
+export const referralRecoverySchema = z.object({ reason: nonEmpty(500), payment_reference: optionalText(200) }).strict();
+export const referrerAccountCreateSchema = z.object({ email: z.string().trim().email("Email không hợp lệ") }).strict();
+export const referrerPortalLoginSchema = z.object({ clinic_slug: z.string().trim().min(1).max(80), email: z.string().trim().email(), password: z.string().min(1) }).strict();
+export const referrerPortalPasswordSchema = z.object({ token: z.string().min(32), password: referralPassword }).strict();
+export type ReferrerCreateInput = z.infer<typeof referrerCreateSchema>;
+export type ReferrerUpdateInput = z.infer<typeof referrerUpdateSchema>;
+export type ReferralProgramInput = z.infer<typeof referralProgramSchema>;
+export type ReferralCaseCreateInput = z.infer<typeof referralCaseCreateSchema>;
+export type ReferralRewardReviewInput = z.infer<typeof referralRewardReviewSchema>;
+export type ReferralCashPaidInput = z.infer<typeof referralCashPaidSchema>;
+export type ReferralRecoveryInput = z.infer<typeof referralRecoverySchema>;
+
 // ──────────────── Patient ────────────────
 
 export const patientCreateSchema = z.object({

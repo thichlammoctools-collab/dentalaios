@@ -22,6 +22,13 @@ export const ROUTES = {
   SETTINGS_AUDIT_LOGS: "/settings/audit-logs",
   SETTINGS_CLINIC: "/settings/clinic",
   SETTINGS_TREATMENT_SERVICES: "/settings/treatment-services",
+  SETTINGS_REFERRAL_PROGRAMS: "/settings/referral-programs",
+  REFERRERS: "/referrers",
+  REFERRALS: "/referrals",
+  REFERRAL_REPORTS: "/reports/referrals",
+  REFERRER_LOGIN: "/referrer/login",
+  REFERRER_ACTIVATE: "/referrer/activate",
+  REFERRER_PORTAL: "/referrer",
 } as const;
 
 /** Role name constants. The actual IDs are stored in D1 (seeded in 0001_roles.sql). */
@@ -102,6 +109,12 @@ export const PERMISSIONS = {
   VIEW_MANAGEMENT_DASHBOARD: "view_management_dashboard",
   READ_CHAIRS: "read_chairs",
   WRITE_CHAIRS: "write_chairs",
+  MANAGE_REFERRAL_PROGRAMS: "manage_referral_programs",
+  MANAGE_REFERRERS: "manage_referrers",
+  READ_REFERRALS: "read_referrals",
+  REVIEW_REFERRAL_REWARDS: "review_referral_rewards",
+  PAY_REFERRAL_REWARDS: "pay_referral_rewards",
+  VIEW_REFERRAL_REPORTS: "view_referral_reports",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

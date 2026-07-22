@@ -20,6 +20,7 @@ import { VisitForm } from "@/components/VisitForm";
 import { MedicalAlertsList } from "@/components/MedicalAlertsList";
 import { PatientNotesTimeline } from "@/components/PatientNotesTimeline";
 import { PatientToothHistory } from "@/components/PatientToothHistory";
+import { PatientClinicalJourney } from "@/components/PatientClinicalJourney";
 import { PaymentForm } from "@/components/PaymentForm";
 import { PaymentDetailDialog } from "@/components/PaymentDetailDialog";
 import { AppointmentCard } from "@/components/schedule/AppointmentCard";
@@ -249,6 +250,7 @@ export function PatientDetailPage() {
                 <TabsTrigger value="plans">Kế hoạch ({plans.length})</TabsTrigger>
                 <TabsTrigger value="payments">Tài chính ({payments.length})</TabsTrigger>
                 <TabsTrigger value="appointments">Lịch hẹn ({appointments.length})</TabsTrigger>
+                <TabsTrigger value="journey">Hành trình</TabsTrigger>
                 <TabsTrigger value="teeth">Sơ đồ răng</TabsTrigger>
                 <TabsTrigger value="images">Hình ảnh</TabsTrigger>
               </TabsList>
@@ -265,6 +267,7 @@ export function PatientDetailPage() {
               <TabsTrigger value="visits" className="w-full justify-between px-3 py-2 text-left">Lượt khám <Count value={visits.length} /></TabsTrigger>
               <TabsTrigger value="plans" className="w-full justify-between px-3 py-2 text-left">Kế hoạch <Count value={plans.length} /></TabsTrigger>
               <TabsTrigger value="appointments" className="w-full justify-between px-3 py-2 text-left">Lịch hẹn <Count value={appointments.length} /></TabsTrigger>
+              <TabsTrigger value="journey" className="w-full justify-between px-3 py-2 text-left">Hành trình lâm sàng</TabsTrigger>
               <TabsTrigger value="payments" className="w-full justify-between px-3 py-2 text-left">Tài chính <Count value={payments.length} /></TabsTrigger>
               <TabsTrigger value="teeth" className="w-full justify-between px-3 py-2 text-left">Sơ đồ răng</TabsTrigger>
               <TabsTrigger value="images" className="w-full justify-between px-3 py-2 text-left">Hình ảnh</TabsTrigger>
@@ -735,6 +738,22 @@ export function PatientDetailPage() {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent className="mt-0" value="journey">
+          <Card>
+            <CardHeader>
+              <CardTitle>Hành trình lâm sàng</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PatientClinicalJourney
+                patientId={patient.id}
+                visits={visits}
+                plans={plans}
+                appointments={appointments}
+              />
             </CardContent>
           </Card>
         </TabsContent>

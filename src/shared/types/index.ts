@@ -62,6 +62,121 @@ export type Gender = "M" | "F" | "O";
 
 export type ReferralType = "doctor" | "staff" | "other" | "ad" | "none";
 
+export type ReferrerType = "patient" | "doctor" | "assistant" | "partner";
+export type ReferrerStatus = "active" | "inactive";
+export type ReferralProgramStatus = "draft" | "active" | "inactive";
+export type ReferralRewardKind = "cash" | "voucher";
+export type ReferralCalculationType = "fixed" | "percentage";
+export type ReferralCaseStatus = "pending_conversion" | "eligible" | "pending_approval" | "approved" | "rejected" | "expired" | "recovery_required" | "recovered" | "cancelled";
+export type ReferralRewardStatus = "pending_approval" | "cash_payable" | "cash_paid" | "voucher_issued" | "rejected" | "expired" | "recovery_required" | "recovered";
+
+export interface Referrer {
+  id: string;
+  tenant_id: string;
+  type: ReferrerType;
+  code: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  linked_patient_id?: string;
+  linked_user_id?: string;
+  status: ReferrerStatus;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReferralProgram {
+  id: string;
+  tenant_id: string;
+  name: string;
+  status: ReferralProgramStatus;
+  starts_at: string;
+  ends_at?: string;
+  priority: number;
+  conversion_window_days: number;
+  review_window_days: number;
+  current_version: number;
+  branch_ids: string[];
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReferralRewardRule {
+  id: string;
+  tenant_id: string;
+  program_id: string;
+  program_version: number;
+  referrer_type: ReferrerType;
+  min_net_revenue: number;
+  reward_kind: ReferralRewardKind;
+  calculation_type: ReferralCalculationType;
+  value: number;
+  voucher_valid_days?: number;
+  created_at: string;
+}
+
+export interface ReferralCase {
+  id: string;
+  tenant_id: string;
+  patient_id: string;
+  referrer_id: string;
+  referrer_name?: string;
+  referrer_code?: string;
+  referrer_type?: ReferrerType;
+  branch_id: string;
+  program_id: string;
+  program_name?: string;
+  program_version: number;
+  source: "code" | "manual";
+  status: ReferralCaseStatus;
+  registered_at: string;
+  conversion_ends_at: string;
+  eligible_at?: string;
+  review_due_at?: string;
+  risk_flags: string[];
+  created_by: string;
+  updated_at: string;
+}
+
+export interface ReferralReward {
+  id: string;
+  tenant_id: string;
+  referral_case_id: string;
+  rule_id: string;
+  reward_kind: ReferralRewardKind;
+  calculation_type: ReferralCalculationType;
+  configured_value: number;
+  basis_net_revenue: number;
+  calculated_amount: number;
+  currency: string;
+  status: ReferralRewardStatus;
+  reviewed_by?: string;
+  reviewed_at?: string;
+  rejection_reason?: string;
+  paid_by?: string;
+  paid_at?: string;
+  payment_method?: string;
+  payment_reference?: string;
+  recovery_by?: string;
+  recovered_at?: string;
+  recovery_reason?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReferralVoucher {
+  id: string;
+  tenant_id: string;
+  reward_id: string;
+  code: string;
+  face_value: number;
+  issued_at: string;
+  expires_at: string;
+  status: "issued" | "expired" | "cancelled";
+}
+
 export interface Patient {
   id: string;
   tenant_id: string;
@@ -452,6 +567,7 @@ export interface Payment {
   /** Set only for a correcting entry; the original payment is never overwritten. */
   original_payment_id?: string;
   adjustment_reason?: string;
+  confirmed_at?: string;
   created_at: string;
 }
 
