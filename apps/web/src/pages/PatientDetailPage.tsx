@@ -752,7 +752,9 @@ export function PatientDetailPage() {
                 patientId={patient.id}
                 visits={visits}
                 plans={plans}
+                payments={payments}
                 appointments={appointments}
+                onPaymentClick={setViewingPaymentId}
               />
             </CardContent>
           </Card>

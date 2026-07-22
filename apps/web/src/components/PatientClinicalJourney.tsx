@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -11,10 +10,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { apiGet, ApiError } from "@/lib/api";
-import { formatDateTime } from "@/lib/utils";
+import { formatCurrency, formatDateTime } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { withPatientReturnContext } from "@/lib/patient-navigation";
-import type { Appointment, ClinicalFinding, TreatmentPlan, TreatmentPlanItem, Visit } from "@shared/types";
+import type { Appointment, ClinicalFinding, Payment, TreatmentPlan, TreatmentPlanItem, Visit } from "@shared/types";
 
 interface ListResponse<T> {
   items: T[];
@@ -28,7 +27,6 @@ interface ClinicalJourneyEntry {
   findings: ClinicalFinding[];
   plans: TreatmentPlan[];
   planItems: TreatmentPlanItem[];
-  followUps: Appointment[];
   scheduledAppointment?: Appointment;
 }
 
@@ -61,16 +59,6 @@ const VISIT_STATUS_LABELS: Record<Visit["status"], string> = {
   cancelled: "Đã hủy",
 };
 
-const APPOINTMENT_STATUS_LABELS: Record<Appointment["status"], string> = {
-  booked: "Mới đặt",
-  confirmed: "Đã xác nhận",
-  arrived: "Đã đến",
-  in_progress: "Đang thực hiện",
-  completed: "Hoàn thành",
-  cancelled: "Đã hủy",
-  no_show: "Không đến",
-};
-
 function findingLabel(finding: ClinicalFinding) {
   const location = finding.tooth_number ? `R${finding.tooth_number}: ` : "";
   return `${location}${CONDITION_LABELS[finding.condition] ?? finding.condition}`;
@@ -81,22 +69,20 @@ function procedureLabel(item: TreatmentPlanItem) {
   return `${item.tooth_number ? `R${item.tooth_number}: ` : ""}${name}`;
 }
 
-function planStatusVariant(status: TreatmentPlanItem["status"]): "secondary" | "warning" | "success" {
-  if (status === "completed") return "success";
-  if (status === "in_progress") return "warning";
-  return "secondary";
-}
-
 export function PatientClinicalJourney({
   patientId,
   visits,
   plans,
+  payments,
   appointments,
+  onPaymentClick,
 }: {
   patientId: string;
   visits: Visit[];
   plans: TreatmentPlan[];
+  payments: Payment[];
   appointments: Appointment[];
+  onPaymentClick: (paymentId: string) => void;
 }) {
   const navigate = useNavigate();
   const [findingsByVisit, setFindingsByVisit] = useState<Record<string, ClinicalFinding[]>>({});
@@ -137,10 +123,6 @@ export function PatientClinicalJourney({
     ...visits.map((visit) => {
       const visitPlans = plans.filter((plan) => plan.visit_id === visit.id);
       const planItems = visitPlans.flatMap((plan) => itemsByPlan[plan.id] ?? []);
-      const followUps = appointments
-        .filter((appointment) => appointment.source_visit_id === visit.id)
-        .sort((left, right) => new Date(left.scheduled_at).getTime() - new Date(right.scheduled_at).getTime());
-
       return {
         id: visit.id,
         date: visit.date,
@@ -148,7 +130,6 @@ export function PatientClinicalJourney({
         findings: findingsByVisit[visit.id] ?? [],
         plans: visitPlans,
         planItems,
-        followUps,
       };
     }),
     ...appointments
@@ -159,7 +140,6 @@ export function PatientClinicalJourney({
         findings: [],
         plans: [],
         planItems: [],
-        followUps: [appointment],
         scheduledAppointment: appointment,
       })),
   ]
@@ -170,10 +150,7 @@ export function PatientClinicalJourney({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-sm text-muted-foreground">
-            Tổng hợp theo từng lượt khám, từ chẩn đoán đến điều trị và lịch tái khám.
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Đơn thuốc: hệ thống chưa có mô-đun kê đơn, nên các dòng chưa có dữ liệu sẽ được đánh dấu rõ ràng.
+            Tóm tắt những việc đã thực hiện trong mỗi lần khám. Chọn một mục để xem chi tiết.
           </p>
         </div>
         <Badge variant="outline" className="gap-1.5 px-2.5 py-1">
@@ -187,23 +164,31 @@ export function PatientClinicalJourney({
           Chưa có lượt khám để tạo hành trình lâm sàng.
         </div>
       ) : (
-        <Table className="min-w-[1050px] text-xs">
+        <Table className="min-w-[900px] text-xs">
           <TableHeader>
             <TableRow>
               <TableHead className="w-40">Ngày khám</TableHead>
-              <TableHead className="min-w-48">Chẩn đoán & thủ thuật</TableHead>
+              <TableHead className="min-w-52">Chẩn đoán & thủ thuật</TableHead>
               <TableHead className="min-w-52">Kế hoạch điều trị</TableHead>
               <TableHead className="min-w-40">Thuốc kê đơn</TableHead>
-              <TableHead className="min-w-48">Tái khám</TableHead>
-              <TableHead className="min-w-52">Ghi chú bác sĩ</TableHead>
-              <TableHead className="w-28" />
+              <TableHead className="min-w-44 text-right">Thanh toán</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {entries.map((entry) => (
               <TableRow key={entry.id}>
                 <TableCell className="align-top">
-                  <time className="block font-medium" dateTime={entry.date}>{formatDateTime(entry.date)}</time>
+                  <button
+                    type="button"
+                    className="block text-left font-medium hover:text-primary hover:underline"
+                    onClick={() => navigate(withPatientReturnContext(
+                      entry.visit ? `/visits/${entry.visit.id}` : `/appointments/${entry.scheduledAppointment?.id}`,
+                      patientId,
+                      "journey",
+                    ))}
+                  >
+                    <time dateTime={entry.date}>{formatDateTime(entry.date)}</time>
+                  </button>
                   <div className="mt-1.5 flex flex-wrap gap-1">
                     {entry.visit ? (
                       <Badge
@@ -224,10 +209,14 @@ export function PatientClinicalJourney({
                   ) : (
                     <div className="space-y-1.5">
                       {entry.findings.map((finding) => (
-                        <div key={finding.id}>
-                          <p className="font-medium">{findingLabel(finding)}</p>
-                          {finding.notes && <p className="text-muted-foreground">{finding.notes}</p>}
-                        </div>
+                        <button
+                          key={finding.id}
+                          type="button"
+                          className="block text-left font-medium hover:text-primary hover:underline"
+                          onClick={() => navigate(withPatientReturnContext(`/visits/${finding.visit_id}`, patientId, "journey"))}
+                        >
+                          {findingLabel(finding)}
+                        </button>
                       ))}
                     </div>
                   )}
@@ -236,14 +225,16 @@ export function PatientClinicalJourney({
                   {loadingDetails ? <span className="text-muted-foreground">Đang tải...</span> : entry.planItems.length === 0 ? (
                     <span className="text-muted-foreground">Chưa có kế hoạch</span>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       {entry.planItems.map((item) => (
-                        <div key={item.id} className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-medium">{procedureLabel(item)}</span>
-                          <Badge variant={planStatusVariant(item.status)} className="text-[10px]">
-                            {item.status === "completed" ? "Hoàn tất" : item.status === "in_progress" ? "Đang làm" : "Dự kiến"}
-                          </Badge>
-                        </div>
+                        <button
+                          key={item.id}
+                          type="button"
+                          className="block text-left font-medium hover:text-primary hover:underline"
+                          onClick={() => navigate(withPatientReturnContext(`/treatment-plans/${item.treatment_plan_id}`, patientId, "journey"))}
+                        >
+                          {procedureLabel(item)}
+                        </button>
                       ))}
                     </div>
                   )}
@@ -251,37 +242,23 @@ export function PatientClinicalJourney({
                 <TableCell className="align-top text-muted-foreground">
                   Chưa ghi nhận đơn thuốc
                 </TableCell>
-                <TableCell className="align-top">
-                  {entry.followUps.length === 0 ? (
-                    <span className="text-muted-foreground">Chưa đặt lịch tái khám</span>
+                <TableCell className="align-top text-right">
+                  {entry.plans.flatMap((plan) => payments.filter((payment) => payment.treatment_plan_id === plan.id)).length === 0 ? (
+                    <span className="text-muted-foreground">Chưa ghi nhận</span>
                   ) : (
-                    <div className="space-y-2">
-                      {entry.followUps.map((appointment) => (
-                        <div key={appointment.id}>
-                          <p className="font-medium">{formatDateTime(appointment.scheduled_at)}</p>
-                          <p className="text-muted-foreground">{appointment.procedure ?? "Tái khám"} · {APPOINTMENT_STATUS_LABELS[appointment.status]}</p>
-                        </div>
+                    <div className="space-y-1.5">
+                      {entry.plans.flatMap((plan) => payments.filter((payment) => payment.treatment_plan_id === plan.id)).map((payment) => (
+                        <button
+                          key={payment.id}
+                          type="button"
+                          className="block w-full text-right font-medium hover:text-primary hover:underline"
+                          onClick={() => onPaymentClick(payment.id)}
+                        >
+                          {formatCurrency(payment.amount, payment.currency)}
+                        </button>
                       ))}
                     </div>
                   )}
-                </TableCell>
-                <TableCell className="align-top text-muted-foreground">
-                  {entry.visit?.notes ?? entry.scheduledAppointment?.notes ?? "Không có ghi chú lâm sàng"}
-                </TableCell>
-                <TableCell className="align-top">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={() => navigate(withPatientReturnContext(
-                      entry.visit ? `/visits/${entry.visit.id}` : `/appointments/${entry.scheduledAppointment?.id}`,
-                      patientId,
-                      "journey",
-                    ))}
-                  >
-                    {entry.visit ? "Mở lượt khám" : "Mở lịch hẹn"}
-                  </Button>
                 </TableCell>
               </TableRow>
             ))}
