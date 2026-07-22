@@ -9,7 +9,11 @@ import { toast } from "@/lib/toast";
 import type { ClinicalFinding } from "@shared/types";
 
 const TOOTH_CONDITIONS = [
+  { value: "good", label: "Tốt" },
   { value: "caries", label: "Sâu răng" },
+  { value: "unerupted", label: "Chưa mọc" },
+  { value: "impacted", label: "Mọc ngầm" },
+  { value: "tilted", label: "Mọc nghiêng" },
   { value: "fracture", label: "Gãy/vỡ" },
   { value: "missing", label: "Mất răng" },
   { value: "periapical", label: "Viêm quanh chóp" },

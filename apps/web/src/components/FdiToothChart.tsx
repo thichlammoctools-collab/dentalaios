@@ -21,13 +21,30 @@ const UPPER_RIGHT = [18, 17, 16, 15, 14, 13, 12, 11];
 const UPPER_LEFT = [21, 22, 23, 24, 25, 26, 27, 28];
 const LOWER_RIGHT = [48, 47, 46, 45, 44, 43, 42, 41];
 const LOWER_LEFT = [31, 32, 33, 34, 35, 36, 37, 38];
+const PRIMARY_UPPER_RIGHT = [55, 54, 53, 52, 51];
+const PRIMARY_UPPER_LEFT = [61, 62, 63, 64, 65];
+const PRIMARY_LOWER_RIGHT = [85, 84, 83, 82, 81];
+const PRIMARY_LOWER_LEFT = [71, 72, 73, 74, 75];
 
-const ALL_TEETH = [...UPPER_RIGHT, ...UPPER_LEFT, ...LOWER_RIGHT, ...LOWER_LEFT];
+const ALL_TEETH = [
+  ...UPPER_RIGHT,
+  ...UPPER_LEFT,
+  ...LOWER_RIGHT,
+  ...LOWER_LEFT,
+  ...PRIMARY_UPPER_RIGHT,
+  ...PRIMARY_UPPER_LEFT,
+  ...PRIMARY_LOWER_RIGHT,
+  ...PRIMARY_LOWER_LEFT,
+];
 
 type Tab = "tooth" | "full_mouth" | "soft_tissue";
 
 const TOOTH_CONDITIONS = [
+  { value: "good", label: "Tốt" },
   { value: "caries", label: "Sâu răng" },
+  { value: "unerupted", label: "Chưa mọc" },
+  { value: "impacted", label: "Mọc ngầm" },
+  { value: "tilted", label: "Mọc nghiêng" },
   { value: "fracture", label: "Gãy/vỡ" },
   { value: "missing", label: "Mất răng" },
   { value: "periapical", label: "Viêm quanh chóp" },
@@ -95,7 +112,7 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
   const [tab, setTab] = useState<Tab>("tooth");
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
-  const [condition, setCondition] = useState("caries");
+  const [condition, setCondition] = useState("good");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -164,7 +181,7 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
       toast.success(`Đã thêm finding cho răng #${selected}`);
       onCreated(created);
       setSelected(null);
-      setCondition("caries");
+      setCondition("good");
       setNotes("");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi thêm finding");
@@ -263,7 +280,8 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
       {/* Tab: Tooth */}
       {tab === "tooth" && (
         <div className="rounded-lg border border-border bg-card p-4">
-          <p className="mb-3 text-center text-xs text-muted-foreground">↑ Hàm trên (Patient's right | left)</p>
+          <p className="mb-3 text-center text-xs text-muted-foreground">Răng vĩnh viễn</p>
+          <p className="mb-2 text-center text-xs text-muted-foreground">↑ Hàm trên (Patient's right | left)</p>
           <div className="overflow-x-auto">
             <div className="flex min-w-max justify-center gap-0">
               <div className="flex">{UPPER_RIGHT.map((n) => renderTooth(n, "right"))}</div>
@@ -274,6 +292,21 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
               <div className="flex">{LOWER_RIGHT.map((n) => renderTooth(n, "right"))}</div>
               <div className="mx-1 w-px flex-shrink-0 bg-border" />
               <div className="flex">{LOWER_LEFT.map((n) => renderTooth(n, "left"))}</div>
+            </div>
+          </div>
+          <p className="mt-3 text-center text-xs text-muted-foreground">↓ Hàm dưới</p>
+          <div className="my-4 border-t border-border" />
+          <p className="mb-2 text-center text-xs text-muted-foreground">Răng trẻ em</p>
+          <div className="overflow-x-auto">
+            <div className="flex min-w-max justify-center gap-0">
+              <div className="flex">{PRIMARY_UPPER_RIGHT.map((n) => renderTooth(n, "right"))}</div>
+              <div className="mx-1 w-px flex-shrink-0 bg-border" />
+              <div className="flex">{PRIMARY_UPPER_LEFT.map((n) => renderTooth(n, "left"))}</div>
+            </div>
+            <div className="mt-3 flex min-w-max justify-center gap-0">
+              <div className="flex">{PRIMARY_LOWER_RIGHT.map((n) => renderTooth(n, "right"))}</div>
+              <div className="mx-1 w-px flex-shrink-0 bg-border" />
+              <div className="flex">{PRIMARY_LOWER_LEFT.map((n) => renderTooth(n, "left"))}</div>
             </div>
           </div>
           <p className="mt-3 text-center text-xs text-muted-foreground">↓ Hàm dưới</p>

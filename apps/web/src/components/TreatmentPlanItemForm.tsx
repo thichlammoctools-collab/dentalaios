@@ -81,7 +81,7 @@ export function TreatmentPlanItemForm({
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!validTooth) {
-      toast.error("Số răng FDI không hợp lệ (vd: 11, 16, 28, 31, 48…)");
+      toast.error("Số răng FDI không hợp lệ (vd: 11, 48, 51, 85…)");
       return;
     }
     if (typeof unitCost !== "number" || unitCost < 0) {
