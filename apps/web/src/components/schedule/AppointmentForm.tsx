@@ -369,20 +369,6 @@ export function AppointmentForm({
             {milestone ? <Input id="patient" value={milestonePatient ? `${milestonePatient.name} · ${milestonePatient.phone}` : milestone.patientId} readOnly className="bg-muted" /> : <PatientCombobox value={patientId} onChange={setPatientId} required dropdownPosition="static" />}
           </div>
 
-          {milestone && milestoneOptions.length > 1 && (
-            <div className="grid gap-1.5">
-              <Label>Milestone thực hiện trong buổi hẹn</Label>
-              <div className="max-h-44 space-y-2 overflow-y-auto rounded-md border p-2">
-                {milestoneOptions.map((option) => {
-                  const checked = selectedMilestoneIds.includes(option.id);
-                  const label = `${option.item.service_name ?? option.item.procedure}${option.item.tooth_number != null ? ` · Răng #${option.item.tooth_number}` : " · Toàn hàm"}`;
-                  return <label key={option.id} className="flex cursor-pointer items-start gap-2 rounded px-1 py-1 text-sm hover:bg-muted/60"><input type="checkbox" checked={checked} onChange={() => toggleMilestone(option)} className="mt-0.5" /><span><span className="font-medium">{label}</span><span className="block text-xs text-muted-foreground">{option.item.description}</span></span></label>;
-                })}
-              </div>
-              <p className="text-xs text-muted-foreground">Một lịch hẹn có thể liên kết với nhiều milestone của cùng ca.</p>
-            </div>
-          )}
-
           {!milestone && patientId && (
             <div className="grid gap-1.5">
               <Label>Thủ thuật từ kế hoạch điều trị</Label>

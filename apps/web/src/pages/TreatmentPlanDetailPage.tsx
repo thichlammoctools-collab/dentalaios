@@ -120,6 +120,18 @@ export function TreatmentPlanDetailPage() {
     } finally { setCaseSaving(false); }
   }
 
+  async function unlinkAppointment(link: TreatmentMilestoneAppointment, milestone: TreatmentCaseMilestone) {
+    if (!plan) return;
+    setCaseSaving(true);
+    try {
+      await apiDelete(`/api/treatment-plans/${plan.id}/case/milestones/${milestone.id}/appointments/${link.appointment_id}`);
+      await load();
+      toast.success("Đã gỡ lịch hẹn khỏi milestone này");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Không thể gỡ lịch hẹn khỏi milestone");
+    } finally { setCaseSaving(false); }
+  }
+
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -405,7 +417,7 @@ export function TreatmentPlanDetailPage() {
               {milestones.map((milestone) => {
                 const links = milestoneAppointments[milestone.id] ?? [];
                 const next = links.find((link) => !["cancelled", "no_show", "completed"].includes(link.appointment.status));
-                return <div key={milestone.id} className="rounded-lg border p-3"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><p className="font-medium">{milestone.item.service_name ?? milestone.item.procedure}{milestone.item.tooth_number != null ? ` · Răng #${milestone.item.tooth_number}` : " · Toàn hàm"}</p><p className="text-sm text-muted-foreground">{next ? `Lịch tiếp theo: ${formatDateTime(next.appointment.scheduled_at)}` : "Chưa có lịch hẹn"}</p></div>{treatmentCase.status === "active" && !["completed", "skipped"].includes(milestone.status) && <Button size="sm" variant="outline" onClick={() => setScheduleMilestone(milestone)}>Đặt lịch</Button>}</div>{links.length > 0 && <div className="mt-3 space-y-2 border-t pt-3">{links.map((link) => <div key={link.id} className="flex flex-col gap-2 rounded-md bg-muted/30 p-2 text-sm sm:flex-row sm:items-center sm:justify-between"><Link to={`/appointments/${link.appointment_id}?edit=1`} className="block rounded-sm flex-1 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><p className="font-medium">{formatDateTime(link.appointment.scheduled_at)} · {link.appointment.duration_min} phút</p><p className="text-xs text-muted-foreground">Lịch: {link.appointment.status} · Kết quả: {link.execution_status}</p><p className="mt-1 text-xs text-primary">Xem chi tiết và sửa lịch</p></Link><div className="flex gap-2">{link.appointment.status === "completed" && link.execution_status === "planned" && <><Button size="sm" variant="outline" disabled={caseSaving} onClick={() => void recordExecution(link, milestone, "partially_completed")}>Một phần</Button><Button size="sm" variant="outline" disabled={caseSaving} onClick={() => void recordExecution(link, milestone, "completed")}>Đã thực hiện</Button><Button size="sm" variant="ghost" disabled={caseSaving} onClick={() => void recordExecution(link, milestone, "not_performed")}>Chưa thực hiện</Button></>}</div></div>)}</div>}</div>;
+                return <div key={milestone.id} className="rounded-lg border p-3"><div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between"><div><p className="font-medium">{milestone.item.service_name ?? milestone.item.procedure}{milestone.item.tooth_number != null ? ` · Răng #${milestone.item.tooth_number}` : " · Toàn hàm"}</p><p className="text-sm text-muted-foreground">{next ? `Lịch tiếp theo: ${formatDateTime(next.appointment.scheduled_at)}` : "Chưa có lịch hẹn"}</p></div>{treatmentCase.status === "active" && !["completed", "skipped"].includes(milestone.status) && <Button size="sm" variant="outline" onClick={() => setScheduleMilestone(milestone)}>Đặt lịch</Button>}</div>{links.length > 0 && <div className="mt-3 space-y-2 border-t pt-3">{links.map((link) => <div key={link.id} className="flex flex-col gap-2 rounded-md bg-muted/30 p-2 text-sm sm:flex-row sm:items-center sm:justify-between"><Link to={`/appointments/${link.appointment_id}?edit=1`} className="block rounded-sm flex-1 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><p className="font-medium">{formatDateTime(link.appointment.scheduled_at)} · {link.appointment.duration_min} phút</p><p className="text-xs text-muted-foreground">Lịch: {link.appointment.status} · Kết quả: {link.execution_status}</p><p className="mt-1 text-xs text-primary">Xem chi tiết và sửa lịch</p></Link><div className="flex flex-wrap gap-2">{treatmentCase.status === "active" && !["completed", "skipped"].includes(milestone.status) && <Button size="sm" variant="ghost" disabled={caseSaving} onClick={() => void unlinkAppointment(link, milestone)}>Gỡ khỏi mốc</Button>}{link.appointment.status === "completed" && link.execution_status === "planned" && <><Button size="sm" variant="outline" disabled={caseSaving} onClick={() => void recordExecution(link, milestone, "partially_completed")}>Một phần</Button><Button size="sm" variant="outline" disabled={caseSaving} onClick={() => void recordExecution(link, milestone, "completed")}>Đã thực hiện</Button><Button size="sm" variant="ghost" disabled={caseSaving} onClick={() => void recordExecution(link, milestone, "not_performed")}>Chưa thực hiện</Button></>}</div></div>)}</div>}</div>;
               })}
             </div>
           </CardContent>
@@ -559,7 +571,6 @@ export function TreatmentPlanDetailPage() {
           patientId: treatmentCase.patient_id,
           procedure: scheduleMilestone.item.service_name ?? scheduleMilestone.item.procedure,
           label: `${scheduleMilestone.item.service_name ?? scheduleMilestone.item.procedure}${scheduleMilestone.item.tooth_number != null ? ` · Răng #${scheduleMilestone.item.tooth_number}` : " · Toàn hàm"}`,
-          availableMilestones: milestones.filter((milestone) => !["completed", "skipped"].includes(milestone.status)),
         }}
         onCreated={() => { setScheduleMilestone(null); void load(); }}
       />}
