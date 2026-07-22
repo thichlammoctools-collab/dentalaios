@@ -116,13 +116,14 @@ export const VISIT_STATUSES = ["in_progress", "completed", "cancelled"] as const
 export const PLAN_STATUSES = ["draft", "approved", "completed", "cancelled"] as const;
 
 /** Appointment statuses (mirrors AppointmentStatus in types). */
-export const APPOINTMENT_STATUSES = ["booked", "confirmed", "arrived", "completed", "cancelled", "no_show"] as const;
+export const APPOINTMENT_STATUSES = ["booked", "confirmed", "arrived", "in_progress", "completed", "cancelled", "no_show"] as const;
 
 /** Vietnamese labels for appointment statuses. */
 export const APPOINTMENT_STATUS_LABELS: Record<(typeof APPOINTMENT_STATUSES)[number], string> = {
   booked: "Mới book",
   confirmed: "Đã xác nhận",
   arrived: "Đã đến",
+  in_progress: "Đang thực hiện",
   completed: "Hoàn thành",
   cancelled: "Hủy lịch",
   no_show: "Không đến",

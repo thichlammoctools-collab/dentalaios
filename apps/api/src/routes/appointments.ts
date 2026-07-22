@@ -26,7 +26,7 @@ router.get(
       patientId: url.searchParams.get("patient_id") ?? undefined,
       from: url.searchParams.get("from") ?? undefined,
       to: url.searchParams.get("to") ?? undefined,
-      status: (url.searchParams.get("status") as "booked" | "confirmed" | "arrived" | "completed" | "cancelled" | "no_show" | null) ?? undefined,
+      status: (url.searchParams.get("status") as "booked" | "confirmed" | "arrived" | "in_progress" | "completed" | "cancelled" | "no_show" | null) ?? undefined,
     });
     return c.json({ items, total: items.length });
   },

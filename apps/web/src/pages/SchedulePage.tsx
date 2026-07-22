@@ -344,7 +344,7 @@ export function SchedulePage() {
         <div className="mt-4 space-y-2 rounded-lg border border-border bg-muted/20 p-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-medium text-muted-foreground">Trạng thái:</span>
-            {(["booked", "confirmed", "arrived", "completed", "cancelled", "no_show"] as const).map((s) => (
+            {(["booked", "confirmed", "arrived", "in_progress", "completed", "cancelled", "no_show"] as const).map((s) => (
               <button
                 key={s}
                 type="button"
@@ -690,6 +690,7 @@ function statusBorderClass(status: string): string {
     case "booked": return "border-l-slate-400 bg-slate-50/50 dark:bg-slate-900/30";
     case "confirmed": return "border-l-blue-500 bg-blue-50/50 dark:bg-blue-900/30";
     case "arrived": return "border-l-amber-500 bg-amber-50/50 dark:bg-amber-900/30";
+    case "in_progress": return "border-l-violet-500 bg-violet-50/50 dark:bg-violet-900/30";
     case "completed": return "border-l-emerald-500 bg-emerald-50/50 dark:bg-emerald-900/30";
     case "cancelled": return "border-l-red-400 bg-red-50/30 dark:bg-red-900/20 opacity-60";
     case "no_show": return "border-l-slate-300 bg-slate-50/30 dark:bg-slate-900/20 opacity-60";
@@ -699,7 +700,7 @@ function statusBorderClass(status: string): string {
 
 function appointmentTiming(appointment: Appointment): "finished" | "in_progress" | "upcoming" {
   if (["completed", "cancelled", "no_show"].includes(appointment.status)) return "finished";
-  if (appointment.status === "arrived") return "in_progress";
+  if (["arrived", "in_progress"].includes(appointment.status)) return "in_progress";
   return "upcoming";
 }
 
@@ -715,6 +716,7 @@ function statusBgClass(status: string): string {
     case "booked": return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
     case "confirmed": return "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300";
     case "arrived": return "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300";
+    case "in_progress": return "bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300";
     case "completed": return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300";
     case "cancelled": return "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300";
     case "no_show": return "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400";
@@ -727,6 +729,7 @@ function statusLabelVi(status: string): string {
     case "booked": return "Mới book";
     case "confirmed": return "Đã xác nhận";
     case "arrived": return "Đã đến";
+    case "in_progress": return "Đang thực hiện";
     case "completed": return "Hoàn thành";
     case "cancelled": return "Hủy lịch";
     case "no_show": return "Không đến";
@@ -877,6 +880,7 @@ function EditAppointmentDialog({
             <option value="booked">Mới book</option>
             <option value="confirmed">Đã xác nhận</option>
             <option value="arrived">Đã đến</option>
+            <option value="in_progress">Đang thực hiện</option>
             <option value="completed">Hoàn thành</option>
             <option value="cancelled">Hủy lịch</option>
             <option value="no_show">Không đến</option>

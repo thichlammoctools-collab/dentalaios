@@ -255,7 +255,7 @@ function ActionGroupCard({ group, branchId }: { group: BranchDashboardActionGrou
     : group.kind === "unconfirmed_appointment"
       ? "booked"
       : group.kind === "overdue_appointment"
-        ? "booked,confirmed,arrived"
+        ? "booked,confirmed,arrived,in_progress"
         : undefined;
   const moreHref = scheduleStatus
     ? `${ROUTES.SCHEDULE}?branch_id=${encodeURIComponent(branchId)}&status=${encodeURIComponent(scheduleStatus)}`

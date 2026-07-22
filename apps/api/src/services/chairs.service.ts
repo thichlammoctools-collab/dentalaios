@@ -212,7 +212,7 @@ export const chairsService = {
       const next = chairAppointments.find((appointment) => new Date(appointment.scheduled_at) > now);
       let currentStatus: ChairDisplayStatus = chair.operational_status;
       if (chair.is_active && chair.operational_status === "available") {
-        currentStatus = current?.status === "arrived" ? "occupied" : current ? "reserved" : "available";
+        currentStatus = current?.status === "in_progress" ? "occupied" : current ? "reserved" : "available";
       }
       const metrics = revenue?.byChair.get(chair.id);
       return {

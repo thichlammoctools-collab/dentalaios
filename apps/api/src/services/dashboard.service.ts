@@ -163,13 +163,13 @@ export const dashboardService = {
         WHERE ${paymentWhere} AND p.status = 'confirmed' AND datetime(p.created_at) >= datetime(?) AND datetime(p.created_at) < datetime(?) GROUP BY date ORDER BY date`,
       [tenantId, branchId, bounds.rangeStart, bounds.rangeEnd]),
       first(db, `SELECT COUNT(*) AS count FROM appointments a WHERE ${appointmentWhere}
-        AND a.status IN ('booked', 'confirmed', 'arrived')
+        AND a.status IN ('booked', 'confirmed', 'arrived', 'in_progress')
         AND datetime(a.scheduled_at, '+' || a.duration_min || ' minutes') < ?
         AND a.scheduled_at >= ? AND a.scheduled_at < ?`,
       [tenantId, branchId, now.toISOString(), bounds.todayStart, bounds.todayEnd]),
       rows(db, `SELECT a.id, a.status, a.scheduled_at, a.duration_min, p.name AS patient_name
         FROM appointments a JOIN patients p ON p.id = a.patient_id AND p.tenant_id = a.tenant_id
-        WHERE ${appointmentWhere} AND a.status IN ('booked', 'confirmed', 'arrived')
+        WHERE ${appointmentWhere} AND a.status IN ('booked', 'confirmed', 'arrived', 'in_progress')
         AND datetime(a.scheduled_at, '+' || a.duration_min || ' minutes') < ?
         AND a.scheduled_at >= ? AND a.scheduled_at < ?
         ORDER BY datetime(a.scheduled_at, '+' || a.duration_min || ' minutes') ASC LIMIT ?`,
@@ -372,7 +372,7 @@ export const dashboardService = {
       [tenantId, bounds.previousStart, bounds.previousEnd, ...paymentBranch.binds]),
        rows(db, `SELECT v.branch_id, COUNT(*) AS visits FROM visits v WHERE v.tenant_id = ? AND v.date >= ? AND v.date < ?${visitBranch.sql} GROUP BY v.branch_id`,
       [tenantId, bounds.previousStart, bounds.previousEnd, ...visitBranch.binds]),
-      rows(db, `SELECT a.branch_id, COUNT(*) AS count FROM appointments a WHERE a.tenant_id = ? AND a.status IN ('booked', 'confirmed', 'arrived')
+      rows(db, `SELECT a.branch_id, COUNT(*) AS count FROM appointments a WHERE a.tenant_id = ? AND a.status IN ('booked', 'confirmed', 'arrived', 'in_progress')
         AND datetime(a.scheduled_at, '+' || a.duration_min || ' minutes') < datetime(?) AND a.scheduled_at >= ? AND a.scheduled_at < ?${appointmentBranch.sql} GROUP BY a.branch_id`,
       [tenantId, now.toISOString(), bounds.todayStart, bounds.todayEnd, ...appointmentBranch.binds]),
       rows(db, `SELECT a.branch_id, COUNT(*) AS count FROM appointments a WHERE a.tenant_id = ? AND a.status IN ('cancelled', 'no_show')

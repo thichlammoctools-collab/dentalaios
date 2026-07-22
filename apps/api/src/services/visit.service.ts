@@ -79,10 +79,7 @@ export const visitService = {
         : undefined,
     });
     if (data.source_appointment_id) {
-      const appointment = await createAppointmentsRepository(db).getById(tenantId, data.source_appointment_id);
-      if (appointment && (appointment.status === "booked" || appointment.status === "confirmed")) {
-        await createAppointmentsRepository(db).update(tenantId, appointment.id, { status: "arrived" });
-      }
+      await createAppointmentsRepository(db).update(tenantId, data.source_appointment_id, { status: "in_progress" });
     }
     return created;
   },
@@ -119,6 +116,9 @@ export const visitService = {
       completed_by: data.status === "completed" ? actorUserId : undefined,
     });
     if (!updated) throw new NotFoundError("Visit not found");
+    if (data.status === "completed" && updated.source_appointment_id) {
+      await createAppointmentsRepository(db).update(tenantId, updated.source_appointment_id, { status: "completed" });
+    }
     return updated;
   },
 

@@ -795,6 +795,7 @@ export type AppointmentStatus =
   | "booked"      // Created, waiting for patient confirmation
   | "confirmed"   // Patient confirmed
   | "arrived"     // Patient arrived at clinic
+  | "in_progress" // Appointment is being carried out
   | "completed"   // Visit happened, appointment fulfilled
   | "cancelled"   // Cancelled by clinic or patient
   | "no_show";    // Patient did not show up

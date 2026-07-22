@@ -575,7 +575,7 @@ export const appointmentUpdateSchema = z.object({
   clinician_id: z.string().min(1).optional(),
   assistant_id: z.string().min(1).nullable().optional(),
   chair_id: z.string().min(1).nullable().optional(),
-  status: z.enum(["booked", "confirmed", "arrived", "completed", "cancelled", "no_show"]).optional(),
+  status: z.enum(["booked", "confirmed", "arrived", "in_progress", "completed", "cancelled", "no_show"]).optional(),
   procedure: optionalText(100).optional(),
   notes: optionalText(2000).optional(),
   cancelled_reason: optionalText(500).optional(),
