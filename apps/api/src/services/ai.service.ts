@@ -15,6 +15,8 @@ import { createTreatmentServicesRepository } from "../repositories/treatment-ser
 import { NotFoundError } from "../lib/errors";
 import { aiModelConfigService } from "./ai-model-config.service";
 import { isValidFdiTooth } from "@shared/constants";
+import { getAnatomicalSiteLabel, getFindingCategory } from "@shared/constants/clinical-findings";
+import type { FindingCategory, FindingScope } from "@shared/types";
 
 export interface SummarizeResult {
   summary: string;
@@ -46,8 +48,9 @@ export interface AiDeps {
 
 export interface ImageAnalysisFinding {
   tooth_number: number | null;
-  scope: "tooth" | "full_mouth" | "soft_tissue" | "occlusion";
-  area?: string;
+  category: FindingCategory;
+  scope: FindingScope;
+  anatomical_site?: string;
   condition: string;
   description: string;
   recommendation: string;
@@ -154,7 +157,7 @@ export const aiService = {
       : "không rõ";
     const findingsText = findings.length
       ? findings.map((f) => {
-          const loc = f.scope === "tooth" ? `Răng ${f.tooth_number}` : f.scope === "full_mouth" ? "Toàn hàm" : f.scope === "occlusion" ? "Khớp cắn" : `Mô mềm (${f.area ?? f.scope})`;
+          const loc = findingLocation(f);
           return `  - ${loc}: ${f.condition}${f.notes ? ` (${f.notes})` : ""}`;
         }).join("\n")
       : "  (không có clinical findings)";
@@ -264,9 +267,10 @@ FORMAT JSON (bắt buộc):
   "analysis": "<tổng quan về hình ảnh, 1-3 câu tiếng Việt>",
   "findings": [
     {
-      "tooth_number": <số FDI hoặc null nếu là toàn hàm/mô mềm>,
-      "scope": "<tooth | full_mouth | soft_tissue | occlusion>",
-      "area": "<mặt răng nếu là tooth: occlusal/mesial/distal/lingual/buccal, hoặc bỏ trống>",
+      "tooth_number": <số FDI hoặc null>,
+      "category": "<tooth_hard_tissue | periodontal | oral_soft_tissue | occlusion_orthodontics | tmj_function | preventive_general>",
+      "scope": "<tooth | region | full_mouth>",
+      "anatomical_site": "<gum|tongue|buccal|palate|floor_mouth|lip|pharynx|salivary_gland|tmj, hoặc bỏ trống>",
       "condition": "<tình trạng bằng tiếng Việt: sâu răng, viêm tủy, viêm quanh răng, tổn thương…>",
       "description": "<mô tả chi tiết tổn thương bằng tiếng Việt, 1-2 câu>",
       "recommendation": "<đề xuất điều trị bằng tiếng Việt, 1-2 câu>"
@@ -277,7 +281,10 @@ FORMAT JSON (bắt buộc):
 QUY TẮC QUAN TRỌNG:
 - findings có thể là mảng rỗng [] nếu không phát hiện bất thường
 - tooth_number dùng hệ FDI (VD: 11= răng cửa trên phải, 36= răng hàm dưới trái)
-- scope="tooth" khi chỉ 1 răng, scope="full_mouth" khi nhiều răng, scope="soft_tissue" khi là mô mềm, scope="occlusion" khi là phân loại khớp cắn`;
+- category="tooth_hard_tissue" và scope="tooth" khi chỉ 1 răng
+- category="periodontal" hoặc "oral_soft_tissue" với scope="region" khi là nướu/niêm mạc
+- category="occlusion_orthodontics" với scope="full_mouth" khi là phân loại khớp cắn
+- category="tmj_function" với scope="region" và anatomical_site="tmj" khi là TMJ/chức năng`;
 
     // Step 1: Resolve the database file id in the caller's tenant before
     // reading R2. `fileId` is an opaque DB UUID, not an R2 key; using it as a
@@ -370,11 +377,33 @@ QUY TẮC QUAN TRỌNG:
 interface SummaryData {
   patient: { name: string; dob: string; gender: string; phone: string } | null;
   visit: { date: string; status: string; notes?: string | null };
-  findings: { tooth?: number; scope: string; area?: string; condition: string; notes?: string | null }[];
+  findings: { tooth?: number; category: FindingCategory; scope: FindingScope; anatomical_site?: string; condition: string; notes?: string | null }[];
   planItems: {
     plan: Awaited<ReturnType<ReturnType<typeof createTreatmentPlansRepository>["getById"]>>;
     items: Awaited<ReturnType<ReturnType<typeof createTreatmentItemsRepository>["listByPlan"]>>;
   }[];
+}
+
+function findingLocation(finding: { tooth_number?: number; category: FindingCategory; scope: FindingScope; anatomical_site?: string }): string {
+  if (finding.scope === "tooth") return `Răng ${finding.tooth_number ?? "không xác định"}`;
+  const category = getFindingCategory(finding.category).label;
+  if (finding.scope === "full_mouth") return category;
+  return `${category} (${getAnatomicalSiteLabel(finding.anatomical_site as never)})`;
+}
+
+function summaryFindingLocation(finding: SummaryData["findings"][number]): string {
+  if (finding.scope === "tooth") return `Răng ${finding.tooth ?? "không xác định"}`;
+  const category = getFindingCategory(finding.category).label;
+  if (finding.scope === "full_mouth") return category;
+  return `${category} (${getAnatomicalSiteLabel(finding.anatomical_site as never)})`;
+}
+
+function isFindingCategory(value: unknown): value is FindingCategory {
+  return ["tooth_hard_tissue", "periodontal", "oral_soft_tissue", "occlusion_orthodontics", "tmj_function", "preventive_general"].includes(String(value));
+}
+
+function isFindingScope(value: unknown): value is FindingScope {
+  return value === "tooth" || value === "region" || value === "full_mouth";
 }
 
 function buildSummaryData(opts: {
@@ -386,7 +415,7 @@ function buildSummaryData(opts: {
   return {
     patient: opts.patient ? { name: opts.patient.name, dob: opts.patient.date_of_birth, gender: opts.patient.gender, phone: opts.patient.phone } : null,
     visit: { date: opts.visit.date, status: opts.visit.status, notes: opts.visit.notes },
-    findings: opts.findings.map((f) => ({ tooth: f.tooth_number, scope: f.scope, area: f.area, condition: f.condition, notes: f.notes })),
+    findings: opts.findings.map((f) => ({ tooth: f.tooth_number, category: f.category, scope: f.scope, anatomical_site: f.anatomical_site, condition: f.condition, notes: f.notes })),
     planItems: opts.planItems,
   };
 }
@@ -399,7 +428,7 @@ function buildPrompt(data: SummaryData): string {
   const visit = `Lượt khám: ${new Date(data.visit.date).toLocaleDateString("vi-VN")}, trạng thái: ${visitStatusVi(data.visit.status)}${data.visit.notes ? `, Ghi chú: ${data.visit.notes}` : ""}`;
   const findings = translated.length
     ? `Phát hiện lâm sàng:\n${translated.map((f) => {
-        const loc = f.scope === "tooth" ? `Răng ${f.tooth}` : f.scope === "full_mouth" ? "Toàn hàm" : f.scope === "occlusion" ? "Khớp cắn" : `Mô mềm (${f.area ?? f.scope})`;
+        const loc = summaryFindingLocation(f);
         return `  - ${loc}: ${f.condition}${f.notes ? ` (${f.notes})` : ""}`;
       }).join("\n")}`
     : "Phát hiện lâm sàng: không có";
@@ -497,7 +526,7 @@ function buildStructuredSummary(data: SummaryData): string {
   if (translated.length) {
     lines.push(`## Phát hiện lâm sàng (${translated.length})`);
     translated.forEach((f) => {
-      const loc = f.scope === "tooth" ? `Răng ${f.tooth}` : f.scope === "full_mouth" ? "Toàn hàm" : f.scope === "occlusion" ? "Khớp cắn" : `Mô mềm (${f.area ?? f.scope})`;
+      const loc = summaryFindingLocation(f);
       lines.push(`- ${loc}: ${f.condition}${f.notes ? ` — ${f.notes}` : ""}`);
     });
   }
@@ -572,8 +601,9 @@ function parseAnalyzeImageResponse(raw: string): { analysis: string; findings: I
       findings: Array.isArray(parsed.findings)
         ? parsed.findings.map((f: Record<string, unknown>) => ({
             tooth_number: f.tooth_number == null ? null : (Number(f.tooth_number) || 0),
-            scope: (String(f.scope || "tooth")) as ImageAnalysisFinding["scope"],
-            area: f.area ? String(f.area) : undefined,
+            category: isFindingCategory(f.category) ? f.category : "tooth_hard_tissue",
+            scope: isFindingScope(f.scope) ? f.scope : "tooth",
+            anatomical_site: f.anatomical_site ? String(f.anatomical_site) : undefined,
             condition: String(f.condition || "Không xác định"),
             description: String(f.description || ""),
             recommendation: String(f.recommendation || ""),
@@ -656,13 +686,7 @@ function buildFallbackPlan(
     const service = services.find((candidate) => candidate.procedure === procedure);
     if (services.length > 0 && !service) return [];
     const label = PROCEDURE_LABELS[procedure] || "Điều trị";
-    const loc = f.scope === "tooth" && f.tooth_number != null
-      ? `răng ${f.tooth_number}`
-        : f.scope === "full_mouth"
-          ? "toàn hàm"
-          : f.scope === "occlusion"
-            ? "khớp cắn"
-            : `mô mềm (${f.area ?? f.scope})`;
+    const loc = findingLocation(f).toLowerCase();
     return [{
       tooth: f.tooth_number ?? null,
       service_code: service?.code,

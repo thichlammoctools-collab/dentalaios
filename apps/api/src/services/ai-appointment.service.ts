@@ -22,6 +22,7 @@ import { createPatientsRepository } from "../repositories/patients.repo";
 import { createUsersRepository } from "../repositories/users.repo";
 import { NotFoundError } from "../lib/errors";
 import { isDoctorRole } from "@shared/constants";
+import { getAnatomicalSiteLabel, getFindingCategory } from "@shared/constants/clinical-findings";
 import { aiModelConfigService } from "./ai-model-config.service";
 
 // ─── Result types ────────────────────────────────────────────
@@ -225,7 +226,7 @@ Trả CHÍNH XÁC JSON, KHÔNG thêm text khác:
 
     const findingsText = findings.length
       ? findings.map((f) => {
-        const loc = f.scope === "tooth" ? `Răng ${f.tooth_number}` : f.scope === "full_mouth" ? "Toàn hàm" : f.scope === "occlusion" ? "Khớp cắn" : `Mô mềm (${f.area ?? f.scope})`;
+        const loc = f.scope === "tooth" ? `Răng ${f.tooth_number}` : f.scope === "full_mouth" ? getFindingCategory(f.category).label : `${getFindingCategory(f.category).label} (${getAnatomicalSiteLabel(f.anatomical_site)})`;
         return `- ${loc}: ${f.condition}${f.notes ? ` (${f.notes})` : ""}`;
       }).join("\n")
       : "Không có findings.";

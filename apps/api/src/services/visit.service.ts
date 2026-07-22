@@ -137,8 +137,11 @@ export const visitService = {
     return createFindingsRepository(db).create(tenantId, visitId, {
       tooth_number: data.tooth_number ?? undefined,
       tooth_system: data.scope === "tooth" ? "FDI" : undefined,
-      scope: data.scope ?? "tooth",
-      area: data.area,
+      category: data.category,
+      scope: data.scope,
+      anatomical_site: data.anatomical_site,
+      location_details: data.location_details,
+      measurements: data.measurements,
       condition: data.condition,
       notes: data.notes,
     });
@@ -156,6 +159,9 @@ export const visitService = {
     return createFindingsRepository(db).update(tenantId, findingId, {
       condition: data.condition,
       notes: data.notes ?? null,
+      anatomical_site: data.anatomical_site,
+      location_details: data.location_details,
+      measurements: data.measurements,
     });
   },
 };

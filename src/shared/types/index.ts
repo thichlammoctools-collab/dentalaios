@@ -170,16 +170,21 @@ export interface Visit {
 export type ToothSystem = "FDI";
 
 /**
- * Scope of a clinical finding:
- *  - "tooth"         — specific FDI tooth
- *  - "full_mouth"    — entire dentition (e.g. scaling)
- *  - "soft_tissue"   — oral soft tissue (gums, tongue, etc.)
- *  - "occlusion"     — occlusal classification
+ * Clinical discipline of a finding. This is distinct from its physical scope.
  */
-export type FindingScope = "tooth" | "full_mouth" | "soft_tissue" | "occlusion";
+export type FindingCategory =
+  | "tooth_hard_tissue"
+  | "periodontal"
+  | "oral_soft_tissue"
+  | "occlusion_orthodontics"
+  | "tmj_function"
+  | "preventive_general";
 
-/** Valid soft-tissue areas when scope = "soft_tissue" */
-export type SoftTissueArea =
+/** Physical scope of a clinical finding. */
+export type FindingScope = "tooth" | "region" | "full_mouth";
+
+/** Valid anatomical sites used by non-tooth clinical findings. */
+export type AnatomicalSite =
   | "gum"           // nướu
   | "tongue"        // lưỡi
   | "buccal"        // niêm mạc má
@@ -191,14 +196,28 @@ export type SoftTissueArea =
   | "tmj"           // khớp thái dương hàm
   | "salivary_gland"; // tuyến nước bọt
 
+/** Legacy name retained for API consumers during the clinical finding migration. */
+export type SoftTissueArea = AnatomicalSite;
+
+export interface FindingLocationDetails {
+  quadrant?: "upper_right" | "upper_left" | "lower_right" | "lower_left";
+  laterality?: "right" | "left" | "bilateral" | "midline";
+  tooth_surfaces?: Array<"occlusal" | "mesial" | "distal" | "buccal" | "lingual">;
+}
+
+export type FindingMeasurements = Record<string, string | number | boolean>;
+
 export interface ClinicalFinding {
   id: string;
   tenant_id: string;
   visit_id: string;
-  tooth_number?: number; // present when scope = "tooth"; absent for full_mouth / soft_tissue
+  category: FindingCategory;
+  tooth_number?: number; // present when scope = "tooth"
   tooth_system?: ToothSystem; // always present when tooth_number is present
   scope: FindingScope;
-  area?: SoftTissueArea; // required when scope = "soft_tissue"
+  anatomical_site?: AnatomicalSite;
+  location_details?: FindingLocationDetails;
+  measurements?: FindingMeasurements;
   condition: string; // e.g. "caries", "fracture", "gingivitis", "ulcer"
   notes?: string;
   created_at: string;
@@ -668,9 +687,12 @@ export interface LarkConfigUpdate {
 // ───────────────────────── Voice ─────────────────────────
 
 export interface VoiceParsedFinding {
+  category: FindingCategory;
   scope: FindingScope;
   tooth_number: number | null;
-  area?: string;
+  anatomical_site?: AnatomicalSite;
+  location_details?: FindingLocationDetails;
+  measurements?: FindingMeasurements;
   condition: string;
   notes: string;
 }
@@ -938,8 +960,11 @@ export interface PatientImage {
 
 export interface ImageAnalysisFinding {
   tooth_number: number | null;
+  category: FindingCategory;
   scope: FindingScope;
-  area?: string;
+  anatomical_site?: AnatomicalSite;
+  location_details?: FindingLocationDetails;
+  measurements?: FindingMeasurements;
   condition: string;
   description: string;
   recommendation: string;

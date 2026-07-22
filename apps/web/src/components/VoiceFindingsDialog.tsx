@@ -6,13 +6,15 @@ import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/c
 import { VoiceInputButton } from "@/components/VoiceInputButton";
 import { apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
-import type { ClinicalFinding } from "@shared/types";
+import type { ClinicalFinding, FindingCategory, FindingScope } from "@shared/types";
+import { CLINICAL_FINDING_CATEGORIES, getFindingConditionLabel } from "@shared/constants/clinical-findings";
 import { cn } from "@/lib/utils";
 
 interface ParsedFinding {
-  scope: "tooth" | "full_mouth" | "soft_tissue" | "occlusion";
+  category: FindingCategory;
+  scope: FindingScope;
   tooth_number: number | null;
-  area?: string;
+  anatomical_site?: string;
   condition: string;
   notes: string;
 }
@@ -30,92 +32,7 @@ interface VoiceFindingsDialogProps {
   onSaved: (findings: ClinicalFinding[]) => void;
 }
 
-const TOOTH_CONDITIONS = [
-  { value: "good", label: "Tốt" },
-  { value: "caries", label: "Sâu răng" },
-  { value: "unerupted", label: "Chưa mọc" },
-  { value: "impacted", label: "Mọc ngầm" },
-  { value: "tilted", label: "Mọc nghiêng" },
-  { value: "fracture", label: "Gãy/vỡ" },
-  { value: "missing", label: "Mất răng" },
-  { value: "periapical", label: "Viêm quanh chóp" },
-  { value: "calculus", label: "Cao răng" },
-  { value: "pulpitis", label: "Viêm tủy" },
-  { value: "discoloration", label: "Đổi màu" },
-  { value: "wear", label: "Mòn răng" },
-  { value: "other", label: "Khác" },
-];
-
-const FULLMOUTH_CONDITIONS = [
-  { value: "calculus", label: "Cao răng (cạo vôi toàn hàm)" },
-  { value: "staining", label: "Nhuộm màu toàn hàm" },
-  { value: "halitosis", label: "Hôi miệng" },
-  { value: "dry_mouth", label: "Khô miệng" },
-  { value: "bruxism", label: "Nghiến răng" },
-  { value: "other", label: "Khác" },
-];
-
-const SOFT_TISSUE_AREAS = [
-  { value: "gum", label: "Nướu (lợi)" },
-  { value: "tongue", label: "Lưỡi" },
-  { value: "buccal", label: "Niêm mạc má" },
-  { value: "palate", label: "Vòm miệng" },
-  { value: "floor_mouth", label: "Đáy miệng" },
-  { value: "lip", label: "Môi" },
-  { value: "pharynx", label: "Họng" },
-  { value: "jaw", label: "Xương hàm" },
-  { value: "tmj", label: "Khớp TMJ" },
-  { value: "salivary_gland", label: "Tuyến nước bọt" },
-];
-
-const SOFT_TISSUE_CONDITIONS = [
-  { value: "gingivitis", label: "Viêm lợi" },
-  { value: "periodontitis", label: "Viêm quanh răng" },
-  { value: "ulcer", label: "Loét miệng" },
-  { value: "aphtha", label: "Aft miệng" },
-  { value: "leukoplakia", label: "Bạch sản" },
-  { value: "erythroplakia", label: "Hồng sản" },
-  { value: "herpes", label: "Mụn rộp herpes" },
-  { value: "candidiasis", label: "Nấm miệng" },
-  { value: "fissure", label: "Nứt khóe miệng" },
-  { value: "abscess", label: "Áp xe nướu" },
-  { value: "fistula", label: "Rò quanh răng" },
-  { value: "recession", label: "Tụt lợi" },
-  { value: "hypertrophy", label: "Phì đại nướu" },
-  { value: "tongue_coating", label: "Bội lưỡi" },
-  { value: "geographic_tongue", label: "Lưỡi địa lý" },
-  { value: "fissured_tongue", label: "Lưỡi nứt" },
-  { value: "macroglossia", label: "Lưỡi to" },
-  { value: "torus", label: "Gai xương hàm" },
-  { value: "tmd_pain", label: "Đau khớp TMJ" },
-  { value: "clicking", label: "Khớp kêu click" },
-  { value: "limitation", label: "Hạn chế há miệng" },
-  { value: "sialolith", label: "Sialolith" },
-  { value: "swelling", label: "Sưng tuyến nước bọt" },
-  { value: "other", label: "Khác" },
-];
-
-const OCCLUSION_CONDITIONS = [
-  { value: "angle_class_i", label: "Angle loại I" },
-  { value: "angle_class_ii_div_1", label: "Angle loại II, chia 1" },
-  { value: "angle_class_ii_div_2", label: "Angle loại II, chia 2" },
-  { value: "angle_class_iii", label: "Angle loại III" },
-  { value: "deep_bite", label: "Cắn sâu" },
-  { value: "open_bite", label: "Cắn hở" },
-  { value: "crossbite", label: "Cắn chéo" },
-  { value: "edge_to_edge", label: "Cắn đối đầu" },
-  { value: "overjet", label: "Cắn chìa (overjet)" },
-  { value: "crowding", label: "Chen chúc" },
-  { value: "spacing", label: "Thưa răng" },
-  { value: "other", label: "Khác" },
-];
-
-function conditionOptions(scope: string) {
-  if (scope === "soft_tissue") return SOFT_TISSUE_CONDITIONS;
-  if (scope === "occlusion") return OCCLUSION_CONDITIONS;
-  if (scope === "full_mouth") return FULLMOUTH_CONDITIONS;
-  return TOOTH_CONDITIONS;
-}
+function conditionOptions(category: FindingCategory) { return CLINICAL_FINDING_CATEGORIES.find((item) => item.value === category)?.conditions ?? []; }
 
 export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: VoiceFindingsDialogProps) {
   const [transcript, setTranscript] = useState("");
@@ -156,7 +73,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
         const created = await apiPost<ClinicalFinding>(`/api/visits/${visitId}/findings`, {
           tooth_number: f.tooth_number,
           scope: f.scope,
-          area: f.area as ClinicalFinding["area"],
+          anatomical_site: f.anatomical_site as ClinicalFinding["anatomical_site"],
           condition: f.condition,
           notes: f.notes || undefined,
         });
@@ -199,15 +116,13 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
 
   const scopeVariant = (scope: string) => {
     if (scope === "full_mouth") return "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800";
-    if (scope === "soft_tissue") return "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800";
-    if (scope === "occlusion") return "bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800";
+    if (scope === "region") return "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800";
     return "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700";
   };
 
   const scopeLabel = (scope: string) => {
-    if (scope === "full_mouth") return "Toàn hàm";
-    if (scope === "soft_tissue") return "Mô mềm";
-    if (scope === "occlusion") return "Khớp cắn";
+    if (scope === "full_mouth") return "Toàn miệng";
+    if (scope === "region") return "Vùng";
     return "Răng";
   };
 
@@ -311,16 +226,10 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
                     {/* Header row */}
                     <div className="flex items-center gap-2 mb-2">
                       <span className={cn("inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium", scopeVariant(f.scope))}>
-                        {f.scope === "tooth" ? `Răng #${f.tooth_number}` : scopeLabel(f.scope)}
+                        {f.scope === "tooth" ? `Răng #${f.tooth_number}` : CLINICAL_FINDING_CATEGORIES.find((item) => item.value === f.category)?.label ?? scopeLabel(f.scope)}
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        {f.scope === "tooth"
-                          ? TOOTH_CONDITIONS.find((c) => c.value === f.condition)?.label ?? f.condition
-                          : f.scope === "soft_tissue"
-                            ? SOFT_TISSUE_CONDITIONS.find((c) => c.value === f.condition)?.label ?? f.condition
-                            : f.scope === "occlusion"
-                              ? OCCLUSION_CONDITIONS.find((c) => c.value === f.condition)?.label ?? f.condition
-                            : FULLMOUTH_CONDITIONS.find((c) => c.value === f.condition)?.label ?? f.condition}
+                        {getFindingConditionLabel(f.category, f.condition)}
                       </span>
                       <div className="ml-auto flex gap-1">
                         <Button
@@ -348,16 +257,24 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
                         {/* Scope */}
                         <div className="grid grid-cols-3 gap-2">
                           <div className="grid gap-1">
-                            <label className="text-xs text-muted-foreground">Phạm vi</label>
+                            <label className="text-xs text-muted-foreground">Nhóm khám</label>
                             <select
-                              value={f.scope}
-                              onChange={(e) => updateFinding(idx, "scope", e.target.value as ParsedFinding["scope"])}
+                              value={f.category}
+                              onChange={(e) => {
+                                const next = CLINICAL_FINDING_CATEGORIES.find((item) => item.value === e.target.value);
+                                if (!next) return;
+                                setParsedFindings((prev) => prev.map((finding, findingIndex) => findingIndex === idx ? {
+                                  ...finding,
+                                  category: next.value,
+                                  scope: next.scope,
+                                  tooth_number: next.scope === "tooth" ? finding.tooth_number : null,
+                                  anatomical_site: next.defaultSite,
+                                  condition: next.conditions[0].value,
+                                } : finding));
+                              }}
                               className="h-8 rounded-md border border-input bg-background px-2 text-xs"
                             >
-                              <option value="tooth">Răng</option>
-                              <option value="full_mouth">Toàn hàm</option>
-                              <option value="soft_tissue">Mô mềm</option>
-                              <option value="occlusion">Khớp cắn</option>
+                              {CLINICAL_FINDING_CATEGORIES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
                             </select>
                           </div>
                           {f.scope === "tooth" && (
@@ -373,20 +290,6 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
                               />
                             </div>
                           )}
-                          {f.scope === "soft_tissue" && (
-                            <div className="grid gap-1">
-                              <label className="text-xs text-muted-foreground">Vùng</label>
-                              <select
-                                value={f.area ?? "gum"}
-                                onChange={(e) => updateFinding(idx, "area", e.target.value)}
-                                className="h-8 rounded-md border border-input bg-background px-2 text-xs"
-                              >
-                                {SOFT_TISSUE_AREAS.map((a) => (
-                                  <option key={a.value} value={a.value}>{a.label}</option>
-                                ))}
-                              </select>
-                            </div>
-                          )}
                         </div>
                         {/* Condition */}
                         <div className="grid gap-1">
@@ -396,7 +299,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
                             onChange={(e) => updateFinding(idx, "condition", e.target.value)}
                             className="h-8 rounded-md border border-input bg-background px-2 text-xs"
                           >
-                            {conditionOptions(f.scope).map((c) => (
+                            {conditionOptions(f.category).map((c) => (
                               <option key={c.value} value={c.value}>{c.label}</option>
                             ))}
                           </select>
@@ -431,7 +334,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
               onClick={() =>
                 setParsedFindings((prev) => [
                   ...prev,
-                  { scope: "tooth", tooth_number: null, condition: "caries", notes: "" },
+                  { category: "tooth_hard_tissue", scope: "tooth", tooth_number: null, condition: "caries", notes: "" },
                 ])
               }
             >

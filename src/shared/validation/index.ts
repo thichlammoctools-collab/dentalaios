@@ -201,23 +201,45 @@ export type VisitUpdateInput = z.infer<typeof visitUpdateSchema>;
 
 // ──────────────── Clinical finding ────────────────
 
-const SOFT_TISSUE_AREAS = [
+const ANATOMICAL_SITES = [
   "gum", "tongue", "buccal", "palate",
   "floor_mouth", "lip", "pharynx", "jaw", "tmj", "salivary_gland",
 ] as const;
 
 export const findingCreateSchema = z.object({
   tooth_number: z.number().int().nullable(),
-  scope: z.enum(["tooth", "full_mouth", "soft_tissue", "occlusion"]).default("tooth"),
-  area: z.enum(SOFT_TISSUE_AREAS).optional(),
+  category: z.enum(["tooth_hard_tissue", "periodontal", "oral_soft_tissue", "occlusion_orthodontics", "tmj_function", "preventive_general"]),
+  scope: z.enum(["tooth", "region", "full_mouth"]),
+  anatomical_site: z.enum(ANATOMICAL_SITES).optional(),
+  location_details: z.object({
+    quadrant: z.enum(["upper_right", "upper_left", "lower_right", "lower_left"]).optional(),
+    laterality: z.enum(["right", "left", "bilateral", "midline"]).optional(),
+    tooth_surfaces: z.array(z.enum(["occlusal", "mesial", "distal", "buccal", "lingual"])).min(1).optional(),
+  }).optional(),
+  measurements: z.record(z.string(), z.union([z.string(), z.number().finite(), z.boolean()])).optional(),
   condition: nonEmpty(100),
   notes: optionalText(2000),
 }).superRefine((data, ctx) => {
   if (data.scope === "tooth" && (data.tooth_number == null || !isValidFdiTooth(data.tooth_number))) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Số răng FDI không hợp lệ" });
   }
-  if (data.scope === "soft_tissue" && !data.area) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Vùng mô mềm là bắt buộc khi scope = soft_tissue" });
+  if (data.scope !== "tooth" && data.tooth_number != null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Số răng chỉ áp dụng cho finding theo răng" });
+  }
+  if (data.category === "tooth_hard_tissue" && data.scope !== "tooth") {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Finding răng và mô cứng phải gắn với một răng FDI" });
+  }
+  if (data.category === "oral_soft_tissue" && (data.scope !== "region" || !data.anatomical_site)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Finding mô mềm phải có vùng giải phẫu" });
+  }
+  if (data.category === "occlusion_orthodontics" && data.scope !== "full_mouth") {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Finding khớp cắn áp dụng cho toàn miệng" });
+  }
+  if (data.category === "tmj_function" && data.anatomical_site !== "tmj") {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Finding chức năng phải ghi nhận tại khớp thái dương hàm" });
+  }
+  if (data.category === "preventive_general" && data.scope !== "full_mouth") {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Finding dự phòng áp dụng cho toàn miệng" });
   }
 });
 
@@ -226,6 +248,13 @@ export type FindingCreateInput = z.infer<typeof findingCreateSchema>;
 export const findingUpdateSchema = z.object({
   condition: nonEmpty(100),
   notes: optionalText(2000),
+  anatomical_site: z.enum(ANATOMICAL_SITES).optional(),
+  location_details: z.object({
+    quadrant: z.enum(["upper_right", "upper_left", "lower_right", "lower_left"]).optional(),
+    laterality: z.enum(["right", "left", "bilateral", "midline"]).optional(),
+    tooth_surfaces: z.array(z.enum(["occlusal", "mesial", "distal", "buccal", "lingual"])).min(1).optional(),
+  }).optional(),
+  measurements: z.record(z.string(), z.union([z.string(), z.number().finite(), z.boolean()])).optional(),
 });
 
 export type FindingUpdateInput = z.infer<typeof findingUpdateSchema>;

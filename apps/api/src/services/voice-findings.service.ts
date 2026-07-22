@@ -11,11 +11,14 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { createVisitsRepository } from "../repositories/visits.repo";
 import { NotFoundError } from "../lib/errors";
 import { aiModelConfigService } from "./ai-model-config.service";
+import type { AnatomicalSite, FindingCategory, FindingMeasurements, FindingScope } from "@shared/types";
 
 export interface ParsedFinding {
-  scope: "tooth" | "full_mouth" | "soft_tissue" | "occlusion";
+  category: FindingCategory;
+  scope: FindingScope;
   tooth_number: number | null;
-  area?: string;
+  anatomical_site?: AnatomicalSite;
+  measurements?: FindingMeasurements;
   condition: string;
   notes: string;
 }
@@ -73,10 +76,12 @@ export const voiceFindingsService = {
                 content: `Bạn là bác sĩ nha khoa chuyên nghiệp. Đọc bản ghi ghi âm lời bác sĩ mô tả phát hiện lâm sàng và trả về CHÍNH XÁC một mảng JSON các findings.
 
 QUY TẮC:
-- Mỗi câu mô tả 1 răng = 1 finding có scope="tooth" và tooth_number = số FDI
-- Mô tả toàn hàm (ca răng, tẩy trắng, khám toàn hàm…) = scope="full_mouth"
-- Mô tả mô mềm (lợi, lưỡi, niêm mạc…) = scope="soft_tissue", chọn area phù hợp nhất
-- Phân loại khớp cắn (Angle, cắn sâu, cắn hở, cắn chéo, cắn đối đầu…) = scope="occlusion"
+- Răng và mô cứng: category="tooth_hard_tissue", scope="tooth", tooth_number = số FDI
+- Nha chu: category="periodontal", scope="region", anatomical_site="gum"
+- Mô mềm miệng: category="oral_soft_tissue", scope="region", chọn anatomical_site phù hợp
+- Phân loại khớp cắn: category="occlusion_orthodontics", scope="full_mouth"
+- TMJ/cơ nhai: category="tmj_function", scope="region", anatomical_site="tmj"
+- Khám tổng quát/dự phòng: category="preventive_general", scope="full_mouth"
 - condition phải thuộc danh sách: caries, fracture, missing, periapical, calculus, pulpitis, discoloration, wear, other, gingivitis, periodontitis, ulcer, aphtha, leukoplakia, erythroplakia, herpes, candidiasis, fissure, abscess, fistula, recession, hypertrophy, tongue_coating, geographic_tongue, fissured_tongue, macroglossia, torus, tmd_pain, clicking, limitation, sialolith, swelling, staining, halitosis, dry_mouth, bruxism, angle_class_i, angle_class_ii_div_1, angle_class_ii_div_2, angle_class_iii, deep_bite, open_bite, crossbite, edge_to_edge, overjet, crowding, spacing
 - notes là phần mô tả thêm không thuộc condition chuẩn
 - Luôn trả JSON thuần túy, KHÔNG có text giải thích khác
@@ -87,9 +92,11 @@ Format:
 {
   "findings": [
     {
-      "scope": "tooth|full_mouth|soft_tissue|occlusion",
+      "category": "tooth_hard_tissue|periodontal|oral_soft_tissue|occlusion_orthodontics|tmj_function|preventive_general",
+      "scope": "tooth|region|full_mouth",
       "tooth_number": <số FDI hoặc null>,
-      "area": "<một trong: gum|tongue|buccal|palate|floor_mouth|lip|pharynx|jaw|tmj|salivary_gland — CHỈ khi scope=soft_tissue, bỏ trống otherwise>",
+      "anatomical_site": "<gum|tongue|buccal|palate|floor_mouth|lip|pharynx|jaw|tmj|salivary_gland — chỉ khi scope=region>",
+      "measurements": "<object số đo như overjet_mm hoặc max_opening_mm, hoặc {}>",
       "condition": "<tên tiếng Anh viết thường>",
       "notes": "<mô tả thêm hoặc empty string>"
     }
@@ -138,13 +145,14 @@ function parseVoiceResponse(raw: string): { findings: ParsedFinding[] } | null {
     if (!Array.isArray(parsed.findings)) return null;
 
     const findings: ParsedFinding[] = parsed.findings.map((item: Record<string, unknown>) => {
-      const scope = (item.scope === "tooth" || item.scope === "full_mouth" || item.scope === "soft_tissue" || item.scope === "occlusion")
+      const scope = (item.scope === "tooth" || item.scope === "region" || item.scope === "full_mouth")
         ? item.scope
         : "tooth";
+      const category = isFindingCategory(item.category) ? item.category : "tooth_hard_tissue";
       const tooth = item.tooth_number == null ? null : Number(item.tooth_number);
       const condition = String(item.condition || "other").toLowerCase().trim();
       const area = (() => {
-        const a = String(item.area ?? "").toLowerCase().trim();
+        const a = String(item.anatomical_site ?? "").toLowerCase().trim();
         if (!a) return undefined;
         if (SOFT_TISSUE_AREAS.includes(a as typeof SOFT_TISSUE_AREAS[number])) return a;
         // fuzzy match
@@ -162,9 +170,12 @@ function parseVoiceResponse(raw: string): { findings: ParsedFinding[] } | null {
         };
         return areaMap[a] ?? "gum";
       })();
+      const measurements = typeof item.measurements === "object" && item.measurements !== null
+        ? item.measurements as FindingMeasurements
+        : undefined;
       const notes = String(item.notes ?? "").trim();
 
-      return { scope, tooth_number: tooth, area, condition, notes } as ParsedFinding;
+      return { category, scope, tooth_number: tooth, anatomical_site: area as AnatomicalSite | undefined, measurements, condition, notes };
     });
 
     return { findings };
@@ -187,6 +198,7 @@ function extractFindFromText(text: string): ParsedFinding[] {
   const uniqueTeeth = [...new Set(toothNums)];
   for (const tooth of uniqueTeeth) {
     const finding: ParsedFinding = {
+      category: "tooth_hard_tissue",
       scope: "tooth",
       tooth_number: tooth,
       condition: "other",
@@ -213,6 +225,7 @@ function extractFindFromText(text: string): ParsedFinding[] {
   const lower = text.toLowerCase();
   if (/\btoàn\s*h[àáảã]m\b|\bfull\s*mouth\b/i.test(text)) {
     const fmFinding: ParsedFinding = {
+      category: "preventive_general",
       scope: "full_mouth",
       tooth_number: null,
       condition: "other",
@@ -224,7 +237,7 @@ function extractFindFromText(text: string): ParsedFinding[] {
     else if (/\bnghiến\b|\bbruxism\b/.test(lower)) fmFinding.condition = "bruxism";
     else if (/\bkh[óòỏõô]\s*m[ắầậ]ng\b|\bdry\s*mouth\b/i.test(lower)) fmFinding.condition = "dry_mouth";
 
-    if (!findings.some((f) => f.scope === "full_mouth")) {
+    if (!findings.some((f) => f.category === "preventive_general")) {
       findings.push(fmFinding);
     }
   }
@@ -245,9 +258,10 @@ function extractFindFromText(text: string): ParsedFinding[] {
 
   for (const { regex, area, condition } of stPatterns) {
     if (regex.test(text)) {
-      const existing = findings.find((f) => f.scope === "soft_tissue" && f.area === area);
+      const category: FindingCategory = area === "gum" ? "periodontal" : area === "tmj" ? "tmj_function" : "oral_soft_tissue";
+      const existing = findings.find((f) => f.category === category && f.anatomical_site === area);
       if (!existing) {
-        findings.push({ scope: "soft_tissue", tooth_number: null, area, condition, notes: "" });
+        findings.push({ category, scope: "region", tooth_number: null, anatomical_site: area as AnatomicalSite, condition, notes: "" });
       }
     }
   }
@@ -266,10 +280,14 @@ function extractFindFromText(text: string): ParsedFinding[] {
     { regex: /thưa\s*răng|spacing/i, condition: "spacing" },
   ];
   for (const { regex, condition } of occlusionPatterns) {
-    if (regex.test(text) && !findings.some((f) => f.scope === "occlusion" && f.condition === condition)) {
-      findings.push({ scope: "occlusion", tooth_number: null, condition, notes: "" });
+    if (regex.test(text) && !findings.some((f) => f.category === "occlusion_orthodontics" && f.condition === condition)) {
+      findings.push({ category: "occlusion_orthodontics", scope: "full_mouth", tooth_number: null, condition, notes: "" });
     }
   }
 
   return findings.length > 0 ? findings : [];
+}
+
+function isFindingCategory(value: unknown): value is FindingCategory {
+  return ["tooth_hard_tissue", "periodontal", "oral_soft_tissue", "occlusion_orthodontics", "tmj_function", "preventive_general"].includes(String(value));
 }

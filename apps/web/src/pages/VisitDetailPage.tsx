@@ -779,7 +779,7 @@ export function VisitDetailPage() {
       {/* FDI Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>So đồ răng FDI</CardTitle>
+          <CardTitle>Khám răng hàm mặt</CardTitle>
         </CardHeader>
         <CardContent>
           <FdiToothChart
@@ -794,7 +794,7 @@ export function VisitDetailPage() {
       {/* Findings */}
       <Card id="findings">
         <CardHeader>
-          <CardTitle>Clinical Findings ({findings.length})</CardTitle>
+          <CardTitle>Ghi nhận lâm sàng ({findings.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <FindingsList

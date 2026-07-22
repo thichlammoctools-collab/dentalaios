@@ -200,15 +200,16 @@ export function PatientImageGallery({
   async function handleSaveFindings(result: AnalyzeImageResult) {
     if (!visitId || result.findings.length === 0) return;
     try {
-      await apiPost(`/api/visits/${visitId}/findings`, {
-        findings: result.findings.map((f) => ({
+      await Promise.all(result.findings.map((f) =>
+        apiPost(`/api/visits/${visitId}/findings`, {
           tooth_number: f.tooth_number,
+          category: f.category,
           scope: f.scope,
-          area: f.area,
+          anatomical_site: f.anatomical_site,
           condition: f.condition,
           notes: `${f.description}\nĐề xuất: ${f.recommendation}`,
-        })),
-      });
+        }),
+      ));
       toast.success(`Đã lưu ${result.findings.length} clinical finding(s)`);
       setAnalysisResult(null);
     } catch (err) {
@@ -414,7 +415,7 @@ export function PatientImageGallery({
                     <div key={i} className="text-sm bg-white/50 dark:bg-black/20 rounded-lg p-2">
                       {f.tooth_number && <span className="font-bold mr-2">Răng #{f.tooth_number}</span>}
                       <span className="font-medium">{f.condition}</span>
-                      {f.area && <span className="text-muted-foreground ml-1">({f.area})</span>}
+                       {f.anatomical_site && <span className="text-muted-foreground ml-1">({f.anatomical_site})</span>}
                       <p className="text-xs mt-0.5">{f.description}</p>
                       {f.recommendation && (
                         <p className="text-xs text-teal-600 dark:text-teal-400 mt-0.5">

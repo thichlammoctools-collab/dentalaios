@@ -182,6 +182,8 @@ describe("POST /api/visits/:id/findings", () => {
         permissions: ["write_findings"],
         body: {
           tooth_number: 11,
+          category: "tooth_hard_tissue",
+          scope: "tooth",
           condition: "caries",
         },
       },
@@ -203,6 +205,8 @@ describe("POST /api/visits/:id/findings", () => {
         permissions: ["write_findings"],
         body: {
           tooth_number: 99, // invalid
+          category: "tooth_hard_tissue",
+          scope: "tooth",
           condition: "caries",
         },
       },
@@ -221,6 +225,8 @@ describe("POST /api/visits/:id/findings", () => {
         permissions: ["write_findings"],
         body: {
           tooth_number: 11,
+          category: "tooth_hard_tissue",
+          scope: "tooth",
           condition: "caries",
         },
       },
@@ -252,11 +258,39 @@ describe("POST /api/visits/:id/findings", () => {
         permissions: ["write_findings"],
         body: {
           tooth_number: 55,
+          category: "tooth_hard_tissue",
+          scope: "tooth",
           condition: "caries",
         },
       },
     );
     expect(res.status).toBe(201);
+  });
+
+  it("accepts an occlusion finding for the full mouth", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const findingRow = {
+      id: "occlusion-1", tenant_id: "test-tenant", visit_id: "visit-1", category: "occlusion_orthodontics",
+      scope: "full_mouth", tooth_number: null, tooth_system: null, anatomical_site: null,
+      condition: "deep_bite", notes: "Overjet 5 mm", created_at: "2026-01-01",
+    };
+    const res = await authedRequestWithDB(app, "POST", "/api/visits/visit-1/findings", new Map([
+      ["FROM visits", [visitRow()]], ["FROM clinical_findings", [findingRow]],
+    ]), {
+      permissions: ["write_findings"],
+      body: { tooth_number: null, category: "occlusion_orthodontics", scope: "full_mouth", condition: "deep_bite", measurements: { overjet_mm: 5 } },
+    });
+    expect(res.status).toBe(201);
+    expect((await res.json() as { category: string }).category).toBe("occlusion_orthodontics");
+  });
+
+  it("rejects an oral soft-tissue finding without an anatomical site", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const res = await authedRequestWithDB(app, "POST", "/api/visits/visit-1/findings", new Map(), {
+      permissions: ["write_findings"],
+      body: { tooth_number: null, category: "oral_soft_tissue", scope: "region", condition: "ulcer" },
+    });
+    expect(res.status).toBe(400);
   });
 });
 

@@ -1,5 +1,5 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import type { ClinicalFinding, SoftTissueArea, ToothHistoryEntry } from "@shared/types";
+import type { AnatomicalSite, ClinicalFinding, FindingLocationDetails, FindingMeasurements, ToothHistoryEntry } from "@shared/types";
 import type { D1Row } from "./base";
 
 export interface FindingsRepository {
@@ -14,7 +14,7 @@ export interface FindingsRepository {
   update(
     tenantId: string,
     id: string,
-    data: { condition: string; notes: string | null },
+    data: Pick<ClinicalFinding, "condition" | "anatomical_site" | "location_details" | "measurements"> & { notes: string | null },
   ): Promise<ClinicalFinding>;
   delete(tenantId: string, id: string): Promise<boolean>;
 }
@@ -99,17 +99,20 @@ export function createFindingsRepository(db: D1Database): FindingsRepository {
       await db
         .prepare(
           `INSERT INTO clinical_findings
-             (id, tenant_id, visit_id, tooth_number, tooth_system, scope, area, condition, notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              (id, tenant_id, visit_id, category, scope, tooth_number, tooth_system, anatomical_site, location_details_json, measurements_json, condition, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
           tenantId,
           visitId,
+          data.category,
+          data.scope,
           data.tooth_number ?? null,
           data.tooth_system ?? null,
-          data.scope,
-          data.area ?? null,
+          data.anatomical_site ?? null,
+          data.location_details ? JSON.stringify(data.location_details) : null,
+          data.measurements ? JSON.stringify(data.measurements) : null,
           data.condition,
           data.notes ?? null,
         )
@@ -126,10 +129,21 @@ export function createFindingsRepository(db: D1Database): FindingsRepository {
       await db
         .prepare(
           `UPDATE clinical_findings
-             SET condition = ?, notes = ?
+             SET condition = ?, notes = ?,
+                 anatomical_site = COALESCE(?, anatomical_site),
+                 location_details_json = COALESCE(?, location_details_json),
+                 measurements_json = COALESCE(?, measurements_json)
            WHERE tenant_id = ? AND id = ?`,
         )
-        .bind(data.condition, data.notes, tenantId, id)
+        .bind(
+          data.condition,
+          data.notes,
+          data.anatomical_site ?? null,
+          data.location_details ? JSON.stringify(data.location_details) : null,
+          data.measurements ? JSON.stringify(data.measurements) : null,
+          tenantId,
+          id,
+        )
         .run();
       const row = (await db
         .prepare("SELECT * FROM clinical_findings WHERE tenant_id = ? AND id = ? LIMIT 1")
@@ -157,10 +171,22 @@ function mapFinding(row: D1Row): ClinicalFinding {
     visit_id: row.visit_id as string,
     tooth_number: row.tooth_number as number | undefined,
     tooth_system: (row.tooth_system as ClinicalFinding["tooth_system"]) || undefined,
+    category: row.category as ClinicalFinding["category"],
     scope,
-    area: (row.area as SoftTissueArea | undefined) ?? undefined,
+    anatomical_site: (row.anatomical_site as AnatomicalSite | undefined) ?? undefined,
+    location_details: parseJson<FindingLocationDetails>(row.location_details_json),
+    measurements: parseJson<FindingMeasurements>(row.measurements_json),
     condition: row.condition as string,
     notes: (row.notes as string | null) ?? undefined,
     created_at: row.created_at as string,
   };
+}
+
+function parseJson<T>(value: unknown): T | undefined {
+  if (typeof value !== "string" || !value) return undefined;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return undefined;
+  }
 }
