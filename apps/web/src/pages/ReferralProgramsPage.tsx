@@ -415,7 +415,7 @@ export function ReferralProgramsPage() {
                 {form.rules.map((rule, index) => (
                   <div
                     key={index}
-                    className="grid gap-2 rounded-lg border border-border p-3 sm:grid-cols-12"
+                    className="grid gap-3 rounded-lg border border-border p-3 md:grid-cols-12"
                   >
                     <select
                       value={rule.referrer_type}
@@ -424,10 +424,11 @@ export function ReferralProgramsPage() {
                           referrer_type: event.target.value as ReferrerType,
                         })
                       }
-                      className="rounded-md border border-input bg-background px-2 py-1.5 text-sm sm:col-span-2"
+                      className="min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm md:col-span-2"
                     >
                       <option value="patient">Bệnh nhân</option>
                       <option value="doctor">Bác sĩ</option>
+
                       <option value="assistant">Phụ tá</option>
                       <option value="partner">Đối tác</option>
                     </select>
@@ -441,9 +442,9 @@ export function ReferralProgramsPage() {
                           min_net_revenue: Number(event.target.value),
                         })
                       }
-                      className="rounded-md border border-input bg-background px-2 py-1.5 text-sm sm:col-span-4"
+                      className="min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm md:col-span-4"
                     />
-                    <div className="flex gap-2 sm:col-span-6">
+                    <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(7.5rem,0.9fr)_6rem_minmax(11rem,1.6fr)] md:col-span-6">
                       <select
                         value={rule.reward_kind}
                         onChange={(event) =>
@@ -452,7 +453,7 @@ export function ReferralProgramsPage() {
                               .value as RuleDraft["reward_kind"],
                           })
                         }
-                        className="w-32 shrink-0 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                        className="min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm"
                       >
                         <option value="cash">Tiền mặt</option>
                         <option value="voucher">Voucher</option>
@@ -465,7 +466,7 @@ export function ReferralProgramsPage() {
                               .value as RuleDraft["calculation_type"],
                           })
                         }
-                        className="w-24 shrink-0 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                        className="min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm"
                       >
                         <option value="fixed">Cố định</option>
                         <option value="percentage">%</option>
@@ -480,10 +481,11 @@ export function ReferralProgramsPage() {
                             value: Number(event.target.value),
                           })
                         }
-                        className="min-w-0 flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                        className="min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm"
                       />
                     </div>
                     {rule.reward_kind === "voucher" && (
+
                       <input
                         type="number"
                         min={1}
@@ -494,11 +496,12 @@ export function ReferralProgramsPage() {
                             voucher_valid_days: Number(event.target.value),
                           })
                         }
-                        className="rounded-md border border-input bg-background px-2 py-1.5 text-sm sm:col-span-12"
+                        className="min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm md:col-span-12"
                       />
                     )}
                     {form.rules.length > 1 && (
                       <button
+
                         type="button"
                         onClick={() =>
                           setForm((current) => ({
@@ -508,10 +511,11 @@ export function ReferralProgramsPage() {
                             ),
                           }))
                         }
-                        className="text-left text-xs text-destructive sm:col-span-12"
+                        className="text-left text-xs text-destructive md:col-span-12"
                       >
                         Xóa bậc này
                       </button>
+
                     )}
                   </div>
                 ))}
