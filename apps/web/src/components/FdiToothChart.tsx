@@ -20,8 +20,14 @@ interface FdiToothChartProps {
   onCreatedBatch?: (findings: ClinicalFinding[]) => void;
 }
 
-const ADULT_TEETH = [[18, 17, 16, 15, 14, 13, 12, 11], [21, 22, 23, 24, 25, 26, 27, 28], [48, 47, 46, 45, 44, 43, 42, 41], [31, 32, 33, 34, 35, 36, 37, 38]];
-const PRIMARY_TEETH = [[55, 54, 53, 52, 51], [61, 62, 63, 64, 65], [85, 84, 83, 82, 81], [71, 72, 73, 74, 75]];
+const ADULT_UPPER_RIGHT = [18, 17, 16, 15, 14, 13, 12, 11];
+const ADULT_UPPER_LEFT = [21, 22, 23, 24, 25, 26, 27, 28];
+const ADULT_LOWER_RIGHT = [48, 47, 46, 45, 44, 43, 42, 41];
+const ADULT_LOWER_LEFT = [31, 32, 33, 34, 35, 36, 37, 38];
+const PRIMARY_UPPER_RIGHT = [55, 54, 53, 52, 51];
+const PRIMARY_UPPER_LEFT = [61, 62, 63, 64, 65];
+const PRIMARY_LOWER_RIGHT = [85, 84, 83, 82, 81];
+const PRIMARY_LOWER_LEFT = [71, 72, 73, 74, 75];
 const SURFACES = [
   { value: "occlusal", label: "Nhai" }, { value: "mesial", label: "Gần" },
   { value: "distal", label: "Xa" }, { value: "buccal", label: "Má" }, { value: "lingual", label: "Lưỡi" },
@@ -65,21 +71,27 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
     return "border-border bg-background hover:border-primary hover:bg-accent";
   }
 
-  function renderArch(teeth: number[][]) {
-    return teeth.map((row, rowIndex) => (
-      <div key={rowIndex} className="flex justify-center gap-0.5">
-        {row.map((tooth) => (
-          <button
-            key={tooth}
-            type="button"
-            onClick={() => selectTooth(tooth)}
-            className={cn("flex h-9 w-9 items-center justify-center rounded border font-mono text-xs font-semibold transition-colors sm:h-10 sm:w-10", toothNumber === tooth && "ring-2 ring-primary ring-offset-2 ring-offset-card", toothStatus(tooth))}
-          >
-            {tooth}
-          </button>
-        ))}
+  function renderJaw(right: number[], left: number[]) {
+    return (
+      <div className="flex min-w-max justify-center gap-0.5">
+        {right.map(renderTooth)}
+        <div aria-hidden="true" className="mx-1 w-px self-stretch bg-border" />
+        {left.map(renderTooth)}
       </div>
-    ));
+    );
+  }
+
+  function renderTooth(tooth: number) {
+    return (
+      <button
+        key={tooth}
+        type="button"
+        onClick={() => selectTooth(tooth)}
+        className={cn("flex h-9 w-9 items-center justify-center rounded border font-mono text-xs font-semibold transition-colors sm:h-10 sm:w-10", toothNumber === tooth && "ring-2 ring-primary ring-offset-2 ring-offset-card", toothStatus(tooth))}
+      >
+        {tooth}
+      </button>
+    );
   }
 
   async function submit() {
@@ -133,14 +145,21 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
         })}
       </div>
 
-      {category === "tooth_hard_tissue" && (
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="mb-2 text-center text-xs font-medium text-muted-foreground">Răng vĩnh viễn</p>
-          <div className="space-y-1 overflow-x-auto">{renderArch(ADULT_TEETH)}</div>
-          <p className="my-3 text-center text-xs font-medium text-muted-foreground">Răng sữa</p>
-          <div className="space-y-1 overflow-x-auto">{renderArch(PRIMARY_TEETH)}</div>
-          <p className="mt-3 text-center text-xs text-muted-foreground">Chọn răng để ghi nhận finding theo FDI/ISO 3950.</p>
-        </div>
+        {category === "tooth_hard_tissue" && (
+          <div className="rounded-lg border border-border bg-card p-4">
+            <p className="mb-2 text-center text-xs font-medium text-muted-foreground">Răng vĩnh viễn</p>
+            <p className="mb-1 text-center text-[11px] text-muted-foreground">Hàm trên</p>
+            <div className="overflow-x-auto pb-1">{renderJaw(ADULT_UPPER_RIGHT, ADULT_UPPER_LEFT)}</div>
+            <p className="mb-1 mt-3 text-center text-[11px] text-muted-foreground">Hàm dưới</p>
+            <div className="overflow-x-auto pb-1">{renderJaw(ADULT_LOWER_RIGHT, ADULT_LOWER_LEFT)}</div>
+            <div className="my-4 border-t border-border" />
+            <p className="mb-2 text-center text-xs font-medium text-muted-foreground">Răng sữa</p>
+            <p className="mb-1 text-center text-[11px] text-muted-foreground">Hàm trên</p>
+            <div className="overflow-x-auto pb-1">{renderJaw(PRIMARY_UPPER_RIGHT, PRIMARY_UPPER_LEFT)}</div>
+            <p className="mb-1 mt-3 text-center text-[11px] text-muted-foreground">Hàm dưới</p>
+            <div className="overflow-x-auto pb-1">{renderJaw(PRIMARY_LOWER_RIGHT, PRIMARY_LOWER_LEFT)}</div>
+            <p className="mt-3 text-center text-xs text-muted-foreground">Chọn răng để ghi nhận finding theo FDI/ISO 3950.</p>
+          </div>
       )}
 
       <div className="rounded-lg border border-border bg-card p-4">
