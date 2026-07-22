@@ -108,6 +108,17 @@ function toothLabel(n: number) {
   return `#${n}`;
 }
 
+type ToothVisualStatus = "empty" | "good" | "missing" | "unavailable" | "condition";
+
+function getToothVisualStatus(findings: ClinicalFinding[]): ToothVisualStatus {
+  const conditions = new Set(findings.map((finding) => finding.condition));
+  if (conditions.has("missing")) return "missing";
+  if (conditions.has("unerupted") || conditions.has("impacted")) return "unavailable";
+  if (conditions.size > 0 && !(conditions.size === 1 && conditions.has("good"))) return "condition";
+  if (conditions.has("good")) return "good";
+  return "empty";
+}
+
 export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: FdiToothChartProps) {
   const [tab, setTab] = useState<Tab>("tooth");
   const [voiceOpen, setVoiceOpen] = useState(false);
@@ -143,7 +154,7 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
 
   function renderTooth(n: number, side: "right" | "left") {
     const list = findingsByTooth.get(n) ?? [];
-    const hasFinding = list.length > 0;
+    const visualStatus = getToothVisualStatus(list);
     const tooltip = list.map((f) => f.condition).join(", ") || undefined;
     return (
       <button
@@ -152,15 +163,22 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
         title={tooltip ?? `#${n}`}
         onClick={() => setSelected(n)}
         className={cn(
-          "flex h-8 w-8 flex-col items-center justify-center rounded border text-xs transition-colors sm:h-10 sm:w-10",
-          hasFinding
-            ? "border-red-400 bg-red-50 dark:bg-red-950/50 text-red-900 dark:text-red-300"
-            : "border-border bg-background dark:bg-zinc-900 hover:border-primary hover:bg-accent dark:hover:bg-zinc-800",
+          "relative flex h-8 w-8 flex-col items-center justify-center rounded border text-xs transition-colors sm:h-10 sm:w-10",
+          visualStatus === "good" && "border-emerald-400 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
+          visualStatus === "missing" && "border-red-400 bg-red-50 text-red-900 dark:border-red-800 dark:bg-red-950/50 dark:text-red-300",
+          visualStatus === "unavailable" && "border-slate-300 bg-slate-100 text-slate-500 opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400",
+          visualStatus === "condition" && "border-amber-400 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
+          visualStatus === "empty" && "border-border bg-background dark:bg-zinc-900 hover:border-primary hover:bg-accent dark:hover:bg-zinc-800",
           side === "right" ? "border-r-2" : "border-l-2",
         )}
       >
-        <span className="font-mono font-medium text-foreground dark:text-zinc-200">{n}</span>
-        {hasFinding && <span className="text-[8px] text-red-700 dark:text-red-400">{list.length}</span>}
+        <span className="font-mono font-medium">{n}</span>
+        {visualStatus === "missing" && (
+          <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center text-xl font-bold leading-none text-red-600 dark:text-red-400">×</span>
+        )}
+        {list.length > 0 && visualStatus !== "missing" && (
+          <span className="text-[8px] opacity-80">{list.length}</span>
+        )}
       </button>
     );
   }
@@ -310,9 +328,13 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
             </div>
           </div>
           <p className="mt-3 text-center text-xs text-muted-foreground">↓ Hàm dưới</p>
-          <p className="mt-2 text-center text-xs text-muted-foreground">
-            Nhấn răng để thêm tình trạng. Răng đỏ = đã có findings.
-          </p>
+          <div className="mt-4 flex flex-wrap justify-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5"><i className="h-3 w-3 rounded border border-emerald-400 bg-emerald-50 dark:border-emerald-700 dark:bg-emerald-950" />Tốt</span>
+            <span className="inline-flex items-center gap-1.5"><i className="flex h-3 w-3 items-center justify-center rounded border border-red-400 bg-red-50 text-[11px] font-bold leading-none text-red-600 dark:border-red-800 dark:bg-red-950 dark:text-red-400">×</i>Mất răng</span>
+            <span className="inline-flex items-center gap-1.5"><i className="h-3 w-3 rounded border border-slate-300 bg-slate-100 opacity-50 dark:border-slate-700 dark:bg-slate-900" />Chưa mọc, mọc ngầm</span>
+            <span className="inline-flex items-center gap-1.5"><i className="h-3 w-3 rounded border border-amber-400 bg-amber-50 dark:border-amber-700 dark:bg-amber-950" />Tình trạng khác</span>
+          </div>
+          <p className="mt-2 text-center text-xs text-muted-foreground">Nhấn răng để thêm tình trạng.</p>
         </div>
       )}
 
