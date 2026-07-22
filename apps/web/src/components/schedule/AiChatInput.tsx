@@ -69,7 +69,7 @@ export function AiChatInput({ onApply }: AiChatInputProps) {
   }
 
   return (
-    <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50">
+    <Card className="border-purple-200 bg-gradient-to-br from-purple-50 to-blue-50 dark:border-purple-800 dark:from-purple-950/40 dark:to-blue-950/40">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-purple-600 to-blue-600 text-white text-sm">
@@ -104,7 +104,7 @@ export function AiChatInput({ onApply }: AiChatInputProps) {
                   key={i}
                   type="button"
                   onClick={() => setMessage(q)}
-                  className="rounded-full bg-white px-3 py-1 text-xs text-purple-700 border border-purple-200 hover:bg-purple-100"
+                  className="rounded-full border border-purple-200 bg-card px-3 py-1 text-xs text-purple-700 hover:bg-purple-100 dark:border-purple-800 dark:text-purple-300 dark:hover:bg-purple-950/60"
                 >
                   {q}
                 </button>
@@ -122,8 +122,8 @@ export function AiChatInput({ onApply }: AiChatInputProps) {
           </>
         ) : (
           <>
-            <div className="rounded-md border border-purple-200 bg-white p-3 space-y-2 text-sm">
-              <div className="font-medium text-purple-900">{result.appointment.summary}</div>
+            <div className="space-y-2 rounded-md border border-purple-200 bg-card p-3 text-sm dark:border-purple-800">
+              <div className="font-medium text-purple-900 dark:text-purple-200">{result.appointment.summary}</div>
 
               <div className="grid grid-cols-2 gap-2 text-xs">
                 {result.appointment.scheduled_at && (

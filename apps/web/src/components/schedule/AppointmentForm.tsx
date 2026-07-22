@@ -9,7 +9,7 @@ import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/c
 import { apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
-import type { Appointment, DentalChair, Patient, PatientOpenTreatmentMilestone, TreatmentCaseMilestone, UserWithDetails } from "@shared/types";
+import type { Appointment, DentalChair, Patient, PatientOpenTreatmentMilestone, TreatmentCaseMilestone, TreatmentService, UserWithDetails } from "@shared/types";
 import { isAssistantRole, isDoctorRole } from "@shared/constants";
 import { combineDateTime, isoToTime, ymd } from "@/lib/utils";
 import { getMinimumAppointmentTime, getNextAppointmentSlot, isAppointmentTimeInPast } from "@/lib/appointment-time";
@@ -75,6 +75,7 @@ export function AppointmentForm({
     milestone ? [milestone.milestoneId] : [],
   );
   const [patientMilestones, setPatientMilestones] = useState<PatientOpenTreatmentMilestone[]>([]);
+  const [treatmentServices, setTreatmentServices] = useState<TreatmentService[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState("");
   const [loadingPatientMilestones, setLoadingPatientMilestones] = useState(false);
   const [notes, setNotes] = useState("");
@@ -87,6 +88,13 @@ export function AppointmentForm({
       .then((res) => setUsers(res.items))
       .catch(() => setUsers([]));
   }, [open, session]);
+
+  useEffect(() => {
+    if (!open) return;
+    apiGet<{ items: TreatmentService[] }>("/api/clinic/treatment-services")
+      .then((response) => setTreatmentServices(response.items.filter((service) => service.is_active)))
+      .catch(() => setTreatmentServices([]));
+  }, [open]);
 
   useEffect(() => {
     if (!open || !milestone) return;
@@ -135,9 +143,12 @@ export function AppointmentForm({
     }
     setDurationMin(Math.min(
       480,
-      selectedItems.reduce((total, item) => total + item.item.estimated_duration_min, 0),
+      selectedItems.reduce((total, item) => {
+        const serviceDuration = treatmentServices.find((service) => service.code === item.item.service_code)?.estimated_duration_min;
+        return total + (serviceDuration ?? item.item.estimated_duration_min);
+      }, 0),
     ));
-  }, [milestone, milestone?.availableMilestones, patientMilestones, selectedMilestoneIds]);
+  }, [milestone, milestone?.availableMilestones, patientMilestones, selectedMilestoneIds, treatmentServices]);
 
   useEffect(() => {
     if (!open) return;
@@ -481,7 +492,7 @@ export function AppointmentForm({
               <option value="120">120 phút</option>
             </Select>
             {hasLinkedMilestones && (
-              <p className="text-xs text-muted-foreground">Tự động tính theo định mức của thủ thuật đã chọn. Có thể điều chỉnh khi cần.</p>
+              <p className="text-xs text-muted-foreground">Tự động tính theo định mức dịch vụ hiện hành. Có thể điều chỉnh khi cần.</p>
             )}
           </div>
 
