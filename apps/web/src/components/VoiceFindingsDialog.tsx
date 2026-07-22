@@ -71,6 +71,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
       const saved: ClinicalFinding[] = [];
       for (const f of parsedFindings) {
         const created = await apiPost<ClinicalFinding>(`/api/visits/${visitId}/findings`, {
+          category: f.category,
           tooth_number: f.tooth_number,
           scope: f.scope,
           anatomical_site: f.anatomical_site as ClinicalFinding["anatomical_site"],

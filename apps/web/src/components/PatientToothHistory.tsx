@@ -74,58 +74,87 @@ export function PatientToothHistory({ patientId }: PatientToothHistoryProps) {
     }
   }
 
-  function renderTooth(n: number, side: "right" | "left") {
+  function renderTooth(n: number) {
     return (
       <button
         key={n}
         type="button"
-        title={`#${n}`}
+        title={`Xem lịch sử răng #${n}`}
+        aria-label={`Xem lịch sử răng ${n}`}
         onClick={() => openTooth(n)}
-        className={cn(
-          "flex h-8 w-8 items-center justify-center rounded border border-border bg-background text-xs transition-colors hover:border-primary hover:bg-accent sm:h-10 sm:w-10 dark:bg-zinc-900 dark:hover:bg-zinc-800",
-          side === "right" ? "border-r-2" : "border-l-2",
-        )}
+        className="group relative flex h-11 w-9 shrink-0 items-center justify-center transition-transform duration-200 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 sm:h-14 sm:w-11"
       >
-        <span className="font-mono font-medium">{n}</span>
+        <svg
+          viewBox="0 0 48 60"
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full drop-shadow-sm transition-[filter] duration-200 group-hover:drop-shadow-md"
+        >
+          <path
+            d="M8.5 9.5C11.2 3.7 17 2 24 2s12.8 1.7 15.5 7.5c2.6 5.6 1 12.6-1.9 17.5-2.4 4.1-3.1 9.4-4.1 15.3-.9 5.6-2.8 14.2-7.5 14.2-3.2 0-3.4-7.6-5.7-7.6s-2.5 7.6-5.7 7.6c-4.7 0-6.6-8.6-7.5-14.2-1-5.9-1.7-11.2-4.1-15.3-2.9-4.9-4.5-11.9-1.9-17.5Z"
+            className="fill-card stroke-border stroke-[1.5] transition-colors duration-200 group-hover:fill-primary/10 group-hover:stroke-primary"
+          />
+          <path
+            d="M13 11c2.2-3.3 6.1-4.8 11-4.8S32.8 7.7 35 11"
+            className="fill-none stroke-muted-foreground/25 stroke-[1.5]"
+          />
+        </svg>
+        <span className="relative mt-0.5 font-mono text-[10px] font-semibold tracking-tight text-foreground sm:text-xs">
+          {n}
+        </span>
       </button>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-border bg-card p-4">
-        <p className="mb-3 text-center text-xs text-muted-foreground">Răng vĩnh viễn</p>
-        <p className="mb-2 text-center text-xs text-muted-foreground">↑ Hàm trên</p>
-        <div className="overflow-x-auto">
-          <div className="flex min-w-max justify-center gap-0">
-            <div className="flex">{UPPER_RIGHT.map((n) => renderTooth(n, "right"))}</div>
-            <div className="mx-1 w-px flex-shrink-0 bg-border" />
-            <div className="flex">{UPPER_LEFT.map((n) => renderTooth(n, "left"))}</div>
-          </div>
-          <div className="mt-3 flex min-w-max justify-center gap-0">
-            <div className="flex">{LOWER_RIGHT.map((n) => renderTooth(n, "right"))}</div>
-            <div className="mx-1 w-px flex-shrink-0 bg-border" />
-            <div className="flex">{LOWER_LEFT.map((n) => renderTooth(n, "left"))}</div>
-          </div>
+      <div className="overflow-hidden rounded-xl border border-border bg-gradient-to-b from-muted/35 to-card shadow-sm">
+        <div className="border-b border-border bg-card/80 px-4 py-3 text-center">
+          <p className="text-sm font-semibold text-foreground">Sơ đồ răng</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Chọn một răng để xem lịch sử điều trị</p>
         </div>
-        <p className="mt-3 text-center text-xs text-muted-foreground">↓ Hàm dưới</p>
-        <div className="my-4 border-t border-border" />
-        <p className="mb-2 text-center text-xs text-muted-foreground">Răng trẻ em</p>
-        <div className="overflow-x-auto">
-          <div className="flex min-w-max justify-center gap-0">
-            <div className="flex">{PRIMARY_UPPER_RIGHT.map((n) => renderTooth(n, "right"))}</div>
-            <div className="mx-1 w-px flex-shrink-0 bg-border" />
-            <div className="flex">{PRIMARY_UPPER_LEFT.map((n) => renderTooth(n, "left"))}</div>
-          </div>
-          <div className="mt-3 flex min-w-max justify-center gap-0">
-            <div className="flex">{PRIMARY_LOWER_RIGHT.map((n) => renderTooth(n, "right"))}</div>
-            <div className="mx-1 w-px flex-shrink-0 bg-border" />
-            <div className="flex">{PRIMARY_LOWER_LEFT.map((n) => renderTooth(n, "left"))}</div>
-          </div>
+
+        <div className="space-y-5 p-4 sm:p-6">
+          <section aria-label="Sơ đồ răng vĩnh viễn">
+            <div className="mb-3 flex items-center gap-3">
+              <div className="h-px flex-1 bg-border" />
+              <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                Răng vĩnh viễn
+              </p>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+            <div className="overflow-x-auto pb-1">
+              <div className="mx-auto grid w-max min-w-[35rem] grid-cols-[1fr_auto_1fr] items-center gap-x-3 sm:min-w-[43rem]">
+                <div className="flex justify-end gap-0.5">{UPPER_RIGHT.map(renderTooth)}</div>
+                <div className="row-span-2 h-full min-h-28 w-px bg-border" />
+                <div className="flex gap-0.5">{UPPER_LEFT.map(renderTooth)}</div>
+                <div className="mt-1 flex justify-end gap-0.5">{LOWER_RIGHT.map(renderTooth)}</div>
+                <div className="mt-1 flex gap-0.5">{LOWER_LEFT.map(renderTooth)}</div>
+              </div>
+            </div>
+          </section>
+
+          <section aria-label="Sơ đồ răng trẻ em" className="border-t border-border pt-5">
+            <div className="mb-3 flex items-center gap-3">
+              <div className="h-px flex-1 bg-border" />
+              <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                Răng trẻ em
+              </p>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+            <div className="overflow-x-auto pb-1">
+              <div className="mx-auto grid w-max min-w-[22rem] grid-cols-[1fr_auto_1fr] items-center gap-x-3 sm:min-w-[28rem]">
+                <div className="flex justify-end gap-0.5">{PRIMARY_UPPER_RIGHT.map(renderTooth)}</div>
+                <div className="row-span-2 h-full min-h-28 w-px bg-border" />
+                <div className="flex gap-0.5">{PRIMARY_UPPER_LEFT.map(renderTooth)}</div>
+                <div className="mt-1 flex justify-end gap-0.5">{PRIMARY_LOWER_RIGHT.map(renderTooth)}</div>
+                <div className="mt-1 flex gap-0.5">{PRIMARY_LOWER_LEFT.map(renderTooth)}</div>
+              </div>
+            </div>
+          </section>
         </div>
-        <p className="mt-3 text-center text-xs text-muted-foreground">↓ Hàm dưới</p>
-        <p className="mt-4 text-center text-xs text-muted-foreground">
-          Nhấn vào một răng để xem toàn bộ lịch sử qua các lần khám.
+
+        <p className="border-t border-border bg-card/70 px-4 py-3 text-center text-xs text-muted-foreground">
+          Di chuột qua răng để xem lựa chọn, hoặc nhấn để mở lịch sử.
         </p>
       </div>
 
