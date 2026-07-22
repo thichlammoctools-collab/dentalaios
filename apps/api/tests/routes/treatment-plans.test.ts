@@ -149,6 +149,7 @@ describe("POST /api/treatment-plans/:id/items", () => {
           procedure: "filling",
           description: "test",
           unit_cost: 100,
+          estimated_duration_min: 30,
         },
       },
     );
@@ -168,6 +169,7 @@ describe("POST /api/treatment-plans/:id/items", () => {
           procedure: "filling",
           description: "test",
           unit_cost: -100,
+          estimated_duration_min: 30,
         },
       },
     );
@@ -187,6 +189,7 @@ describe("POST /api/treatment-plans/:id/items", () => {
           procedure: "filling",
           description: "test",
           unit_cost: 100,
+          estimated_duration_min: 30,
         },
       },
     );
@@ -208,6 +211,7 @@ describe("POST /api/treatment-plans/:id/items", () => {
           procedure: "filling",
           description: "test",
           unit_cost: 100,
+          estimated_duration_min: 30,
         },
       },
     );
