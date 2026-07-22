@@ -11,6 +11,7 @@ import {
   CLINICAL_FINDING_CATEGORIES,
   PERIODONTAL_POCKET_POINTS,
   PERIODONTAL_SURFACE_OPTIONS,
+  getAnatomicalSiteLabel,
   getFindingCategory,
   getFindingConditionLabel,
 } from "@shared/constants/clinical-findings";
@@ -67,6 +68,7 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
   const [surfaceOrientation, setSurfaceOrientation] = useState<"internal" | "external" | "">("");
   const [otherNotes, setOtherNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [savedMessage, setSavedMessage] = useState("");
 
   const toothDefinition = getFindingCategory(toothTab);
   const otherDefinition = otherCategory ? getFindingCategory(otherCategory) : null;
@@ -81,11 +83,13 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
   }
 
   function openTooth(tooth: number) {
+    setSavedMessage("");
     setSelectedTooth(tooth);
     resetToothForm("tooth_hard_tissue");
   }
 
   function openOther(category: FindingCategory) {
+    setSavedMessage("");
     const definition = getFindingCategory(category);
     setOtherCategory(category);
     setOtherCondition(definition.conditions[0].value);
@@ -101,6 +105,17 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
     if (toothFindings.some((finding) => finding.condition === "missing")) return "border-red-500 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-300";
     if (toothFindings.length) return "border-amber-500 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300";
     return "border-border bg-background hover:border-primary hover:bg-accent";
+  }
+
+  function existingFindings(location: { tooth?: number; site?: AnatomicalSite | "" }): ClinicalFinding[] {
+    if (location.tooth != null) return findings.filter((finding) => finding.scope === "tooth" && finding.tooth_number === location.tooth);
+    if (location.site) return findings.filter((finding) => finding.scope === "region" && finding.anatomical_site === location.site);
+    return [];
+  }
+
+  function ExistingFindingsNotice({ items, location }: { items: ClinicalFinding[]; location: string }) {
+    if (!items.length) return null;
+    return <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"><p className="text-sm font-medium">Đã ghi nhận tại {location}</p><p className="mt-1 text-xs">Kiểm tra các finding bên dưới trước khi lưu để tránh thông tin mâu thuẫn.</p><div className="mt-2 flex flex-wrap gap-1.5">{items.map((finding) => <span key={finding.id} className="rounded-md bg-amber-100 px-2 py-1 text-xs dark:bg-amber-900/60">{getFindingCategory(finding.category).label}: {getFindingConditionLabel(finding.category, finding.condition)}</span>)}</div></div>;
   }
 
   function renderTooth(tooth: number) {
@@ -145,7 +160,9 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
         notes: toothNotes || undefined,
       });
       onCreated(created);
-      toast.success(`Đã lưu finding răng #${selectedTooth}`);
+      const message = `Đã lưu finding răng #${selectedTooth}`;
+      setSavedMessage(message);
+      toast.success(message);
       resetToothForm(toothTab);
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Không thể lưu finding");
@@ -177,7 +194,9 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
         notes: otherNotes || undefined,
       });
       onCreated(created);
-      toast.success("Đã lưu finding lâm sàng");
+      const message = "Đã lưu finding lâm sàng";
+      setSavedMessage(message);
+      toast.success(message);
       openOther(otherCategory);
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Không thể lưu finding");
@@ -209,6 +228,8 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
     <Dialog open={selectedTooth !== null} onOpenChange={(open) => !open && setSelectedTooth(null)}>
       <DialogHeader><DialogTitle>Ghi nhận răng #{selectedTooth}</DialogTitle><p className="mt-1 text-xs text-muted-foreground">Lưu xong có thể tiếp tục ghi nhận trên cùng răng.</p></DialogHeader>
       <DialogBody className="space-y-4">
+        {savedMessage && <div role="status" className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">{savedMessage}</div>}
+        {selectedTooth != null && <ExistingFindingsNotice items={existingFindings({ tooth: selectedTooth })} location={`răng #${selectedTooth}`} />}
         <div className="flex gap-2 border-b border-border"><button type="button" onClick={() => resetToothForm("tooth_hard_tissue")} className={cn("border-b-2 px-3 py-2 text-sm font-medium", toothTab === "tooth_hard_tissue" ? "border-primary text-primary" : "border-transparent text-muted-foreground")}>Răng &amp; mô cứng</button><button type="button" onClick={() => resetToothForm("periodontal")} className={cn("border-b-2 px-3 py-2 text-sm font-medium", toothTab === "periodontal" ? "border-primary text-primary" : "border-transparent text-muted-foreground")}>Nha chu</button></div>
         <div className="grid gap-4 md:grid-cols-2"><div className="grid gap-1.5"><Label htmlFor="tooth-condition">Tình trạng</Label><select id="tooth-condition" value={toothCondition} onChange={(event) => setToothCondition(event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">{toothDefinition.conditions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>
           {toothTab === "tooth_hard_tissue" ? <SurfacePicker label="Mặt răng" options={TOOTH_SURFACES} values={toothSurfaces} onToggle={(value) => toggleValue(setToothSurfaces, toothSurfaces, value)} /> : <SurfacePicker label="Mặt nha chu" options={PERIODONTAL_SURFACE_OPTIONS} values={periodontalSurfaces} onToggle={(value) => toggleValue(setPeriodontalSurfaces, periodontalSurfaces, value)} />}
@@ -221,7 +242,8 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
 
     <Dialog open={otherCategory !== null} onOpenChange={(open) => !open && setOtherCategory(null)}>
       <DialogHeader><DialogTitle>Thêm finding: {otherDefinition?.label}</DialogTitle><p className="mt-1 text-xs text-muted-foreground">{otherDefinition?.description}</p></DialogHeader>
-      {otherDefinition && <><DialogBody className="space-y-4"><div className="grid gap-4 md:grid-cols-2"><div className="grid gap-1.5"><Label htmlFor="other-condition">Tình trạng</Label><select id="other-condition" value={otherCondition} onChange={(event) => setOtherCondition(event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">{otherDefinition.conditions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>{otherDefinition.scope === "region" && <div className="grid gap-1.5"><Label htmlFor="anatomical-site">Vùng giải phẫu</Label><select id="anatomical-site" value={anatomicalSite} onChange={(event) => { setAnatomicalSite(event.target.value as AnatomicalSite); setLaterality(""); setVerticalPosition(""); setSurfaceOrientation(""); }} className="h-9 rounded-md border border-input bg-background px-3 text-sm">{selectableSites(otherCategory as FindingCategory).map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>}</div>
+        {otherDefinition && <><DialogBody className="space-y-4">{savedMessage && <div role="status" className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">{savedMessage}</div>}<div className="grid gap-4 md:grid-cols-2"><div className="grid gap-1.5"><Label htmlFor="other-condition">Tình trạng</Label><select id="other-condition" value={otherCondition} onChange={(event) => setOtherCondition(event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">{otherDefinition.conditions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>{otherDefinition.scope === "region" && <div className="grid gap-1.5"><Label htmlFor="anatomical-site">Vùng giải phẫu</Label><select id="anatomical-site" value={anatomicalSite} onChange={(event) => { setAnatomicalSite(event.target.value as AnatomicalSite); setLaterality(""); setVerticalPosition(""); setSurfaceOrientation(""); }} className="h-9 rounded-md border border-input bg-background px-3 text-sm">{selectableSites(otherCategory as FindingCategory).map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>}</div>
+        {otherDefinition.scope === "region" && anatomicalSite && <ExistingFindingsNotice items={existingFindings({ site: anatomicalSite })} location={getAnatomicalSiteLabel(anatomicalSite)} />}
         {otherDefinition.scope === "region" && anatomicalSite && <div className="grid gap-3 rounded-lg border border-border bg-muted/20 p-3 sm:grid-cols-3">{supportsLaterality(anatomicalSite) && <div className="grid gap-1.5"><Label htmlFor="laterality">Bên</Label><select id="laterality" value={laterality} onChange={(event) => setLaterality(event.target.value as typeof laterality)} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="">Không chỉ định</option><option value="right">Phải</option><option value="left">Trái</option><option value="bilateral">Hai bên</option><option value="midline">Đường giữa</option></select></div>}{supportsVerticalAndOrientation(anatomicalSite) && <><div className="grid gap-1.5"><Label htmlFor="vertical-position">Trên/dưới</Label><select id="vertical-position" value={verticalPosition} onChange={(event) => setVerticalPosition(event.target.value as typeof verticalPosition)} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="">Không chỉ định</option><option value="upper">Trên</option><option value="lower">Dưới</option></select></div><div className="grid gap-1.5"><Label htmlFor="surface-orientation">Bề mặt</Label><select id="surface-orientation" value={surfaceOrientation} onChange={(event) => setSurfaceOrientation(event.target.value as typeof surfaceOrientation)} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="">Không chỉ định</option><option value="internal">Trong</option><option value="external">Ngoài</option></select></div></>}</div>}
         <div className="grid gap-1.5"><Label htmlFor="other-notes">Ghi chú</Label><Textarea id="other-notes" rows={3} value={otherNotes} onChange={(event) => setOtherNotes(event.target.value)} placeholder="Mô tả lâm sàng hoặc chỉ định theo dõi…" /></div></DialogBody><DialogFooter><Button variant="outline" onClick={() => setOtherCategory(null)}>Đóng</Button><Button onClick={saveOtherFinding} disabled={saving}>{saving ? "Đang lưu…" : "Lưu finding"}</Button></DialogFooter></>}
     </Dialog>
