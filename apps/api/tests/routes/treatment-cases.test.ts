@@ -40,6 +40,7 @@ const planItem = {
   procedure: "root_canal",
   description: "Điều trị tủy răng 36",
   unit_cost: 3000000,
+  estimated_duration_min: 60,
   status: "planned",
   created_at: "2026-07-20T08:00:00.000Z",
 };
@@ -171,7 +172,11 @@ describe("treatment case lifecycle", () => {
       { permissions: ["approve_plans"], body: { status: "in_progress" } },
     );
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ id: "milestone-1", status: "in_progress" });
+    expect(await res.json()).toMatchObject({
+      id: "milestone-1",
+      status: "in_progress",
+      item: { estimated_duration_min: 60 },
+    });
   });
 
   it("rejects linking an appointment for another patient", async () => {

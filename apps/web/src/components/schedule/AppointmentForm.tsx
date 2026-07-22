@@ -126,6 +126,20 @@ export function AppointmentForm({
   }, [open, milestone, patientId]);
 
   useEffect(() => {
+    const selectedItems = milestone
+      ? milestoneOptions.filter((item) => selectedMilestoneIds.includes(item.id))
+      : patientMilestones.filter((item) => selectedMilestoneIds.includes(item.milestone_id));
+    if (selectedItems.length === 0) {
+      setDurationMin(30);
+      return;
+    }
+    setDurationMin(Math.min(
+      480,
+      selectedItems.reduce((total, item) => total + item.item.estimated_duration_min, 0),
+    ));
+  }, [milestone, milestoneOptions, patientMilestones, selectedMilestoneIds]);
+
+  useEffect(() => {
     if (!open) return;
     setStep(1);
     const nextSlot = getNextAppointmentSlot();
@@ -456,6 +470,9 @@ export function AppointmentForm({
               value={String(durationMin)}
               onChange={(e) => setDurationMin(Number(e.target.value))}
             >
+              {![15, 30, 45, 60, 90, 120].includes(durationMin) && (
+                <option value={String(durationMin)}>{durationMin} phút</option>
+              )}
               <option value="15">15 phút</option>
               <option value="30">30 phút</option>
               <option value="45">45 phút</option>
@@ -463,6 +480,9 @@ export function AppointmentForm({
               <option value="90">90 phút</option>
               <option value="120">120 phút</option>
             </Select>
+            {hasLinkedMilestones && (
+              <p className="text-xs text-muted-foreground">Tự động tính theo định mức của thủ thuật đã chọn. Có thể điều chỉnh khi cần.</p>
+            )}
           </div>
 
           {chairAvailability.length > 0 && (

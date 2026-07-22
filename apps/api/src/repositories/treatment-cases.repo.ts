@@ -127,7 +127,7 @@ export function createTreatmentCasesRepository(db: D1Database) {
 
     async listMilestones(tenantId: string, caseId: string): Promise<TreatmentCaseMilestone[]> {
       const result = await db.prepare(
-        `SELECT m.*, i.treatment_plan_id AS item_treatment_plan_id, i.tooth_number, i.procedure, i.description, i.unit_cost, i.status AS item_status, i.created_at AS item_created_at,
+         `SELECT m.*, i.treatment_plan_id AS item_treatment_plan_id, i.tooth_number, i.procedure, i.description, i.unit_cost, i.estimated_duration_min, i.status AS item_status, i.created_at AS item_created_at,
                 s.service_code, s.service_name, s.price_includes_vat, s.price_snapshot_at
          FROM treatment_case_milestones m
          JOIN treatment_plan_items i ON i.id = m.treatment_plan_item_id AND i.tenant_id = m.tenant_id
@@ -142,7 +142,7 @@ export function createTreatmentCasesRepository(db: D1Database) {
       const result = await db.prepare(
         `SELECT tc.id AS treatment_case_id, tc.treatment_plan_id, tc.case_number, tc.title AS case_title,
                 m.id AS milestone_id, m.sort_order, m.status,
-                i.id AS treatment_plan_item_id, i.tooth_number, i.procedure, i.description, i.unit_cost,
+                 i.id AS treatment_plan_item_id, i.tooth_number, i.procedure, i.description, i.unit_cost, i.estimated_duration_min,
                 i.status AS item_status, i.created_at AS item_created_at,
                 s.service_code, s.service_name, s.price_includes_vat, s.price_snapshot_at
          FROM treatment_cases tc
@@ -158,7 +158,7 @@ export function createTreatmentCasesRepository(db: D1Database) {
 
     async getMilestone(tenantId: string, caseId: string, milestoneId: string): Promise<TreatmentCaseMilestone | null> {
       const row = await db.prepare(
-        `SELECT m.*, i.treatment_plan_id AS item_treatment_plan_id, i.tooth_number, i.procedure, i.description, i.unit_cost, i.status AS item_status, i.created_at AS item_created_at,
+        `SELECT m.*, i.treatment_plan_id AS item_treatment_plan_id, i.tooth_number, i.procedure, i.description, i.unit_cost, i.estimated_duration_min, i.status AS item_status, i.created_at AS item_created_at,
                 s.service_code, s.service_name, s.price_includes_vat, s.price_snapshot_at
          FROM treatment_case_milestones m
          JOIN treatment_plan_items i ON i.id = m.treatment_plan_item_id AND i.tenant_id = m.tenant_id
