@@ -173,6 +173,7 @@ describe("POST /api/ai/parse-appointment-chat", () => {
         },
       },
     );
+    if (res.status !== 200) throw new Error(await res.text());
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       appointment: { duration_min: number; summary: string };
