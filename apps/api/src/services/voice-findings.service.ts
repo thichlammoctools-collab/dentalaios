@@ -11,13 +11,14 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { createVisitsRepository } from "../repositories/visits.repo";
 import { NotFoundError } from "../lib/errors";
 import { aiModelConfigService } from "./ai-model-config.service";
-import type { AnatomicalSite, FindingCategory, FindingMeasurements, FindingScope } from "@shared/types";
+import type { AnatomicalSite, FindingCategory, FindingLocationDetails, FindingMeasurements, FindingScope } from "@shared/types";
 
 export interface ParsedFinding {
   category: FindingCategory;
   scope: FindingScope;
   tooth_number: number | null;
   anatomical_site?: AnatomicalSite;
+  location_details?: FindingLocationDetails;
   measurements?: FindingMeasurements;
   condition: string;
   notes: string;
@@ -37,6 +38,7 @@ export interface VoiceFindingsDeps {
 const SOFT_TISSUE_AREAS = [
   "gum", "tongue", "buccal", "palate",
   "floor_mouth", "lip", "pharynx", "jaw", "tmj", "salivary_gland",
+  "parotid_gland", "submandibular_gland", "sublingual_gland", "minor_salivary_gland",
 ] as const;
 
 // ─── Main entry point ──────────────────────────────────────────
@@ -77,11 +79,12 @@ export const voiceFindingsService = {
 
 QUY TẮC:
 - Răng và mô cứng: category="tooth_hard_tissue", scope="tooth", tooth_number = số FDI
-- Nha chu: category="periodontal", scope="region", anatomical_site="gum"
+- Nha chu theo răng: category="periodontal", scope="tooth", tooth_number = số FDI, anatomical_site="gum". Vôi răng/viêm nướu có location_details.periodontal_surfaces=[mesial|distal|buccal|lingual]. Viêm nha chu có measurements.periodontal_pocket_depth_mm với các điểm mesiobuccal, midbuccal, distobuccal, mesiolingual, midlingual, distolingual (mm).
 - Mô mềm miệng: category="oral_soft_tissue", scope="region", chọn anatomical_site phù hợp
 - Phân loại khớp cắn: category="occlusion_orthodontics", scope="full_mouth"
 - TMJ/cơ nhai: category="tmj_function", scope="region", anatomical_site="tmj"
 - Khám tổng quát/dự phòng: category="preventive_general", scope="full_mouth"
+- anatomical_site tuyến nước bọt: parotid_gland, submandibular_gland, sublingual_gland hoặc minor_salivary_gland; dùng location_details.laterality khi có bên.
 - condition phải thuộc danh sách: caries, fracture, missing, periapical, calculus, pulpitis, discoloration, wear, other, gingivitis, periodontitis, ulcer, aphtha, leukoplakia, erythroplakia, herpes, candidiasis, fissure, abscess, fistula, recession, hypertrophy, tongue_coating, geographic_tongue, fissured_tongue, macroglossia, torus, tmd_pain, clicking, limitation, sialolith, swelling, staining, halitosis, dry_mouth, bruxism, angle_class_i, angle_class_ii_div_1, angle_class_ii_div_2, angle_class_iii, deep_bite, open_bite, crossbite, edge_to_edge, overjet, crowding, spacing
 - notes là phần mô tả thêm không thuộc condition chuẩn
 - Luôn trả JSON thuần túy, KHÔNG có text giải thích khác
@@ -95,7 +98,8 @@ Format:
       "category": "tooth_hard_tissue|periodontal|oral_soft_tissue|occlusion_orthodontics|tmj_function|preventive_general",
       "scope": "tooth|region|full_mouth",
       "tooth_number": <số FDI hoặc null>,
-      "anatomical_site": "<gum|tongue|buccal|palate|floor_mouth|lip|pharynx|jaw|tmj|salivary_gland — chỉ khi scope=region>",
+       "anatomical_site": "<gum|tongue|buccal|palate|floor_mouth|lip|pharynx|jaw|tmj|parotid_gland|submandibular_gland|sublingual_gland|minor_salivary_gland — chỉ khi scope=region, hoặc gum cho nha chu theo răng>",
+       "location_details": "<object có periodontal_surfaces/laterality/vertical_position/surface_orientation nếu có>",
       "measurements": "<object số đo như overjet_mm hoặc max_opening_mm, hoặc {}>",
       "condition": "<tên tiếng Anh viết thường>",
       "notes": "<mô tả thêm hoặc empty string>"
@@ -166,16 +170,19 @@ function parseVoiceResponse(raw: string): { findings: ParsedFinding[] } | null {
           "họng": "pharynx",
           "xương hàm": "jaw", "hàm": "jaw",
           "khớp": "tmj", "tmj": "tmj",
-          "tuyến": "salivary_gland",
+          "tuyến mang tai": "parotid_gland", "tuyến dưới hàm": "submandibular_gland", "tuyến dưới lưỡi": "sublingual_gland", "tuyến": "minor_salivary_gland",
         };
         return areaMap[a] ?? "gum";
       })();
       const measurements = typeof item.measurements === "object" && item.measurements !== null
         ? item.measurements as FindingMeasurements
         : undefined;
+      const locationDetails = typeof item.location_details === "object" && item.location_details !== null
+        ? item.location_details as FindingLocationDetails
+        : undefined;
       const notes = String(item.notes ?? "").trim();
 
-      return { category, scope, tooth_number: tooth, anatomical_site: area as AnatomicalSite | undefined, measurements, condition, notes };
+      return { category, scope, tooth_number: tooth, anatomical_site: area as AnatomicalSite | undefined, location_details: locationDetails, measurements, condition, notes };
     });
 
     return { findings };

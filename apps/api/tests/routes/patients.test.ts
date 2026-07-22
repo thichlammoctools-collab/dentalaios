@@ -147,6 +147,26 @@ describe("POST /api/patients", () => {
     expect(body.cccd).toBe("012345678912");
   });
 
+  it("returns 400 when CCCD is missing", async () => {
+    const app = mountRoute("/api/patients", patientsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/patients",
+      new Map(),
+      {
+        body: {
+          branch_id: "test-branch",
+          name: "Test",
+          date_of_birth: "1990-01-01",
+          gender: "M",
+          phone: "0901234567",
+        },
+      },
+    );
+    expect(res.status).toBe(400);
+  });
+
   it("returns 400 for missing required field", async () => {
     const app = mountRoute("/api/patients", patientsRoutes);
     const res = await authedRequestWithDB(
@@ -161,6 +181,7 @@ describe("POST /api/patients", () => {
           date_of_birth: "1990-01-01",
           gender: "M",
           phone: "0901234567",
+          cccd: "012345678912",
         },
       },
     );
@@ -184,6 +205,7 @@ describe("POST /api/patients", () => {
           date_of_birth: "1990-13-45",
           gender: "M",
           phone: "0901234567",
+          cccd: "012345678912",
         },
       },
     );
@@ -225,6 +247,7 @@ describe("POST /api/patients", () => {
           date_of_birth: "1990-01-01",
           gender: "M",
           phone: "0901234567",
+          cccd: "012345678912",
         },
       },
     );
@@ -241,9 +264,24 @@ describe("POST /api/patients", () => {
         date_of_birth: "1990-01-01",
         gender: "M",
         phone: "0901234567",
+        cccd: "012345678912",
       },
     });
     expect(res.status).toBe(403);
+  });
+});
+
+describe("PUT /api/patients/:id", () => {
+  it("returns 400 when CCCD is missing", async () => {
+    const app = mountRoute("/api/patients", patientsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "PUT",
+      "/api/patients/patient-1",
+      new Map(),
+      { body: { phone: "0912345678" } },
+    );
+    expect(res.status).toBe(400);
   });
 });
 

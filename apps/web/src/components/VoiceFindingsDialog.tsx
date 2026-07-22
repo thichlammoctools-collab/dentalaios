@@ -6,7 +6,7 @@ import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/c
 import { VoiceInputButton } from "@/components/VoiceInputButton";
 import { apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
-import type { ClinicalFinding, FindingCategory, FindingScope } from "@shared/types";
+import type { ClinicalFinding, FindingCategory, FindingLocationDetails, FindingMeasurements, FindingScope } from "@shared/types";
 import { CLINICAL_FINDING_CATEGORIES, getFindingConditionLabel } from "@shared/constants/clinical-findings";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +15,8 @@ interface ParsedFinding {
   scope: FindingScope;
   tooth_number: number | null;
   anatomical_site?: string;
+  location_details?: FindingLocationDetails;
+  measurements?: FindingMeasurements;
   condition: string;
   notes: string;
 }
@@ -75,6 +77,8 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
           tooth_number: f.tooth_number,
           scope: f.scope,
           anatomical_site: f.anatomical_site as ClinicalFinding["anatomical_site"],
+          location_details: f.location_details,
+          measurements: f.measurements,
           condition: f.condition,
           notes: f.notes || undefined,
         });

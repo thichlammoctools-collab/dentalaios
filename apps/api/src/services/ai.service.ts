@@ -16,7 +16,7 @@ import { NotFoundError } from "../lib/errors";
 import { aiModelConfigService } from "./ai-model-config.service";
 import { isValidFdiTooth } from "@shared/constants";
 import { getAnatomicalSiteLabel, getFindingCategory } from "@shared/constants/clinical-findings";
-import type { FindingCategory, FindingScope } from "@shared/types";
+import type { FindingCategory, FindingLocationDetails, FindingMeasurements, FindingScope } from "@shared/types";
 
 export interface SummarizeResult {
   summary: string;
@@ -51,6 +51,8 @@ export interface ImageAnalysisFinding {
   category: FindingCategory;
   scope: FindingScope;
   anatomical_site?: string;
+  location_details?: FindingLocationDetails;
+  measurements?: FindingMeasurements;
   condition: string;
   description: string;
   recommendation: string;
@@ -269,9 +271,11 @@ FORMAT JSON (bắt buộc):
     {
       "tooth_number": <số FDI hoặc null>,
       "category": "<tooth_hard_tissue | periodontal | oral_soft_tissue | occlusion_orthodontics | tmj_function | preventive_general>",
-      "scope": "<tooth | region | full_mouth>",
-      "anatomical_site": "<gum|tongue|buccal|palate|floor_mouth|lip|pharynx|salivary_gland|tmj, hoặc bỏ trống>",
-      "condition": "<tình trạng bằng tiếng Việt: sâu răng, viêm tủy, viêm quanh răng, tổn thương…>",
+       "scope": "<tooth | region | full_mouth>",
+       "anatomical_site": "<gum|tongue|buccal|palate|floor_mouth|lip|pharynx|parotid_gland|submandibular_gland|sublingual_gland|minor_salivary_gland|tmj, hoặc bỏ trống>",
+       "location_details": "<tooth_surfaces/periodontal_surfaces hoặc laterality nếu xác định được, hoặc bỏ trống>",
+       "measurements": "<periodontal_pocket_depth_mm sáu điểm nếu đo được, hoặc bỏ trống>",
+       "condition": "<tình trạng bằng tiếng Việt: sâu răng, viêm tủy, viêm quanh răng, tổn thương…>",
       "description": "<mô tả chi tiết tổn thương bằng tiếng Việt, 1-2 câu>",
       "recommendation": "<đề xuất điều trị bằng tiếng Việt, 1-2 câu>"
     }
@@ -282,7 +286,7 @@ QUY TẮC QUAN TRỌNG:
 - findings có thể là mảng rỗng [] nếu không phát hiện bất thường
 - tooth_number dùng hệ FDI (VD: 11= răng cửa trên phải, 36= răng hàm dưới trái)
 - category="tooth_hard_tissue" và scope="tooth" khi chỉ 1 răng
-- category="periodontal" hoặc "oral_soft_tissue" với scope="region" khi là nướu/niêm mạc
+- category="periodontal" với scope="tooth" và số FDI khi phát hiện thuộc một răng; oral_soft_tissue với scope="region" khi là niêm mạc
 - category="occlusion_orthodontics" với scope="full_mouth" khi là phân loại khớp cắn
 - category="tmj_function" với scope="region" và anatomical_site="tmj" khi là TMJ/chức năng`;
 
@@ -500,7 +504,7 @@ function conditionVi(cond: string): string {
     "discoloration": "Đổi màu răng",
     "malocclusion": "Răng lệch khớp cắn",
     "sensitivity": "Nhạy cảm răng",
-    "calculus": "Cao răng",
+    "calculus": "Vôi răng",
     "stain": "Đốm răng",
     "pericoronitis": "Viêm quanh răng khôn",
     "fistula": "Rò quanh răng",
@@ -604,6 +608,8 @@ function parseAnalyzeImageResponse(raw: string): { analysis: string; findings: I
             category: isFindingCategory(f.category) ? f.category : "tooth_hard_tissue",
             scope: isFindingScope(f.scope) ? f.scope : "tooth",
             anatomical_site: f.anatomical_site ? String(f.anatomical_site) : undefined,
+            location_details: typeof f.location_details === "object" && f.location_details !== null ? f.location_details as FindingLocationDetails : undefined,
+            measurements: typeof f.measurements === "object" && f.measurements !== null ? f.measurements as FindingMeasurements : undefined,
             condition: String(f.condition || "Không xác định"),
             description: String(f.description || ""),
             recommendation: String(f.recommendation || ""),

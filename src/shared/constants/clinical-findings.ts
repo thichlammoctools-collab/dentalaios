@@ -22,7 +22,10 @@ export const ANATOMICAL_SITE_OPTIONS: Array<{ value: AnatomicalSite; label: stri
   { value: "floor_mouth", label: "Sàn miệng" },
   { value: "lip", label: "Môi" },
   { value: "pharynx", label: "Hầu họng" },
-  { value: "salivary_gland", label: "Tuyến nước bọt" },
+  { value: "parotid_gland", label: "Tuyến mang tai" },
+  { value: "submandibular_gland", label: "Tuyến dưới hàm" },
+  { value: "sublingual_gland", label: "Tuyến dưới lưỡi" },
+  { value: "minor_salivary_gland", label: "Tuyến nước bọt nhỏ" },
   { value: "tmj", label: "Khớp thái dương hàm" },
 ];
 
@@ -48,7 +51,7 @@ export const CLINICAL_FINDING_CATEGORIES: ClinicalFindingCategoryDefinition[] = 
     scope: "region",
     defaultSite: "gum",
     conditions: [
-      { value: "plaque", label: "Mảng bám" }, { value: "calculus", label: "Cao răng" },
+      { value: "plaque", label: "Mảng bám" }, { value: "calculus", label: "Vôi răng" },
       { value: "gingivitis", label: "Viêm nướu" }, { value: "periodontitis", label: "Viêm nha chu" },
       { value: "recession", label: "Tụt nướu" }, { value: "hypertrophy", label: "Phì đại nướu" },
       { value: "abscess", label: "Áp xe nha chu" }, { value: "fistula", label: "Rò nha chu" },
@@ -105,7 +108,7 @@ export const CLINICAL_FINDING_CATEGORIES: ClinicalFindingCategoryDefinition[] = 
     description: "Đánh giá tổng quát và chỉ định dự phòng.",
     scope: "full_mouth",
     conditions: [
-      { value: "plaque", label: "Mảng bám toàn miệng" }, { value: "calculus", label: "Cao răng toàn miệng" },
+      { value: "plaque", label: "Mảng bám toàn miệng" }, { value: "calculus", label: "Vôi răng toàn miệng" },
       { value: "halitosis", label: "Hôi miệng" }, { value: "dry_mouth", label: "Khô miệng" },
       { value: "caries_risk", label: "Nguy cơ sâu răng" }, { value: "oral_hygiene_instruction", label: "Hướng dẫn vệ sinh" },
       { value: "fluoride", label: "Fluoride dự phòng" }, { value: "sealant", label: "Trám bít hố rãnh" },
@@ -126,4 +129,36 @@ export function getFindingConditionLabel(category: FindingCategory, condition: s
 
 export function getAnatomicalSiteLabel(site?: AnatomicalSite): string {
   return ANATOMICAL_SITE_OPTIONS.find((item) => item.value === site)?.label ?? site ?? "";
+}
+
+export const PERIODONTAL_SURFACE_OPTIONS = [
+  { value: "mesial", label: "Gần" },
+  { value: "distal", label: "Xa" },
+  { value: "buccal", label: "Ngoài (má)" },
+  { value: "lingual", label: "Trong (lưỡi/khẩu cái)" },
+] as const;
+
+export const PERIODONTAL_POCKET_POINTS = [
+  { value: "mesiobuccal", label: "Gần - ngoài" },
+  { value: "midbuccal", label: "Giữa - ngoài" },
+  { value: "distobuccal", label: "Xa - ngoài" },
+  { value: "mesiolingual", label: "Gần - trong" },
+  { value: "midlingual", label: "Giữa - trong" },
+  { value: "distolingual", label: "Xa - trong" },
+] as const;
+
+export function getFindingLocationLabel(location?: {
+  laterality?: string;
+  vertical_position?: string;
+  surface_orientation?: string;
+}): string {
+  if (!location) return "";
+  const labels: Record<string, string> = {
+    right: "phải", left: "trái", bilateral: "hai bên", midline: "đường giữa",
+    upper: "trên", lower: "dưới", internal: "trong", external: "ngoài",
+  };
+  return [location.laterality, location.vertical_position, location.surface_orientation]
+    .map((value) => value ? labels[value] ?? value : "")
+    .filter(Boolean)
+    .join(", ");
 }

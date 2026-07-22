@@ -120,7 +120,7 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
           data.referral_notes ?? null,
           data.height_cm ?? null,
           data.weight_kg ?? null,
-          data.cccd ?? null,
+          data.cccd,
         )
         .run();
       const created = await this.getById(tenantId, id);

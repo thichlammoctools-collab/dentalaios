@@ -139,10 +139,12 @@ export const patientCreateSchema = z.object({
   // Body metrics
   height_cm: z.number().positive().max(300).optional(),
   weight_kg: z.number().positive().max(500).optional(),
-  cccd: z.string().regex(/^[0-9]{12}$/, "CCCD phải có đúng 12 chữ số").optional(),
+  cccd: z.string().regex(/^[0-9]{12}$/, "CCCD phải có đúng 12 chữ số"),
 });
 
-export const patientUpdateSchema = patientCreateSchema.partial();
+export const patientUpdateSchema = patientCreateSchema.partial().extend({
+  cccd: z.string().regex(/^[0-9]{12}$/, "CCCD phải có đúng 12 chữ số"),
+});
 
 export type PatientCreateInput = z.infer<typeof patientCreateSchema>;
 export type PatientUpdateInput = z.infer<typeof patientUpdateSchema>;
@@ -204,19 +206,61 @@ export type VisitUpdateInput = z.infer<typeof visitUpdateSchema>;
 const ANATOMICAL_SITES = [
   "gum", "tongue", "buccal", "palate",
   "floor_mouth", "lip", "pharynx", "jaw", "tmj", "salivary_gland",
+  "parotid_gland", "submandibular_gland", "sublingual_gland", "minor_salivary_gland",
 ] as const;
+
+const periodontalPocketPoints = ["mesiobuccal", "midbuccal", "distobuccal", "mesiolingual", "midlingual", "distolingual"] as const;
+const toothSurfaces = z.array(z.enum(["occlusal", "mesial", "distal", "buccal", "lingual"])).min(1);
+const periodontalSurfaces = z.array(z.enum(["mesial", "distal", "buccal", "lingual"])).min(1);
+const findingLocationDetailsSchema = z.object({
+  quadrant: z.enum(["upper_right", "upper_left", "lower_right", "lower_left"]).optional(),
+  laterality: z.enum(["right", "left", "bilateral", "midline"]).optional(),
+  vertical_position: z.enum(["upper", "lower"]).optional(),
+  surface_orientation: z.enum(["internal", "external"]).optional(),
+  tooth_surfaces: toothSurfaces.optional(),
+  periodontal_surfaces: periodontalSurfaces.optional(),
+}).optional();
+const findingMeasurementsSchema = z.record(z.string(), z.union([
+  z.string(), z.number().finite(), z.boolean(),
+  z.object({
+    mesiobuccal: z.number().finite().min(0).max(20).optional(),
+    midbuccal: z.number().finite().min(0).max(20).optional(),
+    distobuccal: z.number().finite().min(0).max(20).optional(),
+    mesiolingual: z.number().finite().min(0).max(20).optional(),
+    midlingual: z.number().finite().min(0).max(20).optional(),
+    distolingual: z.number().finite().min(0).max(20).optional(),
+  }).strict(),
+])).optional();
+
+function validateFindingDetails(data: {
+  category: string;
+  scope: string;
+  anatomical_site?: string;
+  location_details?: { laterality?: string; vertical_position?: string; surface_orientation?: string; periodontal_surfaces?: string[] };
+  measurements?: Record<string, unknown>;
+  condition: string;
+}, ctx: z.RefinementCtx) {
+  const location = data.location_details;
+  const site = data.anatomical_site;
+  const lateralSites = ["tongue", "buccal", "palate", "floor_mouth", "lip", "tmj", "parotid_gland", "submandibular_gland", "sublingual_gland"];
+  const verticalAndOrientationSites = ["buccal", "lip"];
+  if (location?.laterality && !lateralSites.includes(site ?? "")) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["location_details", "laterality"], message: "Vùng giải phẫu này không hỗ trợ chọn bên" });
+  if ((location?.vertical_position || location?.surface_orientation) && !verticalAndOrientationSites.includes(site ?? "")) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["location_details"], message: "Vị trí trên/dưới và trong/ngoài chỉ áp dụng cho môi hoặc niêm mạc má" });
+  if (location?.periodontal_surfaces && !(data.category === "periodontal" && data.scope === "tooth")) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["location_details", "periodontal_surfaces"], message: "Mặt nha chu chỉ áp dụng cho finding nha chu theo răng" });
+  if (["calculus", "gingivitis"].includes(data.condition) && data.category === "periodontal" && data.scope === "tooth" && !location?.periodontal_surfaces?.length) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["location_details", "periodontal_surfaces"], message: "Chọn ít nhất một mặt răng" });
+  if (data.condition === "periodontitis" && data.category === "periodontal" && data.scope === "tooth") {
+    const pockets = data.measurements?.periodontal_pocket_depth_mm;
+    if (!pockets || typeof pockets !== "object" || !periodontalPocketPoints.some((point) => typeof (pockets as Record<string, unknown>)[point] === "number")) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["measurements", "periodontal_pocket_depth_mm"], message: "Viêm nha chu cần ít nhất một độ sâu túi nha chu (mm)" });
+  }
+}
 
 export const findingCreateSchema = z.object({
   tooth_number: z.number().int().nullable(),
   category: z.enum(["tooth_hard_tissue", "periodontal", "oral_soft_tissue", "occlusion_orthodontics", "tmj_function", "preventive_general"]),
   scope: z.enum(["tooth", "region", "full_mouth"]),
   anatomical_site: z.enum(ANATOMICAL_SITES).optional(),
-  location_details: z.object({
-    quadrant: z.enum(["upper_right", "upper_left", "lower_right", "lower_left"]).optional(),
-    laterality: z.enum(["right", "left", "bilateral", "midline"]).optional(),
-    tooth_surfaces: z.array(z.enum(["occlusal", "mesial", "distal", "buccal", "lingual"])).min(1).optional(),
-  }).optional(),
-  measurements: z.record(z.string(), z.union([z.string(), z.number().finite(), z.boolean()])).optional(),
+  location_details: findingLocationDetailsSchema,
+  measurements: findingMeasurementsSchema,
   condition: nonEmpty(100),
   notes: optionalText(2000),
 }).superRefine((data, ctx) => {
@@ -228,6 +272,12 @@ export const findingCreateSchema = z.object({
   }
   if (data.category === "tooth_hard_tissue" && data.scope !== "tooth") {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Finding răng và mô cứng phải gắn với một răng FDI" });
+  }
+  if (data.category === "periodontal" && !["tooth", "region"].includes(data.scope)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Finding nha chu phải gắn răng hoặc vùng nướu" });
+  }
+  if (data.category === "periodontal" && data.scope === "tooth" && data.anatomical_site && data.anatomical_site !== "gum") {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["anatomical_site"], message: "Finding nha chu theo răng thuộc vùng nướu" });
   }
   if (data.category === "oral_soft_tissue" && (data.scope !== "region" || !data.anatomical_site)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Finding mô mềm phải có vùng giải phẫu" });
@@ -241,6 +291,7 @@ export const findingCreateSchema = z.object({
   if (data.category === "preventive_general" && data.scope !== "full_mouth") {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Finding dự phòng áp dụng cho toàn miệng" });
   }
+  validateFindingDetails(data, ctx);
 });
 
 export type FindingCreateInput = z.infer<typeof findingCreateSchema>;
@@ -249,12 +300,8 @@ export const findingUpdateSchema = z.object({
   condition: nonEmpty(100),
   notes: optionalText(2000),
   anatomical_site: z.enum(ANATOMICAL_SITES).optional(),
-  location_details: z.object({
-    quadrant: z.enum(["upper_right", "upper_left", "lower_right", "lower_left"]).optional(),
-    laterality: z.enum(["right", "left", "bilateral", "midline"]).optional(),
-    tooth_surfaces: z.array(z.enum(["occlusal", "mesial", "distal", "buccal", "lingual"])).min(1).optional(),
-  }).optional(),
-  measurements: z.record(z.string(), z.union([z.string(), z.number().finite(), z.boolean()])).optional(),
+  location_details: findingLocationDetailsSchema,
+  measurements: findingMeasurementsSchema,
 });
 
 export type FindingUpdateInput = z.infer<typeof findingUpdateSchema>;

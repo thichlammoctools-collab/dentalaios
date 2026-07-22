@@ -206,6 +206,8 @@ export function PatientImageGallery({
           category: f.category,
           scope: f.scope,
           anatomical_site: f.anatomical_site,
+          location_details: f.location_details,
+          measurements: f.measurements,
           condition: f.condition,
           notes: `${f.description}\nĐề xuất: ${f.recommendation}`,
         }),

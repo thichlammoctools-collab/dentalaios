@@ -4,7 +4,8 @@ import type { PatientCreateInput, PatientUpdateInput } from "@shared/validation"
 import { createPatientsRepository } from "../repositories/patients.repo";
 import { createFindingsRepository } from "../repositories/findings.repo";
 import { assertAllInTenant } from "../lib/tenant-scope";
-import { NotFoundError } from "../lib/errors";
+import { ConflictError, NotFoundError } from "../lib/errors";
+import { isUniqueConstraintError } from "../lib/db-errors";
 
 function displayAddress(data: Pick<Patient, "address" | "address_line" | "ward_name" | "district_name" | "province_name" | "country_name">) {
   const structuredParts = [
@@ -45,33 +46,40 @@ export const patientService = {
         { table: "branches", id: data.branch_id },
         { table: "users", id: data.referral_user_id ?? undefined },
       ]);
-      return createPatientsRepository(db).create(tenantId, {
-      branch_id: data.branch_id,
-      name: data.name,
-      date_of_birth: data.date_of_birth,
-      gender: data.gender,
-      phone: data.phone,
-      email: data.email || undefined,
-        address: displayAddress(data),
-        address_line: data.address_line,
-        ward_name: data.ward_name,
-        ward_code: data.ward_code,
-        district_name: data.district_name,
-        district_code: data.district_code,
-        province_name: data.province_name,
-        country_name: data.country_name ?? "Việt Nam",
-        country_code: data.country_code,
-      family_name: data.family_name ?? undefined,
-      family_phone: data.family_phone ?? undefined,
-      family_relation: data.family_relation ?? undefined,
-      marketing_source: data.marketing_source ?? undefined,
-      referral_type: data.referral_type,
-      referral_user_id: data.referral_user_id ?? undefined,
-      referral_notes: data.referral_notes,
-      height_cm: data.height_cm ?? undefined,
-      weight_kg: data.weight_kg ?? undefined,
-      cccd: data.cccd ?? undefined,
-      });
+      try {
+        return await createPatientsRepository(db).create(tenantId, {
+          branch_id: data.branch_id,
+          name: data.name,
+          date_of_birth: data.date_of_birth,
+          gender: data.gender,
+          phone: data.phone,
+          email: data.email || undefined,
+          address: displayAddress(data),
+          address_line: data.address_line,
+          ward_name: data.ward_name,
+          ward_code: data.ward_code,
+          district_name: data.district_name,
+          district_code: data.district_code,
+          province_name: data.province_name,
+          country_name: data.country_name ?? "Việt Nam",
+          country_code: data.country_code,
+          family_name: data.family_name ?? undefined,
+          family_phone: data.family_phone ?? undefined,
+          family_relation: data.family_relation ?? undefined,
+          marketing_source: data.marketing_source ?? undefined,
+          referral_type: data.referral_type,
+          referral_user_id: data.referral_user_id ?? undefined,
+          referral_notes: data.referral_notes,
+          height_cm: data.height_cm ?? undefined,
+          weight_kg: data.weight_kg ?? undefined,
+          cccd: data.cccd,
+        });
+      } catch (err) {
+        if (isUniqueConstraintError(err)) {
+          throw new ConflictError("Số CCCD đã tồn tại trong phòng khám");
+        }
+        throw err;
+      }
     })();
   },
 
@@ -97,32 +105,39 @@ export const patientService = {
         province_name: data.province_name ?? existing.province_name,
         country_name: data.country_name ?? existing.country_name,
       });
-      return repository.update(tenantId, id, {
-      name: data.name,
-      date_of_birth: data.date_of_birth,
-      gender: data.gender,
-      phone: data.phone,
-      email: data.email ?? undefined,
-        address,
-        address_line: data.address_line,
-        ward_name: data.ward_name,
-        ward_code: data.ward_code,
-        district_name: data.district_name,
-        district_code: data.district_code,
-        province_name: data.province_name,
-        country_name: data.country_name,
-        country_code: data.country_code,
-      family_name: data.family_name ?? undefined,
-      family_phone: data.family_phone ?? undefined,
-      family_relation: data.family_relation ?? undefined,
-      marketing_source: data.marketing_source ?? undefined,
-      referral_type: data.referral_type,
-      referral_user_id: data.referral_user_id ?? undefined,
-      referral_notes: data.referral_notes,
-      height_cm: data.height_cm ?? undefined,
-      weight_kg: data.weight_kg ?? undefined,
-      cccd: data.cccd ?? undefined,
-      });
+      try {
+        return await repository.update(tenantId, id, {
+          name: data.name,
+          date_of_birth: data.date_of_birth,
+          gender: data.gender,
+          phone: data.phone,
+          email: data.email ?? undefined,
+          address,
+          address_line: data.address_line,
+          ward_name: data.ward_name,
+          ward_code: data.ward_code,
+          district_name: data.district_name,
+          district_code: data.district_code,
+          province_name: data.province_name,
+          country_name: data.country_name,
+          country_code: data.country_code,
+          family_name: data.family_name ?? undefined,
+          family_phone: data.family_phone ?? undefined,
+          family_relation: data.family_relation ?? undefined,
+          marketing_source: data.marketing_source ?? undefined,
+          referral_type: data.referral_type,
+          referral_user_id: data.referral_user_id ?? undefined,
+          referral_notes: data.referral_notes,
+          height_cm: data.height_cm ?? undefined,
+          weight_kg: data.weight_kg ?? undefined,
+          cccd: data.cccd,
+        });
+      } catch (err) {
+        if (isUniqueConstraintError(err)) {
+          throw new ConflictError("Số CCCD đã tồn tại trong phòng khám");
+        }
+        throw err;
+      }
     })();
   },
 

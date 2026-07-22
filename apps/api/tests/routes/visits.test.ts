@@ -292,6 +292,45 @@ describe("POST /api/visits/:id/findings", () => {
     });
     expect(res.status).toBe(400);
   });
+
+  it("accepts calculus recorded by periodontal tooth surfaces", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const findingRow = { id: "periodontal-1", tenant_id: "test-tenant", visit_id: "visit-1", category: "periodontal", scope: "tooth", tooth_number: 36, tooth_system: "FDI", anatomical_site: "gum", condition: "calculus", notes: null, created_at: "2026-01-01" };
+    const res = await authedRequestWithDB(app, "POST", "/api/visits/visit-1/findings", new Map([["FROM visits", [visitRow()]], ["FROM clinical_findings", [findingRow]]]), {
+      permissions: ["write_findings"],
+      body: { tooth_number: 36, category: "periodontal", scope: "tooth", anatomical_site: "gum", condition: "calculus", location_details: { periodontal_surfaces: ["buccal", "mesial"] } },
+    });
+    expect(res.status).toBe(201);
+  });
+
+  it("accepts periodontitis with six-point pocket measurements", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const findingRow = { id: "periodontal-2", tenant_id: "test-tenant", visit_id: "visit-1", category: "periodontal", scope: "tooth", tooth_number: 36, tooth_system: "FDI", anatomical_site: "gum", condition: "periodontitis", notes: null, created_at: "2026-01-01" };
+    const res = await authedRequestWithDB(app, "POST", "/api/visits/visit-1/findings", new Map([["FROM visits", [visitRow()]], ["FROM clinical_findings", [findingRow]]]), {
+      permissions: ["write_findings"],
+      body: { tooth_number: 36, category: "periodontal", scope: "tooth", anatomical_site: "gum", condition: "periodontitis", measurements: { periodontal_pocket_depth_mm: { mesiobuccal: 4, mesiolingual: 5 } } },
+    });
+    expect(res.status).toBe(201);
+  });
+
+  it("rejects periodontitis without pocket depth", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const res = await authedRequestWithDB(app, "POST", "/api/visits/visit-1/findings", new Map(), {
+      permissions: ["write_findings"],
+      body: { tooth_number: 36, category: "periodontal", scope: "tooth", anatomical_site: "gum", condition: "periodontitis" },
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("accepts side-specific submandibular gland finding", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const findingRow = { id: "salivary-1", tenant_id: "test-tenant", visit_id: "visit-1", category: "oral_soft_tissue", scope: "region", tooth_number: null, tooth_system: null, anatomical_site: "submandibular_gland", condition: "swelling", notes: null, created_at: "2026-01-01" };
+    const res = await authedRequestWithDB(app, "POST", "/api/visits/visit-1/findings", new Map([["FROM visits", [visitRow()]], ["FROM clinical_findings", [findingRow]]]), {
+      permissions: ["write_findings"],
+      body: { tooth_number: null, category: "oral_soft_tissue", scope: "region", anatomical_site: "submandibular_gland", condition: "swelling", location_details: { laterality: "left" } },
+    });
+    expect(res.status).toBe(201);
+  });
 });
 
 describe("PATCH /api/visits/:id", () => {

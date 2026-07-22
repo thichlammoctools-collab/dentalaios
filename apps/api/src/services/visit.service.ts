@@ -139,7 +139,7 @@ export const visitService = {
       tooth_system: data.scope === "tooth" ? "FDI" : undefined,
       category: data.category,
       scope: data.scope,
-      anatomical_site: data.anatomical_site,
+      anatomical_site: data.category === "periodontal" && data.scope === "tooth" ? "gum" : data.anatomical_site,
       location_details: data.location_details,
       measurements: data.measurements,
       condition: data.condition,

@@ -35,7 +35,7 @@ const CONDITION_LABELS: Record<string, string> = {
   fracture: "Gãy/vỡ",
   missing: "Mất răng",
   periapical: "Viêm quanh chóp",
-  calculus: "Cao răng",
+  calculus: "Vôi răng",
   pulpitis: "Viêm tủy",
   discoloration: "Đổi màu",
   wear: "Mòn răng",
@@ -87,8 +87,8 @@ export function PatientToothHistory({ patientId }: PatientToothHistoryProps) {
         aria-label={`Xem lịch sử răng ${n}`}
         onClick={() => openTooth(n)}
         className={cn(
-          "group relative flex h-12 shrink-0 items-center justify-center transition-transform duration-200 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 sm:h-16",
-          kind === "incisor" ? "w-7 sm:w-9" : kind === "canine" ? "w-8 sm:w-10" : kind === "premolar" ? "w-10 sm:w-12" : "w-11 sm:w-14",
+          "group relative flex h-12 shrink-0 items-center justify-center transition-transform duration-200 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 sm:h-14",
+          kind === "incisor" ? "w-7" : kind === "canine" ? "w-8" : kind === "premolar" ? "w-10" : "w-11",
         )}
       >
         <svg
@@ -157,13 +157,13 @@ export function PatientToothHistory({ patientId }: PatientToothHistoryProps) {
               </p>
               <div className="h-px flex-1 bg-border" />
             </div>
-            <div className="overflow-x-auto pb-1">
-              <div className="mx-auto grid w-max min-w-[35rem] grid-cols-[1fr_auto_1fr] items-center gap-x-3 sm:min-w-[43rem]">
-                <div className="flex justify-end gap-0.5">{UPPER_RIGHT.map(renderTooth)}</div>
-                <div className="row-span-2 h-full min-h-28 w-px bg-border" />
-                <div className="flex gap-0.5">{UPPER_LEFT.map(renderTooth)}</div>
-                <div className="mt-1 flex justify-end gap-0.5">{LOWER_RIGHT.map(renderTooth)}</div>
-                <div className="mt-1 flex gap-0.5">{LOWER_LEFT.map(renderTooth)}</div>
+            <div className="overflow-x-auto pb-1 lg:overflow-x-visible">
+              <div className="mx-auto grid w-max min-w-[35rem] grid-cols-[1fr_auto_1fr] items-center gap-x-2 lg:min-w-0 lg:w-full">
+                <div className="flex justify-end gap-0">{UPPER_RIGHT.map(renderTooth)}</div>
+                <div className="row-span-2 h-full min-h-24 w-px bg-border" />
+                <div className="flex gap-0">{UPPER_LEFT.map(renderTooth)}</div>
+                <div className="mt-1 flex justify-end gap-0">{LOWER_RIGHT.map(renderTooth)}</div>
+                <div className="mt-1 flex gap-0">{LOWER_LEFT.map(renderTooth)}</div>
               </div>
             </div>
           </section>

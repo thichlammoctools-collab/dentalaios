@@ -134,7 +134,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
         referral_type: referralType || undefined,
         referral_user_id: referralUserId || undefined,
         referral_notes: referralNotes || undefined,
-        cccd: cccd || undefined,
+        cccd,
       };
       if (isEdit && patient) {
         await apiPut(`/api/patients/${patient.id}`, payload);
@@ -258,10 +258,13 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="pf-cccd">Số CCCD</Label>
+            <Label htmlFor="pf-cccd">
+              Số CCCD <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="pf-cccd"
               type="text"
+              required
               inputMode="numeric"
               maxLength={12}
               pattern="[0-9]*"

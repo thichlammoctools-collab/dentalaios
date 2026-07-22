@@ -194,7 +194,11 @@ export type AnatomicalSite =
   | "pharynx"       // họng
   | "jaw"           // xương hàm
   | "tmj"           // khớp thái dương hàm
-  | "salivary_gland"; // tuyến nước bọt
+  | "salivary_gland" // tuyến nước bọt (legacy)
+  | "parotid_gland"
+  | "submandibular_gland"
+  | "sublingual_gland"
+  | "minor_salivary_gland";
 
 /** Legacy name retained for API consumers during the clinical finding migration. */
 export type SoftTissueArea = AnatomicalSite;
@@ -202,10 +206,22 @@ export type SoftTissueArea = AnatomicalSite;
 export interface FindingLocationDetails {
   quadrant?: "upper_right" | "upper_left" | "lower_right" | "lower_left";
   laterality?: "right" | "left" | "bilateral" | "midline";
+  vertical_position?: "upper" | "lower";
+  surface_orientation?: "internal" | "external";
   tooth_surfaces?: Array<"occlusal" | "mesial" | "distal" | "buccal" | "lingual">;
+  periodontal_surfaces?: Array<"mesial" | "distal" | "buccal" | "lingual">;
 }
 
-export type FindingMeasurements = Record<string, string | number | boolean>;
+export interface PeriodontalPocketDepths {
+  mesiobuccal?: number;
+  midbuccal?: number;
+  distobuccal?: number;
+  mesiolingual?: number;
+  midlingual?: number;
+  distolingual?: number;
+}
+
+export type FindingMeasurements = Record<string, string | number | boolean | PeriodontalPocketDepths>;
 
 export interface ClinicalFinding {
   id: string;
