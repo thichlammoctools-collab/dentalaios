@@ -41,6 +41,8 @@ import appointmentsRoutes from "./routes/appointments";
 import schedulesRoutes from "./routes/schedules";
 import platformAuthRoutes from "./routes/platform-auth";
 import platformRoutes from "./routes/platform";
+import clinicalTerminologyRoutes from "./routes/clinical-terminology";
+import clinicalReportsRoutes from "./routes/clinical-reports";
 import { TenantDashboardHub } from "./durable-objects/tenant-dashboard-hub";
 import chairsRoutes from "./routes/chairs";
 import referrersRoutes from "./routes/referrers";
@@ -153,6 +155,8 @@ app.route("/api/register", registerRoutes);
 // Platform administration has independent identity, JWT, and RBAC.
 app.route("/api/platform/auth", platformAuthRoutes);
 app.route("/api/platform", platformRoutes);
+app.route("/api/clinical-terminology", clinicalTerminologyRoutes);
+app.route("/api/clinical-reports", clinicalReportsRoutes);
 
 // Dashboard
 app.route("/api/dashboard", dashboardRoutes);

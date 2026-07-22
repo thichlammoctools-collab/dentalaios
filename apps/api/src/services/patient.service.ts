@@ -1,6 +1,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import type { Patient, ToothHistoryEntry } from "@shared/types";
+import type { ClinicalJourney, Patient, ToothHistoryEntry } from "@shared/types";
 import type { PatientCreateInput, PatientUpdateInput } from "@shared/validation";
+import { createClinicalJourneyRepository } from "../repositories/clinical-journey.repo";
 import { createPatientsRepository } from "../repositories/patients.repo";
 import { createFindingsRepository } from "../repositories/findings.repo";
 import { assertAllInTenant } from "../lib/tenant-scope";
@@ -166,6 +167,12 @@ export const patientService = {
     const patient = await createPatientsRepository(db).getById(tenantId, patientId);
     if (!patient) throw new NotFoundError("Patient not found");
     return createFindingsRepository(db).listToothHistory(tenantId, patientId, toothNumber);
+  },
+
+  async clinicalJourney(db: D1Database, tenantId: string, patientId: string): Promise<ClinicalJourney> {
+    const patient = await createPatientsRepository(db).getById(tenantId, patientId);
+    if (!patient) throw new NotFoundError("Patient not found");
+    return createClinicalJourneyRepository(db).getByPatient(tenantId, patientId);
   },
 
   archive(db: D1Database, tenantId: string, id: string, userId: string, reason: string): Promise<boolean> {

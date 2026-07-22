@@ -11,6 +11,7 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { VisitForm } from "@/components/VisitForm";
 import { FdiToothChart } from "@/components/FdiToothChart";
 import { FindingsList } from "@/components/FindingsList";
+import { ClinicalDiagnosesCard } from "@/components/ClinicalDiagnosesCard";
 import { PatientImageGallery } from "@/components/PatientImageGallery";
 import { Dialog, DialogBody, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
@@ -806,6 +807,8 @@ export function VisitDetailPage() {
           />
         </CardContent>
       </Card>
+
+      <ClinicalDiagnosesCard visitId={visit.id} findings={findings} />
 
       {/* Images */}
       <Card>

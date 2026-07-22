@@ -226,7 +226,8 @@ Trả CHÍNH XÁC JSON, KHÔNG thêm text khác:
 
     const findingsText = findings.length
       ? findings.map((f) => {
-        const loc = f.scope === "tooth" ? `${getFindingCategory(f.category).label} · Răng ${f.tooth_number}` : f.scope === "full_mouth" ? getFindingCategory(f.category).label : `${getFindingCategory(f.category).label} (${getAnatomicalSiteLabel(f.anatomical_site)})`;
+        const categoryLabel = f.category ? getFindingCategory(f.category).label : "Finding lâm sàng";
+        const loc = f.scope === "tooth" ? `${categoryLabel} · Răng ${f.tooth_number}` : f.scope === "full_mouth" ? categoryLabel : `${categoryLabel} (${getAnatomicalSiteLabel(f.anatomical_site)})`;
         return `- ${loc}: ${f.condition}${f.notes ? ` (${f.notes})` : ""}`;
       }).join("\n")
       : "Không có findings.";

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { visitCreateSchema, visitUpdateSchema, findingCreateSchema, findingUpdateSchema } from "@shared/validation";
+import { diagnosisCreateSchema, diagnosisUpdateSchema, visitCreateSchema, visitUpdateSchema, findingCreateSchema, findingUpdateSchema } from "@shared/validation";
 import { PERMISSIONS } from "@shared/constants";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
@@ -8,6 +8,7 @@ import { requirePermission } from "../middleware/rbac";
 import { auditLog } from "../middleware/audit";
 import type { AuthContext } from "../middleware/auth";
 import { visitService } from "../services/visit.service";
+import { diagnosisService } from "../services/diagnosis.service";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -75,6 +76,48 @@ router.get(
   async (c) => {
     const jwt = getJwt(c);
     const items = await visitService.listFindings(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    return c.json({ items, total: items.length });
+  },
+);
+
+router.get(
+  "/:id/diagnoses",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const items = await diagnosisService.list(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    return c.json({ items, total: items.length });
+  },
+);
+
+router.post(
+  "/:id/diagnoses",
+  requirePermission(PERMISSIONS.WRITE_FINDINGS),
+  auditLog("create", "clinical_diagnosis"),
+  zValidator("json", diagnosisCreateSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    return c.json(await diagnosisService.create(c.env.DB, jwt.tenant_id, c.req.param("id"), jwt.sub, c.req.valid("json")), 201);
+  },
+);
+
+router.patch(
+  "/:visitId/diagnoses/:diagnosisId",
+  requirePermission(PERMISSIONS.WRITE_FINDINGS),
+  auditLog("update", "clinical_diagnosis"),
+  zValidator("json", diagnosisUpdateSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    return c.json(await diagnosisService.update(c.env.DB, jwt.tenant_id, c.req.param("visitId"), c.req.param("diagnosisId"), jwt.sub, c.req.valid("json")));
+  },
+);
+
+router.get(
+  "/:visitId/diagnoses/:diagnosisId/revisions",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const items = await diagnosisService.revisions(c.env.DB, jwt.tenant_id, c.req.param("visitId"), c.req.param("diagnosisId"));
     return c.json({ items, total: items.length });
   },
 );

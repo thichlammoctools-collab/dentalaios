@@ -341,6 +341,7 @@ function validateFindingDetails(data: {
 
 export const findingCreateSchema = z.object({
   tooth_number: z.number().int().nullable(),
+  concept_id: z.string().min(1).optional(),
   category: z.enum(["tooth_hard_tissue", "periodontal", "oral_soft_tissue", "occlusion_orthodontics", "tmj_function", "preventive_general"]),
   scope: z.enum(["tooth", "region", "full_mouth"]),
   anatomical_site: z.enum(ANATOMICAL_SITES).optional(),
@@ -383,6 +384,7 @@ export type FindingCreateInput = z.infer<typeof findingCreateSchema>;
 
 export const findingUpdateSchema = z.object({
   condition: nonEmpty(100),
+  concept_id: z.string().min(1).nullable().optional(),
   notes: optionalText(2000),
   anatomical_site: z.enum(ANATOMICAL_SITES).optional(),
   location_details: findingLocationDetailsSchema,
@@ -390,6 +392,86 @@ export const findingUpdateSchema = z.object({
 });
 
 export type FindingUpdateInput = z.infer<typeof findingUpdateSchema>;
+
+// ──────────────── Clinical terminology and diagnoses ────────────────
+
+const diagnosisStatuses = ["suspected", "confirmed", "ruled_out", "resolved"] as const;
+const diagnosisSources = ["manual", "finding_confirmed", "voice_suggestion", "image_suggestion", "backfill"] as const;
+const clinicalConceptKinds = ["diagnosis", "observation", "symptom", "risk", "preventive"] as const;
+const terminologyStatuses = ["draft", "approved", "retired"] as const;
+
+export const diagnosisCreateSchema = z.object({
+  source_finding_id: z.string().min(1).nullable().optional(),
+  concept_id: z.string().min(1),
+  icd10_code_id: z.string().min(1).nullable().optional(),
+  status: z.enum(diagnosisStatuses).default("confirmed"),
+  source: z.enum(diagnosisSources).default("manual"),
+  source_text: optionalText(2000),
+  notes: optionalText(2000),
+}).strict();
+
+export const diagnosisUpdateSchema = z.object({
+  concept_id: z.string().min(1).optional(),
+  icd10_code_id: z.string().min(1).nullable().optional(),
+  status: z.enum(diagnosisStatuses).optional(),
+  notes: optionalText(2000),
+  change_reason: nonEmpty(1000),
+}).strict().refine((data) => Object.keys(data).some((key) => key !== "change_reason"), "Cần ít nhất một thay đổi chẩn đoán");
+
+export type DiagnosisCreateInput = z.infer<typeof diagnosisCreateSchema>;
+export type DiagnosisUpdateInput = z.infer<typeof diagnosisUpdateSchema>;
+
+const clinicalConceptCategory = z.enum(["tooth_hard_tissue", "periodontal", "oral_soft_tissue", "occlusion_orthodontics", "tmj_function", "preventive_general"]);
+const clinicalFindingScope = z.enum(["tooth", "region", "full_mouth"]);
+
+export const terminologyVersionCreateSchema = z.object({
+  system: z.enum(["LOCAL", "ICD10_VN"]),
+  version_key: z.string().trim().min(2).max(100).regex(/^[A-Za-z0-9._-]+$/),
+  title: nonEmpty(300),
+  publisher: optionalText(300),
+  published_at: z.string().datetime({ offset: true }).optional(),
+  source_url: z.string().url().optional(),
+  source_file_name: optionalText(300),
+  source_sha256: z.string().regex(/^[a-fA-F0-9]{64}$/, "SHA-256 phải có 64 ký tự hex").optional(),
+}).strict().superRefine((data, ctx) => {
+  if (data.system === "ICD10_VN" && (!data.publisher || !data.source_file_name || !data.source_sha256)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "ICD-10 Việt Nam cần cơ quan ban hành, tệp nguồn và SHA-256" });
+  }
+});
+
+export const terminologyVersionPublishSchema = z.object({ status: z.enum(terminologyStatuses) }).strict();
+
+export const clinicalConceptCreateSchema = z.object({
+  code: z.string().trim().min(3).max(100).regex(/^[a-z0-9._-]+$/),
+  legacy_condition: z.string().trim().min(1).max(100),
+  kind: z.enum(clinicalConceptKinds),
+  category: clinicalConceptCategory,
+  default_scope: clinicalFindingScope,
+  default_anatomical_site: z.enum(ANATOMICAL_SITES).nullable().optional(),
+  display_vi: nonEmpty(300),
+  description_vi: optionalText(2000),
+  is_active: z.boolean().default(true),
+  sort_order: z.number().int().min(0).max(100000).default(0),
+}).strict();
+
+export const clinicalConceptUpdateSchema = clinicalConceptCreateSchema.omit({ code: true }).partial().refine((data) => Object.keys(data).length > 0, "Cần ít nhất một trường để cập nhật");
+
+export const icd10ImportSchema = z.object({
+  terminology_version_id: z.string().min(1),
+  codes: z.array(z.object({
+    code: z.string().trim().min(1).max(20).regex(/^[A-Z][0-9]{2}(\.[0-9A-Z]{1,4})?$/),
+    display_vi: nonEmpty(500),
+    parent_code: z.string().trim().min(1).max(20).nullable().optional(),
+    is_billable: z.boolean().default(true),
+    sort_order: z.number().int().min(0).max(1_000_000).default(0),
+  }).strict()).min(1).max(5000),
+}).strict();
+
+export const clinicalConceptMappingCreateSchema = z.object({
+  concept_id: z.string().min(1),
+  icd10_code_id: z.string().min(1),
+  mapping_role: z.enum(["primary", "alternative"]).default("primary"),
+}).strict();
 
 // ──────────────── Treatment plan ────────────────
 

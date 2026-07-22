@@ -14,7 +14,7 @@ export interface FindingsRepository {
   update(
     tenantId: string,
     id: string,
-    data: Pick<ClinicalFinding, "condition" | "anatomical_site" | "location_details" | "measurements"> & { notes: string | null },
+    data: Pick<ClinicalFinding, "condition" | "concept_id" | "anatomical_site" | "location_details" | "measurements"> & { notes: string | null },
   ): Promise<ClinicalFinding>;
   delete(tenantId: string, id: string): Promise<boolean>;
 }
@@ -96,14 +96,16 @@ export function createFindingsRepository(db: D1Database): FindingsRepository {
 
     async create(tenantId, visitId, data) {
       const id = crypto.randomUUID();
+      const code = await allocateFindingCode(db, tenantId);
       await db
         .prepare(
           `INSERT INTO clinical_findings
-              (id, tenant_id, visit_id, category, scope, tooth_number, tooth_system, anatomical_site, location_details_json, measurements_json, condition, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              (id, code, tenant_id, visit_id, category, scope, tooth_number, tooth_system, anatomical_site, location_details_json, measurements_json, condition, concept_id, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
+          code,
           tenantId,
           visitId,
           data.category,
@@ -114,6 +116,7 @@ export function createFindingsRepository(db: D1Database): FindingsRepository {
           data.location_details ? JSON.stringify(data.location_details) : null,
           data.measurements ? JSON.stringify(data.measurements) : null,
           data.condition,
+          data.concept_id ?? null,
           data.notes ?? null,
         )
         .run();
@@ -129,7 +132,7 @@ export function createFindingsRepository(db: D1Database): FindingsRepository {
       await db
         .prepare(
           `UPDATE clinical_findings
-             SET condition = ?, notes = ?,
+             SET condition = ?, concept_id = COALESCE(?, concept_id), notes = ?,
                  anatomical_site = COALESCE(?, anatomical_site),
                  location_details_json = COALESCE(?, location_details_json),
                  measurements_json = COALESCE(?, measurements_json)
@@ -137,6 +140,7 @@ export function createFindingsRepository(db: D1Database): FindingsRepository {
         )
         .bind(
           data.condition,
+          data.concept_id ?? null,
           data.notes,
           data.anatomical_site ?? null,
           data.location_details ? JSON.stringify(data.location_details) : null,
@@ -167,11 +171,13 @@ function mapFinding(row: D1Row): ClinicalFinding {
   const scope = (row.scope as ClinicalFinding["scope"]) || "tooth";
   return {
     id: row.id as string,
+    code: (row.code as string | null) ?? undefined,
     tenant_id: row.tenant_id as string,
     visit_id: row.visit_id as string,
     tooth_number: row.tooth_number as number | undefined,
     tooth_system: (row.tooth_system as ClinicalFinding["tooth_system"]) || undefined,
     category: row.category as ClinicalFinding["category"],
+    concept_id: (row.concept_id as string | null) ?? undefined,
     scope,
     anatomical_site: (row.anatomical_site as AnatomicalSite | undefined) ?? undefined,
     location_details: parseJson<FindingLocationDetails>(row.location_details_json),
@@ -180,6 +186,28 @@ function mapFinding(row: D1Row): ClinicalFinding {
     notes: (row.notes as string | null) ?? undefined,
     created_at: row.created_at as string,
   };
+}
+
+async function allocateFindingCode(db: D1Database, tenantId: string): Promise<string> {
+  const dateKey = hoChiMinhDateKey();
+  const row = await db.prepare(
+    `INSERT INTO clinical_document_code_counters (tenant_id, document_type, date_key, last_seq)
+     VALUES (?, 'finding', ?, 1)
+     ON CONFLICT(tenant_id, document_type, date_key) DO UPDATE SET last_seq = last_seq + 1
+     RETURNING last_seq`,
+  ).bind(tenantId, dateKey).first<{ last_seq: number }>();
+  return `FND-${dateKey}-${String(row?.last_seq ?? 1).padStart(4, "0")}`;
+}
+
+function hoChiMinhDateKey(): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value;
+  return `${part("year")}${part("month")}${part("day")}`;
 }
 
 function parseJson<T>(value: unknown): T | undefined {

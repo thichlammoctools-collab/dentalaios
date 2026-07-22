@@ -345,9 +345,13 @@ export type FindingMeasurements = Record<string, string | number | boolean | Per
 
 export interface ClinicalFinding {
   id: string;
+  /** Immutable human-readable finding code, e.g. FND-20260722-0001. */
+  code?: string;
   tenant_id: string;
   visit_id: string;
   category: FindingCategory;
+  /** Optional standardized concept. Legacy rows retain only `condition`. */
+  concept_id?: string;
   tooth_number?: number; // present when scope = "tooth"
   tooth_system?: ToothSystem; // always present when tooth_number is present
   scope: FindingScope;
@@ -357,6 +361,153 @@ export interface ClinicalFinding {
   condition: string; // e.g. "caries", "fracture", "gingivitis", "ulcer"
   notes?: string;
   created_at: string;
+}
+
+export type ClinicalConceptKind = "diagnosis" | "observation" | "symptom" | "risk" | "preventive";
+export type TerminologySystem = "LOCAL" | "ICD10_VN";
+export type TerminologyVersionStatus = "draft" | "approved" | "retired";
+export type ClinicalDiagnosisStatus = "suspected" | "confirmed" | "ruled_out" | "resolved";
+export type ClinicalDiagnosisSource = "manual" | "finding_confirmed" | "voice_suggestion" | "image_suggestion" | "backfill";
+
+export interface TerminologyVersion {
+  id: string;
+  system: TerminologySystem;
+  version_key: string;
+  title: string;
+  publisher?: string;
+  published_at?: string;
+  source_url?: string;
+  source_file_name?: string;
+  source_sha256?: string;
+  status: TerminologyVersionStatus;
+  approved_by?: string;
+  approved_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClinicalConcept {
+  id: string;
+  code: string;
+  legacy_condition: string;
+  kind: ClinicalConceptKind;
+  category: FindingCategory;
+  default_scope: FindingScope;
+  default_anatomical_site?: AnatomicalSite;
+  display_vi: string;
+  description_vi?: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  version_id?: string;
+  default_icd10?: Icd10Code;
+}
+
+export interface Icd10Code {
+  id: string;
+  terminology_version_id: string;
+  code: string;
+  display_vi: string;
+  parent_code?: string;
+  is_billable: boolean;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface ClinicalConceptIcd10Mapping {
+  id: string;
+  concept_version_id: string;
+  icd10_code_id: string;
+  mapping_role: "primary" | "alternative";
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface ClinicalDiagnosis {
+  id: string;
+  tenant_id: string;
+  visit_id: string;
+  patient_id: string;
+  source_finding_id?: string;
+  concept_id: string;
+  concept_version_id: string;
+  status: ClinicalDiagnosisStatus;
+  icd10_code_id?: string;
+  icd10_version_id?: string;
+  icd10_code_snapshot?: string;
+  icd10_display_vi_snapshot?: string;
+  concept_code_snapshot: string;
+  concept_display_vi_snapshot: string;
+  mapping_id?: string;
+  mapping_role?: "primary" | "alternative";
+  source: ClinicalDiagnosisSource;
+  source_text?: string;
+  confirmed_by?: string;
+  confirmed_at?: string;
+  ruled_out_at?: string;
+  resolved_at?: string;
+  notes?: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  current_revision: number;
+}
+
+export interface ClinicalDiagnosisRevision {
+  id: string;
+  tenant_id: string;
+  diagnosis_id: string;
+  revision_no: number;
+  change_reason: string;
+  before_json: string;
+  after_json: string;
+  changed_by: string;
+  changed_at: string;
+}
+
+export interface ClinicalJourneyVisit {
+  id: string;
+  date: string;
+  status: VisitStatus;
+  treating_clinician_name?: string;
+  assistant_name?: string;
+}
+
+export interface ClinicalJourneyFinding {
+  id: string;
+  code?: string;
+  visit_id: string;
+}
+
+export interface ClinicalJourneyPlan {
+  id: string;
+  code?: string;
+  visit_id: string;
+  status: TreatmentPlanStatus;
+  clinician_names: string[];
+  assistant_names: string[];
+}
+
+export interface ClinicalJourneyCompletedProcedure {
+  id: string;
+  completed_at: string;
+  treatment_plan_id: string;
+  plan_code?: string;
+  procedure: string;
+  service_name?: string;
+  tooth_number?: number;
+  notes?: string;
+  clinician_name?: string;
+  assistant_name?: string;
+}
+
+export interface ClinicalJourney {
+  visits: ClinicalJourneyVisit[];
+  findings: ClinicalJourneyFinding[];
+  plans: ClinicalJourneyPlan[];
+  completed_procedures: ClinicalJourneyCompletedProcedure[];
 }
 
 // ───────────────────────── Treatment ─────────────────────────
@@ -1133,6 +1284,8 @@ export type PlatformPermission =
   | "platform_admins.write"
   | "platform_procedures.read"
   | "platform_procedures.write"
+  | "platform_clinical_terminology.read"
+  | "platform_clinical_terminology.write"
   | "platform_ai_config.read"
   | "platform_ai_config.write"
   | "platform_audit.read";

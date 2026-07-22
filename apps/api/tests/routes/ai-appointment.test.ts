@@ -63,6 +63,37 @@ const findingRow = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+const diagnosisRow = (overrides: Record<string, unknown> = {}) => ({
+  id: "diagnosis-1",
+  tenant_id: "test-tenant",
+  visit_id: "visit-1",
+  patient_id: "patient-1",
+  source_finding_id: "finding-1",
+  concept_id: "concept-caries",
+  concept_version_id: "concept-version-caries",
+  status: "confirmed",
+  icd10_code_id: "icd-k02-9",
+  icd10_version_id: "icd-vn-1",
+  icd10_code_snapshot: "K02.9",
+  icd10_display_vi_snapshot: "Sâu răng, không xác định",
+  concept_code_snapshot: "dental.caries",
+  concept_display_vi_snapshot: "Sâu răng",
+  mapping_id: "mapping-caries",
+  mapping_role: "primary",
+  source: "manual",
+  source_text: null,
+  confirmed_by: "doc-1",
+  confirmed_at: "2026-07-15T10:00:00.000Z",
+  ruled_out_at: null,
+  resolved_at: null,
+  notes: null,
+  created_by: "doc-1",
+  created_at: "2026-07-15T10:00:00.000Z",
+  updated_at: "2026-07-15T10:00:00.000Z",
+  current_revision: 1,
+  ...overrides,
+});
+
 const planRow = (overrides: Record<string, unknown> = {}) => ({
   id: "plan-1",
   tenant_id: "test-tenant",
@@ -113,6 +144,7 @@ describe("POST /api/ai/generate-plan", () => {
       new Map([
         ["FROM visits", [visitRow()]],
         ["FROM clinical_findings", [findingRow({ condition: "caries" })]],
+        ["FROM clinical_diagnoses", [diagnosisRow()]],
         ["FROM patients", [patientRow()]],
         ["FROM treatment_services", [treatmentServiceRow()]],
       ]),
@@ -142,6 +174,7 @@ describe("POST /api/ai/generate-plan", () => {
       new Map([
         ["FROM visits", [visitRow()]],
         ["FROM clinical_findings", [findingRow({ condition: "caries" })]],
+        ["FROM clinical_diagnoses", [diagnosisRow()]],
         ["FROM patients", [patientRow()]],
         ["FROM treatment_services", [treatmentServiceRow({ is_active: 0 })]],
       ]),

@@ -750,11 +750,6 @@ export function PatientDetailPage() {
             <CardContent>
               <PatientClinicalJourney
                 patientId={patient.id}
-                visits={visits}
-                plans={plans}
-                payments={payments}
-                appointments={appointments}
-                onPaymentClick={setViewingPaymentId}
               />
             </CardContent>
           </Card>

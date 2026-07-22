@@ -117,6 +117,55 @@ describe("GET /api/patients/:id/open-treatment-milestones", () => {
   });
 });
 
+describe("GET /api/patients/:id/clinical-journey", () => {
+  it("returns coded findings, summarized plans, and completed procedures", async () => {
+    const app = mountRoute("/api/patients", patientsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "GET",
+      "/api/patients/patient-1/clinical-journey",
+      new Map([
+        ["FROM patients p", [patientRow()]],
+        ["FROM visits v", [{
+          id: "visit-1", date: "2026-07-20T02:00:00.000Z", status: "completed",
+          treating_clinician_name: "BS Nam", assistant_name: "PT Hoa",
+        }]],
+        ["FROM clinical_findings cf", [{ id: "finding-1", code: "FND-20260720-0001", visit_id: "visit-1" }]],
+        ["GROUP_CONCAT(DISTINCT item_clinician.name)", [{
+          id: "plan-1", code: "KHD-20260720-0001", visit_id: "visit-1", status: "approved",
+          item_clinician_names: "BS Lan,BS Nam", item_assistant_names: null,
+          visit_clinician_name: "BS Nam", visit_assistant_name: "PT Hoa",
+        }]],
+        ["WITH ranked_links", [{
+          id: "milestone-1", completed_at: "2026-07-22T07:00:00.000Z", treatment_plan_id: "plan-1",
+          plan_code: "KHD-20260720-0001", procedure: "filling", service_name: "Trám composite",
+          tooth_number: 21, notes: "Hoàn tất trám", clinician_name: "BS Thảo", assistant_name: "PT Mai",
+        }]],
+      ]),
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      visits: [{ id: "visit-1", treating_clinician_name: "BS Nam" }],
+      findings: [{ code: "FND-20260720-0001", visit_id: "visit-1" }],
+      plans: [{
+        code: "KHD-20260720-0001",
+        clinician_names: ["BS Lan", "BS Nam"],
+        assistant_names: ["PT Hoa"],
+      }],
+      completed_procedures: [{
+        id: "milestone-1", completed_at: "2026-07-22T07:00:00.000Z",
+        notes: "Hoàn tất trám", clinician_name: "BS Thảo", assistant_name: "PT Mai",
+      }],
+    });
+  });
+
+  it("returns 403 without patient read permission", async () => {
+    const app = mountRoute("/api/patients", patientsRoutes);
+    const res = await authedRequest(app, "GET", "/api/patients/patient-1/clinical-journey", { permissions: ["write_visits"] });
+    expect(res.status).toBe(403);
+  });
+});
+
 describe("POST /api/patients", () => {
   it("returns 201 + patient for valid data", async () => {
     const app = mountRoute("/api/patients", patientsRoutes);

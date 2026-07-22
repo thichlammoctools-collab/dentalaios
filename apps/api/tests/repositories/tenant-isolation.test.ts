@@ -107,12 +107,12 @@ describe("Tenant isolation: patients.repo", () => {
     expect(calls).toHaveLength(0); // no UPDATE was issued (no fields to update)
   });
 
-  it("delete() scopes by tenant_id", async () => {
-    await createPatientsRepository(db as any).delete(TENANT_A, PATIENT_A1);
-    const calls = db.__sqlContaining("DELETE FROM patients");
-    expect(calls[0].sql).toMatch(/DELETE FROM patients WHERE tenant_id = \? AND id = \?/i);
-    expect(calls[0].binds[0]).toBe(TENANT_A);
-    expect(calls[0].binds[1]).toBe(PATIENT_A1);
+  it("archive() scopes by tenant_id", async () => {
+    await createPatientsRepository(db as any).archive(TENANT_A, PATIENT_A1, "user-1", "No longer active");
+    const calls = db.__sqlContaining("UPDATE patients SET archived_at");
+    expect(calls[0].sql).toMatch(/WHERE tenant_id = \? AND id = \?/i);
+    expect(calls[0].binds.at(-2)).toBe(TENANT_A);
+    expect(calls[0].binds.at(-1)).toBe(PATIENT_A1);
   });
 });
 
@@ -145,7 +145,7 @@ describe("Tenant isolation: visits.repo", () => {
       clinician_id: "doc-1",
     });
     const calls = db.__sqlContaining("INSERT INTO visits");
-    expect(calls[0].binds[1]).toBe(TENANT_A);
+    expect(calls[0].binds[2]).toBe(TENANT_A);
   });
 
   it("getById() scopes by tenant_id", async () => {
@@ -184,7 +184,7 @@ describe("Tenant isolation: findings.repo", () => {
       condition: "caries",
     });
     const calls = db.__sqlContaining("INSERT INTO clinical_findings");
-    expect(calls[0].binds[1]).toBe(TENANT_A);
+    expect(calls[0].binds[2]).toBe(TENANT_A);
   });
 
   it("delete() scopes by tenant_id", async () => {
@@ -237,7 +237,7 @@ describe("Tenant isolation: treatment-plans.repo", () => {
       currency: "VND",
     });
     const calls = db.__sqlContaining("INSERT INTO treatment_plans");
-    expect(calls[0].binds[1]).toBe(TENANT_A);
+    expect(calls[0].binds[2]).toBe(TENANT_A);
   });
 
   it("approve() scopes by tenant_id AND status filter", async () => {

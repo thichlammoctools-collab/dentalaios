@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { apiPost, ApiError } from "@/lib/api";
+import { apiGet, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import {
@@ -15,7 +15,7 @@ import {
   getFindingCategory,
   getFindingConditionLabel,
 } from "@shared/constants/clinical-findings";
-import type { AnatomicalSite, ClinicalFinding, FindingCategory, FindingLocationDetails, FindingMeasurements, PeriodontalPocketDepths } from "@shared/types";
+import type { AnatomicalSite, ClinicalConcept, ClinicalFinding, FindingCategory, FindingLocationDetails, FindingMeasurements, PeriodontalPocketDepths } from "@shared/types";
 
 interface FdiToothChartProps {
   visitId: string;
@@ -69,6 +69,13 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
   const [otherNotes, setOtherNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
+  const [concepts, setConcepts] = useState<ClinicalConcept[]>([]);
+
+  useEffect(() => {
+    void apiGet<{ items: ClinicalConcept[] }>("/api/clinical-terminology/concepts")
+      .then((response) => setConcepts(response.items))
+      .catch(() => undefined);
+  }, []);
 
   const toothDefinition = getFindingCategory(toothTab);
   const otherDefinition = otherCategory ? getFindingCategory(otherCategory) : null;
@@ -80,6 +87,10 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
     setPeriodontalSurfaces([]);
     setPocketDepths({});
     setToothNotes("");
+  }
+
+  function conceptFor(category: FindingCategory, scope: string, condition: string) {
+    return concepts.find((concept) => concept.category === category && concept.default_scope === scope && concept.legacy_condition === condition);
   }
 
   function openTooth(tooth: number) {
@@ -157,6 +168,7 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
         location_details: locationDetails,
         measurements,
         condition: toothCondition,
+        concept_id: (() => { const concept = conceptFor(toothTab, "tooth", toothCondition); return concept?.kind === "diagnosis" ? undefined : concept?.id; })(),
         notes: toothNotes || undefined,
       });
       onCreated(created);
@@ -191,6 +203,7 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
         anatomical_site: otherDefinition.scope === "region" ? anatomicalSite : undefined,
         location_details: locationDetails,
         condition: otherCondition,
+        concept_id: (() => { const concept = conceptFor(otherCategory, otherDefinition.scope, otherCondition); return concept?.kind === "diagnosis" ? undefined : concept?.id; })(),
         notes: otherNotes || undefined,
       });
       onCreated(created);

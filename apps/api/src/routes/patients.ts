@@ -60,6 +60,15 @@ router.post(
 
 // GET /api/patients/:id
 router.get(
+  "/:id/clinical-journey",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    return c.json(await patientService.clinicalJourney(c.env.DB, jwt.tenant_id, c.req.param("id")));
+  },
+);
+
+router.get(
   "/:id/open-treatment-milestones",
   requirePermission(PERMISSIONS.READ_PATIENTS),
   async (c) => {

@@ -8,6 +8,7 @@
 import type { D1Database, R2Bucket, R2ObjectBody } from "@cloudflare/workers-types";
 import { createVisitsRepository } from "../repositories/visits.repo";
 import { createFindingsRepository } from "../repositories/findings.repo";
+import { createDiagnosesRepository } from "../repositories/diagnoses.repo";
 import { createTreatmentPlansRepository } from "../repositories/treatment-plans.repo";
 import { createTreatmentItemsRepository } from "../repositories/treatment-items.repo";
 import { createPatientsRepository } from "../repositories/patients.repo";
@@ -141,6 +142,7 @@ export const aiService = {
 
     const visitsRepo = createVisitsRepository(db);
     const findingsRepo = createFindingsRepository(db);
+    const diagnosesRepo = createDiagnosesRepository(db);
     const patientsRepo = createPatientsRepository(db);
     const treatmentServicesRepo = createTreatmentServicesRepository(db);
 
@@ -148,8 +150,9 @@ export const aiService = {
     if (!visit) throw new NotFoundError("Visit not found");
 
     const patient = await patientsRepo.getById(tenantId, visit.patient_id);
-    const [findings, services] = await Promise.all([
+    const [findings, diagnoses, services] = await Promise.all([
       findingsRepo.listByVisit(tenantId, visitId),
+      diagnosesRepo.listConfirmedByVisit(tenantId, visitId),
       treatmentServicesRepo.list(tenantId),
     ]);
     const activeServices = services.filter((service) => service.is_active);
@@ -163,6 +166,9 @@ export const aiService = {
           return `  - ${loc}: ${f.condition}${f.notes ? ` (${f.notes})` : ""}`;
         }).join("\n")
       : "  (không có clinical findings)";
+    const diagnosesText = diagnoses.length
+      ? diagnoses.map((diagnosis) => `  - ${diagnosis.concept_display_vi_snapshot} (${diagnosis.icd10_code_snapshot}: ${diagnosis.icd10_display_vi_snapshot})`).join("\n")
+      : "  (chưa có chẩn đoán ICD-10 xác nhận)";
 
     const catalogText = activeServices.length
       ? activeServices.map((service) =>
@@ -177,6 +183,9 @@ NGÀY KHÁM: ${new Date(visit.date).toLocaleDateString("vi-VN")}
 
 CLINICAL FINDINGS:
 ${findingsText}
+
+CHẨN ĐOÁN ICD-10 ĐÃ XÁC NHẬN:
+${diagnosesText}
 
 DANH MỤC DỊCH VỤ ĐIỀU TRỊ ĐANG HOẠT ĐỘNG CỦA PHÒNG KHÁM:
 ${catalogText}
@@ -196,7 +205,7 @@ Hãy trả lời CHÍNH XÁC theo format JSON bên dưới (KHÔNG thêm text g�
 }
 
 QUY TẮC QUAN TRỌNG:
-- Chỉ đề xuất điều trị dựa trên clinical findings có sẵn
+- Chỉ đề xuất điều trị dựa trên clinical findings và chẩn đoán ICD-10 đã xác nhận có sẵn
 - Mỗi finding chỉ cần 1 item điều trị chính
 - Finding "toàn hàm" → tooth = null, procedure phù hợp (scaling, fluoride…)
 - Finding "mô mềm" → tooth = null, procedure = examination hoặc treatment phù hợp
@@ -230,7 +239,7 @@ QUY TẮC QUAN TRỌNG:
     }
 
     // Fallback: rule-based plan
-    return buildFallbackPlan(findings, visit, patient, activeServices);
+    return buildFallbackPlan(findings, diagnoses, visit, patient, activeServices);
   },
 
   // ─── Analyze Image ─────────────────────────────────────────────
@@ -621,49 +630,16 @@ function parseAnalyzeImageResponse(raw: string): { analysis: string; findings: I
   }
 }
 
-const PROCEDURE_MAP: Record<string, { procedure: string; cost: number }> = {
-  caries: { procedure: "filling", cost: 800000 },
-  "deep caries": { procedure: "filling", cost: 1500000 },
-  pulpitis: { procedure: "root_canal", cost: 4000000 },
-  "pulp necrosis": { procedure: "root_canal", cost: 4500000 },
-  periapical: { procedure: "root_canal", cost: 4000000 },
-  "periapical abscess": { procedure: "root_canal", cost: 5000000 },
-  fracture: { procedure: "crown", cost: 6000000 },
-  missing: { procedure: "implant", cost: 20000000 },
-  "partial edentulism": { procedure: "bridge", cost: 12000000 },
-  calculus: { procedure: "scaling", cost: 500000 },
-  gingivitis: { procedure: "scaling", cost: 500000 },
-  periodontitis: { procedure: "scaling", cost: 800000 },
-  "tooth wear": { procedure: "crown", cost: 6000000 },
-  hypercementosis: { procedure: "examination", cost: 200000 },
-  concrescence: { procedure: "examination", cost: 200000 },
-  dilaceration: { procedure: "examination", cost: 200000 },
-  "pulp polyp": { procedure: "root_canal", cost: 4000000 },
-  impaction: { procedure: "extraction", cost: 2000000 },
-  transposition: { procedure: "examination", cost: 200000 },
-  "supernumerary tooth": { procedure: "extraction", cost: 1500000 },
-  "agenesis (permanent)": { procedure: "examination", cost: 200000 },
-  "tooth discoloration": { procedure: "veneer", cost: 8000000 },
-  attrition: { procedure: "crown", cost: 6000000 },
-  abrasion: { procedure: "filling", cost: 1000000 },
-  erosion: { procedure: "filling", cost: 1000000 },
-  abfraction: { procedure: "filling", cost: 800000 },
-  "pulp stone": { procedure: "root_canal", cost: 3500000 },
-  resorption: { procedure: "root_canal", cost: 5000000 },
-  "unerupted tooth": { procedure: "examination", cost: 200000 },
-  "unerupted third molar": { procedure: "extraction", cost: 2500000 },
-  "fistula/sinus": { procedure: "root_canal", cost: 4000000 },
-  "internal resorption": { procedure: "root_canal", cost: 5000000 },
-  "external resorption": { procedure: "root_canal", cost: 5000000 },
-  "vertical root fracture": { procedure: "extraction", cost: 1500000 },
-  "caries in young patient": { procedure: "filling", cost: 600000 },
-  "reversible pulpitis": { procedure: "filling", cost: 800000 },
-  "irreversible pulpitis": { procedure: "root_canal", cost: 4000000 },
-  "symptomatic apical periodontitis": { procedure: "root_canal", cost: 4500000 },
-  "asymptomatic apical periodontitis": { procedure: "root_canal", cost: 4000000 },
-  "acute apical abscess": { procedure: "root_canal", cost: 5000000 },
-  "chronic apical abscess": { procedure: "root_canal", cost: 4500000 },
-  suppuration: { procedure: "root_canal", cost: 4500000 },
+const DIAGNOSIS_PROCEDURE_MAP: Record<string, { procedure: string; cost: number }> = {
+  "dental.caries": { procedure: "filling", cost: 800000 },
+  "dental.pulpitis": { procedure: "root_canal", cost: 4000000 },
+  "dental.periapical_disease": { procedure: "root_canal", cost: 4000000 },
+  "dental.tooth_fracture": { procedure: "crown", cost: 6000000 },
+  "dental.impacted_tooth": { procedure: "extraction", cost: 2000000 },
+  "periodontal.gingivitis": { procedure: "scaling", cost: 500000 },
+  "periodontal.periodontitis": { procedure: "scaling", cost: 800000 },
+  "periodontal.abscess": { procedure: "examination", cost: 200000 },
+  "tmj.tmd_pain": { procedure: "examination", cost: 200000 },
 };
 
 const PROCEDURE_LABELS: Record<string, string> = {
@@ -682,23 +658,26 @@ const PROCEDURE_LABELS: Record<string, string> = {
 
 function buildFallbackPlan(
   findings: Awaited<ReturnType<ReturnType<typeof createFindingsRepository>["listByVisit"]>>,
+  diagnoses: Awaited<ReturnType<ReturnType<typeof createDiagnosesRepository>["listConfirmedByVisit"]>>,
   visit: Awaited<ReturnType<ReturnType<typeof createVisitsRepository>["getById"]>>,
   patient: Awaited<ReturnType<ReturnType<typeof createPatientsRepository>["getById"]>>,
   services: Awaited<ReturnType<ReturnType<typeof createTreatmentServicesRepository>["list"]>>,
 ): GeneratePlanResult {
-  const items: TreatmentPlanItemDraft[] = findings.flatMap((f) => {
-    const found = PROCEDURE_MAP[f.condition];
+  const findingsById = new Map(findings.map((finding) => [finding.id, finding]));
+  const items: TreatmentPlanItemDraft[] = diagnoses.flatMap((diagnosis) => {
+    const found = DIAGNOSIS_PROCEDURE_MAP[diagnosis.concept_code_snapshot];
+    const finding = diagnosis.source_finding_id ? findingsById.get(diagnosis.source_finding_id) : undefined;
     const procedure = found?.procedure || "examination";
     const service = services.find((candidate) => candidate.procedure === procedure);
     if (services.length > 0 && !service) return [];
     const label = PROCEDURE_LABELS[procedure] || "Điều trị";
-    const loc = findingLocation(f).toLowerCase();
+    const loc = finding ? findingLocation(finding).toLowerCase() : "toàn hàm";
     return [{
-      tooth: f.tooth_number ?? null,
+      tooth: finding?.tooth_number ?? null,
       service_code: service?.code,
       service_name: service?.name,
       procedure: service?.procedure ?? procedure,
-      description: `${label} ${loc}${f.notes ? ` — ${f.notes}` : ""}`,
+      description: `${label} ${loc}${diagnosis.notes ? ` — ${diagnosis.notes}` : ""}`,
       cost: service?.price ?? found?.cost ?? 200000,
     }];
   });
@@ -706,7 +685,7 @@ function buildFallbackPlan(
   const patientName = patient?.name || "bệnh nhân";
   return {
     items,
-    notes: `Kế hoạch điều trị cho ${patientName} dựa trên clinical findings${visit ? ` từ lượt khám ngày ${new Date(visit.date).toLocaleDateString("vi-VN")}` : ""}. Chi phí là ước tính, cần điều chỉnh theo thực tế.`,
+    notes: `Kế hoạch điều trị cho ${patientName} dựa trên chẩn đoán ICD-10 đã xác nhận${visit ? ` từ lượt khám ngày ${new Date(visit.date).toLocaleDateString("vi-VN")}` : ""}. Chi phí là ước tính, cần điều chỉnh theo thực tế.`,
     ai_model: "structured-fallback",
     generated_at: new Date().toISOString(),
   };

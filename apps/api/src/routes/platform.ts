@@ -14,6 +14,12 @@ import {
   platformLimitsSchema,
   procedureCatalogCreateSchema,
   procedureCatalogUpdateSchema,
+  clinicalConceptCreateSchema,
+  clinicalConceptMappingCreateSchema,
+  clinicalConceptUpdateSchema,
+  icd10ImportSchema,
+  terminologyVersionCreateSchema,
+  terminologyVersionPublishSchema,
   platformTenantCreateSchema,
   platformTenantListQuerySchema,
   platformTenantUpdateSchema,
@@ -36,6 +42,7 @@ import { createPlatformContentRepository } from "../repositories/platform-conten
 import { createPlatformTenantsRepository } from "../repositories/platform-tenants.repo";
 import { createPlatformUsersRepository } from "../repositories/platform-users.repo";
 import { createProcedureCatalogRepository } from "../repositories/procedure-catalog.repo";
+import { createClinicalTerminologyRepository } from "../repositories/clinical-terminology.repo";
 import { platformService } from "../services/platform.service";
 import { platformTenantProvisionService } from "../services/platform-tenant-provision.service";
 import { aiModelConfigService } from "../services/ai-model-config.service";
@@ -66,6 +73,100 @@ function validateContentScope(
   }
 }
 router.use("*", requirePlatformAuth());
+router.get(
+  "/clinical-terminology/versions",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.CLINICAL_TERMINOLOGY_READ),
+  async (c) => c.json({ items: await createClinicalTerminologyRepository(c.env.DB).listVersions() }),
+);
+router.post(
+  "/clinical-terminology/versions",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.CLINICAL_TERMINOLOGY_WRITE),
+  requireRecentPlatformMfa(),
+  zValidator("json", terminologyVersionCreateSchema),
+  async (c) => {
+    const item = await createClinicalTerminologyRepository(c.env.DB).createVersion(c.req.valid("json"));
+    await platformAudit(c.env.DB, { ...actor(c), action: "clinical_terminology.version_created", entity_type: "clinical_terminology_version", entity_id: item.id, details: { system: item.system, version_key: item.version_key } });
+    return c.json(item, 201);
+  },
+);
+router.patch(
+  "/clinical-terminology/versions/:id/status",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.CLINICAL_TERMINOLOGY_WRITE),
+  requireRecentPlatformMfa(),
+  zValidator("json", terminologyVersionPublishSchema),
+  async (c) => {
+    const item = await createClinicalTerminologyRepository(c.env.DB).setVersionStatus(c.req.param("id"), c.req.valid("json").status, getPlatformJwt(c).sub);
+    if (!item) throw new NotFoundError("Terminology version not found");
+    await platformAudit(c.env.DB, { ...actor(c), action: "clinical_terminology.version_status_updated", entity_type: "clinical_terminology_version", entity_id: item.id, details: { status: item.status } });
+    return c.json(item);
+  },
+);
+router.get(
+  "/clinical-terminology/concepts",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.CLINICAL_TERMINOLOGY_READ),
+  async (c) => c.json({ items: await createClinicalTerminologyRepository(c.env.DB).listConcepts() }),
+);
+router.post(
+  "/clinical-terminology/concepts",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.CLINICAL_TERMINOLOGY_WRITE),
+  requireRecentPlatformMfa(),
+  zValidator("json", clinicalConceptCreateSchema),
+  async (c) => {
+    const data = c.req.valid("json");
+    const item = await createClinicalTerminologyRepository(c.env.DB).createConcept({ ...data, default_anatomical_site: data.default_anatomical_site ?? undefined });
+    await platformAudit(c.env.DB, { ...actor(c), action: "clinical_terminology.concept_created", entity_type: "clinical_concept", entity_id: item.id, details: { code: item.code } });
+    return c.json(item, 201);
+  },
+);
+router.patch(
+  "/clinical-terminology/concepts/:id",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.CLINICAL_TERMINOLOGY_WRITE),
+  requireRecentPlatformMfa(),
+  zValidator("json", clinicalConceptUpdateSchema),
+  async (c) => {
+    const data = c.req.valid("json");
+    const item = await createClinicalTerminologyRepository(c.env.DB).updateConcept(c.req.param("id"), { ...data, default_anatomical_site: data.default_anatomical_site ?? undefined });
+    if (!item) throw new NotFoundError("Clinical concept not found");
+    await platformAudit(c.env.DB, { ...actor(c), action: "clinical_terminology.concept_updated", entity_type: "clinical_concept", entity_id: item.id, details: { fields: Object.keys(data) } });
+    return c.json(item);
+  },
+);
+router.post(
+  "/clinical-terminology/icd10/import",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.CLINICAL_TERMINOLOGY_WRITE),
+  requireRecentPlatformMfa(),
+  zValidator("json", icd10ImportSchema),
+  async (c) => {
+    const data = c.req.valid("json");
+    const terminology = createClinicalTerminologyRepository(c.env.DB);
+    const version = await terminology.getVersion(data.terminology_version_id);
+    if (!version || version.system !== "ICD10_VN" || version.status !== "draft") throw new ConflictError("Chỉ được import vào phiên bản ICD-10 Việt Nam dạng nháp");
+    const imported = await terminology.importIcd10(data.terminology_version_id, data.codes.map((code) => ({ ...code, parent_code: code.parent_code ?? undefined })));
+    await platformAudit(c.env.DB, { ...actor(c), action: "clinical_terminology.icd10_imported", entity_type: "icd10_version", entity_id: version.id, details: { imported } });
+    return c.json({ imported });
+  },
+);
+router.get(
+  "/clinical-terminology/icd10",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.CLINICAL_TERMINOLOGY_READ),
+  async (c) => c.json({ items: await createClinicalTerminologyRepository(c.env.DB).listIcd10({ query: new URL(c.req.url).searchParams.get("q") ?? undefined }) }),
+);
+router.post(
+  "/clinical-terminology/mappings",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.CLINICAL_TERMINOLOGY_WRITE),
+  requireRecentPlatformMfa(),
+  zValidator("json", clinicalConceptMappingCreateSchema),
+  async (c) => {
+    const data = c.req.valid("json");
+    const terminology = createClinicalTerminologyRepository(c.env.DB);
+    const concept = await terminology.getConcept(data.concept_id);
+    const code = await terminology.getIcd10(data.icd10_code_id);
+    if (!concept || !code) throw new NotFoundError("Concept or ICD-10 code not found");
+    const mapping = await terminology.createMapping(data.concept_id, data.icd10_code_id, data.mapping_role);
+    await platformAudit(c.env.DB, { ...actor(c), action: "clinical_terminology.mapping_created", entity_type: "clinical_concept_mapping", entity_id: mapping.id, details: { concept_id: concept.id, icd10_code_id: code.id } });
+    return c.json(mapping, 201);
+  },
+);
 router.get(
   "/procedures",
   requirePlatformPermission(PLATFORM_PERMISSIONS.PROCEDURES_READ),

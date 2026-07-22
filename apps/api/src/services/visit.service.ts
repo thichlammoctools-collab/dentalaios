@@ -3,6 +3,7 @@ import type { Visit, ClinicalFinding } from "@shared/types";
 import type { VisitCreateInput, VisitUpdateInput, FindingCreateInput, FindingUpdateInput } from "@shared/validation";
 import { createVisitsRepository } from "../repositories/visits.repo";
 import { createFindingsRepository } from "../repositories/findings.repo";
+import { createClinicalTerminologyRepository } from "../repositories/clinical-terminology.repo";
 import { createAppointmentsRepository } from "../repositories/appointments.repo";
 import { createChairsRepository } from "../repositories/chairs.repo";
 import { ConflictError, NotFoundError, ValidationError } from "../lib/errors";
@@ -134,15 +135,20 @@ export const visitService = {
   ): Promise<ClinicalFinding> {
     const visit = await createVisitsRepository(db).getById(tenantId, visitId);
     if (!visit) throw new NotFoundError("Visit not found");
+    const concept = data.concept_id ? await createClinicalTerminologyRepository(db).getConcept(data.concept_id) : null;
+    if (data.concept_id && (!concept || !concept.is_active)) throw new ValidationError("Khái niệm lâm sàng không còn hoạt động");
+    if (concept && (concept.category !== data.category || concept.default_scope !== data.scope)) throw new ValidationError("Khái niệm không phù hợp với nhóm hoặc phạm vi finding");
+    if (concept?.kind === "diagnosis") throw new ValidationError("Chẩn đoán cần được xác nhận qua hồ sơ diagnosis riêng");
     return createFindingsRepository(db).create(tenantId, visitId, {
       tooth_number: data.tooth_number ?? undefined,
       tooth_system: data.scope === "tooth" ? "FDI" : undefined,
       category: data.category,
+      concept_id: concept?.id,
       scope: data.scope,
       anatomical_site: data.category === "periodontal" && data.scope === "tooth" ? "gum" : data.anatomical_site,
       location_details: data.location_details,
       measurements: data.measurements,
-      condition: data.condition,
+      condition: concept?.legacy_condition ?? data.condition,
       notes: data.notes,
     });
   },
@@ -156,8 +162,11 @@ export const visitService = {
   ): Promise<ClinicalFinding> {
     const visit = await createVisitsRepository(db).getById(tenantId, visitId);
     if (!visit) throw new NotFoundError("Visit not found");
+    const concept = data.concept_id ? await createClinicalTerminologyRepository(db).getConcept(data.concept_id) : null;
+    if (data.concept_id && (!concept || !concept.is_active)) throw new ValidationError("Khái niệm lâm sàng không còn hoạt động");
     return createFindingsRepository(db).update(tenantId, findingId, {
-      condition: data.condition,
+      condition: concept?.legacy_condition ?? data.condition,
+      concept_id: data.concept_id ?? undefined,
       notes: data.notes ?? null,
       anatomical_site: data.anatomical_site,
       location_details: data.location_details,
