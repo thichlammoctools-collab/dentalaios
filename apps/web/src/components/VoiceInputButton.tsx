@@ -6,6 +6,8 @@ type Status = "idle" | "recording" | "processing";
 
 interface VoiceInputButtonProps {
   onTranscription: (text: string) => void;
+  onTranscriptChange?: (text: string) => void;
+  onRecordingChange?: (recording: boolean) => void;
   disabled?: boolean;
   variant?: "default" | "outline" | "ghost" | "secondary";
   size?: "default" | "sm" | "lg" | "icon";
@@ -15,6 +17,8 @@ interface VoiceInputButtonProps {
 
 export function VoiceInputButton({
   onTranscription,
+  onTranscriptChange,
+  onRecordingChange,
   disabled,
   variant = "outline",
   size = "sm",
@@ -23,6 +27,10 @@ export function VoiceInputButton({
 }: VoiceInputButtonProps) {
   const [status, setStatus] = useState<Status>("idle");
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recordingRef = useRef(false);
+  const finalTranscriptRef = useRef("");
+  const latestTranscriptRef = useRef("");
+  const restartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [supported, setSupported] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,34 +45,62 @@ export function VoiceInputButton({
     }
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.continuous = true;
+    recognition.interimResults = true;
     recognition.lang = "vi-VN";
 
     recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      setStatus("processing");
+      let interimTranscript = "";
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const result = event.results[index];
+        const text = result[0].transcript;
+        if (result.isFinal) {
+          finalTranscriptRef.current += `${finalTranscriptRef.current ? " " : ""}${text.trim()}`;
+        } else {
+          interimTranscript += text;
+        }
+      }
+      const transcript = `${finalTranscriptRef.current}${interimTranscript ? `${finalTranscriptRef.current ? " " : ""}${interimTranscript.trim()}` : ""}`.trim();
+      latestTranscriptRef.current = transcript;
       setError(null);
-      onTranscription(transcript);
-      setStatus("idle");
+      onTranscriptChange?.(transcript);
     };
 
     recognition.onerror = (event) => {
-      if (event.error === "no-speech") {
-        setStatus("idle");
+      if (event.error === "aborted" && !recordingRef.current) {
         return;
       }
+      if (event.error === "no-speech") return;
       setError(event.error);
-      setStatus("idle");
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        recordingRef.current = false;
+        setStatus("idle");
+        onRecordingChange?.(false);
+      }
     };
 
     recognition.onend = () => {
-      if (status === "recording") setStatus("idle");
+      if (!recordingRef.current) {
+        setStatus("idle");
+        return;
+      }
+
+      // Chrome can end a continuous recognition session after silence. Restart it
+      // while the clinician's recording session is still active.
+      restartTimerRef.current = setTimeout(() => {
+        try {
+          recognition.start();
+        } catch {
+          // An in-flight restart can throw; the following onend cycle retries it.
+        }
+      }, 200);
     };
 
     recognitionRef.current = recognition;
 
     return () => {
+      recordingRef.current = false;
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       recognition.stop();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -72,17 +108,27 @@ export function VoiceInputButton({
 
   function handleClick() {
     if (status === "recording") {
+      recordingRef.current = false;
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       recognitionRef.current?.stop();
       setStatus("idle");
+      onRecordingChange?.(false);
+      onTranscription(latestTranscriptRef.current);
       return;
     }
 
     setError(null);
+    finalTranscriptRef.current = "";
+    latestTranscriptRef.current = "";
+    recordingRef.current = true;
     setStatus("recording");
+    onRecordingChange?.(true);
     try {
       recognitionRef.current?.start();
     } catch {
+      recordingRef.current = false;
       setStatus("idle");
+      onRecordingChange?.(false);
     }
   }
 
@@ -117,7 +163,7 @@ export function VoiceInputButton({
       type="button"
       variant={variant}
       size={size}
-      disabled={disabled || status === "processing"}
+      disabled={disabled}
       onClick={handleClick}
       className={cn(
         status === "recording" && "ring-2 ring-red-400 ring-offset-1 bg-red-50 text-red-600 hover:bg-red-50 border-red-300",
@@ -127,7 +173,7 @@ export function VoiceInputButton({
       title={error ?? (status === "recording" ? "Dừng ghi âm" : "Bắt đầu ghi âm")}
     >
       {icon}
-      {label && <span>{label}</span>}
+      {label && <span>{status === "recording" ? "Dừng ghi âm" : label}</span>}
     </Button>
   );
 }

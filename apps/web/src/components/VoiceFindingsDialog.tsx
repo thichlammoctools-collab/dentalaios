@@ -38,13 +38,13 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
   const [transcript, setTranscript] = useState("");
   const [parsedFindings, setParsedFindings] = useState<ParsedFinding[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
+  const [recording, setRecording] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [manualEntry, setManualEntry] = useState("");
 
   function handleTranscription(text: string) {
     setTranscript(text);
-    analyzeText(text);
   }
 
   async function analyzeText(text: string) {
@@ -94,6 +94,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
     setTranscript("");
     setParsedFindings([]);
     setAnalyzing(false);
+    setRecording(false);
     setEditingIdx(null);
     setManualEntry("");
     onOpenChange(false);
@@ -147,16 +148,41 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
         {/* Step 1: Voice input */}
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium">Bước 1 — Ghi âm hoặc nhập text</p>
+            <div>
+              <p className="text-sm font-medium">Bước 1 — Ghi âm liên tục hoặc nhập text</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Bấm bắt đầu, nói liên tục; transcript sẽ hiển thị ngay để kiểm tra trước khi phân tích.</p>
+            </div>
             <VoiceInputButton
               onTranscription={handleTranscription}
-              label="Ghi âm"
+              onTranscriptChange={setTranscript}
+              onRecordingChange={(isRecording) => {
+                setRecording(isRecording);
+                if (isRecording) {
+                  setTranscript("");
+                  setParsedFindings([]);
+                }
+              }}
+              label="Bắt đầu ghi âm"
             />
           </div>
-          {transcript ? (
+          {transcript || recording ? (
             <div className="rounded-lg bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 p-3">
-              <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">Bản ghi:</p>
-              <p className="text-sm text-zinc-800 dark:text-zinc-200 italic">"{transcript}"</p>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <p className="text-xs font-medium text-blue-600 dark:text-blue-400">{recording ? "Đang nhận diện trực tiếp" : "Bản ghi"}</p>
+                {recording && <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600 dark:text-red-400"><span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />Đang ghi âm</span>}
+              </div>
+              <Textarea
+                rows={3}
+                value={transcript}
+                readOnly={recording}
+                onChange={(event) => setTranscript(event.target.value)}
+                className="border-blue-200 bg-white/70 text-sm text-zinc-800 dark:border-blue-800 dark:bg-zinc-950/40 dark:text-zinc-200"
+              />
+              {!recording && (
+                <Button size="sm" onClick={() => analyzeText(transcript)} className="mt-3 text-xs">
+                  Phân tích bản ghi bằng AI
+                </Button>
+              )}
             </div>
           ) : (
             <div className="space-y-2">
@@ -345,12 +371,12 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
         )}
 
         {/* Empty state */}
-        {!transcript && !analyzing && parsedFindings.length === 0 && (
+        {!transcript && !recording && !analyzing && parsedFindings.length === 0 && (
           <div className="rounded-xl border border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 py-8 flex flex-col items-center gap-2 text-center">
             <svg className="h-8 w-8 text-zinc-300 dark:text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
             </svg>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Nhấn <strong>Ghi âm</strong> hoặc nhập text để bắt đầu</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Nhấn <strong>Bắt đầu ghi âm</strong> hoặc nhập text để bắt đầu</p>
             <p className="text-xs text-zinc-400 dark:text-zinc-600">AI sẽ phân tích và tạo clinical findings cho bạn duyệt</p>
           </div>
         )}

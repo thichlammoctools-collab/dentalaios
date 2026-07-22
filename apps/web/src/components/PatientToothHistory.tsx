@@ -75,6 +75,10 @@ export function PatientToothHistory({ patientId }: PatientToothHistoryProps) {
   }
 
   function renderTooth(n: number) {
+    const position = n % 10;
+    const kind = position <= 2 ? "incisor" : position === 3 ? "canine" : position <= 5 ? "premolar" : "molar";
+    const isPrimaryMolar = n >= 50 && position >= 4;
+
     return (
       <button
         key={n}
@@ -82,21 +86,52 @@ export function PatientToothHistory({ patientId }: PatientToothHistoryProps) {
         title={`Xem lịch sử răng #${n}`}
         aria-label={`Xem lịch sử răng ${n}`}
         onClick={() => openTooth(n)}
-        className="group relative flex h-11 w-9 shrink-0 items-center justify-center transition-transform duration-200 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 sm:h-14 sm:w-11"
+        className={cn(
+          "group relative flex h-12 shrink-0 items-center justify-center transition-transform duration-200 hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 sm:h-16",
+          kind === "incisor" ? "w-7 sm:w-9" : kind === "canine" ? "w-8 sm:w-10" : kind === "premolar" ? "w-10 sm:w-12" : "w-11 sm:w-14",
+        )}
       >
         <svg
-          viewBox="0 0 48 60"
+          viewBox="0 0 64 72"
           aria-hidden="true"
           className="absolute inset-0 h-full w-full drop-shadow-sm transition-[filter] duration-200 group-hover:drop-shadow-md"
         >
-          <path
-            d="M8.5 9.5C11.2 3.7 17 2 24 2s12.8 1.7 15.5 7.5c2.6 5.6 1 12.6-1.9 17.5-2.4 4.1-3.1 9.4-4.1 15.3-.9 5.6-2.8 14.2-7.5 14.2-3.2 0-3.4-7.6-5.7-7.6s-2.5 7.6-5.7 7.6c-4.7 0-6.6-8.6-7.5-14.2-1-5.9-1.7-11.2-4.1-15.3-2.9-4.9-4.5-11.9-1.9-17.5Z"
-            className="fill-card stroke-border stroke-[1.5] transition-colors duration-200 group-hover:fill-primary/10 group-hover:stroke-primary"
-          />
-          <path
-            d="M13 11c2.2-3.3 6.1-4.8 11-4.8S32.8 7.7 35 11"
-            className="fill-none stroke-muted-foreground/25 stroke-[1.5]"
-          />
+          {kind === "incisor" && (
+            <>
+              <path
+                d="M18 8Q32 3 46 8l-2 25q-1 9-5 18l-4 15q-1 4-3 4t-3-4l-4-15q-4-9-5-18Z"
+                className="fill-card stroke-border stroke-[1.5] transition-colors duration-200 group-hover:fill-primary/10 group-hover:stroke-primary"
+              />
+              <path d="M20 13q12 3 24 0M22 28h20" className="fill-none stroke-muted-foreground/25 stroke-[1.25]" />
+            </>
+          )}
+          {kind === "canine" && (
+            <>
+              <path
+                d="m15 13 17-9 17 9-4 20q-2 10-6 19l-5 15q-1 4-3 0l-5-15q-4-9-6-19Z"
+                className="fill-card stroke-border stroke-[1.5] transition-colors duration-200 group-hover:fill-primary/10 group-hover:stroke-primary"
+              />
+              <path d="M16 14h32M20 29l12-10 12 10" className="fill-none stroke-muted-foreground/25 stroke-[1.25]" />
+            </>
+          )}
+          {kind === "premolar" && (
+            <>
+              <path
+                d="m10 15 10-9 12 7 12-7 10 9-3 19q-2 8-7 15l-5 16q-1 4-4 0l-3-12-3 12q-3 4-4 0l-5-16q-5-7-7-15Z"
+                className="fill-card stroke-border stroke-[1.5] transition-colors duration-200 group-hover:fill-primary/10 group-hover:stroke-primary"
+              />
+              <path d="m14 18 9 7 9-8 9 8 9-7M20 34l12-6 12 6" className="fill-none stroke-muted-foreground/25 stroke-[1.25]" />
+            </>
+          )}
+          {kind === "molar" && (
+            <>
+              <path
+                d={isPrimaryMolar ? "m8 17 8-10 10 6 6-8 6 8 10-6 8 10-3 19q-2 8-8 14l-4 14q-2 5-5 0l-4-12-4 12q-3 5-5 0l-4-14q-6-6-8-14Z" : "m6 17 8-11 11 7 7-9 7 9 11-7 8 11-3 19q-2 8-8 14l-4 14q-2 5-5 0l-4-12-5 12q-3 5-5 0l-4-14q-6-6-8-14Z"}
+                className="fill-card stroke-border stroke-[1.5] transition-colors duration-200 group-hover:fill-primary/10 group-hover:stroke-primary"
+              />
+              <path d="m10 20 10 7 12-9 12 9 10-7M18 36l14-7 14 7M32 29v11" className="fill-none stroke-muted-foreground/25 stroke-[1.25]" />
+            </>
+          )}
         </svg>
         <span className="relative mt-0.5 font-mono text-[10px] font-semibold tracking-tight text-foreground sm:text-xs">
           {n}
