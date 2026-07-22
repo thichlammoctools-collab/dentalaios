@@ -14,6 +14,7 @@ describe("treatment items repository", () => {
       procedure: "filling",
       description: "Trám răng",
       unit_cost: 650000,
+      estimated_duration_min: 45,
       snapshot_price_includes_vat: 1,
       snapshot_price_snapshot_at: "2026-07-20T08:00:00.000Z",
       status: "planned",
@@ -30,18 +31,20 @@ describe("treatment items repository", () => {
       procedure: "filling",
       description: "Trám răng",
       unit_cost: 650000,
+      estimated_duration_min: 45,
       price_includes_vat: true,
       price_snapshot_at: undefined,
     });
 
     const insert = db.__calls.find((call) => call.method === "run" && call.sql.startsWith("INSERT INTO treatment_plan_items"));
     const snapshotInsert = db.__calls.find((call) => call.method === "run" && call.sql.startsWith("INSERT INTO treatment_plan_item_price_snapshots"));
-    expect(insert?.binds.slice(4)).toEqual(["filling", "Trám răng", 650000, null, null]);
+    expect(insert?.binds.slice(4)).toEqual(["filling", "Trám răng", 650000, 45, null, null]);
     expect(snapshotInsert?.binds.slice(2)).toEqual(["TRAM-COM", "Trám composite", 1]);
     expect(item).toMatchObject({
       service_code: "TRAM-COM",
       service_name: "Trám composite",
       price_includes_vat: true,
+      estimated_duration_min: 45,
       price_snapshot_at: "2026-07-20T08:00:00.000Z",
     });
   });

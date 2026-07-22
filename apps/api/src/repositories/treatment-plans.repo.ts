@@ -7,7 +7,7 @@ export interface TreatmentPlansRepository {
   list(tenantId: string, opts?: { patientId?: string; visitId?: string; status?: TreatmentPlan["status"] }): Promise<TreatmentPlan[]>;
   create(
     tenantId: string,
-    data: Omit<TreatmentPlan, "id" | "tenant_id" | "created_at" | "total_cost" | "status" | "approved_at">,
+    data: Omit<TreatmentPlan, "id" | "tenant_id" | "created_at" | "total_cost" | "estimated_duration_min" | "status" | "approved_at">,
   ): Promise<TreatmentPlan>;
   approve(tenantId: string, id: string): Promise<TreatmentPlan | null>;
   recomputeTotal(tenantId: string, id: string): Promise<number>;

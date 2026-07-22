@@ -112,6 +112,7 @@ export const paymentService = {
         procedure: row.procedure as string,
         description: row.description as string,
         unit_cost: unitCost,
+        estimated_duration_min: Number(row.estimated_duration_min ?? 30),
         price_includes_vat: true,
         status: row.status as PaymentableTreatmentPlanItem["status"],
         created_at: row.created_at as string,

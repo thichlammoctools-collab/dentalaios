@@ -252,7 +252,6 @@ export interface TreatmentService {
   procedure: string;
   price: number;
   estimated_duration_min: number;
-  estimated_duration_min: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -275,7 +274,6 @@ export interface TreatmentPlan {
   patient_id: string;
   status: TreatmentPlanStatus;
   total_cost: number; // sum of TreatmentPlanItem.unit_cost (recomputed on save)
-  estimated_duration_min: number; // sum of TreatmentPlanItem estimated-duration snapshots
   estimated_duration_min: number; // sum of item duration snapshots, computed on read
   currency: string; // ISO 4217 e.g. "VND"
   notes?: string;
@@ -298,7 +296,6 @@ export interface TreatmentPlanItem {
   procedure: string; // e.g. "root_canal", "crown", "implant", "filling"
   description: string;
   unit_cost: number;
-  estimated_duration_min: number;
   estimated_duration_min: number;
   price_includes_vat: boolean;
   price_snapshot_at?: string;

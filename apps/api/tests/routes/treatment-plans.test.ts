@@ -176,6 +176,19 @@ describe("POST /api/treatment-plans/:id/items", () => {
     expect(res.status).toBe(400);
   });
 
+  it.each([undefined, 0, 30.5, 481])("rejects missing or invalid custom estimated duration %s", async (estimated_duration_min) => {
+    const app = mountRoute("/api/treatment-plans", treatmentPlansRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/treatment-plans/plan-1/items",
+      new Map(),
+      { body: { tooth_number: 11, procedure: "filling", description: "test", unit_cost: 100, ...(estimated_duration_min === undefined ? {} : { estimated_duration_min }) } },
+    );
+
+    expect(res.status).toBe(400);
+  });
+
   it("returns 404 for non-existent plan", async () => {
     const app = mountRoute("/api/treatment-plans", treatmentPlansRoutes);
     const res = await authedRequestWithDB(
@@ -230,6 +243,7 @@ describe("PATCH /api/treatment-plans/:id/items/:itemId", () => {
       procedure: "root_canal",
       description: "Điều trị tủy răng 21",
       unit_cost: 900000,
+      estimated_duration_min: 60,
     });
     const res = await authedRequestWithDB(
       app,
@@ -247,14 +261,16 @@ describe("PATCH /api/treatment-plans/:id/items/:itemId", () => {
           procedure: "root_canal",
           description: "Điều trị tủy răng 21",
           unit_cost: 900000,
+          estimated_duration_min: 60,
         },
       },
     );
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { id: string; tooth_number: number; unit_cost: number };
+    const body = (await res.json()) as { id: string; tooth_number: number; unit_cost: number; estimated_duration_min: number };
     expect(body.id).toBe(updated.id);
     expect(body.tooth_number).toBe(21);
     expect(body.unit_cost).toBe(900000);
+    expect(body.estimated_duration_min).toBe(60);
   });
 
   it("rejects an edit after the plan is approved", async () => {
@@ -270,6 +286,7 @@ describe("PATCH /api/treatment-plans/:id/items/:itemId", () => {
           procedure: "root_canal",
           description: "Điều trị tủy răng 21",
           unit_cost: 900000,
+          estimated_duration_min: 60,
         },
       },
     );
@@ -384,9 +401,10 @@ describe("GET /api/treatment-plans/:id", () => {
       new Map([["FROM treatment_plans", [planRow({ total_cost: 1500000 })]]]),
     );
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { id: string; total_cost: number };
+    const body = (await res.json()) as { id: string; total_cost: number; estimated_duration_min: number };
     expect(body.id).toBe("plan-1");
     expect(body.total_cost).toBe(1500000);
+    expect(body.estimated_duration_min).toBe(0);
   });
 });
 
@@ -462,17 +480,18 @@ describe("GET /api/treatment-plans/:id/pdf", () => {
       "/api/treatment-plans/plan-1/items",
       new Map([
         ["FROM treatment_plans", [planRow()]],
-        ["FROM treatment_services", [{ id: "service-1", tenant_id: "test-tenant", code: "TRAM-COM", name: "Trám composite", procedure: "filling", price: 650000, is_active: 1, created_at: "2026-01-01", updated_at: "2026-01-01" }]],
+        ["FROM treatment_services", [{ id: "service-1", tenant_id: "test-tenant", code: "TRAM-COM", name: "Trám composite", procedure: "filling", price: 650000, estimated_duration_min: 45, is_active: 1, created_at: "2026-01-01", updated_at: "2026-01-01" }]],
         ["FROM treatment_plan_items", [itemRow({
           snapshot_service_code: "TRAM-COM",
           snapshot_service_name: "Trám composite",
           snapshot_price_includes_vat: 1,
           snapshot_price_snapshot_at: "2026-01-01",
           unit_cost: 650000,
+          estimated_duration_min: 45,
         })]],
         ["COALESCE(SUM", [{ total: 650000 }]],
       ]),
-      { body: { tooth_number: 11, service_code: "TRAM-COM", procedure: "other", description: "Trám răng", unit_cost: 1 } },
+      { body: { tooth_number: 11, service_code: "TRAM-COM", procedure: "other", description: "Trám răng", unit_cost: 1, estimated_duration_min: 1 } },
     );
     expect(res.status).toBe(201);
     const body = await res.json() as {
@@ -480,6 +499,7 @@ describe("GET /api/treatment-plans/:id/pdf", () => {
       service_name?: string;
       procedure: string;
       unit_cost: number;
+      estimated_duration_min: number;
       price_includes_vat: boolean;
       price_snapshot_at?: string;
     };
@@ -488,6 +508,7 @@ describe("GET /api/treatment-plans/:id/pdf", () => {
       service_name: "Trám composite",
       procedure: "filling",
       unit_cost: 650000,
+      estimated_duration_min: 45,
       price_includes_vat: true,
       price_snapshot_at: "2026-01-01",
     });

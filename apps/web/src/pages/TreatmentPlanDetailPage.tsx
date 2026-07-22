@@ -414,13 +414,15 @@ export function TreatmentPlanDetailPage() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Thủ thuật & dịch vụ điều trị ({items.length})</CardTitle>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Tổng:</span>
-              <span className="text-lg font-semibold">
-                {formatCurrency(plan.total_cost, plan.currency)}
-              </span>
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <CardTitle>Thủ thuật & dịch vụ điều trị ({items.length})</CardTitle>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Tổng:</span>
+                <span className="text-lg font-semibold">
+                  {formatCurrency(plan.total_cost, plan.currency)}
+                </span>
+              </div>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">Thời gian điều trị dự kiến: <span className="font-medium text-foreground">{formatEstimatedDuration(plan.estimated_duration_min)}</span>. Đây là dự toán và không tự động đặt lịch.</p>
           </div>
