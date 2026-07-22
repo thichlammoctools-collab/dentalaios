@@ -6,7 +6,7 @@ const versionSelect = `SELECT id, system, version_key, title, publisher, publish
   source_sha256, status, approved_by, approved_at, created_at, updated_at FROM clinical_terminology_versions`;
 const conceptSelect = `SELECT id, code, legacy_condition, kind, category, default_scope, default_anatomical_site,
   display_vi, description_vi, is_active, sort_order, created_at, updated_at FROM clinical_concepts`;
-const icdSelect = `SELECT id, terminology_version_id, code, display_vi, parent_code, is_billable, is_active, sort_order, created_at FROM icd10_codes`;
+const icdSelect = `SELECT i.id, i.terminology_version_id, i.code, i.display_vi, i.parent_code, i.is_billable, i.is_active, i.sort_order, i.created_at FROM icd10_codes i`;
 
 export function createClinicalTerminologyRepository(db: D1Database) {
   return {
@@ -101,7 +101,7 @@ export function createClinicalTerminologyRepository(db: D1Database) {
       const binds: unknown[] = [];
       if (filters.activeOnly) where.push("i.is_active = 1");
       if (filters.query) { where.push("(i.code LIKE ? OR i.display_vi LIKE ?)"); binds.push(`${filters.query}%`, `%${filters.query}%`); }
-      const result = await db.prepare(`${icdSelect.replace(" FROM icd10_codes", " FROM icd10_codes i JOIN clinical_terminology_versions v ON v.id = i.terminology_version_id")}
+      const result = await db.prepare(`${icdSelect} JOIN clinical_terminology_versions v ON v.id = i.terminology_version_id
         WHERE ${where.join(" AND ")} ORDER BY i.code LIMIT 100`).bind(...binds).all<D1Row>();
       return result.results.map(mapIcd10);
     },
