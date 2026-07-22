@@ -63,7 +63,9 @@ export function createUsersRepository(db: D1Database): UsersRepository {
              u.is_active AS u_is_active, u.password_hash AS u_password_hash, u.created_at AS u_created_at,
              r.id AS r_id, r.tenant_id AS r_tenant_id, r.system_key AS r_system_key, r.name AS r_name,
              r.permissions AS r_permissions, r.created_at AS r_created_at,
-             t.id AS t_id, t.name AS t_name, t.slug AS t_slug, t.is_active AS t_is_active, t.created_at AS t_created_at,
+              t.id AS t_id, t.name AS t_name, t.slug AS t_slug, t.email AS t_email, t.logo_file_id AS t_logo_file_id,
+              t.tax_code AS t_tax_code, t.tax_address AS t_tax_address, t.hotline AS t_hotline,
+              t.bank_account_number AS t_bank_account_number, t.is_active AS t_is_active, t.created_at AS t_created_at,
              b.id AS b_id, b.tenant_id AS b_tenant_id, b.name AS b_name,
              b.address AS b_address, b.created_at AS b_created_at
            FROM users u
@@ -89,7 +91,9 @@ export function createUsersRepository(db: D1Database): UsersRepository {
              u.is_active AS u_is_active, u.password_hash AS u_password_hash, u.created_at AS u_created_at,
              r.id AS r_id, r.tenant_id AS r_tenant_id, r.system_key AS r_system_key, r.name AS r_name,
              r.permissions AS r_permissions, r.created_at AS r_created_at,
-             t.id AS t_id, t.name AS t_name, t.slug AS t_slug, t.is_active AS t_is_active, t.created_at AS t_created_at,
+              t.id AS t_id, t.name AS t_name, t.slug AS t_slug, t.email AS t_email, t.logo_file_id AS t_logo_file_id,
+              t.tax_code AS t_tax_code, t.tax_address AS t_tax_address, t.hotline AS t_hotline,
+              t.bank_account_number AS t_bank_account_number, t.is_active AS t_is_active, t.created_at AS t_created_at,
              b.id AS b_id, b.tenant_id AS b_tenant_id, b.name AS b_name,
              b.address AS b_address, b.created_at AS b_created_at
            FROM users u
@@ -265,6 +269,12 @@ function mapUserWithContext(row: D1Row): UserWithContext {
     id: row.t_id as string,
     name: row.t_name as string,
     slug: (row as Record<string, unknown>).t_slug as string | undefined,
+    email: ((row as Record<string, unknown>).t_email as string | null) || undefined,
+    logo_file_id: ((row as Record<string, unknown>).t_logo_file_id as string | null) || undefined,
+    tax_code: ((row as Record<string, unknown>).t_tax_code as string | null) || "",
+    tax_address: ((row as Record<string, unknown>).t_tax_address as string | null) || "",
+    hotline: ((row as Record<string, unknown>).t_hotline as string | null) || "",
+    bank_account_number: ((row as Record<string, unknown>).t_bank_account_number as string | null) || "",
     is_active: ((row as Record<string, unknown>).t_is_active as number | undefined) !== 0,
     created_at: row.t_created_at as string,
   };

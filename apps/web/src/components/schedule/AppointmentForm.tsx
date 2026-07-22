@@ -127,7 +127,7 @@ export function AppointmentForm({
 
   useEffect(() => {
     const selectedItems = milestone
-      ? milestoneOptions.filter((item) => selectedMilestoneIds.includes(item.id))
+      ? (milestone.availableMilestones ?? []).filter((item) => selectedMilestoneIds.includes(item.id))
       : patientMilestones.filter((item) => selectedMilestoneIds.includes(item.milestone_id));
     if (selectedItems.length === 0) {
       setDurationMin(30);
@@ -137,7 +137,7 @@ export function AppointmentForm({
       480,
       selectedItems.reduce((total, item) => total + item.item.estimated_duration_min, 0),
     ));
-  }, [milestone, milestoneOptions, patientMilestones, selectedMilestoneIds]);
+  }, [milestone, milestone?.availableMilestones, patientMilestones, selectedMilestoneIds]);
 
   useEffect(() => {
     if (!open) return;

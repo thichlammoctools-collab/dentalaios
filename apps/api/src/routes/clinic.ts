@@ -11,7 +11,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { PERMISSIONS } from "@shared/constants";
-import { branchCreateSchema, branchUpdateSchema, paymentPrefixSchema, treatmentServiceUpsertSchema } from "@shared/validation";
+import { branchCreateSchema, branchUpdateSchema, paymentPrefixSchema, tenantBusinessInfoSchema, treatmentServiceUpsertSchema } from "@shared/validation";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
 import { requirePermission } from "../middleware/rbac";
@@ -45,14 +45,44 @@ router.patch(
   "/",
   requirePermission(PERMISSIONS.MANAGE_USERS),
   auditLog("update", "tenant"),
-  zValidator("json", z.object({ name: z.string().min(1).max(200) })),
+  zValidator("json", tenantBusinessInfoSchema),
   async (c) => {
     const jwt = getJwt(c);
-    const { name } = c.req.valid("json");
-    const updated = await clinicService.updateTenant(c.env.DB, jwt.tenant_id, { name });
+    const data = c.req.valid("json");
+    const updated = await clinicService.updateTenant(c.env.DB, jwt.tenant_id, data);
     if (!updated) throw new NotFoundError("Tenant not found");
     return c.json(updated);
   },
+);
+
+router.put(
+  "/logo",
+  requirePermission(PERMISSIONS.MANAGE_USERS),
+  auditLog("update", "tenant_logo"),
+  async (c) => {
+    const jwt = getJwt(c);
+    const contentType = c.req.header("content-type")?.split(";", 1)[0] ?? "";
+    const filename = decodeURIComponent(c.req.header("x-logo-filename") ?? "logo.jpg");
+    return c.json(await clinicService.uploadLogo(c.env.DB, c.env, jwt.tenant_id, jwt.sub, {
+      filename,
+      content_type: contentType,
+      body: await c.req.raw.arrayBuffer(),
+    }));
+  },
+);
+
+router.get("/logo", async (c) => {
+  const jwt = getJwt(c);
+  const file = await clinicService.getLogoFile(c.env.DB, c.env, jwt.tenant_id);
+  if (!file) throw new NotFoundError("Logo not found");
+  return new Response(file.object.body, { headers: { "Content-Type": file.contentType, "Content-Length": String(file.size), "Cache-Control": "private, max-age=300", ETag: file.object.httpEtag } });
+});
+
+router.delete(
+  "/logo",
+  requirePermission(PERMISSIONS.MANAGE_USERS),
+  auditLog("delete", "tenant_logo"),
+  async (c) => c.json(await clinicService.removeLogo(c.env.DB, c.env, getJwt(c).tenant_id)),
 );
 
 // POST /api/clinic/branches — create branch

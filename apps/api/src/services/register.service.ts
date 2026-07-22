@@ -158,7 +158,7 @@ export const registerService = {
       session: {
         user: { id: r.user_id as string, tenant_id: r.tenant_id as string, branch_id: r.branch_id as string, role_id: r.role_id as string, email: r.email as string, name: r.name as string, is_active: true, created_at: "" },
         role: { id: r.role_id as string, tenant_id: r.tenant_id as string, name: r.role_name as string, permissions, created_at: "" },
-        tenant: { id: r.tenant_id as string, name: r.tenant_name as string, slug: r.tenant_slug as string | undefined, is_active: true, created_at: "" },
+        tenant: { id: r.tenant_id as string, name: r.tenant_name as string, slug: r.tenant_slug as string | undefined, tax_code: "", tax_address: "", hotline: "", bank_account_number: "", is_active: true, created_at: "" },
         branch: { id: r.branch_id as string, tenant_id: r.tenant_id as string, name: r.branch_name as string, address: r.branch_address as string, phone: "", email: "", manager_name: "", opening_date: null, created_at: "" },
         token,
         expires_at,
@@ -289,7 +289,7 @@ export const registerService = {
       session: {
         user: { id: userId, tenant_id: r.tenant_id as string, branch_id: r.branch_id as string, role_id: r.role_id as string, email: inviteEmail, name: data.name.trim(), is_active: true, created_at: "" },
         role: { id: r.role_id as string, tenant_id: r.tenant_id as string, name: r.role_name as string, permissions, created_at: "" },
-        tenant: { id: r.tenant_id as string, name: r.tenant_name as string, slug: r.tenant_slug as string | undefined, is_active: true, created_at: "" },
+        tenant: { id: r.tenant_id as string, name: r.tenant_name as string, slug: r.tenant_slug as string | undefined, tax_code: "", tax_address: "", hotline: "", bank_account_number: "", is_active: true, created_at: "" },
         branch: { id: r.branch_id as string, tenant_id: r.tenant_id as string, name: r.branch_name as string, address: r.branch_address as string, phone: "", email: "", manager_name: "", opening_date: null, created_at: "" },
         token,
         expires_at,

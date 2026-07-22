@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiGet, apiPost, apiPatch, apiPut, apiDelete, ApiError } from "@/lib/api";
+import { api, apiBlob, apiGet, apiPost, apiPatch, apiPut, apiDelete, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import { BranchForm } from "@/components/BranchForm";
@@ -28,10 +28,11 @@ export function ClinicSettingsPage() {
   const [data, setData] = useState<ClinicData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Clinic name edit
-  const [editingName, setEditingName] = useState(false);
-  const [clinicName, setClinicName] = useState("");
-  const [savingName, setSavingName] = useState(false);
+  const [editingBusinessInfo, setEditingBusinessInfo] = useState(false);
+  const [businessInfo, setBusinessInfo] = useState({ name: "", tax_code: "", tax_address: "", email: "", hotline: "", bank_account_number: "" });
+  const [savingBusinessInfo, setSavingBusinessInfo] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [savingLogo, setSavingLogo] = useState(false);
 
   // Branch dialog (open/close + which branch to edit; form logic lives in BranchForm)
   const [branchDialogOpen, setBranchDialogOpen] = useState(false);
@@ -53,6 +54,21 @@ export function ClinicSettingsPage() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    let objectUrl: string | null = null;
+    if (!data?.tenant.logo_file_id) {
+      setLogoUrl(null);
+      return;
+    }
+    apiBlob("/api/clinic/logo")
+      .then((blob) => {
+        objectUrl = URL.createObjectURL(blob);
+        setLogoUrl(objectUrl);
+      })
+      .catch(() => setLogoUrl(null));
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [data?.tenant.logo_file_id]);
+
   async function loadData() {
     setLoading(true);
     try {
@@ -62,7 +78,14 @@ export function ClinicSettingsPage() {
         apiGet<{ prefix: string }>(`/api/clinic/payment-prefix`),
       ]);
       setData(clinicRes);
-      setClinicName(clinicRes.tenant.name);
+      setBusinessInfo({
+        name: clinicRes.tenant.name,
+        tax_code: clinicRes.tenant.tax_code,
+        tax_address: clinicRes.tenant.tax_address,
+        email: clinicRes.tenant.email ?? "",
+        hotline: clinicRes.tenant.hotline,
+        bank_account_number: clinicRes.tenant.bank_account_number,
+      });
       setLarkConfig(larkRes.config);
       setPaymentPrefix(prefixRes.prefix);
     } catch (err) {
@@ -72,18 +95,54 @@ export function ClinicSettingsPage() {
     }
   }
 
-  async function saveClinicName() {
+  async function saveBusinessInfo() {
     if (!data) return;
-    setSavingName(true);
+    setSavingBusinessInfo(true);
     try {
-      const updated = await apiPatch<Tenant>("/api/clinic", { name: clinicName.trim() });
+      const updated = await apiPatch<Tenant>("/api/clinic", businessInfo);
       setData((prev) => prev ? { ...prev, tenant: updated } : prev);
-      setEditingName(false);
-      toast.success("Đã lưu tên phòng khám");
+      setBusinessInfo({ name: updated.name, tax_code: updated.tax_code, tax_address: updated.tax_address, email: updated.email ?? "", hotline: updated.hotline, bank_account_number: updated.bank_account_number });
+      setEditingBusinessInfo(false);
+      toast.success("Đã lưu thông tin doanh nghiệp");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi lưu");
     } finally {
-      setSavingName(false);
+      setSavingBusinessInfo(false);
+    }
+  }
+
+  async function uploadLogo(file: File) {
+    if (!data) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      toast.error("Chỉ hỗ trợ logo JPG, PNG hoặc WebP");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Logo không được vượt quá 5 MB");
+      return;
+    }
+    setSavingLogo(true);
+    try {
+      const updated = await api<Tenant>("/api/clinic/logo", { method: "PUT", body: file, headers: { "Content-Type": file.type, "X-Logo-Filename": encodeURIComponent(file.name) } });
+      setData((current) => current ? { ...current, tenant: updated } : current);
+      toast.success("Đã cập nhật logo phòng khám");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Không thể tải logo lên");
+    } finally {
+      setSavingLogo(false);
+    }
+  }
+
+  async function removeLogo() {
+    setSavingLogo(true);
+    try {
+      const updated = await apiDelete<Tenant>("/api/clinic/logo");
+      setData((current) => current ? { ...current, tenant: updated } : current);
+      toast.success("Đã xóa logo phòng khám");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Không thể xóa logo");
+    } finally {
+      setSavingLogo(false);
     }
   }
 
@@ -236,46 +295,67 @@ export function ClinicSettingsPage() {
       <section className="space-y-4">
         <h2 className="text-base font-semibold">Thông tin phòng khám</h2>
         <div className="rounded-lg border border-border bg-card">
-          <div className="flex items-center justify-between p-4 gap-4">
-            <div className="flex-1 min-w-0">
-              <label className="text-sm font-medium text-muted-foreground block mb-1">Tên phòng khám</label>
-              {editingName && isAdmin ? (
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="text"
-                    value={clinicName}
-                    onChange={(e) => setClinicName(e.target.value)}
-                    className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/40 min-w-0"
-                    autoFocus
-                  />
+          <div className="p-4">
+            <div className="mb-5 flex items-center gap-4 border-b border-border pb-4">
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted text-2xl font-semibold text-muted-foreground">
+                {logoUrl ? <img src={logoUrl} alt={`Logo ${data.tenant.name}`} className="h-full w-full object-contain" /> : data.tenant.name.slice(0, 1).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium">Logo phòng khám</p>
+                <p className="mt-1 text-xs text-muted-foreground">JPG, PNG hoặc WebP, dung lượng tối đa 5 MB.</p>
+                {isAdmin && <div className="mt-2 flex gap-2"><label className="cursor-pointer rounded-md border border-input px-3 py-1.5 text-sm hover:bg-muted"><input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={savingLogo} onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadLogo(file); event.target.value = ""; }} />{savingLogo ? "Đang tải..." : logoUrl ? "Thay logo" : "Tải logo lên"}</label>{data.tenant.logo_file_id && <button type="button" disabled={savingLogo} onClick={() => void removeLogo()} className="rounded-md border border-destructive/30 px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-50">Xóa</button>}</div>}
+              </div>
+            </div>
+            {editingBusinessInfo && isAdmin ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {[
+                  ["name", "Tên đơn vị", "Công ty TNHH Nha khoa..."],
+                  ["tax_code", "Mã số thuế", "10 hoặc 13 chữ số"],
+                  ["tax_address", "Địa chỉ thuế", "Số nhà, đường, phường/xã, tỉnh/thành"],
+                  ["email", "Địa chỉ email", "contact@phongkham.vn"],
+                  ["hotline", "Số hotline", "0901234567"],
+                  ["bank_account_number", "Số tài khoản ngân hàng", "Chỉ gồm chữ số"],
+                ].map(([field, label, placeholder]) => (
+                  <label key={field} className="block text-sm font-medium">
+                    {label} <span className="text-destructive">*</span>
+                    <input
+                      type={field === "email" ? "email" : "text"}
+                      value={businessInfo[field as keyof typeof businessInfo]}
+                      onChange={(e) => setBusinessInfo((current) => ({ ...current, [field]: e.target.value }))}
+                      placeholder={placeholder}
+                      className="mt-1 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm font-normal outline-none focus:border-ring focus:ring-2 focus:ring-ring/40"
+                    />
+                  </label>
+                ))}
+                <div className="flex gap-2 sm:col-span-2">
                   <button
-                    onClick={saveClinicName}
-                    disabled={savingName || !clinicName.trim()}
-                    className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 shrink-0"
+                    onClick={saveBusinessInfo}
+                    disabled={savingBusinessInfo || Object.values(businessInfo).some((value) => !value.trim())}
+                    className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                   >
-                    {savingName ? "..." : "Lưu"}
+                    {savingBusinessInfo ? "Đang lưu..." : "Lưu thông tin"}
                   </button>
                   <button
-                    onClick={() => { setEditingName(false); setClinicName(data.tenant.name); }}
-                    className="rounded-md border border-input px-3 py-1.5 text-sm hover:bg-muted shrink-0"
+                    onClick={() => { setEditingBusinessInfo(false); setBusinessInfo({ name: data.tenant.name, tax_code: data.tenant.tax_code, tax_address: data.tenant.tax_address, email: data.tenant.email ?? "", hotline: data.tenant.hotline, bank_account_number: data.tenant.bank_account_number }); }}
+                    className="rounded-md border border-input px-3 py-1.5 text-sm hover:bg-muted"
                   >
                     Hủy
                   </button>
                 </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span className="text-base font-medium truncate">{data.tenant.name}</span>
-                  {isAdmin && (
-                    <button
-                      onClick={() => setEditingName(true)}
-                      className="text-sm text-primary hover:underline shrink-0"
-                    >
-                      Sửa
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="flex items-start justify-between gap-4">
+                <dl className="grid flex-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+                  <div><dt className="text-muted-foreground">Tên đơn vị</dt><dd className="font-medium">{data.tenant.name}</dd></div>
+                  <div><dt className="text-muted-foreground">Mã số thuế</dt><dd className="font-medium">{data.tenant.tax_code || "Chưa cập nhật"}</dd></div>
+                  <div><dt className="text-muted-foreground">Địa chỉ thuế</dt><dd className="font-medium">{data.tenant.tax_address || "Chưa cập nhật"}</dd></div>
+                  <div><dt className="text-muted-foreground">Địa chỉ email</dt><dd className="font-medium">{data.tenant.email || "Chưa cập nhật"}</dd></div>
+                  <div><dt className="text-muted-foreground">Số hotline</dt><dd className="font-medium">{data.tenant.hotline || "Chưa cập nhật"}</dd></div>
+                  <div><dt className="text-muted-foreground">Số tài khoản ngân hàng</dt><dd className="font-medium">{data.tenant.bank_account_number || "Chưa cập nhật"}</dd></div>
+                </dl>
+                {isAdmin && <button onClick={() => setEditingBusinessInfo(true)} className="text-sm text-primary hover:underline shrink-0">Sửa</button>}
+              </div>
+            )}
           </div>
 
           <div className="border-t border-border px-4 py-3 flex items-center gap-2 text-xs text-muted-foreground">

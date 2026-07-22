@@ -1,14 +1,21 @@
 import type { D1Database } from "@cloudflare/workers-types";
+import type { Env } from "../index";
 import type {
   Tenant,
   Branch,
   LarkConfigPublic,
   LarkConfigUpdate,
 } from "@shared/types";
+import type { TenantBusinessInfoInput } from "@shared/validation";
 import { createTenantRepository } from "../repositories/tenant.repo";
 import { createBranchRepository } from "../repositories/branch.repo";
 import { createLarkConfigRepository } from "../repositories/lark-config.repo";
 import { ConflictError } from "../lib/errors";
+import { newId } from "../lib/ids";
+import { filesService } from "./files.service";
+
+const MAX_LOGO_SIZE = 5 * 1024 * 1024;
+const LOGO_CONTENT_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 export const clinicService = {
   async getTenant(db: D1Database, tenantId: string): Promise<Tenant | null> {
@@ -18,9 +25,61 @@ export const clinicService = {
   async updateTenant(
     db: D1Database,
     tenantId: string,
-    data: { name?: string },
+    data: TenantBusinessInfoInput,
   ): Promise<Tenant | null> {
     return createTenantRepository(db).update(tenantId, data);
+  },
+
+  async uploadLogo(
+    db: D1Database,
+    env: Env,
+    tenantId: string,
+    userId: string,
+    input: { filename: string; content_type: string; body: ArrayBuffer },
+  ): Promise<Tenant> {
+    const tenant = await this.getTenant(db, tenantId);
+    if (!tenant) throw new Error("Tenant not found");
+    if (!LOGO_CONTENT_TYPES.has(input.content_type)) throw new Error("Logo phải là ảnh JPG, PNG hoặc WebP");
+    if (input.body.byteLength > MAX_LOGO_SIZE) throw new Error("Logo không được vượt quá 5 MB");
+
+    const fileId = newId();
+    const safeFilename = input.filename.replace(/[^a-zA-Z0-9._-]/g, "_") || "logo.jpg";
+    const r2Key = `tenant-${tenantId}/branding/logo/${fileId}-${safeFilename}`;
+    await env.FILES.put(r2Key, input.body, { httpMetadata: { contentType: input.content_type } });
+
+    try {
+      await db.prepare(
+        `INSERT INTO file_objects (id, tenant_id, r2_key, filename, content_type, size, uploaded_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(fileId, tenantId, r2Key, input.filename, input.content_type, input.body.byteLength, userId).run();
+      const updated = await createTenantRepository(db).update(tenantId, { logo_file_id: fileId });
+      if (!updated) throw new Error("Tenant not found");
+      if (tenant.logo_file_id) await filesService.remove(db, env, tenantId, tenant.logo_file_id);
+      return updated;
+    } catch (error) {
+      await env.FILES.delete(r2Key);
+      throw error;
+    }
+  },
+
+  async getLogoFile(db: D1Database, env: Env, tenantId: string) {
+    const tenant = await this.getTenant(db, tenantId);
+    if (!tenant?.logo_file_id) return null;
+    const file = await filesService.getById(db, tenantId, tenant.logo_file_id);
+    if (!file) return null;
+    const object = await filesService.download(env, file.r2_key);
+    if (!object) return null;
+    return { object, contentType: file.content_type, size: file.size };
+  },
+
+  async removeLogo(db: D1Database, env: Env, tenantId: string): Promise<Tenant> {
+    const tenant = await this.getTenant(db, tenantId);
+    if (!tenant) throw new Error("Tenant not found");
+    if (!tenant.logo_file_id) return tenant;
+    const updated = await createTenantRepository(db).update(tenantId, { logo_file_id: null });
+    if (!updated) throw new Error("Tenant not found");
+    await filesService.remove(db, env, tenantId, tenant.logo_file_id);
+    return updated;
   },
 
   async listBranches(db: D1Database, tenantId: string): Promise<Branch[]> {

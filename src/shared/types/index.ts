@@ -17,6 +17,11 @@ export interface Tenant {
   name: string;
   slug?: string;
   email?: string;
+  logo_file_id?: string;
+  tax_code: string;
+  tax_address: string;
+  hotline: string;
+  bank_account_number: string;
   is_active: boolean;
   created_at: string;
 }

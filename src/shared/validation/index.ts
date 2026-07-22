@@ -85,6 +85,17 @@ export const registerSchema = z.object({
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 
+export const tenantBusinessInfoSchema = z.object({
+  name: nonEmpty(200),
+  tax_code: z.string().trim().regex(/^\d{10}(?:-\d{3})?$/, "Mã số thuế phải gồm 10 số hoặc 10 số-3 số"),
+  tax_address: nonEmpty(500),
+  email: z.string().trim().email("Email không hợp lệ").max(200),
+  hotline: z.string().trim().regex(/^(?:\+84|0)\d{9,10}$/, "Hotline phải là số điện thoại Việt Nam hợp lệ"),
+  bank_account_number: z.string().trim().regex(/^\d{6,30}$/, "Số tài khoản chỉ gồm 6–30 chữ số"),
+}).strict();
+
+export type TenantBusinessInfoInput = z.infer<typeof tenantBusinessInfoSchema>;
+
 export const emailVerifySchema = z.object({
   token: z.string().min(1),
 });
