@@ -335,6 +335,36 @@ describe("POST /api/visits/:id/findings", () => {
   });
 });
 
+describe("DELETE /api/visits/:visitId/findings/:findingId", () => {
+  it("deletes a finding belonging to the visit", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const findingRow = {
+      id: "finding-1", tenant_id: "test-tenant", visit_id: "visit-1", category: "tooth_hard_tissue",
+      scope: "tooth", tooth_number: 11, tooth_system: "FDI", anatomical_site: null, condition: "caries", notes: null,
+    };
+    const res = await authedRequestWithDB(
+      app,
+      "DELETE",
+      "/api/visits/visit-1/findings/finding-1",
+      new Map([["FROM visits", [visitRow()]], ["FROM clinical_findings", [findingRow]]]),
+      { permissions: ["write_findings"] },
+    );
+    expect(res.status).toBe(204);
+  });
+
+  it("returns 404 when the finding is not in the visit", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "DELETE",
+      "/api/visits/visit-1/findings/missing-finding",
+      new Map([["FROM visits", [visitRow()]], ["FROM clinical_findings", []]]),
+      { permissions: ["write_findings"] },
+    );
+    expect(res.status).toBe(404);
+  });
+});
+
 describe("Clinical diagnosis routes", () => {
   const diagnosisRow = {
     id: "diagnosis-1", tenant_id: "test-tenant", visit_id: "visit-1", patient_id: "patient-1",

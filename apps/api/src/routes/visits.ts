@@ -156,4 +156,16 @@ router.patch(
   },
 );
 
+// DELETE /api/visits/:visitId/findings/:findingId
+router.delete(
+  "/:visitId/findings/:findingId",
+  requirePermission(PERMISSIONS.WRITE_FINDINGS),
+  auditLog("delete", "clinical_finding"),
+  async (c) => {
+    const jwt = getJwt(c);
+    await visitService.deleteFinding(c.env.DB, jwt.tenant_id, c.req.param("visitId"), c.req.param("findingId"));
+    return c.body(null, 204);
+  },
+);
+
 export default router;

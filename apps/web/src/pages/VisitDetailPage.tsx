@@ -805,6 +805,7 @@ export function VisitDetailPage() {
             onUpdate={(updated) =>
               setFindings((prev) => prev.map((f) => (f.id === updated.id ? updated : f)))
             }
+            onDeleted={(id) => setFindings((prev) => prev.filter((finding) => finding.id !== id))}
           />
         </CardContent>
       </Card>

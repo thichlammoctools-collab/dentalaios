@@ -173,6 +173,22 @@ export const visitService = {
       measurements: data.measurements,
     });
   },
+
+  async deleteFinding(
+    db: D1Database,
+    tenantId: string,
+    visitId: string,
+    findingId: string,
+  ): Promise<void> {
+    const visits = createVisitsRepository(db);
+    const visit = await visits.getById(tenantId, visitId);
+    if (!visit) throw new NotFoundError("Visit not found");
+
+    const findings = createFindingsRepository(db);
+    const finding = (await findings.listByVisit(tenantId, visitId)).find((item) => item.id === findingId);
+    if (!finding) throw new NotFoundError("Finding not found");
+    await findings.delete(tenantId, findingId);
+  },
 };
 
 async function assertVisitChair(
