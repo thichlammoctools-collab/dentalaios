@@ -10,7 +10,7 @@ import type { ClinicalFinding } from "@shared/types";
 import { cn } from "@/lib/utils";
 
 interface ParsedFinding {
-  scope: "tooth" | "full_mouth" | "soft_tissue";
+  scope: "tooth" | "full_mouth" | "soft_tissue" | "occlusion";
   tooth_number: number | null;
   area?: string;
   condition: string;
@@ -95,8 +95,24 @@ const SOFT_TISSUE_CONDITIONS = [
   { value: "other", label: "Khác" },
 ];
 
+const OCCLUSION_CONDITIONS = [
+  { value: "angle_class_i", label: "Angle loại I" },
+  { value: "angle_class_ii_div_1", label: "Angle loại II, chia 1" },
+  { value: "angle_class_ii_div_2", label: "Angle loại II, chia 2" },
+  { value: "angle_class_iii", label: "Angle loại III" },
+  { value: "deep_bite", label: "Cắn sâu" },
+  { value: "open_bite", label: "Cắn hở" },
+  { value: "crossbite", label: "Cắn chéo" },
+  { value: "edge_to_edge", label: "Cắn đối đầu" },
+  { value: "overjet", label: "Cắn chìa (overjet)" },
+  { value: "crowding", label: "Chen chúc" },
+  { value: "spacing", label: "Thưa răng" },
+  { value: "other", label: "Khác" },
+];
+
 function conditionOptions(scope: string) {
   if (scope === "soft_tissue") return SOFT_TISSUE_CONDITIONS;
+  if (scope === "occlusion") return OCCLUSION_CONDITIONS;
   if (scope === "full_mouth") return FULLMOUTH_CONDITIONS;
   return TOOTH_CONDITIONS;
 }
@@ -184,12 +200,14 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
   const scopeVariant = (scope: string) => {
     if (scope === "full_mouth") return "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800";
     if (scope === "soft_tissue") return "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800";
+    if (scope === "occlusion") return "bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800";
     return "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700";
   };
 
   const scopeLabel = (scope: string) => {
     if (scope === "full_mouth") return "Toàn hàm";
     if (scope === "soft_tissue") return "Mô mềm";
+    if (scope === "occlusion") return "Khớp cắn";
     return "Răng";
   };
 
@@ -300,6 +318,8 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
                           ? TOOTH_CONDITIONS.find((c) => c.value === f.condition)?.label ?? f.condition
                           : f.scope === "soft_tissue"
                             ? SOFT_TISSUE_CONDITIONS.find((c) => c.value === f.condition)?.label ?? f.condition
+                            : f.scope === "occlusion"
+                              ? OCCLUSION_CONDITIONS.find((c) => c.value === f.condition)?.label ?? f.condition
                             : FULLMOUTH_CONDITIONS.find((c) => c.value === f.condition)?.label ?? f.condition}
                       </span>
                       <div className="ml-auto flex gap-1">
@@ -337,6 +357,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
                               <option value="tooth">Răng</option>
                               <option value="full_mouth">Toàn hàm</option>
                               <option value="soft_tissue">Mô mềm</option>
+                              <option value="occlusion">Khớp cắn</option>
                             </select>
                           </div>
                           {f.scope === "tooth" && (

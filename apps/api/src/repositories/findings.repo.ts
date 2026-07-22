@@ -1,9 +1,11 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import type { ClinicalFinding, SoftTissueArea } from "@shared/types";
+import type { ClinicalFinding, SoftTissueArea, ToothHistoryEntry } from "@shared/types";
 import type { D1Row } from "./base";
 
 export interface FindingsRepository {
   listByVisit(tenantId: string, visitId: string): Promise<ClinicalFinding[]>;
+  /** Cross-visit history of a single FDI tooth for one patient (findings + treatments). */
+  listToothHistory(tenantId: string, patientId: string, toothNumber: number): Promise<ToothHistoryEntry[]>;
   create(
     tenantId: string,
     visitId: string,
@@ -29,6 +31,67 @@ export function createFindingsRepository(db: D1Database): FindingsRepository {
         .bind(tenantId, visitId)
         .all();
       return (result.results as D1Row[]).map(mapFinding);
+    },
+
+    async listToothHistory(tenantId, patientId, toothNumber) {
+      // Findings recorded on this tooth across every visit.
+      const findingsResult = await db
+        .prepare(
+          `SELECT cf.id, cf.condition, cf.notes, v.id AS visit_id, v.code AS visit_code,
+                  v.date AS visit_date, tc.name AS clinician_name
+             FROM clinical_findings cf
+             JOIN visits v ON v.id = cf.visit_id AND v.tenant_id = cf.tenant_id
+             LEFT JOIN users tc ON tc.id = v.treating_clinician_id
+            WHERE cf.tenant_id = ? AND v.patient_id = ?
+              AND cf.scope = 'tooth' AND cf.tooth_number = ?`,
+        )
+        .bind(tenantId, patientId, toothNumber)
+        .all();
+
+      // Treatment plan items targeting this tooth, linked back to their originating visit.
+      const treatmentsResult = await db
+        .prepare(
+          `SELECT tpi.id, tpi.procedure, tpi.description, tpi.status,
+                  ps.service_name AS service_name,
+                  v.id AS visit_id, v.code AS visit_code, v.date AS visit_date,
+                  tc.name AS clinician_name
+             FROM treatment_plan_items tpi
+             JOIN treatment_plans tp ON tp.id = tpi.treatment_plan_id AND tp.tenant_id = tpi.tenant_id
+             JOIN visits v ON v.id = tp.visit_id AND v.tenant_id = tp.tenant_id
+             LEFT JOIN treatment_plan_item_price_snapshots ps
+               ON ps.treatment_plan_item_id = tpi.id AND ps.tenant_id = tpi.tenant_id
+             LEFT JOIN users tc ON tc.id = tpi.treating_clinician_id
+            WHERE tpi.tenant_id = ? AND tp.patient_id = ? AND tpi.tooth_number = ?`,
+        )
+        .bind(tenantId, patientId, toothNumber)
+        .all();
+
+      const findings: ToothHistoryEntry[] = (findingsResult.results as D1Row[]).map((row) => ({
+        kind: "finding",
+        id: row.id as string,
+        date: row.visit_date as string,
+        visit_id: row.visit_id as string,
+        visit_code: (row.visit_code as string | null) ?? undefined,
+        clinician_name: (row.clinician_name as string | null) ?? undefined,
+        condition: row.condition as string,
+        notes: (row.notes as string | null) ?? undefined,
+      }));
+
+      const treatments: ToothHistoryEntry[] = (treatmentsResult.results as D1Row[]).map((row) => ({
+        kind: "treatment",
+        id: row.id as string,
+        date: row.visit_date as string,
+        visit_id: row.visit_id as string,
+        visit_code: (row.visit_code as string | null) ?? undefined,
+        clinician_name: (row.clinician_name as string | null) ?? undefined,
+        procedure: row.procedure as string,
+        service_name: (row.service_name as string | null) ?? undefined,
+        status: row.status as ToothHistoryEntry["status"],
+        description: (row.description as string | null) ?? undefined,
+      }));
+
+      // Merge both sources, newest first.
+      return [...findings, ...treatments].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
     },
 
     async create(tenantId, visitId, data) {

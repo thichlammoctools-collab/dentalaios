@@ -73,9 +73,27 @@ const SOFT_TISSUE_CONDITIONS = [
   { value: "other", label: "Khác" },
 ];
 
+const OCCLUSION_CONDITIONS = [
+  { value: "angle_class_i", label: "Angle loại I" },
+  { value: "angle_class_ii_div_1", label: "Angle loại II, chia 1" },
+  { value: "angle_class_ii_div_2", label: "Angle loại II, chia 2" },
+  { value: "angle_class_iii", label: "Angle loại III" },
+  { value: "deep_bite", label: "Cắn sâu" },
+  { value: "open_bite", label: "Cắn hở" },
+  { value: "crossbite", label: "Cắn chéo" },
+  { value: "edge_to_edge", label: "Cắn đối đầu" },
+  { value: "overjet", label: "Cắn chìa (overjet)" },
+  { value: "crowding", label: "Chen chúc" },
+  { value: "spacing", label: "Thưa răng" },
+  { value: "other", label: "Khác" },
+];
+
 function conditionLabel(scope: string, condition: string): string {
   if (scope === "soft_tissue") {
     return SOFT_TISSUE_CONDITIONS.find((c) => c.value === condition)?.label ?? condition;
+  }
+  if (scope === "occlusion") {
+    return OCCLUSION_CONDITIONS.find((c) => c.value === condition)?.label ?? condition;
   }
   if (scope === "full_mouth") {
     return FULLMOUTH_CONDITIONS.find((c) => c.value === condition)?.label ?? condition;
@@ -144,6 +162,7 @@ export function FindingsList({ visitId, findings, onUpdate }: FindingsListProps)
   const toothFindings = findings.filter((f) => f.scope === "tooth");
   const fmFindings = findings.filter((f) => f.scope === "full_mouth");
   const stFindings = findings.filter((f) => f.scope === "soft_tissue");
+  const occlusionFindings = findings.filter((f) => f.scope === "occlusion");
 
   function renderRow(f: ClinicalFinding) {
     const isEditing = editing?.finding.id === f.id;
@@ -156,19 +175,21 @@ export function FindingsList({ visitId, findings, onUpdate }: FindingsListProps)
             <span className="font-mono font-medium">#{f.tooth_number}</span>
           ) : scope === "full_mouth" ? (
             <span className="text-xs font-medium text-orange-700 dark:text-orange-400">Toàn hàm</span>
+          ) : scope === "occlusion" ? (
+            <span className="text-xs font-medium text-violet-700 dark:text-violet-400">Khớp cắn</span>
           ) : (
             <span className="text-xs font-medium text-blue-700 dark:text-blue-400">{areaLabel(f.area)}</span>
           )}
         </TableCell>
         <TableCell>
           <div className="flex flex-wrap items-center gap-1.5">
-            <Badge variant={scopeBadgeVariant(scope)}>{scope === "tooth" ? "Răng" : scope === "full_mouth" ? "Toàn hàm" : "Mô mềm"}</Badge>
+            <Badge variant={scopeBadgeVariant(scope)}>{scope === "tooth" ? "Răng" : scope === "full_mouth" ? "Toàn hàm" : scope === "occlusion" ? "Khớp cắn" : "Mô mềm"}</Badge>
             {isEditing ? (
               <Select
                 value={editing.condition}
                 onChange={(e) => setEditing((prev) => prev ? { ...prev, condition: e.target.value } : null)}
               >
-                {(scope === "soft_tissue" ? SOFT_TISSUE_CONDITIONS : scope === "full_mouth" ? FULLMOUTH_CONDITIONS : TOOTH_CONDITIONS).map((c) => (
+                {(scope === "soft_tissue" ? SOFT_TISSUE_CONDITIONS : scope === "occlusion" ? OCCLUSION_CONDITIONS : scope === "full_mouth" ? FULLMOUTH_CONDITIONS : TOOTH_CONDITIONS).map((c) => (
                   <option key={c.value} value={c.value}>{c.label}</option>
                 ))}
               </Select>
@@ -263,6 +284,25 @@ export function FindingsList({ visitId, findings, onUpdate }: FindingsListProps)
             </TableHeader>
             <TableBody>
               {stFindings.map(renderRow)}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {occlusionFindings.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-violet-600 dark:text-violet-400">Khớp cắn</p>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Phân loại</TableHead>
+                <TableHead>Tình trạng</TableHead>
+                <TableHead>Ghi chú</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {occlusionFindings.map(renderRow)}
             </TableBody>
           </Table>
         </div>

@@ -37,7 +37,7 @@ const ALL_TEETH = [
   ...PRIMARY_LOWER_LEFT,
 ];
 
-type Tab = "tooth" | "full_mouth" | "soft_tissue";
+type Tab = "tooth" | "full_mouth" | "soft_tissue" | "occlusion";
 
 const TOOTH_CONDITIONS = [
   { value: "good", label: "Tốt" },
@@ -104,6 +104,21 @@ const SOFT_TISSUE_CONDITIONS = [
   { value: "other", label: "Khác" },
 ];
 
+const OCCLUSION_CONDITIONS = [
+  { value: "angle_class_i", label: "Angle loại I" },
+  { value: "angle_class_ii_div_1", label: "Angle loại II, chia 1" },
+  { value: "angle_class_ii_div_2", label: "Angle loại II, chia 2" },
+  { value: "angle_class_iii", label: "Angle loại III" },
+  { value: "deep_bite", label: "Cắn sâu" },
+  { value: "open_bite", label: "Cắn hở" },
+  { value: "crossbite", label: "Cắn chéo" },
+  { value: "edge_to_edge", label: "Cắn đối đầu" },
+  { value: "overjet", label: "Cắn chìa (overjet)" },
+  { value: "crowding", label: "Chen chúc" },
+  { value: "spacing", label: "Thưa răng" },
+  { value: "other", label: "Khác" },
+];
+
 function toothLabel(n: number) {
   return `#${n}`;
 }
@@ -140,9 +155,15 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
   const [stOpen, setStOpen] = useState(false);
   const [stSaving, setStSaving] = useState(false);
 
+  const [occlusionCondition, setOcclusionCondition] = useState("angle_class_i");
+  const [occlusionNotes, setOcclusionNotes] = useState("");
+  const [occlusionOpen, setOcclusionOpen] = useState(false);
+  const [occlusionSaving, setOcclusionSaving] = useState(false);
+
   const toothFindings = findings.filter((f) => f.scope === "tooth");
   const fullMouthFindings = findings.filter((f) => f.scope === "full_mouth");
   const softTissueFindings = findings.filter((f) => f.scope === "soft_tissue");
+  const occlusionFindings = findings.filter((f) => f.scope === "occlusion");
 
   const findingsByTooth = new Map<number, ClinicalFinding[]>();
   for (const f of toothFindings) {
@@ -260,6 +281,30 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
     }
   }
 
+  async function onOcclusionSubmit() {
+    setOcclusionSaving(true);
+    try {
+      const created = await apiPost<ClinicalFinding>(
+        `/api/visits/${visitId}/findings`,
+        {
+          tooth_number: null,
+          scope: "occlusion",
+          condition: occlusionCondition,
+          notes: occlusionNotes || undefined,
+        },
+      );
+      toast.success("Đã thêm finding khớp cắn");
+      onCreated(created);
+      setOcclusionOpen(false);
+      setOcclusionCondition("angle_class_i");
+      setOcclusionNotes("");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Lỗi thêm finding");
+    } finally {
+      setOcclusionSaving(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Tab navigation */}
@@ -268,6 +313,7 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
           { key: "tooth" as Tab, label: "Theo răng", count: toothFindings.length },
           { key: "full_mouth" as Tab, label: "Toàn hàm", count: fullMouthFindings.length },
           { key: "soft_tissue" as Tab, label: "Mô mềm", count: softTissueFindings.length },
+          { key: "occlusion" as Tab, label: "Khớp cắn", count: occlusionFindings.length },
         ]).map(({ key, label, count }) => (
           <button
             key={key}
@@ -383,6 +429,30 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
                   </span>
                   <span className="text-muted-foreground">
                     {SOFT_TISSUE_CONDITIONS.find((c) => c.value === f.condition)?.label ?? f.condition}
+                  </span>
+                  {f.notes && <span className="text-muted-foreground italic">— {f.notes}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "occlusion" && (
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="mb-2 text-sm font-medium">Phân loại khớp cắn</p>
+          <p className="mb-4 text-xs text-muted-foreground">
+            Ghi nhận phân loại Angle và các bất thường khớp cắn như cắn sâu, cắn hở hoặc cắn chéo.
+          </p>
+          <Button variant="outline" size="sm" onClick={() => setOcclusionOpen(true)}>
+            + Thêm finding khớp cắn
+          </Button>
+          {occlusionFindings.length > 0 && (
+            <div className="mt-3 flex flex-col gap-1.5">
+              {occlusionFindings.map((f) => (
+                <div key={f.id} className="flex items-center gap-2 text-xs">
+                  <span className="inline-flex items-center rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-800 dark:bg-violet-950 dark:text-violet-300">
+                    {OCCLUSION_CONDITIONS.find((c) => c.value === f.condition)?.label ?? f.condition}
                   </span>
                   {f.notes && <span className="text-muted-foreground italic">— {f.notes}</span>}
                 </div>
@@ -534,6 +604,45 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
           </Button>
           <Button onClick={onSoftTissueSubmit} disabled={stSaving}>
             {stSaving ? "Đang lưu…" : "Lưu"}
+          </Button>
+        </DialogFooter>
+      </Dialog>
+
+      <Dialog open={occlusionOpen} onOpenChange={setOcclusionOpen}>
+        <DialogHeader>
+          <DialogTitle>Thêm finding khớp cắn</DialogTitle>
+        </DialogHeader>
+        <DialogBody className="grid gap-3">
+          <div className="grid gap-1.5">
+            <Label htmlFor="occlusion-cond">Phân loại</Label>
+            <select
+              id="occlusion-cond"
+              value={occlusionCondition}
+              onChange={(e) => setOcclusionCondition(e.target.value)}
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+            >
+              {OCCLUSION_CONDITIONS.map((c) => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="occlusion-notes">Ghi chú</Label>
+            <Textarea
+              id="occlusion-notes"
+              rows={3}
+              value={occlusionNotes}
+              onChange={(e) => setOcclusionNotes(e.target.value)}
+              placeholder="Ví dụ: lệch đường giữa 2 mm sang trái, overjet 5 mm…"
+            />
+          </div>
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOcclusionOpen(false)}>
+            Hủy
+          </Button>
+          <Button onClick={onOcclusionSubmit} disabled={occlusionSaving}>
+            {occlusionSaving ? "Đang lưu…" : "Lưu"}
           </Button>
         </DialogFooter>
       </Dialog>

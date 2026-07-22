@@ -46,7 +46,7 @@ export interface AiDeps {
 
 export interface ImageAnalysisFinding {
   tooth_number: number | null;
-  scope: "tooth" | "full_mouth" | "soft_tissue";
+  scope: "tooth" | "full_mouth" | "soft_tissue" | "occlusion";
   area?: string;
   condition: string;
   description: string;
@@ -154,7 +154,7 @@ export const aiService = {
       : "không rõ";
     const findingsText = findings.length
       ? findings.map((f) => {
-          const loc = f.scope === "tooth" ? `Răng ${f.tooth_number}` : f.scope === "full_mouth" ? "Toàn hàm" : `Mô mềm (${f.area ?? f.scope})`;
+          const loc = f.scope === "tooth" ? `Răng ${f.tooth_number}` : f.scope === "full_mouth" ? "Toàn hàm" : f.scope === "occlusion" ? "Khớp cắn" : `Mô mềm (${f.area ?? f.scope})`;
           return `  - ${loc}: ${f.condition}${f.notes ? ` (${f.notes})` : ""}`;
         }).join("\n")
       : "  (không có clinical findings)";
@@ -265,7 +265,7 @@ FORMAT JSON (bắt buộc):
   "findings": [
     {
       "tooth_number": <số FDI hoặc null nếu là toàn hàm/mô mềm>,
-      "scope": "<tooth | full_mouth | soft_tissue>",
+      "scope": "<tooth | full_mouth | soft_tissue | occlusion>",
       "area": "<mặt răng nếu là tooth: occlusal/mesial/distal/lingual/buccal, hoặc bỏ trống>",
       "condition": "<tình trạng bằng tiếng Việt: sâu răng, viêm tủy, viêm quanh răng, tổn thương…>",
       "description": "<mô tả chi tiết tổn thương bằng tiếng Việt, 1-2 câu>",
@@ -277,7 +277,7 @@ FORMAT JSON (bắt buộc):
 QUY TẮC QUAN TRỌNG:
 - findings có thể là mảng rỗng [] nếu không phát hiện bất thường
 - tooth_number dùng hệ FDI (VD: 11= răng cửa trên phải, 36= răng hàm dưới trái)
-- scope="tooth" khi chỉ 1 răng, scope="full_mouth" khi nhiều răng, scope="soft_tissue" khi là mô mềm`;
+- scope="tooth" khi chỉ 1 răng, scope="full_mouth" khi nhiều răng, scope="soft_tissue" khi là mô mềm, scope="occlusion" khi là phân loại khớp cắn`;
 
     // Step 1: Resolve the database file id in the caller's tenant before
     // reading R2. `fileId` is an opaque DB UUID, not an R2 key; using it as a
@@ -399,7 +399,7 @@ function buildPrompt(data: SummaryData): string {
   const visit = `Lượt khám: ${new Date(data.visit.date).toLocaleDateString("vi-VN")}, trạng thái: ${visitStatusVi(data.visit.status)}${data.visit.notes ? `, Ghi chú: ${data.visit.notes}` : ""}`;
   const findings = translated.length
     ? `Phát hiện lâm sàng:\n${translated.map((f) => {
-        const loc = f.scope === "tooth" ? `Răng ${f.tooth}` : f.scope === "full_mouth" ? "Toàn hàm" : `Mô mềm (${f.area ?? f.scope})`;
+        const loc = f.scope === "tooth" ? `Răng ${f.tooth}` : f.scope === "full_mouth" ? "Toàn hàm" : f.scope === "occlusion" ? "Khớp cắn" : `Mô mềm (${f.area ?? f.scope})`;
         return `  - ${loc}: ${f.condition}${f.notes ? ` (${f.notes})` : ""}`;
       }).join("\n")}`
     : "Phát hiện lâm sàng: không có";
@@ -497,7 +497,7 @@ function buildStructuredSummary(data: SummaryData): string {
   if (translated.length) {
     lines.push(`## Phát hiện lâm sàng (${translated.length})`);
     translated.forEach((f) => {
-      const loc = f.scope === "tooth" ? `Răng ${f.tooth}` : f.scope === "full_mouth" ? "Toàn hàm" : `Mô mềm (${f.area ?? f.scope})`;
+      const loc = f.scope === "tooth" ? `Răng ${f.tooth}` : f.scope === "full_mouth" ? "Toàn hàm" : f.scope === "occlusion" ? "Khớp cắn" : `Mô mềm (${f.area ?? f.scope})`;
       lines.push(`- ${loc}: ${f.condition}${f.notes ? ` — ${f.notes}` : ""}`);
     });
   }
@@ -658,9 +658,11 @@ function buildFallbackPlan(
     const label = PROCEDURE_LABELS[procedure] || "Điều trị";
     const loc = f.scope === "tooth" && f.tooth_number != null
       ? `răng ${f.tooth_number}`
-      : f.scope === "full_mouth"
-        ? "toàn hàm"
-        : `mô mềm (${f.area ?? f.scope})`;
+        : f.scope === "full_mouth"
+          ? "toàn hàm"
+          : f.scope === "occlusion"
+            ? "khớp cắn"
+            : `mô mềm (${f.area ?? f.scope})`;
     return [{
       tooth: f.tooth_number ?? null,
       service_code: service?.code,

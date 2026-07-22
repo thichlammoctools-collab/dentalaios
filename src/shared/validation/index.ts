@@ -208,7 +208,7 @@ const SOFT_TISSUE_AREAS = [
 
 export const findingCreateSchema = z.object({
   tooth_number: z.number().int().nullable(),
-  scope: z.enum(["tooth", "full_mouth", "soft_tissue"]).default("tooth"),
+  scope: z.enum(["tooth", "full_mouth", "soft_tissue", "occlusion"]).default("tooth"),
   area: z.enum(SOFT_TISSUE_AREAS).optional(),
   condition: nonEmpty(100),
   notes: optionalText(2000),

@@ -19,6 +19,7 @@ import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { VisitForm } from "@/components/VisitForm";
 import { MedicalAlertsList } from "@/components/MedicalAlertsList";
 import { PatientNotesTimeline } from "@/components/PatientNotesTimeline";
+import { PatientToothHistory } from "@/components/PatientToothHistory";
 import { PaymentForm } from "@/components/PaymentForm";
 import { PaymentDetailDialog } from "@/components/PaymentDetailDialog";
 import { AppointmentCard } from "@/components/schedule/AppointmentCard";
@@ -248,6 +249,7 @@ export function PatientDetailPage() {
                 <TabsTrigger value="plans">Kế hoạch ({plans.length})</TabsTrigger>
                 <TabsTrigger value="payments">Tài chính ({payments.length})</TabsTrigger>
                 <TabsTrigger value="appointments">Lịch hẹn ({appointments.length})</TabsTrigger>
+                <TabsTrigger value="teeth">Sơ đồ răng</TabsTrigger>
                 <TabsTrigger value="images">Hình ảnh</TabsTrigger>
               </TabsList>
             </div>
@@ -264,6 +266,7 @@ export function PatientDetailPage() {
               <TabsTrigger value="plans" className="w-full justify-between px-3 py-2 text-left">Kế hoạch <Count value={plans.length} /></TabsTrigger>
               <TabsTrigger value="appointments" className="w-full justify-between px-3 py-2 text-left">Lịch hẹn <Count value={appointments.length} /></TabsTrigger>
               <TabsTrigger value="payments" className="w-full justify-between px-3 py-2 text-left">Tài chính <Count value={payments.length} /></TabsTrigger>
+              <TabsTrigger value="teeth" className="w-full justify-between px-3 py-2 text-left">Sơ đồ răng</TabsTrigger>
               <TabsTrigger value="images" className="w-full justify-between px-3 py-2 text-left">Hình ảnh</TabsTrigger>
             </TabsList>
           </aside>
@@ -732,6 +735,20 @@ export function PatientDetailPage() {
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent className="mt-0" value="teeth">
+          <Card>
+            <CardHeader>
+              <CardTitle>Sơ đồ răng — lịch sử</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Nhấn một răng để xem toàn bộ chẩn đoán và điều trị của răng đó qua các lần khám.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <PatientToothHistory patientId={patient.id} />
             </CardContent>
           </Card>
         </TabsContent>

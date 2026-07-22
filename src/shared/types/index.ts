@@ -174,8 +174,9 @@ export type ToothSystem = "FDI";
  *  - "tooth"         — specific FDI tooth
  *  - "full_mouth"    — entire dentition (e.g. scaling)
  *  - "soft_tissue"   — oral soft tissue (gums, tongue, etc.)
+ *  - "occlusion"     — occlusal classification
  */
-export type FindingScope = "tooth" | "full_mouth" | "soft_tissue";
+export type FindingScope = "tooth" | "full_mouth" | "soft_tissue" | "occlusion";
 
 /** Valid soft-tissue areas when scope = "soft_tissue" */
 export type SoftTissueArea =
@@ -266,6 +267,30 @@ export interface TreatmentPlanItem {
   assistant_name?: string;
   status: TreatmentItemStatus;
   created_at: string;
+}
+
+/**
+ * One event in a single tooth's cross-visit history.
+ *  - kind "finding"   — a clinical finding recorded during a visit
+ *  - kind "treatment" — a treatment plan item targeting the tooth
+ * `date` is the owning visit's date (ISO datetime); entries are sorted newest first.
+ */
+export interface ToothHistoryEntry {
+  kind: "finding" | "treatment";
+  id: string;
+  date: string;
+  visit_id: string;
+  visit_code?: string;
+  clinician_name?: string;
+  // finding-only
+  condition?: string;
+  // treatment-only
+  procedure?: string;
+  service_name?: string;
+  status?: TreatmentItemStatus;
+  // shared
+  description?: string;
+  notes?: string;
 }
 
 export type TreatmentCaseType = "general" | "implant" | "orthodontics" | "prosthodontics" | "full_mouth" | "other";
@@ -643,7 +668,7 @@ export interface LarkConfigUpdate {
 // ───────────────────────── Voice ─────────────────────────
 
 export interface VoiceParsedFinding {
-  scope: "tooth" | "full_mouth" | "soft_tissue";
+  scope: FindingScope;
   tooth_number: number | null;
   area?: string;
   condition: string;
@@ -913,7 +938,7 @@ export interface PatientImage {
 
 export interface ImageAnalysisFinding {
   tooth_number: number | null;
-  scope: "tooth" | "full_mouth" | "soft_tissue";
+  scope: FindingScope;
   area?: string;
   condition: string;
   description: string;

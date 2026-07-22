@@ -5,6 +5,7 @@ export const PATIENT_WORKSPACE_SECTIONS = [
   "plans",
   "payments",
   "appointments",
+  "teeth",
   "images",
 ] as const;
 

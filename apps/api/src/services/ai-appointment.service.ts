@@ -225,7 +225,7 @@ Trả CHÍNH XÁC JSON, KHÔNG thêm text khác:
 
     const findingsText = findings.length
       ? findings.map((f) => {
-        const loc = f.scope === "tooth" ? `Răng ${f.tooth_number}` : f.scope === "full_mouth" ? "Toàn hàm" : `Mô mềm (${f.area ?? f.scope})`;
+        const loc = f.scope === "tooth" ? `Răng ${f.tooth_number}` : f.scope === "full_mouth" ? "Toàn hàm" : f.scope === "occlusion" ? "Khớp cắn" : `Mô mềm (${f.area ?? f.scope})`;
         return `- ${loc}: ${f.condition}${f.notes ? ` (${f.notes})` : ""}`;
       }).join("\n")
       : "Không có findings.";

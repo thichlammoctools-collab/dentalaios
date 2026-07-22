@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { patientCreateSchema, patientUpdateSchema } from "@shared/validation";
-import { PERMISSIONS } from "@shared/constants";
+import { PERMISSIONS, isValidFdiTooth } from "@shared/constants";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
 import { requirePermission } from "../middleware/rbac";
@@ -68,6 +68,27 @@ router.get(
       c.env.DB,
       jwt.tenant_id,
       c.req.param("id"),
+    );
+    return c.json({ items, total: items.length });
+  },
+);
+
+// GET /api/patients/:id/teeth/:toothNumber/history
+router.get(
+  "/:id/teeth/:toothNumber/history",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  auditLog("read", "tooth_history"),
+  async (c) => {
+    const jwt = getJwt(c);
+    const toothNumber = Number(c.req.param("toothNumber"));
+    if (!Number.isInteger(toothNumber) || !isValidFdiTooth(toothNumber)) {
+      return c.json({ error: "Số răng FDI không hợp lệ", code: "invalid_tooth" }, 400);
+    }
+    const items = await patientService.toothHistory(
+      c.env.DB,
+      jwt.tenant_id,
+      c.req.param("id"),
+      toothNumber,
     );
     return c.json({ items, total: items.length });
   },

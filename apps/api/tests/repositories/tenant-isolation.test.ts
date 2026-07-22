@@ -191,6 +191,24 @@ describe("Tenant isolation: findings.repo", () => {
     await createFindingsRepository(db as any).delete(TENANT_A, "f-1");
     expect(db.__sqlContaining("DELETE FROM clinical_findings")[0].sql).toMatch(/tenant_id = \? AND id = \?/);
   });
+
+  it("listToothHistory() scopes findings query by tenant_id + patient_id", async () => {
+    await createFindingsRepository(db as any).listToothHistory(TENANT_A, PATIENT_A1, 16);
+    const calls = db.__sqlContaining("FROM clinical_findings cf");
+    expect(calls[0].sql).toMatch(/cf\.tenant_id = \? AND v\.patient_id = \?/);
+    expect(calls[0].binds[0]).toBe(TENANT_A);
+    expect(calls[0].binds[1]).toBe(PATIENT_A1);
+    expect(calls[0].binds[2]).toBe(16);
+  });
+
+  it("listToothHistory() scopes treatment query by tenant_id + patient_id", async () => {
+    await createFindingsRepository(db as any).listToothHistory(TENANT_A, PATIENT_A1, 16);
+    const calls = db.__sqlContaining("FROM treatment_plan_items tpi");
+    expect(calls[0].sql).toMatch(/tpi\.tenant_id = \? AND tp\.patient_id = \?/);
+    expect(calls[0].binds[0]).toBe(TENANT_A);
+    expect(calls[0].binds[1]).toBe(PATIENT_A1);
+    expect(calls[0].binds[2]).toBe(16);
+  });
 });
 
 describe("Tenant isolation: treatment-plans.repo", () => {

@@ -13,7 +13,7 @@ import { NotFoundError } from "../lib/errors";
 import { aiModelConfigService } from "./ai-model-config.service";
 
 export interface ParsedFinding {
-  scope: "tooth" | "full_mouth" | "soft_tissue";
+  scope: "tooth" | "full_mouth" | "soft_tissue" | "occlusion";
   tooth_number: number | null;
   area?: string;
   condition: string;
@@ -76,7 +76,8 @@ QUY TẮC:
 - Mỗi câu mô tả 1 răng = 1 finding có scope="tooth" và tooth_number = số FDI
 - Mô tả toàn hàm (ca răng, tẩy trắng, khám toàn hàm…) = scope="full_mouth"
 - Mô tả mô mềm (lợi, lưỡi, niêm mạc…) = scope="soft_tissue", chọn area phù hợp nhất
-- condition phải thuộc danh sách: caries, fracture, missing, periapical, calculus, pulpitis, discoloration, wear, other, gingivitis, periodontitis, ulcer, aphtha, leukoplakia, erythroplakia, herpes, candidiasis, fissure, abscess, fistula, recession, hypertrophy, tongue_coating, geographic_tongue, fissured_tongue, macroglossia, torus, tmd_pain, clicking, limitation, sialolith, swelling, staining, halitosis, dry_mouth, bruxism
+- Phân loại khớp cắn (Angle, cắn sâu, cắn hở, cắn chéo, cắn đối đầu…) = scope="occlusion"
+- condition phải thuộc danh sách: caries, fracture, missing, periapical, calculus, pulpitis, discoloration, wear, other, gingivitis, periodontitis, ulcer, aphtha, leukoplakia, erythroplakia, herpes, candidiasis, fissure, abscess, fistula, recession, hypertrophy, tongue_coating, geographic_tongue, fissured_tongue, macroglossia, torus, tmd_pain, clicking, limitation, sialolith, swelling, staining, halitosis, dry_mouth, bruxism, angle_class_i, angle_class_ii_div_1, angle_class_ii_div_2, angle_class_iii, deep_bite, open_bite, crossbite, edge_to_edge, overjet, crowding, spacing
 - notes là phần mô tả thêm không thuộc condition chuẩn
 - Luôn trả JSON thuần túy, KHÔNG có text giải thích khác
 - Nếu không chắc chắn về số răng FDI, dùng null và ghi vào notes
@@ -86,7 +87,7 @@ Format:
 {
   "findings": [
     {
-      "scope": "tooth|full_mouth|soft_tissue",
+      "scope": "tooth|full_mouth|soft_tissue|occlusion",
       "tooth_number": <số FDI hoặc null>,
       "area": "<một trong: gum|tongue|buccal|palate|floor_mouth|lip|pharynx|jaw|tmj|salivary_gland — CHỈ khi scope=soft_tissue, bỏ trống otherwise>",
       "condition": "<tên tiếng Anh viết thường>",
@@ -137,7 +138,7 @@ function parseVoiceResponse(raw: string): { findings: ParsedFinding[] } | null {
     if (!Array.isArray(parsed.findings)) return null;
 
     const findings: ParsedFinding[] = parsed.findings.map((item: Record<string, unknown>) => {
-      const scope = (item.scope === "tooth" || item.scope === "full_mouth" || item.scope === "soft_tissue")
+      const scope = (item.scope === "tooth" || item.scope === "full_mouth" || item.scope === "soft_tissue" || item.scope === "occlusion")
         ? item.scope
         : "tooth";
       const tooth = item.tooth_number == null ? null : Number(item.tooth_number);
@@ -248,6 +249,25 @@ function extractFindFromText(text: string): ParsedFinding[] {
       if (!existing) {
         findings.push({ scope: "soft_tissue", tooth_number: null, area, condition, notes: "" });
       }
+    }
+  }
+
+  const occlusionPatterns = [
+    { regex: /angle\s*(?:loại|class)?\s*i\b|hạng\s*i\b/i, condition: "angle_class_i" },
+    { regex: /angle\s*(?:loại|class)?\s*ii\s*(?:div(?:ision)?\s*)?1|hạng\s*ii\s*(?:1|một)/i, condition: "angle_class_ii_div_1" },
+    { regex: /angle\s*(?:loại|class)?\s*ii\s*(?:div(?:ision)?\s*)?2|hạng\s*ii\s*(?:2|hai)/i, condition: "angle_class_ii_div_2" },
+    { regex: /angle\s*(?:loại|class)?\s*iii|hạng\s*iii/i, condition: "angle_class_iii" },
+    { regex: /cắn\s*sâu|deep\s*bite/i, condition: "deep_bite" },
+    { regex: /cắn\s*hở|open\s*bite/i, condition: "open_bite" },
+    { regex: /cắn\s*chéo|cross\s*bite/i, condition: "crossbite" },
+    { regex: /cắn\s*đối\s*đầu|edge\s*to\s*edge/i, condition: "edge_to_edge" },
+    { regex: /overjet|chìa/i, condition: "overjet" },
+    { regex: /chen\s*chúc|crowding/i, condition: "crowding" },
+    { regex: /thưa\s*răng|spacing/i, condition: "spacing" },
+  ];
+  for (const { regex, condition } of occlusionPatterns) {
+    if (regex.test(text) && !findings.some((f) => f.scope === "occlusion" && f.condition === condition)) {
+      findings.push({ scope: "occlusion", tooth_number: null, condition, notes: "" });
     }
   }
 
