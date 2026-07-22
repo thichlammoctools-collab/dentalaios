@@ -91,6 +91,7 @@ export async function buildProposalPdf(input: {
     id: string;
     status: string;
     total_cost: number;
+    estimated_duration_min: number;
     currency: string;
     notes?: string;
     approved_at?: string | null;
@@ -270,14 +271,16 @@ export async function buildProposalPdf(input: {
   y -= lh * 0.6;
 
   // ── Total ───────────────────────────────────────────────────
-  checkPage(60);
-  page.drawRectangle({ x: L, y: y - 44, width: CW, height: 44, color: C.blueLight });
+  checkPage(74);
+  page.drawRectangle({ x: L, y: y - 58, width: CW, height: 58, color: C.blueLight });
   txt(bold, "TONG CONG (DA GOM VAT) / TOTAL", L + 12, y - 16, 10, C.blue);
   txt(bold, formatAmount(plan.total_cost, plan.currency), R, y - 16, 14, C.blue, "right");
   const count = items.length;
   const uniqProc = new Set(items.map((i) => i.procedure)).size;
   txt(font, `${count} hang muc  |  ${uniqProc} thu thuat`, L + 12, y - 32, 9, C.gray);
-  y -= 44 + lh;
+  const estimatedDuration = plan.estimated_duration_min;
+  txt(font, `THOI GIAN DIEU TRI DU KIEN: ${estimatedDuration} phut (Khoang ${Math.round(estimatedDuration * 0.9)}-${Math.round(estimatedDuration * 1.1)} phut)`, L + 12, y - 46, 9, C.gray);
+  y -= 58 + lh;
 
   // ── Notes ────────────────────────────────────────────────────
   if (plan.notes) {

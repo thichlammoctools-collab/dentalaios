@@ -46,6 +46,10 @@ const MILESTONE_STATUS_VARIANTS: Record<TreatmentCaseMilestoneStatus, "secondary
   skipped: "outline",
 };
 
+function formatEstimatedDuration(minutes: number): string {
+  return `${minutes} phút (khoảng ${Math.round(minutes * 0.9)}-${Math.round(minutes * 1.1)} phút)`;
+}
+
 export function TreatmentPlanDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -418,6 +422,7 @@ export function TreatmentPlanDetailPage() {
                 {formatCurrency(plan.total_cost, plan.currency)}
               </span>
             </div>
+            <p className="mt-2 text-sm text-muted-foreground">Thời gian điều trị dự kiến: <span className="font-medium text-foreground">{formatEstimatedDuration(plan.estimated_duration_min)}</span>. Đây là dự toán và không tự động đặt lịch.</p>
           </div>
         </CardHeader>
         <CardContent>
@@ -432,6 +437,7 @@ export function TreatmentPlanDetailPage() {
                   <TableHead>Mô tả</TableHead>
                   <TableHead>Bác sĩ điều trị</TableHead>
                   <TableHead>Phụ tá</TableHead>
+                  <TableHead className="text-right">Định mức</TableHead>
                   <TableHead className="text-right">Đơn giá (gồm VAT)</TableHead>
                   {canEdit && <TableHead></TableHead>}
                 </TableRow>
@@ -452,6 +458,7 @@ export function TreatmentPlanDetailPage() {
                     <TableCell className="text-muted-foreground">{item.description}</TableCell>
                     <TableCell>{item.treating_clinician_name ? <div className="flex items-center gap-2"><ProfileAvatar subject="users" entityId={item.treating_clinician_id} name={item.treating_clinician_name} size="sm" /><span>{item.treating_clinician_name}</span></div> : "—"}</TableCell>
                     <TableCell>{item.assistant_name ? <div className="flex items-center gap-2"><ProfileAvatar subject="users" entityId={item.assistant_id} name={item.assistant_name} size="sm" /><span>{item.assistant_name}</span></div> : "—"}</TableCell>
+                    <TableCell className="text-right tabular-nums">{item.estimated_duration_min} phút</TableCell>
                     <TableCell className="text-right">
                       {formatCurrency(item.unit_cost, plan.currency)}
                     </TableCell>

@@ -32,6 +32,7 @@ export function TreatmentPlanItemForm({
   const [procedure, setProcedure] = useState("filling");
   const [description, setDescription] = useState("");
   const [unitCost, setUnitCost] = useState<number | "">("");
+  const [estimatedDurationMin, setEstimatedDurationMin] = useState<number | "">("");
   const [services, setServices] = useState<TreatmentService[]>([]);
   const [procedures, setProcedures] = useState<ProcedureCatalogItem[]>([]);
   const [serviceCode, setServiceCode] = useState("");
@@ -50,6 +51,7 @@ export function TreatmentPlanItemForm({
     setProcedure(item?.procedure ?? "filling");
     setDescription(item?.description ?? "");
     setUnitCost(item?.unit_cost ?? "");
+    setEstimatedDurationMin(item?.estimated_duration_min ?? "");
     setServiceCode(item?.service_code ?? "");
     setTreatingClinicianId(item?.treating_clinician_id ?? "");
     setAssistantId(item?.assistant_id ?? "");
@@ -76,6 +78,7 @@ export function TreatmentPlanItemForm({
     if (!service) return;
     setProcedure(service.procedure);
     setUnitCost(service.price);
+    setEstimatedDurationMin(service.estimated_duration_min);
   }
 
   async function onSubmit(e: FormEvent) {
@@ -88,6 +91,10 @@ export function TreatmentPlanItemForm({
       toast.error("Đơn giá phải ≥ 0");
       return;
     }
+    if (typeof estimatedDurationMin !== "number" || !Number.isInteger(estimatedDurationMin) || estimatedDurationMin < 1 || estimatedDurationMin > 480) {
+      toast.error("Định mức phải là số phút nguyên từ 1 đến 480");
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -98,6 +105,7 @@ export function TreatmentPlanItemForm({
         assistant_id: assistantId || null,
         description,
         unit_cost: unitCost,
+        estimated_duration_min: estimatedDurationMin,
       };
       const created = item
         ? await apiPatch<TreatmentPlanItem>(`/api/treatment-plans/${planId}/items/${item.id}`, payload)
@@ -108,6 +116,7 @@ export function TreatmentPlanItemForm({
       setToothNumber("");
       setDescription("");
       setUnitCost("");
+      setEstimatedDurationMin("");
       setServiceCode("");
       setTreatingClinicianId("");
       setAssistantId("");
@@ -154,7 +163,7 @@ export function TreatmentPlanItemForm({
                    <option key={service.code} value={service.code}>{service.code} · {service.name}</option>
                  ))}
                </Select>
-                <p className="text-xs text-muted-foreground">Chọn dịch vụ để tự điền thủ thuật, mã và đơn giá đã gồm VAT của phòng khám.</p>
+                 <p className="text-xs text-muted-foreground">Chọn dịch vụ để tự điền thủ thuật, mã, đơn giá và định mức của phòng khám.</p>
              </div>
              <div className="grid gap-1.5">
               <Label htmlFor="tooth">
@@ -225,6 +234,13 @@ export function TreatmentPlanItemForm({
                 placeholder="VD: 500 000"
               />
               {serviceCode && <p className="text-xs text-muted-foreground">Giá được lấy từ danh mục dịch vụ, đã gồm VAT.</p>}
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="duration">
+                Định mức thời gian (phút) <span className="text-destructive">*</span>
+              </Label>
+              <Input id="duration" type="number" min={1} max={480} step={1} required value={estimatedDurationMin} readOnly={Boolean(serviceCode)} onChange={(event) => setEstimatedDurationMin(event.target.value === "" ? "" : Number(event.target.value))} placeholder="VD: 30" />
+              <p className="text-xs text-muted-foreground">Dự toán phục vụ kế hoạch, không thay đổi thời lượng lịch hẹn.</p>
             </div>
           </div>
 

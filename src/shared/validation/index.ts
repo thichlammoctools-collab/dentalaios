@@ -323,6 +323,7 @@ export const planItemCreateSchema = z.object({
   procedure: nonEmpty(100),
   description: nonEmpty(500),
   unit_cost: z.number().nonnegative(),
+  estimated_duration_min: z.number().int("Định mức phải là số phút nguyên từ 1 đến 480").min(1, "Định mức phải là số phút nguyên từ 1 đến 480").max(480, "Định mức phải là số phút nguyên từ 1 đến 480"),
 }).superRefine((data, ctx) => {
   if (data.tooth_number != null && !isValidFdiTooth(data.tooth_number)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Số răng FDI không hợp lệ" });
@@ -403,6 +404,7 @@ export const treatmentServiceUpsertSchema = z.object({
   name: nonEmpty(200),
   procedure: nonEmpty(100),
   price: z.number().nonnegative("Giá dịch vụ phải lớn hơn hoặc bằng 0"),
+  estimated_duration_min: z.number().int("Định mức phải là số phút nguyên từ 1 đến 480").min(1, "Định mức phải là số phút nguyên từ 1 đến 480").max(480, "Định mức phải là số phút nguyên từ 1 đến 480"),
   is_active: z.boolean().default(true),
 });
 

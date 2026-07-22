@@ -12,6 +12,7 @@ describe("buildProposalPdf", () => {
         id: "plan-1",
         status: "draft",
         total_cost: 25_000_000,
+        estimated_duration_min: 1_200,
         currency: "VND",
         notes: "Ghi chu dieu tri can duoc trao doi ky voi benh nhan truoc khi thuc hien.",
         created_at: "2026-07-20",

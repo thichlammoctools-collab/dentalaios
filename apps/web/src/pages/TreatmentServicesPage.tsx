@@ -14,6 +14,7 @@ const EMPTY_SERVICE = {
   name: "",
   procedure: "filling",
   price: "" as number | "",
+  estimated_duration_min: "" as number | "",
   is_active: true,
 };
 
@@ -68,6 +69,7 @@ export function TreatmentServicesPage() {
       name: service.name,
       procedure: service.procedure,
       price: service.price,
+      estimated_duration_min: service.estimated_duration_min,
       is_active: service.is_active,
     });
     setDialogOpen(true);
@@ -100,14 +102,15 @@ export function TreatmentServicesPage() {
 
   async function save() {
     const price = form.price;
-    if (!form.code.trim() || !form.name.trim() || !form.procedure || typeof price !== "number" || !Number.isFinite(price) || price < 0) {
-      toast.error("Nhập mã, tên và giá dịch vụ hợp lệ");
+    const estimatedDurationMin = form.estimated_duration_min;
+    if (!form.code.trim() || !form.name.trim() || !form.procedure || typeof price !== "number" || !Number.isFinite(price) || price < 0 || typeof estimatedDurationMin !== "number" || !Number.isInteger(estimatedDurationMin) || estimatedDurationMin < 1 || estimatedDurationMin > 480) {
+      toast.error("Nhập mã, tên, giá và định mức nguyên từ 1 đến 480 phút hợp lệ");
       return;
     }
 
     setSaving(true);
     try {
-      const saved = await apiPut<TreatmentService>("/api/clinic/treatment-services", { ...form, price });
+      const saved = await apiPut<TreatmentService>("/api/clinic/treatment-services", { ...form, price, estimated_duration_min: estimatedDurationMin });
       setServices((current) =>
         [...current.filter((service) => service.code !== saved.code), saved]
           .sort((a, b) => a.code.localeCompare(b.code)),
@@ -130,22 +133,23 @@ export function TreatmentServicesPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Danh mục dịch vụ điều trị</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Giá niêm yết đã gồm VAT và được áp dụng khi lập kế hoạch điều trị.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Giá niêm yết đã gồm VAT và định mức được snapshot khi lập kế hoạch điều trị.</p>
         </div>
         {isAdmin && <button onClick={openNew} className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90">Thêm dịch vụ</button>}
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-border bg-card">
         {services.length === 0 ? (
-          <p className="p-4 text-sm text-muted-foreground">Chưa có dịch vụ. Thêm dịch vụ để tự động áp dụng giá cho kế hoạch điều trị.</p>
+          <p className="p-4 text-sm text-muted-foreground">Chưa có dịch vụ. Thêm dịch vụ để tự động áp dụng giá và định mức cho kế hoạch điều trị.</p>
         ) : (
-          <table className="w-full min-w-[690px] text-sm">
+          <table className="w-full min-w-[780px] text-sm">
             <thead className="border-b bg-muted/30 text-left text-xs text-muted-foreground">
               <tr>
                 <th className="px-4 py-3 font-medium">Mã</th>
                 <th className="px-4 py-3 font-medium">Dịch vụ</th>
                 <th className="px-4 py-3 font-medium">Thủ thuật</th>
                 <th className="px-4 py-3 text-right font-medium">Giá gồm VAT</th>
+                <th className="px-4 py-3 text-right font-medium">Định mức</th>
                 <th className="px-4 py-3 font-medium">Trạng thái</th>
                 {isAdmin && <th className="px-4 py-3" />}
               </tr>
@@ -156,7 +160,8 @@ export function TreatmentServicesPage() {
                   <td className="px-4 py-3 font-mono text-xs">{service.code}</td>
                   <td className="px-4 py-3 font-medium">{service.name}</td>
                   <td className="px-4 py-3">{service.procedure}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{service.price.toLocaleString("vi-VN")} VND</td>
+                   <td className="px-4 py-3 text-right tabular-nums">{service.price.toLocaleString("vi-VN")} VND</td>
+                   <td className="px-4 py-3 text-right tabular-nums">{service.estimated_duration_min} phút</td>
                   <td className="px-4 py-3"><span className={service.is_active ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"}>{service.is_active ? "Đang áp dụng" : "Ngừng áp dụng"}</span></td>
                   {isAdmin && (
                     <td className="px-4 py-3 text-right">
@@ -183,7 +188,8 @@ export function TreatmentServicesPage() {
           <label className="grid gap-1.5 text-sm font-medium">Mã dịch vụ<input value={form.code} disabled={Boolean(editingCode)} onChange={(event) => setForm((current) => ({ ...current, code: event.target.value.toUpperCase() }))} maxLength={40} placeholder="VD: TRAM-COM" className="rounded-md border border-input bg-background px-3 py-2 font-mono text-sm disabled:opacity-60" /></label>
           <label className="grid gap-1.5 text-sm font-medium">Tên dịch vụ<input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} maxLength={200} placeholder="VD: Trám composite" className="rounded-md border border-input bg-background px-3 py-2 text-sm" /></label>
            <label className="grid gap-1.5 text-sm font-medium">Thủ thuật<select value={form.procedure} onChange={(event) => setForm((current) => ({ ...current, procedure: event.target.value }))} className="rounded-md border border-input bg-background px-3 py-2 text-sm">{!procedures.some((item) => item.code === form.procedure) && form.procedure && <option value={form.procedure}>{form.procedure} (đã ngừng áp dụng)</option>}{procedures.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}</select></label>
-          <label className="grid gap-1.5 text-sm font-medium">Giá đã gồm VAT (VND)<CurrencyInput min="0" value={form.price} onChange={(price) => setForm((current) => ({ ...current, price }))} placeholder="VD: 500 000" /></label>
+           <label className="grid gap-1.5 text-sm font-medium">Giá đã gồm VAT (VND)<CurrencyInput min="0" value={form.price} onChange={(price) => setForm((current) => ({ ...current, price }))} placeholder="VD: 500 000" /></label>
+           <label className="grid gap-1.5 text-sm font-medium">Định mức thời gian (phút)<input type="number" min={1} max={480} step={1} required value={form.estimated_duration_min} onChange={(event) => setForm((current) => ({ ...current, estimated_duration_min: event.target.value === "" ? "" : Number(event.target.value) }))} placeholder="VD: 30" className="rounded-md border border-input bg-background px-3 py-2 text-sm" /></label>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_active} onChange={(event) => setForm((current) => ({ ...current, is_active: event.target.checked }))} />Đang áp dụng</label>
         </DialogBody>
         <DialogFooter>

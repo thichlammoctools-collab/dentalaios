@@ -18,7 +18,7 @@ export function createTreatmentPlansRepository(db: D1Database): TreatmentPlansRe
   return {
     async getById(tenantId, id) {
       const row = (await db
-        .prepare(`SELECT treatment_plans.*, CASE
+        .prepare(`SELECT treatment_plans.*, COALESCE((SELECT SUM(estimated_duration_min) FROM treatment_plan_items WHERE tenant_id = treatment_plans.tenant_id AND treatment_plan_id = treatment_plans.id), 0) AS estimated_duration_min, CASE
           WHEN status <> 'completed'
             AND NOT EXISTS(SELECT 1 FROM treatment_plan_items WHERE tenant_id = treatment_plans.tenant_id AND treatment_plan_id = treatment_plans.id AND status = 'completed')
             AND NOT EXISTS(SELECT 1 FROM treatment_cases WHERE tenant_id = treatment_plans.tenant_id AND treatment_plan_id = treatment_plans.id)
@@ -141,6 +141,7 @@ function mapPlan(row: D1Row): TreatmentPlan {
     patient_id: row.patient_id as string,
     status: row.status as TreatmentPlan["status"],
     total_cost: Number(row.total_cost ?? 0),
+    estimated_duration_min: Number(row.estimated_duration_min ?? 0),
     currency: row.currency as string,
     notes: (row.notes as string | null) ?? undefined,
     approved_at: (row.approved_at as string | null) ?? undefined,

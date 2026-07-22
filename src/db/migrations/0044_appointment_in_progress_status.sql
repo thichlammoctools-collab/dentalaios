@@ -1,6 +1,8 @@
 -- Migration 0044 -- Add an in-progress status to appointment lifecycle.
 -- SQLite cannot modify a CHECK constraint in place, so rebuild the table.
-PRAGMA foreign_keys = OFF;
+-- Appointments are referenced by visits and milestone links. D1 always enforces
+-- foreign keys, so defer their validation until the replacement table is ready.
+PRAGMA defer_foreign_keys = ON;
 
 CREATE TABLE appointments_new (
   id                TEXT PRIMARY KEY,
@@ -43,4 +45,4 @@ CREATE INDEX idx_appts_tenant_clinician ON appointments(tenant_id, clinician_id,
 CREATE INDEX idx_appts_tenant_patient ON appointments(tenant_id, patient_id, scheduled_at);
 CREATE INDEX idx_appts_status ON appointments(tenant_id, status, scheduled_at);
 
-PRAGMA foreign_keys = ON;
+PRAGMA defer_foreign_keys = OFF;

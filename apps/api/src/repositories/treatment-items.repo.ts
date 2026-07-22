@@ -52,9 +52,9 @@ export function createTreatmentItemsRepository(db: D1Database): TreatmentItemsRe
       const itemInsert = db
         .prepare(
           `INSERT INTO treatment_plan_items
-              (id, tenant_id, treatment_plan_id, tooth_number, procedure, description, unit_cost,
+              (id, tenant_id, treatment_plan_id, tooth_number, procedure, description, unit_cost, estimated_duration_min,
                treating_clinician_id, assistant_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
@@ -64,6 +64,7 @@ export function createTreatmentItemsRepository(db: D1Database): TreatmentItemsRe
           data.procedure,
           data.description,
           data.unit_cost,
+          data.estimated_duration_min,
           data.treating_clinician_id ?? null,
           data.assistant_id ?? null,
         );
@@ -106,7 +107,7 @@ export function createTreatmentItemsRepository(db: D1Database): TreatmentItemsRe
       const itemUpdate = db
         .prepare(
           `UPDATE treatment_plan_items
-           SET tooth_number = ?, procedure = ?, description = ?, unit_cost = ?,
+           SET tooth_number = ?, procedure = ?, description = ?, unit_cost = ?, estimated_duration_min = ?,
                treating_clinician_id = ?, assistant_id = ?
            WHERE tenant_id = ? AND id = ?`,
         )
@@ -115,6 +116,7 @@ export function createTreatmentItemsRepository(db: D1Database): TreatmentItemsRe
           data.procedure,
           data.description,
           data.unit_cost,
+          data.estimated_duration_min,
           data.treating_clinician_id ?? null,
           data.assistant_id ?? null,
           tenantId,
@@ -187,6 +189,7 @@ function mapItem(row: D1Row): TreatmentPlanItem {
     procedure: row.procedure as string,
     description: row.description as string,
     unit_cost: Number(row.unit_cost ?? 0),
+    estimated_duration_min: Number(row.estimated_duration_min ?? 30),
     price_includes_vat: row.snapshot_price_includes_vat === undefined ? true : Boolean(row.snapshot_price_includes_vat),
     price_snapshot_at: (row.snapshot_price_snapshot_at as string | null) ?? undefined,
     treating_clinician_id: (row.treating_clinician_id as string | null) ?? undefined,

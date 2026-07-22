@@ -30,7 +30,11 @@ export function Dialog({ open, onOpenChange, children, className }: DialogProps)
         "transition-all duration-200",
         open ? "opacity-100" : "pointer-events-none opacity-0",
       )}
-      onClick={() => onOpenChange(false)}
+      onClick={(event) => {
+        // Only a direct click on the backdrop closes the dialog. Content can
+        // re-render during its click handler without leaking that click here.
+        if (event.target === event.currentTarget) onOpenChange(false);
+      }}
     >
       <div
         className={cn(
