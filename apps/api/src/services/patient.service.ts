@@ -156,7 +156,14 @@ export const patientService = {
     return createPatientsRepository(db).archive(tenantId, id, userId, reason);
   },
 
-  restore(db: D1Database, tenantId: string, id: string): Promise<boolean> {
-    return createPatientsRepository(db).restore(tenantId, id);
+  async restore(db: D1Database, tenantId: string, id: string): Promise<boolean> {
+    try {
+      return await createPatientsRepository(db).restore(tenantId, id);
+    } catch (err) {
+      if (isUniqueConstraintError(err)) {
+        throw new ConflictError("Không thể khôi phục vì số CCCD đã thuộc về bệnh nhân đang hoạt động");
+      }
+      throw err;
+    }
   },
 };

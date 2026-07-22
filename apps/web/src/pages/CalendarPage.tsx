@@ -12,20 +12,14 @@ import { apiGet, apiPost, apiPatch, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { getMinimumAppointmentTime, getNextAppointmentSlot, isAppointmentTimeInPast } from "@/lib/appointment-time";
 import type { Appointment, Patient, User } from "@shared/types";
+import { APPOINTMENT_STATUS_LABELS } from "@shared/constants";
 import { PageContainer } from "@/components/PageContainer";
 
 interface AppointmentsResponse { items: Appointment[]; total: number }
 interface PatientsResponse { items: Patient[]; total: number }
 interface UsersResponse { items: User[]; total: number }
 
-const STATUS_LABELS: Record<string, string> = {
-  booked: "Đã đặt",
-  confirmed: "Xác nhận",
-  arrived: "Đã đến",
-  completed: "Hoàn thành",
-  cancelled: "Đã hủy",
-  no_show: "Không đến",
-};
+const STATUS_LABELS: Record<string, string> = APPOINTMENT_STATUS_LABELS;
 
 const STATUS_DOT: Record<string, string> = {
   booked: "bg-blue-500",
@@ -34,6 +28,15 @@ const STATUS_DOT: Record<string, string> = {
   completed: "bg-emerald-500",
   cancelled: "bg-gray-400",
   no_show: "bg-red-500",
+};
+
+const STATUS_BADGE: Record<string, string> = {
+  booked: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200",
+  confirmed: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200",
+  arrived: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200",
+  completed: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
+  cancelled: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
+  no_show: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200",
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -376,7 +379,7 @@ export function CalendarPage() {
                     <div className="space-y-2">
                       {day.appointments.map((appointment) => (
                         <button key={appointment.id} onClick={() => openAppointment(appointment)} className="w-full rounded-md border p-2 text-left text-sm hover:bg-accent">
-                          <p className="font-medium"><span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${apptDot(appointment.status)}`} />{new Date(appointment.scheduled_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })} · {appointment.patient_name}</p>
+                          <div className="flex items-center justify-between gap-2"><p className="min-w-0 truncate font-medium"><span className={`mr-1.5 inline-block h-2 w-2 rounded-full ${apptDot(appointment.status)}`} />{new Date(appointment.scheduled_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })} · {appointment.patient_name}</p><span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${STATUS_BADGE[appointment.status] ?? "bg-muted text-muted-foreground"}`}>{apptLabel(appointment.status)}</span></div>
                           {appointment.procedure && <p className="mt-0.5 truncate text-xs text-muted-foreground">{appointment.procedure}</p>}
                         </button>
                       ))}
@@ -423,7 +426,7 @@ export function CalendarPage() {
                           title={`${a.patient_name} ${a.scheduled_at ? new Date(a.scheduled_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : ""}`}
                         >
                           <span className={`inline-block h-1.5 w-1.5 rounded-full mr-1 ${apptDot(a.status)}`} />
-                          {a.scheduled_at ? new Date(a.scheduled_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : ""} {a.patient_name}
+                          {a.scheduled_at ? new Date(a.scheduled_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : ""} {a.patient_name} · {apptLabel(a.status)}
                         </button>
                       ))}
                       {day.appointments.length > 4 && (
@@ -477,15 +480,10 @@ export function CalendarPage() {
                       {day.appointments.slice(0, 3).map((a) => (
                         <div
                           key={a.id}
-                          className={`truncate rounded px-1 py-0.5 text-[10px] leading-tight ${
-                            a.status === "cancelled" ? "bg-gray-100 text-gray-400 line-through" :
-                            a.status === "completed" ? "bg-emerald-100 text-emerald-700" :
-                            a.status === "confirmed" ? "bg-amber-100 text-amber-700" :
-                            "bg-blue-100 text-blue-700"
-                          }`}
+                          className={`truncate rounded px-1 py-0.5 text-[10px] font-medium leading-tight ${STATUS_BADGE[a.status] ?? "bg-muted text-muted-foreground"}`}
                           title={`${a.patient_name} ${a.scheduled_at ? new Date(a.scheduled_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : ""}`}
                         >
-                          {a.scheduled_at ? new Date(a.scheduled_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : ""} {a.patient_name}
+                          {a.scheduled_at ? new Date(a.scheduled_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }) : ""} · {apptLabel(a.status)} · {a.patient_name}
                         </div>
                       ))}
                       {day.appointments.length > 3 && (

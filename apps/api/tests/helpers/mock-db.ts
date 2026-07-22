@@ -47,12 +47,15 @@ export interface MockD1Options {
   rowsByFragment?: Map<string, FragmentMatcher>;
   /** Default row for first() when no fragment matches */
   defaultFirst?: unknown;
+  /** Error raised when executing SQL that contains this fragment. */
+  runErrorByFragment?: Map<string, Error>;
 }
 
 export function createMockD1(options: MockD1Options = {}): MockD1 {
   const calls: CapturedCall[] = [];
   const rowsByFragment =
     options.rowsByFragment ?? new Map<string, FragmentMatcher>();
+  const runErrorByFragment = options.runErrorByFragment ?? new Map<string, Error>();
   const callCounts = new Map<string, number>();
 
   function findRows(sql: string): unknown[] | undefined {
@@ -65,6 +68,13 @@ export function createMockD1(options: MockD1Options = {}): MockD1 {
         }
         return matcher;
       }
+    }
+    return undefined;
+  }
+
+  function findRunError(sql: string): Error | undefined {
+    for (const [fragment, error] of runErrorByFragment) {
+      if (sql.includes(fragment)) return error;
     }
     return undefined;
   }
@@ -96,6 +106,8 @@ export function createMockD1(options: MockD1Options = {}): MockD1 {
             },
             async run(): Promise<{ meta: { changes: number } }> {
               recordCall("run");
+              const error = findRunError(sql);
+              if (error) throw error;
               const rows = findRows(sql);
               return { meta: { changes: rows?.length ?? 1 } };
             },

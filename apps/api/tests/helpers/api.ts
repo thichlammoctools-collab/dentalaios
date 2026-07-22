@@ -11,7 +11,7 @@ import type { Env } from "../../src/index";
 import { createTestApp } from "./app";
 import { signJwt } from "../../src/lib/jwt";
 import { TEST_SECRET, buildEnv } from "./jwt";
-import { createMockD1 } from "./mock-db";
+import { createMockD1, type FragmentMatcher, type MockD1Options } from "./mock-db";
 
 /** Mount a Hono router (e.g. import from src/routes/auth) on a test app. */
 export function mountRoute(path: string, router: Hono<any>) {
@@ -95,13 +95,14 @@ export async function authedRequestWithDB(
   app: Hono<{ Bindings: Env }>,
   method: string,
   path: string,
-  dbRowsByFragment: Map<string, unknown[]>,
+  dbRowsByFragment: Map<string, FragmentMatcher>,
   options: {
     permissions?: string[];
     body?: unknown;
+    runErrorByFragment?: MockD1Options["runErrorByFragment"];
   } = {},
 ) {
-  const db = createMockD1({ rowsByFragment: dbRowsByFragment });
+  const db = createMockD1({ rowsByFragment: dbRowsByFragment, runErrorByFragment: options.runErrorByFragment });
   const env = buildEnv(db, { JWT_SECRET: TEST_SECRET });
   const token = await makeToken(options.permissions ?? ["all"]);
 

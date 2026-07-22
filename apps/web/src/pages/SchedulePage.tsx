@@ -724,12 +724,12 @@ function statusBgClass(status: string): string {
 
 function statusLabelVi(status: string): string {
   switch (status) {
-    case "booked": return "Đặt";
-    case "confirmed": return "Xác nhận";
-    case "arrived": return "Đến";
-    case "completed": return "Xong";
-    case "cancelled": return "Hủy";
-    case "no_show": return "Vắng";
+    case "booked": return "Mới book";
+    case "confirmed": return "Đã xác nhận";
+    case "arrived": return "Đã đến";
+    case "completed": return "Hoàn thành";
+    case "cancelled": return "Hủy lịch";
+    case "no_show": return "Không đến";
     default: return status;
   }
 }
@@ -874,11 +874,11 @@ function EditAppointmentDialog({
         <div className="grid gap-1.5">
           <Label>Trạng thái</Label>
           <Select value={status} onChange={(e) => setStatus(e.target.value as Appointment["status"])} disabled={isCancelled}>
-            <option value="booked">Đã đặt</option>
-            <option value="confirmed">Xác nhận</option>
+            <option value="booked">Mới book</option>
+            <option value="confirmed">Đã xác nhận</option>
             <option value="arrived">Đã đến</option>
             <option value="completed">Hoàn thành</option>
-            <option value="cancelled">Hủy</option>
+            <option value="cancelled">Hủy lịch</option>
             <option value="no_show">Không đến</option>
             </Select>
           </div>

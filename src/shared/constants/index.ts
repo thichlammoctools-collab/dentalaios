@@ -120,11 +120,11 @@ export const APPOINTMENT_STATUSES = ["booked", "confirmed", "arrived", "complete
 
 /** Vietnamese labels for appointment statuses. */
 export const APPOINTMENT_STATUS_LABELS: Record<(typeof APPOINTMENT_STATUSES)[number], string> = {
-  booked: "Chờ xác nhận",
+  booked: "Mới book",
   confirmed: "Đã xác nhận",
   arrived: "Đã đến",
   completed: "Hoàn thành",
-  cancelled: "Đã hủy",
+  cancelled: "Hủy lịch",
   no_show: "Không đến",
 };
 

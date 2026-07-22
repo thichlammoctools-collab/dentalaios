@@ -1,8 +1,10 @@
--- Migration 0043 — Make the citizen ID the mandatory, tenant-scoped patient reference.
+-- Migration 0043 — Add a tenant-scoped unique constraint for active patient IDs.
 --
--- Before applying remotely, every existing patient must have a verified, valid,
--- unique 12-digit CCCD within its tenant. This migration intentionally fails if
--- operational data cleanup has not been completed.
+-- API validation already requires a valid CCCD for every new or updated patient.
+-- Historical patients can legitimately lack it, so it remains nullable until
+-- those records are verified and backfilled in a later migration. Archived
+-- records retain historical CCCD values and do not prevent an active record
+-- from using the same value.
 
 PRAGMA foreign_keys = OFF;
 
@@ -28,7 +30,7 @@ CREATE TABLE patients_new (
   weight_kg         REAL,
   address           TEXT,
   avatar_file_id    TEXT REFERENCES file_objects(id),
-  cccd              TEXT NOT NULL CHECK (length(cccd) = 12 AND cccd NOT GLOB '*[^0-9]*'),
+  cccd              TEXT CHECK (cccd IS NULL OR (length(cccd) = 12 AND cccd NOT GLOB '*[^0-9]*')),
   address_line      TEXT,
   ward_name         TEXT,
   ward_code         TEXT,
@@ -39,8 +41,7 @@ CREATE TABLE patients_new (
   country_name      TEXT NOT NULL DEFAULT 'Việt Nam',
   archived_at       TEXT,
   archived_by       TEXT REFERENCES users(id),
-  archive_reason    TEXT,
-  UNIQUE (tenant_id, cccd)
+  archive_reason    TEXT
 );
 
 INSERT INTO patients_new (
@@ -70,5 +71,8 @@ CREATE INDEX idx_patients_geography_province ON patients(tenant_id, province_nam
 CREATE INDEX idx_patients_geography_district ON patients(tenant_id, province_name, district_code, district_name);
 CREATE INDEX idx_patients_geography_ward ON patients(tenant_id, province_name, district_code, ward_code, ward_name);
 CREATE INDEX idx_patients_tenant_archived ON patients(tenant_id, archived_at);
+CREATE UNIQUE INDEX idx_patients_tenant_active_cccd
+  ON patients(tenant_id, cccd)
+  WHERE cccd IS NOT NULL AND archived_at IS NULL;
 
 PRAGMA foreign_keys = ON;

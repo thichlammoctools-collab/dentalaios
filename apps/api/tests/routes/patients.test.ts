@@ -473,4 +473,21 @@ describe("POST /api/patients/:id/restore", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ id: "patient-1", ok: true });
   });
+
+  it("returns 409 when the CCCD belongs to an active patient", async () => {
+    const app = mountRoute("/api/patients", patientsRoutes);
+    const duplicateCccdError = Object.assign(new Error("UNIQUE constraint failed: patients.tenant_id, patients.cccd"), { cause: { code: "SQLITE_CONSTRAINT_UNIQUE" } });
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/patients/patient-1/restore",
+      new Map(),
+      {
+        permissions: ["manage_patients"],
+        runErrorByFragment: new Map([["UPDATE patients SET archived_at = NULL", duplicateCccdError]]),
+      },
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: "conflict" });
+  });
 });
