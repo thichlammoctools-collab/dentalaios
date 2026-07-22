@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DateInput } from "@/components/ui/date-input";
+import { Dialog, DialogBody, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
@@ -13,6 +14,7 @@ import type { Appointment, ChairRevenueMetrics, DentalChair, Patient, UserWithDe
 import { PERMISSIONS, ROUTES } from "@shared/constants";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { PageContainer } from "@/components/PageContainer";
+import { ChairTypeIndicator, chairTypeLabel } from "@/components/ChairTypeIndicator";
 
 interface ChairBoardItem {
   chair: DentalChair;
@@ -51,6 +53,16 @@ const STATUS_STYLE: Record<ChairBoardItem["current_status"], string> = {
   out_of_service: "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
 };
 
+const APPOINTMENT_STATUS_LABEL: Record<Appointment["status"], string> = {
+  booked: "Đã đặt",
+  confirmed: "Đã xác nhận",
+  arrived: "Đã đến",
+  in_progress: "Đang khám",
+  completed: "Hoàn tất",
+  cancelled: "Đã hủy",
+  no_show: "Vắng mặt",
+};
+
 export function ChairBoardPage() {
   const { session } = useAuth();
   const [date, setDate] = useState(ymd(new Date()));
@@ -60,6 +72,7 @@ export function ChairBoardPage() {
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [startingAppointmentId, setStartingAppointmentId] = useState<string | null>(null);
+  const [selectedChair, setSelectedChair] = useState<ChairBoardItem | null>(null);
   const [now, setNow] = useState(() => new Date());
   const canManage = Boolean(
     session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.MANAGE_USERS),
@@ -193,13 +206,17 @@ export function ChairBoardPage() {
           {board.chairs.map((item) => {
             const { chair } = item;
             return (
-              <Card key={chair.id} className="overflow-hidden">
+              <Card key={chair.id} onClick={() => setSelectedChair(item)} className="cursor-pointer overflow-hidden transition-colors hover:bg-muted/20">
                 <CardHeader className="border-b bg-muted/20 pb-3">
-                  <CardTitle className="flex items-start justify-between gap-3 text-base">
-                    <span>{chair.name}<span className="ml-2 font-mono text-xs font-normal text-muted-foreground">{chair.code}</span></span>
-                    <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${STATUS_STYLE[item.current_status]}`}>{STATUS_LABEL[item.current_status]}</span>
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground">{chair.room_name ?? "Chưa gán phòng"} · {chair.chair_type}</p>
+                    <CardTitle className="flex items-start justify-between gap-3 text-base">
+                      <span>{chair.name}<span className="ml-2 font-mono text-xs font-normal text-muted-foreground">{chair.code}</span></span>
+                      <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${STATUS_STYLE[item.current_status]}`}>{STATUS_LABEL[item.current_status]}</span>
+                    </CardTitle>
+                    <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                      <span>{chair.room_name ?? "Chưa gán phòng"}</span>
+                      <ChairTypeIndicator type={chair.chair_type} />
+                    </div>
+                    <p className="mt-2 text-xs font-medium text-primary">Xem {item.appointments.length} lịch trong ngày</p>
                 </CardHeader>
                 <CardContent className="space-y-4 pt-4">
                   {item.current_appointment ? (
@@ -218,9 +235,9 @@ export function ChairBoardPage() {
                     </div>
                   )}
                   <div className="flex flex-wrap gap-2 border-t pt-3">
-                    <Button size="sm" variant="outline" onClick={() => changeStatus(chair.id, "available")}>Trống</Button>
-                    <Button size="sm" variant="outline" onClick={() => changeStatus(chair.id, "cleaning")}>Vệ sinh</Button>
-                    <Button size="sm" variant="outline" onClick={() => changeStatus(chair.id, "maintenance")}>Bảo trì</Button>
+                    <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); void changeStatus(chair.id, "available"); }}>Trống</Button>
+                    <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); void changeStatus(chair.id, "cleaning"); }}>Vệ sinh</Button>
+                    <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); void changeStatus(chair.id, "maintenance"); }}>Bảo trì</Button>
                   </div>
                 </CardContent>
               </Card>
@@ -228,6 +245,7 @@ export function ChairBoardPage() {
           })}
         </div>
       )}
+      <ChairAppointmentsDialog item={selectedChair} date={date} patients={patientsById} users={usersById} onOpenChange={(open) => { if (!open) setSelectedChair(null); }} />
     </PageContainer>
   );
 }
@@ -242,6 +260,40 @@ function MoneySummary({ label, value }: { label: string; value: number }) {
 
 function Metric({ label, value }: { label: string; value: string }) {
   return <div><p className="text-[11px] text-muted-foreground">{label}</p><p className="mt-0.5 font-semibold tabular-nums">{value}</p></div>;
+}
+
+function ChairAppointmentsDialog({ item, date, patients, users, onOpenChange }: {
+  item: ChairBoardItem | null;
+  date: string;
+  patients: Map<string, Patient>;
+  users: Map<string, UserWithDetails>;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const appointments = item?.appointments ?? [];
+  return (
+    <Dialog open={Boolean(item)} onOpenChange={onOpenChange}>
+      <DialogHeader>
+        <div className="flex items-center gap-3 pr-8">
+          {item && <ChairTypeIndicator type={item.chair.chair_type} showLabel={false} />}
+          <div><DialogTitle>Lịch ghế {item?.chair.name}</DialogTitle><DialogDescription>{item && `${chairTypeLabel(item.chair.chair_type)} · ${date} · ${appointments.length} lịch hẹn`}</DialogDescription></div>
+        </div>
+      </DialogHeader>
+      <DialogBody>
+        {appointments.length === 0 ? (
+          <p className="py-8 text-center text-sm text-muted-foreground">Ghế này chưa có lịch hẹn trong ngày đã chọn.</p>
+        ) : (
+          <div className="space-y-2">
+            {appointments.map((appointment) => {
+              const patient = patients.get(appointment.patient_id);
+              const clinician = users.get(appointment.clinician_id);
+              const end = new Date(new Date(appointment.scheduled_at).getTime() + appointment.duration_min * 60_000);
+              return <Link key={appointment.id} to={`/appointments/${appointment.id}?edit=1`} onClick={() => onOpenChange(false)} className="block rounded-lg border p-3 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div className="flex items-start justify-between gap-3"><div><p className="font-medium">{patient?.name ?? appointment.patient_id.slice(0, 8)}</p><p className="mt-1 text-xs text-muted-foreground">{formatTime(appointment.scheduled_at)} - {formatTime(end.toISOString())} · {appointment.duration_min} phút</p>{appointment.procedure && <p className="mt-1 text-xs text-muted-foreground">{appointment.procedure}</p>}</div><span className="rounded-full bg-muted px-2 py-1 text-[11px] font-medium">{APPOINTMENT_STATUS_LABEL[appointment.status]}</span></div><p className="mt-2 text-xs text-muted-foreground">{clinician?.name ?? "Chưa rõ bác sĩ"}</p></Link>;
+            })}
+          </div>
+        )}
+      </DialogBody>
+    </Dialog>
+  );
 }
 
 function AppointmentSummary({ title, appointment, patients, users, compact = false, canEdit = false, onStart, starting, now }: {
@@ -264,8 +316,8 @@ function AppointmentSummary({ title, appointment, patients, users, compact = fal
        <div className="mt-1 flex items-center gap-2"><ProfileAvatar subject="patients" entityId={patient?.id} name={patient?.name ?? appointment.patient_id} avatarFileId={patient?.avatar_file_id} size="sm" /><p className="font-medium">{patient?.name ?? appointment.patient_id.slice(0, 8)}</p></div>
        <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">{clinician && <ProfileAvatar subject="users" entityId={clinician.id} name={clinician.name} avatarFileId={clinician.avatar_file_id} size="sm" />}{formatTime(appointment.scheduled_at)} - {formatTime(end.toISOString())} · {clinician?.name ?? "Chưa rõ bác sĩ"}</p>
       {!compact && appointment.procedure && <p className="mt-1 text-xs text-muted-foreground">{appointment.procedure}</p>}
-      {!compact && appointment.status === "arrived" && appointment.chair_id && new Date(appointment.scheduled_at) <= now && now < end && <Button size="sm" className="mt-3" onClick={() => onStart(appointment)} disabled={starting}>{starting ? "Đang bắt đầu..." : "Bắt đầu khám"}</Button>}
-      {canEdit && <Button size="sm" variant="outline" className="mt-3" asChild><Link to={`/appointments/${appointment.id}?edit=1`}>Sửa lịch</Link></Button>}
+       {!compact && appointment.status === "arrived" && appointment.chair_id && new Date(appointment.scheduled_at) <= now && now < end && <Button size="sm" className="mt-3" onClick={(event) => { event.stopPropagation(); onStart(appointment); }} disabled={starting}>{starting ? "Đang bắt đầu..." : "Bắt đầu khám"}</Button>}
+       {canEdit && <Button size="sm" variant="outline" className="mt-3" asChild><Link to={`/appointments/${appointment.id}?edit=1`} onClick={(event) => event.stopPropagation()}>Sửa lịch</Link></Button>}
     </div>
   );
 }

@@ -39,6 +39,7 @@ export function ScheduleNewPage() {
   const [notes, setNotes] = useState("");
   const [patientSearch, setPatientSearch] = useState("");
   const [aiTab, setAiTab] = useState<"manual" | "ai">("manual");
+  const [aiAssisted, setAiAssisted] = useState(false);
   const [step, setStep] = useState<1 | 2>(1);
 
   useEffect(() => {
@@ -62,6 +63,7 @@ export function ScheduleNewPage() {
   }, [session, clinicianId, setClinicianId]);
 
   function applyAiParse(parsed: ParsedAppointment) {
+    setAiAssisted(true);
     if (parsed.scheduled_at) {
       const iso = new Date(parsed.scheduled_at);
       setDate(isoToYmd(iso.toISOString()));
@@ -112,7 +114,7 @@ export function ScheduleNewPage() {
         duration_min: durationMin,
         procedure: procedure || undefined,
         notes: notes || undefined,
-        source: aiTab === "ai" ? "ai_chat" : "manual",
+        source: aiAssisted ? "ai_chat" : "manual",
       });
       toast.success("Đã tạo lịch hẹn");
       navigate(ROUTES.SCHEDULE);

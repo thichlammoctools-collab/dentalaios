@@ -122,17 +122,17 @@ ${doctorList || "(chưa có bác sĩ)"}
 QUY TẮC:
 - "patient_hint": tên bệnh nhân trong tin nhắn. Phải khớp tên trong danh sách trên. Nếu không tìm thấy, null.
 - "clinician_hint": tên bác sĩ. Phải khớp tên trong danh sách. Nếu không thấy, null.
-- "scheduled_at": giờ hẹn dưới dạng ISO 8601 UTC. Tính từ giờ hiện tại nếu người dùng nói "ngày mai", "tuần sau", "thứ 2" etc.
+- "scheduled_at": giờ hẹn dưới dạng ISO 8601 có offset +07:00. Tính từ giờ hiện tại nếu người dùng nói "ngày mai", "tuần sau", "thứ 2" etc.
   - Nếu người dùng chỉ nói ngày (không nói giờ), dùng giờ mặc định 09:00.
   - Nếu người dùng nói "chiều" mà không rõ giờ, dùng 14:00.
-  - Luôn trả về timezone UTC (+07:00 convert sang UTC).
+  - Giờ người dùng nói là giờ Việt Nam (UTC+07:00). Ví dụ 09:30 phải trả về "...T09:30:00+07:00", không phải 09:30Z.
 - "duration_min": mặc định 30 phút. Nếu người dùng nói "khám nhanh" = 15, "điều trị tủy" = 60, "cạo vôi" = 30.
 - "procedure": procedure code (filling, root_canal, extraction, crown, scaling, implant, veneer, examination, other)
 - "notes": thông tin thêm từ tin nhắn
 - "summary": 1 câu tóm tắt lịch hẹn bằng tiếng Việt rõ ràng
 
 Ví dụ:
-- "Cho BS Nam khám BN An ngày mai 9h30" → scheduled_at = ngày mai 09:30 UTC, clinician_hint = "Nam", patient_hint = "An"
+- "Cho BS Nam khám BN An ngày mai 9h30" → scheduled_at = ngày mai 09:30+07:00, clinician_hint = "Nam", patient_hint = "An"
 - "BS Lan khám răng 36 cho BN Bình thứ 2 tuần sau, 2h" → duration = 120, procedure = other
 - "Khám tổng quát cho BN Chính sáng nay 8h30" → procedure = examination
 
@@ -172,7 +172,7 @@ Trả CHÍNH XÁC JSON, KHÔNG thêm text khác:
 
     // Fallback: extract basic info with regex
     return {
-      appointment: ruleBasedParse(message),
+      appointment: ruleBasedParse(message, patients.results, doctors.results),
       ai_model: "rule-based-fallback",
       generated_at: new Date().toISOString(),
     };
@@ -320,11 +320,16 @@ function parseAiResponse(raw: string): ParsedAppointment | null {
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
     const parsed = JSON.parse(jsonMatch[0]);
+    const scheduledAt = parsed.scheduled_at ? new Date(String(parsed.scheduled_at)) : null;
+    const durationMin = Number(parsed.duration_min);
+    if (scheduledAt && Number.isNaN(scheduledAt.getTime())) return null;
+    if (!Number.isFinite(durationMin) || durationMin < 5 || durationMin > 480) return null;
+
     return {
       patient_hint: parsed.patient_hint ? String(parsed.patient_hint) : null,
       clinician_hint: parsed.clinician_hint ? String(parsed.clinician_hint) : null,
-      scheduled_at: parsed.scheduled_at ? String(parsed.scheduled_at) : null,
-      duration_min: Number(parsed.duration_min) || 30,
+      scheduled_at: scheduledAt?.toISOString() ?? null,
+      duration_min: durationMin,
       procedure: parsed.procedure ? String(parsed.procedure) : null,
       notes: parsed.notes ? String(parsed.notes) : null,
       summary: parsed.summary ? String(parsed.summary) : "Lịch hẹn mới",
@@ -355,14 +360,29 @@ function parseSuggestResponse(raw: string): NextAppointmentSuggestion | null {
 
 // ─── Rule-based fallbacks ────────────────────────────────────
 
-function ruleBasedParse(message: string): ParsedAppointment {
+function ruleBasedParse(
+  message: string,
+  patients: Array<{ name: string }>,
+  users: Array<{ role_id: string; name: string; role_key?: string; role_name: string }>,
+): ParsedAppointment {
   const lower = message.toLowerCase();
+
+  const patientHint = findNameInMessage(message, patients.map((patient) => patient.name));
+  const clinicianHint = findNameInMessage(
+    message,
+    users
+      .filter((user) => isDoctorRole(user.role_key, user.role_id, user.role_name))
+      .map((user) => user.name),
+  );
 
   // Extract time hints
   let durationMin = 30;
-  if (/\b\d+\s*h(?:ours?|oa)?\b/i.test(message)) {
-    const h = message.match(/(\d+)\s*h/i);
-    if (h) durationMin = parseInt(h[1]) * 60;
+  const explicitDuration = message.match(/(?:trong\s+)?(\d+)\s*(?:tiếng|tieng|hours?)\b/i);
+  if (explicitDuration) {
+    durationMin = parseInt(explicitDuration[1]) * 60;
+  } else if (/(?:trong\s+)?(\d+)\s*phút\b/i.test(message)) {
+    const minutes = message.match(/(?:trong\s+)?(\d+)\s*phút\b/i);
+    if (minutes) durationMin = parseInt(minutes[1]);
   } else if (/khám\s*nhanh|quick/i.test(lower)) {
     durationMin = 15;
   } else if (/tủy|root\s*canal/i.test(lower)) {
@@ -373,24 +393,82 @@ function ruleBasedParse(message: string): ParsedAppointment {
 
   // Procedure hints
   let procedure: string | null = null;
-  if (/khám\s*tổng\s*quát|examination/i.test(lower)) procedure = "examination";
+  if (/tủy|root\s*canal/i.test(lower)) procedure = "root_canal";
   else if (/trám|filling/i.test(lower)) procedure = "filling";
-  else if (/tủy|root\s*canal/i.test(lower)) procedure = "root_canal";
   else if (/nhổ|extraction/i.test(lower)) procedure = "extraction";
   else if (/bọc|mão|crown/i.test(lower)) procedure = "crown";
   else if (/cạo\s*vôi|scaling/i.test(lower)) procedure = "scaling";
   else if (/implant/i.test(lower)) procedure = "implant";
   else if (/veneer/i.test(lower)) procedure = "veneer";
+  else if (/khám(?:\s|$)|examination/i.test(lower)) procedure = "examination";
 
   return {
-    patient_hint: null,
-    clinician_hint: null,
-    scheduled_at: null,
+    patient_hint: patientHint,
+    clinician_hint: clinicianHint,
+    scheduled_at: parseVietnameseDateTime(message),
     duration_min: durationMin,
     procedure,
     notes: message.slice(0, 500),
     summary: `Yêu cầu lịch hẹn: ${message.slice(0, 100)}`,
   };
+}
+
+function findNameInMessage(message: string, names: string[]): string | null {
+  const normalizedMessage = normalizeVietnamese(message);
+  const matches = names
+    .map((name) => ({ name, normalized: normalizeVietnamese(name) }))
+    .filter(({ normalized }) => normalized.split(" ").some((part) => part.length > 1 && new RegExp(`\\b${escapeRegExp(part)}\\b`).test(normalizedMessage)))
+    .sort((a, b) => b.normalized.length - a.normalized.length);
+
+  return matches[0]?.name ?? null;
+}
+
+function parseVietnameseDateTime(message: string): string | null {
+  const now = new Date(Date.now() + 7 * 60 * 60 * 1000);
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const lower = normalizeVietnamese(message);
+  let date: Date | null = null;
+
+  const explicitDate = lower.match(/\b(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{4}))?\b/);
+  if (explicitDate) {
+    const [, day, month, year] = explicitDate;
+    date = new Date(Date.UTC(Number(year ?? today.getUTCFullYear()), Number(month) - 1, Number(day)));
+    if (!year && date < today) date.setUTCFullYear(date.getUTCFullYear() + 1);
+  } else if (/ngay mai/.test(lower)) {
+    date = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+  } else if (/hom nay|sang nay|chieu nay|toi nay/.test(lower)) {
+    date = today;
+  } else if (/thu\s*[2-7]|chu nhat/.test(lower)) {
+    const weekdayMatch = lower.match(/thu\s*([2-7])|chu nhat/);
+    const targetDay = weekdayMatch?.[1] ? Number(weekdayMatch[1]) - 1 : 0;
+    let daysUntil = (targetDay - today.getUTCDay() + 7) % 7;
+    if (/tuan sau/.test(lower)) daysUntil += 7;
+    date = new Date(today.getTime() + daysUntil * 24 * 60 * 60 * 1000);
+  } else if (/tuan sau/.test(lower)) {
+    date = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+  }
+
+  if (!date) return null;
+
+  const time = lower.match(/\b(\d{1,2})(?:\s*(?:h|gio|:|\.))\s*(\d{1,2})?\b/);
+  let hours = time ? Number(time[1]) : /chieu/.test(lower) ? 14 : 9;
+  const minutes = time?.[2] ? Number(time[2]) : 0;
+  if (hours < 12 && /chieu|toi/.test(lower)) hours += 12;
+  if (hours > 23 || minutes > 59) return null;
+
+  return `${date.toISOString().slice(0, 10)}T${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00+07:00`;
+}
+
+function normalizeVietnamese(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .toLowerCase();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function ruleBasedSuggestion(

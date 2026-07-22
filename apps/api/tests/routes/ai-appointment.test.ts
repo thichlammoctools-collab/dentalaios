@@ -178,7 +178,13 @@ describe("POST /api/ai/parse-appointment-chat", () => {
       appointment: { duration_min: number; summary: string };
       ai_model: string;
     };
-    expect(body.appointment.duration_min).toBeGreaterThanOrEqual(15);
+    expect(body.appointment).toMatchObject({
+      patient_hint: "Nguyễn Văn An",
+      clinician_hint: "Trần Văn Nam",
+      duration_min: 30,
+      procedure: "examination",
+    });
+    expect(body.appointment.scheduled_at).toMatch(/T09:30:00\+07:00$/);
     expect(body.ai_model).toMatch(/llama|rule-based/);
   });
 
@@ -232,6 +238,25 @@ describe("POST /api/ai/parse-appointment-chat", () => {
     expect(body.ai_model).toBe("rule-based-fallback");
     expect(body.appointment.duration_min).toBe(60);
     expect(body.appointment.procedure).toBe("root_canal");
+  });
+
+  it("fallback understands a future Vietnamese weekday", async () => {
+    const app = mountRoute("/api/ai", aiRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/ai/parse-appointment-chat",
+      new Map([["FROM patients", []], ["FROM users", []]]),
+      {
+        permissions: ["write_appointments", "read_patients"],
+        body: { message: "Cạo vôi thứ 2 tuần sau lúc 14h" },
+      },
+    );
+    const body = (await res.json()) as {
+      appointment: { duration_min: number; procedure: string | null; scheduled_at: string | null };
+    };
+    expect(body.appointment).toMatchObject({ duration_min: 30, procedure: "scaling" });
+    expect(body.appointment.scheduled_at).toMatch(/T14:00:00\+07:00$/);
   });
 });
 

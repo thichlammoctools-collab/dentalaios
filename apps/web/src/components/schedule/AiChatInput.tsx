@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
-import type { Patient, UserWithDetails } from "@shared/types";
 
 export interface ParsedAppointment {
   patient_hint: string | null;
@@ -39,8 +38,6 @@ export function AiChatInput({ onApply }: AiChatInputProps) {
   const [message, setMessage] = useState("");
   const [parsing, setParsing] = useState(false);
   const [result, setResult] = useState<ParseChatResult | null>(null);
-  const [matchedPatient, setMatchedPatient] = useState<Patient | null>(null);
-  const [matchedDoctor, setMatchedDoctor] = useState<UserWithDetails | null>(null);
 
   async function send() {
     if (!message.trim()) {
@@ -53,19 +50,6 @@ export function AiChatInput({ onApply }: AiChatInputProps) {
       const res = await apiPost<ParseChatResult>("/api/ai/parse-appointment-chat", { message });
       setResult(res);
 
-      // Try to match patient_hint + clinician_hint against existing records
-      if (res.appointment.patient_hint) {
-        try {
-          const patients = await apiPost<{ items: Patient[] }>("/api/patients/search", {
-            name: res.appointment.patient_hint,
-          });
-          if (patients.items.length > 0) {
-            setMatchedPatient(patients.items[0]);
-          }
-        } catch {
-          // search endpoint may not exist — ignore
-        }
-      }
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi phân tích");
     } finally {
@@ -82,8 +66,6 @@ export function AiChatInput({ onApply }: AiChatInputProps) {
   function reset() {
     setMessage("");
     setResult(null);
-    setMatchedPatient(null);
-    setMatchedDoctor(null);
   }
 
   return (

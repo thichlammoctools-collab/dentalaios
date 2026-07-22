@@ -10,6 +10,7 @@ import { PERMISSIONS, ROUTES } from "@shared/constants";
 import type { ChairOperationalStatus, DentalChair, DentalChairType, DentalRoom } from "@shared/types";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/pagination";
 import { PageContainer } from "@/components/PageContainer";
+import { ChairTypeIndicator, chairTypeLabel } from "@/components/ChairTypeIndicator";
 
 interface ChairsResponse {
   items: DentalChair[];
@@ -33,13 +34,7 @@ type ChairForm = {
   is_active: boolean;
 };
 
-const CHAIR_TYPES: Array<{ value: DentalChairType; label: string }> = [
-  { value: "general", label: "Tổng quát" },
-  { value: "surgery", label: "Phẫu thuật" },
-  { value: "orthodontic", label: "Chỉnh nha" },
-  { value: "pediatric", label: "Nhi" },
-  { value: "hygiene", label: "Vệ sinh" },
-];
+const CHAIR_TYPES: DentalChairType[] = ["general", "surgery", "orthodontic", "pediatric", "hygiene"];
 
 const STATUS_LABELS: Record<ChairOperationalStatus, string> = {
   available: "Sẵn sàng",
@@ -249,7 +244,7 @@ export function ChairSettingsPage() {
                 {visibleChairs.map((chair) => (
                   <tr key={chair.id}>
                     <td className="px-5 py-4"><div className="flex items-center gap-3"><span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: chair.color ?? "#2563EB" }} /><div><p className="font-medium">{chair.name}</p><p className="font-mono text-xs text-muted-foreground">{chair.code}</p></div></div></td>
-                    <td className="px-4 py-4"><p>{chair.room_name ?? "Chưa gán phòng"}</p><p className="text-xs text-muted-foreground">{CHAIR_TYPES.find((type) => type.value === chair.chair_type)?.label}</p></td>
+                    <td className="px-4 py-4"><p>{chair.room_name ?? "Chưa gán phòng"}</p><ChairTypeIndicator type={chair.chair_type} className="mt-1 text-xs text-muted-foreground" /></td>
                     <td className="px-4 py-4 tabular-nums">{chair.turnover_min} phút</td>
                     <td className="px-4 py-4"><span className="rounded-full bg-muted px-2 py-1 text-xs">{STATUS_LABELS[chair.operational_status]}</span></td>
                     <td className="px-4 py-4">{chair.is_active ? <span className="text-emerald-700 dark:text-emerald-400">Đang dùng</span> : <span className="text-muted-foreground">Tạm dừng</span>}</td>
@@ -270,7 +265,7 @@ export function ChairSettingsPage() {
             <Field label="Mã ghế" required><input value={form.code} disabled={Boolean(editingChair)} onChange={(event) => setField("code", event.target.value)} placeholder="GHE-01" className={INPUT_CLASS} /></Field>
             <Field label="Tên ghế" required><input value={form.name} onChange={(event) => setField("name", event.target.value)} placeholder="Ghế số 1" className={INPUT_CLASS} /></Field>
             <Field label="Phòng"><div className="flex gap-2"><select value={form.room_id} onChange={(event) => setField("room_id", event.target.value)} className={INPUT_CLASS}><option value="">Chưa gán phòng</option>{rooms.filter((room) => room.is_active).map((room) => <option key={room.id} value={room.id}>{room.name}</option>)}</select>{canManage && <Button variant="outline" className="shrink-0" onClick={openCreateRoom}>Tạo phòng</Button>}</div></Field>
-            <Field label="Loại ghế"><select value={form.chair_type} onChange={(event) => setField("chair_type", event.target.value as DentalChairType)} className={INPUT_CLASS}>{CHAIR_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select></Field>
+            <Field label="Loại ghế"><select value={form.chair_type} onChange={(event) => setField("chair_type", event.target.value as DentalChairType)} className={INPUT_CLASS}>{CHAIR_TYPES.map((type) => <option key={type} value={type}>{chairTypeLabel(type)}</option>)}</select></Field>
             <Field label="Trạng thái vận hành"><select value={form.operational_status} onChange={(event) => setField("operational_status", event.target.value as ChairOperationalStatus)} className={INPUT_CLASS}>{Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></Field>
             <Field label="Thời gian chuẩn bị (phút)"><input type="number" min="0" max="120" value={form.turnover_min} onChange={(event) => setField("turnover_min", event.target.value)} className={INPUT_CLASS} /></Field>
             <Field label="Màu hiển thị"><div className="flex gap-2"><input type="color" value={form.color} onChange={(event) => setField("color", event.target.value)} className="h-10 w-12 rounded border border-input bg-background p-1" /><input value={form.color} onChange={(event) => setField("color", event.target.value)} className={INPUT_CLASS} /></div></Field>
