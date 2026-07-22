@@ -301,7 +301,7 @@ export function AppointmentForm({
     setSelectedMilestoneIds(next);
     const names = milestoneOptions
       .filter((candidate) => next.includes(candidate.id))
-      .map((candidate) => candidate.item.service_name ?? candidate.item.procedure);
+      .map(formatMilestoneLabel);
     setProcedure([...new Set(names)].join("; "));
   }
 
@@ -320,7 +320,7 @@ export function AppointmentForm({
     const choices = availablePatientCases.length === 1 ? patientMilestones : selectedPatientMilestones;
     const names = choices
       .filter((candidate) => next.includes(candidate.milestone_id))
-      .map((candidate) => candidate.item.service_name ?? candidate.item.procedure);
+      .map(formatMilestoneLabel);
     setProcedure([...new Set(names)].join("; "));
   }
 
@@ -564,6 +564,14 @@ export function AppointmentForm({
       </form>
     </Dialog>
   );
+}
+
+function formatMilestoneLabel(milestone: { item: TreatmentCaseMilestone["item"] }): string {
+  const service = milestone.item.service_name ?? milestone.item.procedure;
+  const location = milestone.item.tooth_number != null
+    ? `Răng #${milestone.item.tooth_number}`
+    : "Toàn hàm";
+  return `${service} · ${location}`;
 }
 
 function getSuggestedChairTimes(

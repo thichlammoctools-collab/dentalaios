@@ -224,7 +224,7 @@ export const treatmentCasesService = {
       }
       return value;
     }));
-    const procedures = [...new Set(milestones.map((value) => value.item.service_name ?? value.item.procedure))];
+    const procedures = [...new Set(milestones.map((value) => formatMilestoneAppointmentLabel(value)))];
     const appointment = await appointmentsService.create(db, tenantId, actor.userId, treatmentCase.primary_branch_id, {
       patient_id: treatmentCase.patient_id,
       clinician_id: data.clinician_id,
@@ -292,6 +292,14 @@ export const treatmentCasesService = {
     };
   },
 };
+
+function formatMilestoneAppointmentLabel(milestone: TreatmentCaseMilestone): string {
+  const service = milestone.item.service_name ?? milestone.item.procedure;
+  const location = milestone.item.tooth_number != null
+    ? `Răng #${milestone.item.tooth_number}`
+    : "Toàn hàm";
+  return `${service} · ${location}`;
+}
 
 async function requireCase(db: D1Database, tenantId: string, planId: string): Promise<TreatmentCase> {
   const treatmentCase = await createTreatmentCasesRepository(db).getByPlanId(tenantId, planId);
