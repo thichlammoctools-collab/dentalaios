@@ -174,7 +174,10 @@ export function FdiToothChart({ visitId, findings, onCreated, onCreatedBatch }: 
       >
         <span className="font-mono font-medium">{n}</span>
         {visualStatus === "missing" && (
-          <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center text-xl font-bold leading-none text-red-600 dark:text-red-400">×</span>
+          <svg aria-hidden="true" viewBox="0 0 100 100" className="pointer-events-none absolute inset-0 h-full w-full p-0.5 text-red-600 dark:text-red-400">
+            <line x1="5" y1="5" x2="95" y2="95" stroke="currentColor" strokeWidth="9" strokeLinecap="round" />
+            <line x1="95" y1="5" x2="5" y2="95" stroke="currentColor" strokeWidth="9" strokeLinecap="round" />
+          </svg>
         )}
         {list.length > 0 && visualStatus !== "missing" && (
           <span className="text-[8px] opacity-80">{list.length}</span>
