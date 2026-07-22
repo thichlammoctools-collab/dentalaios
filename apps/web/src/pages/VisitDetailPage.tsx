@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { CurrencyInput } from "@/components/ui/currency-input";
-import { VisitForm } from "@/components/VisitForm";
 import { FdiToothChart } from "@/components/FdiToothChart";
 import { FindingsList } from "@/components/FindingsList";
 import { ClinicalDiagnosesCard } from "@/components/ClinicalDiagnosesCard";
@@ -23,7 +22,7 @@ import { PageContainer } from "@/components/PageContainer";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { useAuth } from "@/lib/auth-context";
 import { isAssistantRole, isDoctorRole } from "@shared/constants";
-import type { Patient, MedicalAlert, Visit, ClinicalFinding, TreatmentPlan, GeneratePlanResult, GeneratePlanItemDraft, ProcedureCatalogItem, UserWithDetails } from "@shared/types";
+import type { Patient, MedicalAlert, Visit, ClinicalFinding, TreatmentPlan, GeneratePlanResult, ProcedureCatalogItem, UserWithDetails } from "@shared/types";
 
 interface UsersResponse {
   items: UserWithDetails[];
@@ -597,7 +596,7 @@ export function VisitDetailPage() {
   const toothFindings = findings.filter((finding) => finding.category === "tooth_hard_tissue" || finding.category === "periodontal");
 
   return (
-    <PageContainer size="detail">
+    <PageContainer size="wide" className="space-y-5">
       {/* Header */}
       <div>
         <Breadcrumbs items={[
@@ -687,19 +686,16 @@ export function VisitDetailPage() {
       )}
 
       {/* Patient safety context */}
-      <Card className={alerts.length > 0 ? "border-amber-300 dark:border-amber-800" : undefined}>
-        <CardHeader className="pb-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <CardTitle>Thông tin cần lưu ý</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">Cảnh báo y khoa và chỉ số cơ thể của bệnh nhân</p>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => navigate(`/patients/${visit.patient_id}/alerts`)}>
-              Xem hồ sơ bệnh nhân
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+       <Card className={alerts.length > 0 ? "border-amber-300 dark:border-amber-800" : undefined}>
+         <details open={alerts.length > 0}>
+           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-4 [&::-webkit-details-marker]:hidden">
+             <div>
+               <CardTitle>Thông tin cần lưu ý</CardTitle>
+               <p className="mt-1 text-sm text-muted-foreground">{alerts.length > 0 ? `${alerts.length} cảnh báo y khoa cần xem trước khi điều trị` : "Không có cảnh báo y khoa"}</p>
+             </div>
+             <span className="text-xs font-medium text-muted-foreground">Mở rộng</span>
+           </summary>
+         <CardContent className="space-y-4 border-t border-border pt-4">
           {alerts.length > 0 ? (
             <div className="space-y-2">
               {alerts.map((alert) => (
@@ -728,17 +724,22 @@ export function VisitDetailPage() {
               <p className="text-xs text-muted-foreground">BMI</p>
               <p className="mt-1 font-semibold">{bmi === null ? "Chưa đủ dữ liệu" : `${bmi} · ${bmiLabel}`}</p>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+           </div>
+           <Button variant="outline" size="sm" onClick={() => navigate(`/patients/${visit.patient_id}/alerts`)}>
+             Xem hồ sơ bệnh nhân
+           </Button>
+         </CardContent>
+         </details>
+       </Card>
 
       {/* Previous clinical history */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle>Lịch sử khám và điều trị</CardTitle>
-          <p className="text-sm text-muted-foreground">Xem lại các lượt khám và kế hoạch điều trị trước đó của bệnh nhân.</p>
-        </CardHeader>
-        <CardContent className="grid gap-5 lg:grid-cols-2">
+       <Card>
+         <details>
+           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-4 [&::-webkit-details-marker]:hidden">
+             <div><CardTitle>Lịch sử khám và điều trị</CardTitle><p className="mt-1 text-sm text-muted-foreground">{sortedPreviousVisits.length} lượt khám trước · {sortedTreatmentHistory.length} kế hoạch điều trị</p></div>
+             <span className="text-xs font-medium text-muted-foreground">Mở rộng</span>
+           </summary>
+         <CardContent className="grid gap-5 border-t border-border pt-4 lg:grid-cols-2">
           <div>
             <p className="mb-2 text-sm font-medium">Lượt khám trước ({sortedPreviousVisits.length})</p>
             {sortedPreviousVisits.length === 0 ? (
@@ -775,8 +776,9 @@ export function VisitDetailPage() {
               </div>
             )}
           </div>
-        </CardContent>
-      </Card>
+         </CardContent>
+         </details>
+       </Card>
 
       {/* FDI Chart */}
       <Card>
