@@ -363,6 +363,40 @@ describe("DELETE /api/visits/:visitId/findings/:findingId", () => {
     );
     expect(res.status).toBe(404);
   });
+
+  it("returns 409 without deleting when a diagnosis references the finding", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const findingRow = {
+      id: "finding-1", tenant_id: "test-tenant", visit_id: "visit-1", category: "tooth_hard_tissue",
+      scope: "tooth", tooth_number: 11, tooth_system: "FDI", anatomical_site: null, condition: "caries", notes: null,
+    };
+    const res = await authedRequestWithDB(
+      app,
+      "DELETE",
+      "/api/visits/visit-1/findings/finding-1",
+      new Map([["FROM visits", [visitRow()]], ["FROM clinical_findings", [findingRow]], ["FROM clinical_diagnoses", [{ id: "diagnosis-1" }]]]),
+      { permissions: ["write_findings"] },
+    );
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ code: "conflict", error: expect.stringContaining("nguồn cho chẩn đoán") });
+  });
+
+  it("returns 409 when a diagnosis is created while deleting the finding", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const findingRow = {
+      id: "finding-1", tenant_id: "test-tenant", visit_id: "visit-1", category: "tooth_hard_tissue",
+      scope: "tooth", tooth_number: 11, tooth_system: "FDI", anatomical_site: null, condition: "caries", notes: null,
+    };
+    const res = await authedRequestWithDB(
+      app,
+      "DELETE",
+      "/api/visits/visit-1/findings/finding-1",
+      new Map([["FROM visits", [visitRow()]], ["FROM clinical_findings", [findingRow]], ["FROM clinical_diagnoses", []]]),
+      { permissions: ["write_findings"], runErrorByFragment: new Map([["DELETE FROM clinical_findings", new Error("FOREIGN KEY constraint failed")]]) },
+    );
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ code: "conflict", error: expect.stringContaining("nguồn cho chẩn đoán") });
+  });
 });
 
 describe("Clinical diagnosis routes", () => {

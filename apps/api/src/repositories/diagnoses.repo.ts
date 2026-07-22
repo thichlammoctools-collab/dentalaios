@@ -17,6 +17,12 @@ export function createDiagnosesRepository(db: D1Database) {
       const result = await db.prepare(`${select} WHERE tenant_id = ? AND visit_id = ? AND status = 'confirmed' ORDER BY created_at DESC`).bind(tenantId, visitId).all<D1Row>();
       return result.results.map(mapDiagnosis);
     },
+    async existsForSourceFinding(tenantId: string, findingId: string): Promise<boolean> {
+      const row = await db.prepare("SELECT 1 FROM clinical_diagnoses WHERE tenant_id = ? AND source_finding_id = ? LIMIT 1")
+        .bind(tenantId, findingId)
+        .first();
+      return row !== null;
+    },
     async listConfirmedReport(tenantId: string, filters: { from?: string; to?: string; icd10?: string; branchId?: string }): Promise<Array<ClinicalDiagnosis & { visit_date: string; branch_id: string; clinician_id: string }>> {
       const where = ["d.tenant_id = ?", "d.status = 'confirmed'"];
       const binds: unknown[] = [tenantId];

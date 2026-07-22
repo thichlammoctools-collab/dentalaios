@@ -3,12 +3,14 @@ import type { Visit, ClinicalFinding } from "@shared/types";
 import type { VisitCreateInput, VisitUpdateInput, FindingCreateInput, FindingUpdateInput } from "@shared/validation";
 import { createVisitsRepository } from "../repositories/visits.repo";
 import { createFindingsRepository } from "../repositories/findings.repo";
+import { createDiagnosesRepository } from "../repositories/diagnoses.repo";
 import { createClinicalTerminologyRepository } from "../repositories/clinical-terminology.repo";
 import { createAppointmentsRepository } from "../repositories/appointments.repo";
 import { createChairsRepository } from "../repositories/chairs.repo";
 import { ConflictError, NotFoundError, ValidationError } from "../lib/errors";
 import { assertAllInTenant } from "../lib/tenant-scope";
 import { assertTreatmentPersonnel } from "../lib/personnel";
+import { isForeignKeyError } from "../lib/db-errors";
 
 export const visitService = {
   list(
@@ -187,7 +189,19 @@ export const visitService = {
     const findings = createFindingsRepository(db);
     const finding = (await findings.listByVisit(tenantId, visitId)).find((item) => item.id === findingId);
     if (!finding) throw new NotFoundError("Finding not found");
-    await findings.delete(tenantId, findingId);
+    const diagnoses = createDiagnosesRepository(db);
+    if (await diagnoses.existsForSourceFinding(tenantId, findingId)) {
+      throw new ConflictError("Không thể xóa ghi nhận vì đã được dùng làm nguồn cho chẩn đoán. Hãy cập nhật hoặc xử lý chẩn đoán trước.");
+    }
+    try {
+      await findings.delete(tenantId, findingId);
+    } catch (err) {
+      // A diagnosis could be created after the dependency check above.
+      if (isForeignKeyError(err)) {
+        throw new ConflictError("Không thể xóa ghi nhận vì đã được dùng làm nguồn cho chẩn đoán. Hãy cập nhật hoặc xử lý chẩn đoán trước.");
+      }
+      throw err;
+    }
   },
 };
 
