@@ -56,7 +56,6 @@ export function PatientImageGallery({
   const [annotationShape, setAnnotationShape] = useState<ImageAnnotationShapeType>("pin");
   const [annotationGeometry, setAnnotationGeometry] = useState<ImageAnnotationGeometry | null>(null);
   const [annotationNote, setAnnotationNote] = useState("");
-  const [drawingFreehand, setDrawingFreehand] = useState(false);
   const [savingAnnotation, setSavingAnnotation] = useState(false);
   const [selectedDiagnosisId, setSelectedDiagnosisId] = useState("");
   const [selectedAnnotationVersionId, setSelectedAnnotationVersionId] = useState("");
@@ -65,6 +64,7 @@ export function PatientImageGallery({
   const [linkingEvidence, setLinkingEvidence] = useState(false);
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const freehandPointsRef = useRef<Array<{ x: number; y: number }>>([]);
+  const drawingFreehandRef = useRef(false);
 
   async function load() {
     setLoading(true);
@@ -245,19 +245,21 @@ export function PatientImageGallery({
 
   function handleAnnotationPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (!viewUrl) return;
+    event.preventDefault();
     const point = coordinateFromPointer(event);
     if (!point) return;
     if (annotationShape === "pin") setAnnotationGeometry(point);
     else {
       event.currentTarget.setPointerCapture(event.pointerId);
-      setDrawingFreehand(true);
+      drawingFreehandRef.current = true;
       freehandPointsRef.current = [point];
       setAnnotationGeometry({ points: [point] });
     }
   }
 
   function handleAnnotationPointerMove(event: React.PointerEvent<HTMLDivElement>) {
-    if (annotationShape !== "freehand" || !drawingFreehand) return;
+    if (annotationShape !== "freehand" || !drawingFreehandRef.current) return;
+    event.preventDefault();
     const point = coordinateFromPointer(event);
     if (!point) return;
     const last = freehandPointsRef.current[freehandPointsRef.current.length - 1];
@@ -268,12 +270,18 @@ export function PatientImageGallery({
   }
 
   function handleAnnotationPointerUp(event: React.PointerEvent<HTMLDivElement>) {
-    if (annotationShape !== "freehand" || !drawingFreehand) return;
+    if (annotationShape !== "freehand" || !drawingFreehandRef.current) return;
+    event.preventDefault();
     const point = coordinateFromPointer(event);
     const finalPoints = point ? [...freehandPointsRef.current, point] : freehandPointsRef.current;
-    setDrawingFreehand(false);
+    drawingFreehandRef.current = false;
     freehandPointsRef.current = finalPoints;
     setAnnotationGeometry(finalPoints.length >= 2 ? { points: finalPoints } : null);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  }
+
+  function handleAnnotationPointerCancel(event: React.PointerEvent<HTMLDivElement>) {
+    drawingFreehandRef.current = false;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
 
@@ -538,17 +546,19 @@ export function PatientImageGallery({
           {/* Image */}
           <div className="rounded-xl overflow-hidden bg-black/5 mb-4">
             {viewUrl ? (
-              <div ref={imageContainerRef} className="relative mx-auto w-fit max-w-full touch-none" onPointerDown={handleAnnotationPointerDown} onPointerMove={handleAnnotationPointerMove} onPointerUp={handleAnnotationPointerUp}>
+              <div ref={imageContainerRef} className="relative mx-auto w-fit max-w-full touch-none select-none" onPointerDown={handleAnnotationPointerDown} onPointerMove={handleAnnotationPointerMove} onPointerUp={handleAnnotationPointerUp} onPointerCancel={handleAnnotationPointerCancel}>
                 <img
                   src={viewUrl}
                   alt={selected?.original_name || "Medical image"}
                   className="block max-h-[60vh] max-w-full object-contain"
+                  draggable={false}
                   onError={() => {
                     setViewUrl(null);
                     setViewError("Định dạng hình ảnh này không thể xem trước trong trình duyệt");
                   }}
                 />
                 <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 1 1" preserveAspectRatio="none" aria-label="Ghi chú trên ảnh">
+                  <defs><marker id="annotation-arrow" markerWidth="0.06" markerHeight="0.06" refX="0.045" refY="0.03" orient="auto"><path d="M0,0 L0.06,0.03 L0,0.06 Z" fill="#ef4444" /></marker><marker id="annotation-arrow-active" markerWidth="0.06" markerHeight="0.06" refX="0.045" refY="0.03" orient="auto"><path d="M0,0 L0.06,0.03 L0,0.06 Z" fill="#2563eb" /></marker><marker id="annotation-arrow-draft" markerWidth="0.06" markerHeight="0.06" refX="0.045" refY="0.03" orient="auto"><path d="M0,0 L0.06,0.03 L0,0.06 Z" fill="#f59e0b" /></marker></defs>
                   {annotations.map((annotation) => <AnnotationOverlay key={annotation.id} shape={annotation.current_version.shape_type} geometry={annotation.current_version.geometry} active={selectedAnnotationVersionId === annotation.current_version.id} />)}
                   {annotationGeometry && <AnnotationOverlay shape={annotationShape} geometry={annotationGeometry} draft />}
                 </svg>
@@ -565,9 +575,9 @@ export function PatientImageGallery({
           </div>
 
           {viewUrl && selected && <section className="mb-4 rounded-xl border border-border p-3">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold">Ghi chú trên ảnh</p><p className="text-xs text-muted-foreground">Chọn mũi tên hoặc vẽ tự do trực tiếp lên ảnh.</p></div><div className="flex gap-1"><Button size="sm" variant={annotationShape === "pin" ? "default" : "outline"} onClick={() => { setAnnotationShape("pin"); setAnnotationGeometry(null); freehandPointsRef.current = []; }}>Mũi tên</Button><Button size="sm" variant={annotationShape === "freehand" ? "default" : "outline"} onClick={() => { setAnnotationShape("freehand"); setAnnotationGeometry(null); freehandPointsRef.current = []; }}>Vẽ tự do</Button></div></div>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold">Ghi chú trên ảnh</p><p className="text-xs text-muted-foreground">Mũi tên: bấm lên vị trí cần chỉ. Vẽ tự do: nhấn giữ và kéo trên ảnh.</p></div><div className="flex gap-1"><Button size="sm" variant={annotationShape === "pin" ? "default" : "outline"} onClick={() => { setAnnotationShape("pin"); setAnnotationGeometry(null); drawingFreehandRef.current = false; freehandPointsRef.current = []; }}>Mũi tên</Button><Button size="sm" variant={annotationShape === "freehand" ? "default" : "outline"} onClick={() => { setAnnotationShape("freehand"); setAnnotationGeometry(null); drawingFreehandRef.current = false; freehandPointsRef.current = []; }}>Vẽ tự do</Button></div></div>
             <textarea value={annotationNote} onChange={(event) => setAnnotationNote(event.target.value)} rows={2} placeholder="Mô tả dấu hiệu quan sát được trên ảnh" className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
-            <div className="mt-2 flex items-center justify-between gap-2"><p className="text-xs text-muted-foreground">{annotationGeometry ? "Đã đặt vùng đánh dấu, nhập ghi chú để lưu." : "Chưa đặt vùng đánh dấu."}</p><Button size="sm" onClick={() => void saveAnnotation()} disabled={!annotationGeometry || !annotationNote.trim() || savingAnnotation}>{savingAnnotation ? "Đang lưu..." : "Lưu ghi chú"}</Button></div>
+            <div className="mt-2 flex items-center justify-between gap-2"><p className="text-xs text-muted-foreground">{annotationGeometry ? "Đã tạo nét đánh dấu màu vàng, nhập ghi chú để lưu." : "Chưa tạo nét đánh dấu."}</p><Button size="sm" onClick={() => void saveAnnotation()} disabled={!annotationGeometry || !annotationNote.trim() || savingAnnotation}>{savingAnnotation ? "Đang lưu..." : "Lưu ghi chú"}</Button></div>
             {annotations.length > 0 && <div className="mt-3 space-y-1 border-t pt-3">{annotations.map((annotation) => <button type="button" key={annotation.id} onClick={() => setSelectedAnnotationVersionId(annotation.current_version.id)} className={`block w-full rounded-md px-2 py-1.5 text-left text-xs ${selectedAnnotationVersionId === annotation.current_version.id ? "bg-primary/10 text-primary" : "hover:bg-muted"}`}><span className="font-medium">V{annotation.current_version.version_no}</span> · {annotation.current_version.note}</button>)}</div>}
           </section>}
 
@@ -741,7 +751,12 @@ function ImageThumbnail({ img }: { img: PatientImage }) {
 
 function AnnotationOverlay({ shape, geometry, active, draft }: { shape: ImageAnnotationShapeType; geometry: ImageAnnotationGeometry; active?: boolean; draft?: boolean }) {
   const color = draft ? "#f59e0b" : active ? "#2563eb" : "#ef4444";
-  if (shape === "pin" && "x" in geometry && "y" in geometry) return <circle cx={geometry.x} cy={geometry.y} r="0.018" fill={color} stroke="white" strokeWidth="0.006" />;
+  const marker = draft ? "url(#annotation-arrow-draft)" : active ? "url(#annotation-arrow-active)" : "url(#annotation-arrow)";
+  if (shape === "pin" && "x" in geometry && "y" in geometry) {
+    const tailX = Math.max(0.03, geometry.x - 0.09);
+    const tailY = Math.max(0.03, geometry.y - 0.09);
+    return <line x1={tailX} y1={tailY} x2={geometry.x} y2={geometry.y} stroke={color} strokeWidth="0.009" strokeLinecap="round" markerEnd={marker} vectorEffect="non-scaling-stroke" />;
+  }
   if (shape === "freehand" && "points" in geometry) return <polyline points={geometry.points.map((point) => `${point.x},${point.y}`).join(" ")} fill="none" stroke={color} strokeWidth="0.01" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />;
   if (!("width" in geometry) || !("height" in geometry)) return null;
   return <rect x={geometry.x} y={geometry.y} width={geometry.width} height={geometry.height} fill="none" stroke={color} strokeWidth="0.008" vectorEffect="non-scaling-stroke" />;

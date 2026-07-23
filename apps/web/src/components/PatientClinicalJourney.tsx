@@ -170,15 +170,15 @@ export function PatientClinicalJourney({ patientId }: { patientId: string }) {
                       </Badge>
                     </TableCell>
                     <TableCell className="align-top">
-                      {findings.length === 0 ? <span className="text-muted-foreground">Chưa ghi nhận</span> : <div className="space-y-2">{findings.map((finding) => (
-                        <div key={finding.id}>
+                      {findings.length === 0 ? <span className="text-muted-foreground">Chưa ghi nhận</span> : (
+                        <div>
                           <button type="button" className="font-medium hover:text-primary hover:underline" onClick={() => navigate(withPatientReturnContext(`/visits/${row.visit.id}`, patientId, "journey"))}>
-                            {finding.code ?? "Finding chưa có mã"}
+                            {findings[0].code ?? "Finding chưa có mã"}
                           </button>
                           <p className="mt-0.5 text-muted-foreground">BS. {row.visit.treating_clinician_name ?? "—"}</p>
                           <p className="text-muted-foreground">Phụ tá: {row.visit.assistant_name ?? "—"}</p>
                         </div>
-                      ))}</div>}
+                      )}
                     </TableCell>
                     <TableCell className="align-top">
                       {plans.length === 0 ? <span className="text-muted-foreground">Chưa có kế hoạch</span> : <div className="space-y-2">{plans.map((plan) => (
