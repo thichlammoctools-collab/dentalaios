@@ -719,8 +719,8 @@ const imageAnnotationSchemaBase = z.object({
   anatomical_site: z.enum(ANATOMICAL_SITES).optional(),
 }).strict();
 function validateImageAnnotationShape(value: z.infer<typeof imageAnnotationSchemaBase>, ctx: z.RefinementCtx) {
-  if (value.shape_type === "pin" && ("width" in value.geometry || "height" in value.geometry)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["geometry"], message: "Ghim chỉ dùng tọa độ điểm" });
-  if (value.shape_type === "rectangle" && (!("width" in value.geometry) || !("height" in value.geometry))) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["geometry"], message: "Khung cần chiều rộng và chiều cao" });
+  if (value.shape_type === "pin" && (!("x" in value.geometry) || !("y" in value.geometry) || "width" in value.geometry || "height" in value.geometry)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["geometry"], message: "Mũi tên chỉ dùng tọa độ điểm" });
+  if (value.shape_type === "rectangle" && (!("x" in value.geometry) || !("y" in value.geometry) || !("width" in value.geometry) || !("height" in value.geometry))) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["geometry"], message: "Khung cần chiều rộng và chiều cao" });
   if (value.shape_type === "freehand" && !("points" in value.geometry)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["geometry"], message: "Vẽ tự do cần ít nhất hai điểm" });
 }
 export const imageAnnotationCreateSchema = imageAnnotationSchemaBase.superRefine(validateImageAnnotationShape);

@@ -19,6 +19,24 @@ describe("image annotation routes", () => {
     expect(response.status).toBe(400);
   });
 
+  it("accepts a freehand path with at least two normalized points", async () => {
+    const app = mountRoute("/api/patient-images", patientImagesRoutes);
+    const response = await authedRequestWithDB(app, "POST", "/api/patient-images/image-1/annotations", new Map(), {
+      permissions: ["write_findings"],
+      body: { shape_type: "freehand", geometry: { points: [{ x: 0.2, y: 0.3 }, { x: 0.4, y: 0.5 }] }, note: "Viền tổn thương" },
+    });
+    expect(response.status).not.toBe(400);
+  });
+
+  it("rejects a freehand path with only one point", async () => {
+    const app = mountRoute("/api/patient-images", patientImagesRoutes);
+    const response = await authedRequestWithDB(app, "POST", "/api/patient-images/image-1/annotations", new Map(), {
+      permissions: ["write_findings"],
+      body: { shape_type: "freehand", geometry: { points: [{ x: 0.2, y: 0.3 }] }, note: "Viền tổn thương" },
+    });
+    expect(response.status).toBe(400);
+  });
+
   it("requires write_findings to create annotations", async () => {
     const app = mountRoute("/api/patient-images", patientImagesRoutes);
     const response = await authedRequestWithDB(app, "POST", "/api/patient-images/image-1/annotations", new Map(), {
