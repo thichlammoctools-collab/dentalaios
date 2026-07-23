@@ -6,9 +6,17 @@ interface DialogProps {
   onOpenChange: (open: boolean) => void;
   children: ReactNode;
   className?: string;
+  size?: "sm" | "md" | "lg" | "workspace";
 }
 
-export function Dialog({ open, onOpenChange, children, className }: DialogProps) {
+const sizeClasses = {
+  sm: "lg:max-w-xl",
+  md: "lg:max-w-2xl",
+  lg: "lg:max-w-4xl",
+  workspace: "lg:max-w-5xl xl:max-w-6xl 2xl:max-w-[80rem]",
+} as const;
+
+export function Dialog({ open, onOpenChange, children, className, size = "lg" }: DialogProps) {
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
@@ -26,7 +34,7 @@ export function Dialog({ open, onOpenChange, children, className }: DialogProps)
   return (
     <div
       className={cn(
-        "fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4",
+        "fixed inset-0 z-[9999] flex items-end lg:items-center justify-center bg-black/60 backdrop-blur-sm p-0 lg:p-6",
         "transition-all duration-200",
         open ? "opacity-100" : "pointer-events-none opacity-0",
       )}
@@ -38,12 +46,13 @@ export function Dialog({ open, onOpenChange, children, className }: DialogProps)
     >
       <div
         className={cn(
-          "relative z-[10000] w-full sm:max-w-3xl lg:max-w-4xl rounded-t-2xl sm:rounded-2xl border border-border bg-card shadow-2xl",
-          "max-h-[92dvh] sm:max-h-[90dvh] flex flex-col",
+          "relative z-[10000] flex w-full flex-col rounded-t-2xl border border-border bg-card shadow-2xl lg:max-h-[90dvh] lg:rounded-2xl",
+          "max-h-[94dvh]",
           "transition-all duration-200",
           open
             ? "opacity-100 translate-y-0 sm:scale-100"
             : "opacity-0 translate-y-4 sm:scale-95",
+          sizeClasses[size],
           className,
         )}
         onClick={(e) => e.stopPropagation()}
@@ -72,7 +81,7 @@ interface DialogHeaderProps {
 
 export function DialogHeader({ className, children }: DialogHeaderProps) {
   return (
-    <div className={cn("flex-shrink-0 border-b border-border px-6 pt-5 pb-4 sm:px-8 sm:pt-6 sm:pb-4", className)}>
+    <div className={cn("flex-shrink-0 border-b border-border px-5 pb-4 pt-5 lg:px-8 lg:pb-4 lg:pt-6", className)}>
       {children}
     </div>
   );
@@ -88,7 +97,7 @@ export function DialogDescription({ children }: { children: ReactNode }) {
 
 export function DialogBody({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <div className={cn("flex-1 overflow-y-auto px-6 py-4 sm:px-8 sm:py-5", className)}>
+    <div className={cn("flex-1 overflow-y-auto px-5 py-4 lg:px-8 lg:py-5", className)}>
       {children}
     </div>
   );
@@ -96,7 +105,7 @@ export function DialogBody({ className, children }: { className?: string; childr
 
 export function DialogFooter({ className, children }: DialogHeaderProps) {
   return (
-    <div className={cn("flex-shrink-0 border-t border-border px-6 pb-5 pt-4 sm:px-8 sm:pb-6", className)}>
+    <div className={cn("flex-shrink-0 border-t border-border px-5 pb-5 pt-4 lg:px-8 lg:pb-6", className)}>
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         {children}
       </div>

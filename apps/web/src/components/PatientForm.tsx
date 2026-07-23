@@ -199,7 +199,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} className="sm:max-w-2xl">
+    <Dialog open={open} onOpenChange={onOpenChange} size="workspace">
       <form ref={formRef} onSubmit={onSubmit}>
         <DialogHeader>
           <DialogTitle>{isEdit ? "Sửa bệnh nhân" : "Tạo bệnh nhân mới"}</DialogTitle>
@@ -210,7 +210,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
           </div>
         </DialogHeader>
 
-        <DialogBody className="grid gap-3 pr-1">
+        <DialogBody className="grid gap-4 lg:gap-5">
 
           {step === 1 && <>
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
@@ -231,7 +231,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 lg:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor="pf-dob">
                 Ngày sinh <span className="text-red-500">*</span>
@@ -303,7 +303,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
             Hoàn thiện hồ sơ nếu có thông tin. Toàn bộ mục ở bước này đều không bắt buộc và có thể bổ sung sau.
           </div>
           <SectionDivider>Địa chỉ</SectionDivider>
-          <div className="rounded-lg border border-border bg-muted/20 p-3">
+          <div className="rounded-xl border border-border bg-muted/20 p-4 lg:p-5">
             <div className="mb-3">
               <Label className="text-sm font-semibold">Địa chỉ thường trú</Label>
               <p className="mt-1 text-xs text-muted-foreground">
@@ -321,123 +321,82 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
                   placeholder="VD: 123 Nguyễn Trãi, Chung cư A"
                 />
               </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="pf-ward">Phường/Xã</Label>
-                <Input
-                  id="pf-ward"
-                  value={wardName}
-                  onChange={(e) => setWardName(e.target.value)}
-                  placeholder="VD: Phường Bến Thành"
-                />
+              <div className="grid gap-3 lg:grid-cols-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="pf-ward">Phường/Xã</Label>
+                  <Input
+                    id="pf-ward"
+                    value={wardName}
+                    onChange={(e) => setWardName(e.target.value)}
+                    placeholder="VD: Phường Bến Thành"
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="pf-province">Tỉnh/Thành phố</Label>
+                  <Input
+                    id="pf-province"
+                    value={provinceName}
+                    onChange={(e) => setProvinceName(e.target.value)}
+                    placeholder="VD: TP. Hồ Chí Minh"
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="pf-country">Quốc gia</Label>
+                  <Select
+                    id="pf-country"
+                    value={countryCode}
+                    onChange={(e) => setCountryCode(e.target.value)}
+                  >
+                    {COUNTRY_OPTIONS.map((country) => (
+                      <option key={country.code} value={country.code}>{country.name}</option>
+                    ))}
+                  </Select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <section className="space-y-3 rounded-xl border border-border p-4 lg:p-5">
+              <SectionDivider icon={<FamilyIcon />}>Thông tin người nhà</SectionDivider>
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="pf-fam-name">Họ tên người nhà</Label>
+                  <Input id="pf-fam-name" value={familyName} onChange={(e) => setFamilyName(e.target.value)} placeholder="VD: Trần Thị B" />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="pf-fam-rel">Mối quan hệ</Label>
+                  <Input id="pf-fam-rel" value={familyRelation} onChange={(e) => setFamilyRelation(e.target.value)} placeholder="VD: Vợ, Chồng, Con…" />
+                </div>
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="pf-province">Tỉnh/Thành phố</Label>
-                <Input
-                  id="pf-province"
-                  value={provinceName}
-                  onChange={(e) => setProvinceName(e.target.value)}
-                  placeholder="VD: TP. Hồ Chí Minh"
-                />
+                <Label htmlFor="pf-fam-phone">Số điện thoại người nhà</Label>
+                <Input id="pf-fam-phone" type="tel" value={familyPhone} onChange={(e) => setFamilyPhone(e.target.value)} placeholder="VD: 0907654321" />
               </div>
+            </section>
+
+            <section className="space-y-3 rounded-xl border border-border p-4 lg:p-5">
+              <SectionDivider icon={<MetricsIcon />}>Thông tin bổ sung</SectionDivider>
               <div className="grid gap-1.5">
-                <Label htmlFor="pf-country">Quốc gia</Label>
-                <Select
-                  id="pf-country"
-                  value={countryCode}
-                  onChange={(e) => setCountryCode(e.target.value)}
-                >
-                  {COUNTRY_OPTIONS.map((country) => (
-                    <option key={country.code} value={country.code}>{country.name}</option>
-                  ))}
+                <Label htmlFor="pf-mkt">Biết phòng khám qua kênh nào?</Label>
+                <Select id="pf-mkt" value={marketingSource} onChange={(e) => setMarketingSource(e.target.value)}>
+                  <option value="">— Chưa chọn —</option>
+                  {MARKETING_SOURCES.map((src) => <option key={src} value={src}>{MARKETING_SOURCE_LABELS[src]}</option>)}
                 </Select>
               </div>
-            </div>
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="pf-height">Chiều cao (cm)</Label>
+                  <Input id="pf-height" type="number" min={50} max={250} value={heightCm} onChange={(e) => setHeightCm(e.target.value)} placeholder="VD: 165" />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="pf-weight">Cân nặng (kg)</Label>
+                  <Input id="pf-weight" type="number" min={10} max={300} value={weightKg} onChange={(e) => setWeightKg(e.target.value)} placeholder="VD: 60" />
+                </div>
+              </div>
+              {bmi !== null && bmiLabel && <p className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground">BMI: <strong className="text-foreground">{bmi}</strong> — {bmiLabel}</p>}
+            </section>
           </div>
-
-          {/* ─── 2. Người nhà ─── */}
-          <SectionDivider icon={<FamilyIcon />}>Thông tin người nhà</SectionDivider>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
-              <Label htmlFor="pf-fam-name">Họ tên người nhà</Label>
-              <Input
-                id="pf-fam-name"
-                value={familyName}
-                onChange={(e) => setFamilyName(e.target.value)}
-                placeholder="VD: Trần Thị B"
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="pf-fam-rel">Mối quan hệ</Label>
-              <Input
-                id="pf-fam-rel"
-                value={familyRelation}
-                onChange={(e) => setFamilyRelation(e.target.value)}
-                placeholder="VD: Vợ, Chồng, Con…"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="pf-fam-phone">Số điện thoại người nhà</Label>
-            <Input
-              id="pf-fam-phone"
-              type="tel"
-              value={familyPhone}
-              onChange={(e) => setFamilyPhone(e.target.value)}
-              placeholder="VD: 0907654321"
-            />
-          </div>
-
-          {/* ─── 3. Nguồn bệnh nhân & Chiều cao/Cân nặng ─── */}
-          <SectionDivider icon={<MetricsIcon />}>Thông tin bổ sung</SectionDivider>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="pf-mkt">Biết phòng khám qua kênh nào?</Label>
-            <Select
-              id="pf-mkt"
-              value={marketingSource}
-              onChange={(e) => setMarketingSource(e.target.value)}
-            >
-              <option value="">— Chưa chọn —</option>
-              {MARKETING_SOURCES.map((src) => (
-                <option key={src} value={src}>{MARKETING_SOURCE_LABELS[src]}</option>
-              ))}
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
-              <Label htmlFor="pf-height">Chiều cao (cm)</Label>
-              <Input
-                id="pf-height"
-                type="number"
-                min={50}
-                max={250}
-                value={heightCm}
-                onChange={(e) => setHeightCm(e.target.value)}
-                placeholder="VD: 165"
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="pf-weight">Cân nặng (kg)</Label>
-              <Input
-                id="pf-weight"
-                type="number"
-                min={10}
-                max={300}
-                value={weightKg}
-                onChange={(e) => setWeightKg(e.target.value)}
-                placeholder="VD: 60"
-              />
-            </div>
-          </div>
-
-          {bmi !== null && bmiLabel && (
-            <p className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground">
-              BMI: <strong className="text-foreground">{bmi}</strong> — {bmiLabel}
-            </p>
-          )}
 
           {/* ─── 4. Giới thiệu ─── */}
           <SectionDivider icon={<ReferralIcon />}>Giới thiệu</SectionDivider>
@@ -456,7 +415,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
             </div>
           )}
 
-          <div className="grid gap-1.5">
+          <div className="grid gap-1.5 xl:max-w-[calc(50%-0.5rem)]">
             <Label htmlFor="pf-ref-type">Nguồn giới thiệu</Label>
             <Select id="pf-ref-type" value={referralType} onChange={(e) => setReferralType(e.target.value)}>
               <option value="">— Chưa chọn —</option>
@@ -469,7 +428,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
           </div>
 
           {referralType && referralType !== "none" && (
-            <>
+            <div className="grid gap-3 xl:grid-cols-2">
               <div className="grid gap-1.5">
                 <Label htmlFor="pf-ref-user">Người giới thiệu</Label>
                 <Select id="pf-ref-user" value={referralUserId} onChange={(e) => setReferralUserId(e.target.value)}>
@@ -489,7 +448,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
                   placeholder="VD: Bs. Nguyễn Văn A giới thiệu"
                 />
               </div>
-            </>
+            </div>
           )}
 
           {!isEdit && (

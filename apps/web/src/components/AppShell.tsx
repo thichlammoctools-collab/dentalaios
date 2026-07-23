@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
+import { MobileBottomNav } from "./MobileBottomNav";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "sidebar:collapsed";
@@ -31,7 +32,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-svh bg-background">
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 opacity-100 transition-opacity duration-300 ease-out md:hidden"
+          className="fixed inset-0 z-40 bg-black/50 opacity-100 transition-opacity duration-300 ease-out lg:hidden"
           onClick={() => setMobileOpen(false)}
           aria-hidden="true"
         />
@@ -39,8 +40,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-60 -translate-x-full border-r border-border bg-card transition-[transform,width] duration-300 ease-in-out md:relative md:translate-x-0",
-          sidebarCollapsed && "md:w-[72px]",
+          "fixed inset-y-0 left-0 z-50 w-60 -translate-x-full border-r border-border bg-card transition-[transform,width] duration-300 ease-in-out lg:relative lg:translate-x-0",
+          sidebarCollapsed && "lg:w-[72px]",
           mobileOpen && "translate-x-0",
         )}
       >
@@ -53,8 +54,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar onMenuClick={() => setMobileOpen(true)} />
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto pb-20 lg:pb-0">{children}</main>
       </div>
+      <MobileBottomNav onMenuClick={() => setMobileOpen(true)} />
     </div>
   );
 }

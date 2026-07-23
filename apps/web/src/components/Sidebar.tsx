@@ -95,7 +95,7 @@ const NAV_GROUPS: NavGroup[] = [
 ];
 
 function getInitialGroups(pathname: string): GroupState {
-  const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
+  const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches;
   const activeGroups = NAV_GROUPS.reduce<GroupState>(
     (state, group) => ({ ...state, [group.id]: group.items.some((item) => item.match(pathname)) }),
     { operations: false, referrals: false, settings: false },
@@ -159,11 +159,11 @@ export function Sidebar({ collapsed, onCollapsedChange, onNavigate }: SidebarPro
 
   return (
     <div className="flex h-full w-full flex-col">
-      <div className={cn("flex h-16 shrink-0 items-center gap-2 border-b border-border px-5", collapsed && "md:justify-center md:px-0")}>
+      <div className={cn("flex h-16 shrink-0 items-center gap-2 border-b border-border px-5", collapsed && "lg:justify-center lg:px-0")}>
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 text-lg font-bold text-white shadow-sm">
           D
         </div>
-        <div className={cn("min-w-0", collapsed && "md:hidden")}>
+        <div className={cn("min-w-0", collapsed && "lg:hidden")}>
           <p className="truncate text-sm font-semibold leading-tight text-foreground">Dental Empire</p>
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">OS Clinic</p>
         </div>
@@ -186,7 +186,7 @@ export function Sidebar({ collapsed, onCollapsedChange, onNavigate }: SidebarPro
           return (
             <section
               key={group.id}
-              className={cn("pt-4", (groupIndex > 0 || canViewDashboard) && "mt-3 border-t border-border", collapsed && "md:pt-3")}
+              className={cn("pt-4", (groupIndex > 0 || canViewDashboard) && "mt-3 border-t border-border", collapsed && "lg:pt-3")}
               aria-label={group.label}
             >
               <button
@@ -195,7 +195,7 @@ export function Sidebar({ collapsed, onCollapsedChange, onNavigate }: SidebarPro
                 aria-expanded={isOpen}
                 className={cn(
                   "flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground transition-colors duration-150 hover:bg-accent/50 hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  collapsed && "md:hidden",
+                  collapsed && "lg:hidden",
                 )}
               >
                 <GroupIcon className="h-3.5 w-3.5" aria-hidden="true" />
@@ -207,7 +207,7 @@ export function Sidebar({ collapsed, onCollapsedChange, onNavigate }: SidebarPro
                 className={cn(
                   "grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out",
                   isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
-                  collapsed && "md:grid-rows-[1fr] md:opacity-100",
+                  collapsed && "lg:grid-rows-[1fr] lg:opacity-100",
                 )}
               >
                 <div className="min-h-0 space-y-0.5 pt-1">
@@ -223,20 +223,20 @@ export function Sidebar({ collapsed, onCollapsedChange, onNavigate }: SidebarPro
         })}
       </nav>
 
-      <div className={cn("shrink-0 border-t border-border p-3", collapsed && "md:px-2")}>
+      <div className={cn("shrink-0 border-t border-border p-3", collapsed && "lg:px-2")}>
         <button
           type="button"
           onClick={() => onCollapsedChange(!collapsed)}
-          className="hidden w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:flex"
+          className="hidden w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:flex"
           aria-label={collapsed ? "Mở rộng thanh điều hướng" : "Thu gọn thanh điều hướng"}
           title={collapsed ? "Mở rộng thanh điều hướng" : "Thu gọn thanh điều hướng"}
         >
           {collapsed ? <ChevronsRight className="h-4 w-4" aria-hidden="true" /> : <ChevronsLeft className="h-4 w-4" aria-hidden="true" />}
           <span className={cn(collapsed && "hidden")}>Thu gọn</span>
         </button>
-        <p className={cn("mt-2 text-xs text-muted-foreground", collapsed && "md:mt-0 md:text-center md:text-[10px]")}>
-          <span className={cn(collapsed && "md:hidden")}>v0.1.0 · MVP</span>
-          {collapsed && <span className="hidden md:inline">v0.1</span>}
+        <p className={cn("mt-2 text-xs text-muted-foreground", collapsed && "lg:mt-0 lg:text-center lg:text-[10px]")}>
+          <span className={cn(collapsed && "lg:hidden")}>v0.1.0 · MVP</span>
+          {collapsed && <span className="hidden lg:inline">v0.1</span>}
         </p>
       </div>
     </div>
@@ -263,19 +263,19 @@ function NavLink({ item, collapsed, onNavigate, style }: NavLinkProps) {
         aria-label={item.label}
         className={cn(
           "flex items-center gap-3 rounded-md border-l-2 border-transparent px-3 py-2 text-sm font-medium transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          collapsed && "md:justify-center md:px-0",
+          collapsed && "lg:justify-center lg:px-0",
           active
             ? "border-primary bg-accent text-primary"
             : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground",
         )}
       >
         <Icon className="h-5 w-5 shrink-0" strokeWidth={2} aria-hidden="true" />
-        <span className={cn("min-w-0 truncate", collapsed && "md:hidden")}>{item.label}</span>
+        <span className={cn("min-w-0 truncate", collapsed && "lg:hidden")}>{item.label}</span>
       </Link>
       {collapsed && (
         <span
           role="tooltip"
-          className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-x-1 -translate-y-1/2 whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground opacity-0 shadow-sm transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:translate-x-0 group-focus-within:opacity-100 md:block"
+          className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-x-1 -translate-y-1/2 whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground opacity-0 shadow-sm transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:translate-x-0 group-focus-within:opacity-100 lg:block"
         >
           {item.label}
         </span>

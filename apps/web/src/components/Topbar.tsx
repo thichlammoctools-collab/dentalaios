@@ -58,7 +58,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           <button
             type="button"
             onClick={onMenuClick}
-            className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground md:hidden"
+            className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground lg:hidden"
             aria-label="Open menu"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

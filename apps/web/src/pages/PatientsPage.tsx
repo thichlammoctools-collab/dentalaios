@@ -112,15 +112,15 @@ export function PatientsPage() {
   }
 
   return (
-    <PageContainer className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <PageContainer size="data" className="space-y-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Bệnh nhân</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {loading ? "Đang tải…" : `${total} bệnh nhân ${showArchived ? "đã lưu trữ" : "đang hoạt động"}`}
           </p>
         </div>
-        <Button onClick={() => { setEditPatient(undefined); setOpenForm(true); }} className="gap-1.5">
+        <Button onClick={() => { setEditPatient(undefined); setOpenForm(true); }} className="gap-1.5 lg:shrink-0">
           <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
@@ -129,8 +129,8 @@ export function PatientsPage() {
       </div>
 
       <Card>
-        <CardHeader className="pb-0">
-          <div className="relative">
+        <CardHeader className="grid gap-3 pb-0 lg:grid-cols-[minmax(20rem,1fr)_auto] lg:items-center">
+          <div className="relative min-w-0">
             <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
               <svg className="h-4 w-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <circle cx="11" cy="11" r="8" />
@@ -153,7 +153,7 @@ export function PatientsPage() {
             <Button
               variant="outline"
               size="sm"
-              className="mt-3"
+              className="lg:justify-self-end"
               onClick={() => {
                 setShowArchived((value) => !value);
                 setPage(1);
@@ -185,15 +185,43 @@ export function PatientsPage() {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
-                <Table>
+              <div className="space-y-2 lg:hidden">
+                {loading ? (
+                  Array.from({ length: 3 }, (_, index) => (
+                    <div key={index} className="h-24 animate-pulse rounded-lg border border-border bg-muted/30" />
+                  ))
+                ) : patients.map((p) => (
+                  <article key={p.id} className="rounded-lg border border-border bg-card p-3">
+                    <div className="flex items-start gap-3">
+                      <ProfileAvatar subject="patients" entityId={p.id} name={p.name} avatarFileId={p.avatar_file_id} size="sm" />
+                      <Link to={`/patients/${p.id}`} className="min-w-0 flex-1">
+                        <p className="truncate font-medium text-primary">{p.name}</p>
+                        <p className="mt-0.5 text-sm text-muted-foreground">{p.phone}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Sinh {formatDate(p.date_of_birth)} · {p.gender === "M" ? "Nam" : p.gender === "F" ? "Nữ" : "Khác"}</p>
+                      </Link>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {!showArchived && <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => { setEditPatient(p); setOpenForm(true); }} aria-label={`Sửa ${p.name}`}>
+                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                        </Button>}
+                        {canManagePatients && (showArchived ? <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => onRestore(p)} aria-label={`Khôi phục ${p.name}`}>
+                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12a9 9 0 101.76-5.37M3 4v5h5" /></svg>
+                        </Button> : <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:text-destructive" onClick={() => onArchive(p)} aria-label={`Lưu trữ ${p.name}`}>
+                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                        </Button>)}
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+              <div className="hidden lg:block">
+              <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Họ tên</TableHead>
-                    <TableHead className="hidden sm:table-cell">SĐT</TableHead>
-                    <TableHead className="hidden md:table-cell">Ngày sinh</TableHead>
-                    <TableHead className="hidden lg:table-cell">Giới tính</TableHead>
-                    <TableHead className="hidden lg:table-cell">Ngày tạo</TableHead>
+                    <TableHead>SĐT</TableHead>
+                    <TableHead>Ngày sinh</TableHead>
+                    <TableHead>Giới tính</TableHead>
+                    <TableHead>Ngày tạo</TableHead>
                     <TableHead className="w-24"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -216,9 +244,9 @@ export function PatientsPage() {
                             </span>
                           </Link>
                         </TableCell>
-                        <TableCell className="hidden sm:table-cell font-mono text-sm">{p.phone}</TableCell>
-                        <TableCell className="hidden md:table-cell">{formatDate(p.date_of_birth)}</TableCell>
-                        <TableCell className="hidden lg:table-cell">
+                        <TableCell className="font-mono text-sm">{p.phone}</TableCell>
+                        <TableCell>{formatDate(p.date_of_birth)}</TableCell>
+                        <TableCell>
                           <div className="flex items-center gap-1.5">
                             {p.gender === "M" ? (
                               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-600">M</span>
@@ -232,7 +260,7 @@ export function PatientsPage() {
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell className="hidden lg:table-cell text-muted-foreground text-sm">
+                        <TableCell className="text-sm text-muted-foreground">
                           {formatDate(p.created_at)}
                         </TableCell>
                         <TableCell>
@@ -277,7 +305,7 @@ export function PatientsPage() {
                     ))
                   )}
                 </TableBody>
-                </Table>
+              </Table>
               </div>
               <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={total} disabled={loading} onPageChange={setPage} />
             </>

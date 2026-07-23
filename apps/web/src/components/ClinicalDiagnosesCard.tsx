@@ -183,7 +183,7 @@ export function ClinicalDiagnosesCard({ visitId, patientId, findings }: Props) {
         </div>)}
       </div>}
     </CardContent>
-    <Dialog open={open} onOpenChange={setOpen} className="sm:max-w-xl">
+    <Dialog open={open} onOpenChange={setOpen} size="sm">
       <DialogHeader><DialogTitle>{editing ? "Cập nhật chẩn đoán" : "Thêm chẩn đoán"}</DialogTitle></DialogHeader>
       <DialogBody className="space-y-4">
         <div className="grid gap-1.5"><Label htmlFor="diagnosis-concept">Kết luận chẩn đoán</Label><p className="text-xs text-muted-foreground">Bệnh lý được bác sĩ đánh giá sau khi khám, có thể lập độc lập với ghi nhận.</p><Select id="diagnosis-concept" value={form.concept_id} onChange={(event) => selectConcept(event.target.value)}><option value="">Chọn chẩn đoán</option>{concepts.map((concept) => <option key={concept.id} value={concept.id}>{concept.display_vi}</option>)}</Select></div>

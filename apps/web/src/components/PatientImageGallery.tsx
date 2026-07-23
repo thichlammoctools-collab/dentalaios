@@ -546,7 +546,16 @@ export function PatientImageGallery({
           {/* Image */}
           <div className="rounded-xl overflow-hidden bg-black/5 mb-4">
             {viewUrl ? (
-              <div ref={imageContainerRef} className="relative mx-auto w-fit max-w-full touch-none select-none">
+              <div
+                ref={imageContainerRef}
+                className={`relative mx-auto w-fit max-w-full touch-none select-none ${annotationShape === "freehand" ? "cursor-crosshair" : "cursor-pointer"}`}
+                aria-label="Vùng đánh dấu ảnh"
+                onPointerDown={handleAnnotationPointerDown}
+                onPointerMove={handleAnnotationPointerMove}
+                onPointerUp={handleAnnotationPointerUp}
+                onPointerCancel={handleAnnotationPointerCancel}
+                onLostPointerCapture={handleAnnotationPointerCancel}
+              >
                 <img
                   src={viewUrl}
                   alt={selected?.original_name || "Medical image"}
@@ -562,15 +571,6 @@ export function PatientImageGallery({
                   {annotations.map((annotation) => <AnnotationOverlay key={annotation.id} shape={annotation.current_version.shape_type} geometry={annotation.current_version.geometry} active={selectedAnnotationVersionId === annotation.current_version.id} />)}
                   {annotationGeometry && <AnnotationOverlay shape={annotationShape} geometry={annotationGeometry} draft />}
                 </svg>
-                <div
-                  className={`absolute inset-0 z-10 touch-none ${annotationShape === "freehand" ? "cursor-crosshair" : "cursor-pointer"}`}
-                  aria-label="Vùng đánh dấu ảnh"
-                  role="presentation"
-                  onPointerDown={handleAnnotationPointerDown}
-                  onPointerMove={handleAnnotationPointerMove}
-                  onPointerUp={handleAnnotationPointerUp}
-                  onPointerCancel={handleAnnotationPointerCancel}
-                />
               </div>
             ) : viewError ? (
               <div className="w-full min-h-48 flex items-center justify-center px-6 py-10 text-center text-sm text-destructive">

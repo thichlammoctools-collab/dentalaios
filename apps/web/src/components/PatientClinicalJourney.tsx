@@ -208,7 +208,7 @@ export function PatientClinicalJourney({ patientId }: { patientId: string }) {
 
 function ProcedureDetailDialog({ procedure, onOpenChange }: { procedure: ClinicalJourneyCompletedProcedure | null; onOpenChange: (open: boolean) => void }) {
   return (
-    <Dialog open={Boolean(procedure)} onOpenChange={onOpenChange} className="sm:max-w-xl">
+    <Dialog open={Boolean(procedure)} onOpenChange={onOpenChange} size="sm">
       <DialogHeader>
         <DialogTitle>Chi tiết thủ thuật đã thực hiện</DialogTitle>
       </DialogHeader>
