@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { apiGet, apiPost, ApiError } from "@/lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import {
@@ -22,6 +22,8 @@ interface FdiToothChartProps {
   findings: ClinicalFinding[];
   onCreated: (finding: ClinicalFinding) => void;
   onCreatedBatch?: (findings: ClinicalFinding[]) => void;
+  onUpdated: (finding: ClinicalFinding) => void;
+  onDeleted: (findingId: string) => void;
 }
 
 const ADULT_UPPER_RIGHT = [18, 17, 16, 15, 14, 13, 12, 11];
@@ -52,7 +54,7 @@ function supportsVerticalAndOrientation(site: string) {
   return site === "buccal" || site === "lip";
 }
 
-export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartProps) {
+export function FdiToothChart({ visitId, findings, onCreated, onUpdated, onDeleted }: FdiToothChartProps) {
   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
   const [toothTab, setToothTab] = useState<"tooth_hard_tissue" | "periodontal">("tooth_hard_tissue");
   const [toothCondition, setToothCondition] = useState("good");
@@ -67,6 +69,7 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
   const [verticalPosition, setVerticalPosition] = useState<"upper" | "lower" | "">("");
   const [surfaceOrientation, setSurfaceOrientation] = useState<"internal" | "external" | "">("");
   const [otherNotes, setOtherNotes] = useState("");
+  const [editingOther, setEditingOther] = useState<ClinicalFinding | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
   const [concepts, setConcepts] = useState<ClinicalConcept[]>([]);
@@ -101,6 +104,7 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
 
   function openOther(category: FindingCategory) {
     setSavedMessage("");
+    setEditingOther(null);
     const definition = getFindingCategory(category);
     setOtherCategory(category);
     setOtherCondition(definition.conditions[0].value);
@@ -109,6 +113,18 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
     setVerticalPosition("");
     setSurfaceOrientation("");
     setOtherNotes("");
+  }
+
+  function editOther(finding: ClinicalFinding) {
+    setSavedMessage("");
+    setEditingOther(finding);
+    setOtherCategory(finding.category);
+    setOtherCondition(finding.condition);
+    setAnatomicalSite(finding.anatomical_site ?? "");
+    setLaterality(finding.location_details?.laterality ?? "");
+    setVerticalPosition(finding.location_details?.vertical_position ?? "");
+    setSurfaceOrientation(finding.location_details?.surface_orientation ?? "");
+    setOtherNotes(finding.notes ?? "");
   }
 
   function toothStatus(tooth: number): string {
@@ -207,7 +223,7 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
     } : undefined;
     setSaving(true);
     try {
-      const created = await apiPost<ClinicalFinding>(`/api/visits/${visitId}/findings`, {
+      const payload = {
         category: otherCategory,
         scope: otherDefinition.scope,
         tooth_number: null,
@@ -216,14 +232,37 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
         condition: otherCondition,
         concept_id: (() => { const concept = conceptFor(otherCategory, otherDefinition.scope, otherCondition); return concept?.kind === "diagnosis" ? undefined : concept?.id; })(),
         notes: otherNotes || undefined,
-      });
-      onCreated(created);
-      const message = "Đã lưu finding lâm sàng";
+      };
+      const updated = editingOther
+        ? await apiPatch<ClinicalFinding>(`/api/visits/${visitId}/findings/${editingOther.id}`, {
+          condition: payload.condition,
+          concept_id: payload.concept_id,
+          anatomical_site: payload.anatomical_site,
+          location_details: payload.location_details,
+          notes: payload.notes,
+        })
+        : await apiPost<ClinicalFinding>(`/api/visits/${visitId}/findings`, payload);
+      if (editingOther) onUpdated(updated); else onCreated(updated);
+      const message = editingOther ? "Đã cập nhật finding lâm sàng" : "Đã lưu finding lâm sàng";
       setSavedMessage(message);
       toast.success(message);
-      openOther(otherCategory);
+      if (editingOther) setOtherCategory(null); else openOther(otherCategory);
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Không thể lưu finding");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeOther(finding: ClinicalFinding) {
+    if (!confirm(`Xóa ghi nhận ${getFindingConditionLabel(finding.category, finding.condition)}?`)) return;
+    setSaving(true);
+    try {
+      await apiDelete(`/api/visits/${visitId}/findings/${finding.id}`);
+      onDeleted(finding.id);
+      toast.success("Đã xóa ghi nhận lâm sàng");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Không thể xóa ghi nhận lâm sàng");
     } finally {
       setSaving(false);
     }
@@ -235,7 +274,7 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
         const categoryFindings = findings.filter((finding) => finding.category === item.value);
         const count = categoryFindings.length;
         const isToothCategory = item.value === "tooth_hard_tissue" || item.value === "periodontal";
-        return <div key={item.value} className="rounded-lg border border-border p-3"><div className="flex items-center justify-between gap-2"><span className="text-sm font-semibold">{item.label}</span><span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">{count}</span></div><p className="mt-1 min-h-8 text-xs text-muted-foreground">{item.description}</p>{isToothCategory ? <p className="mt-2 text-xs font-medium text-primary">Chọn răng trên sơ đồ</p> : <><div className="mt-2 space-y-1.5">{categoryFindings.map((finding) => <div key={finding.id} className="rounded-md bg-muted/50 px-2 py-1.5 text-xs"><p className="font-medium text-foreground">{getFindingConditionLabel(finding.category, finding.condition)}</p><p className="mt-0.5 text-muted-foreground">{findingLocation(finding)}</p>{finding.notes && <p className="mt-1 text-muted-foreground">{finding.notes}</p>}</div>)}</div><Button size="sm" variant="outline" className="mt-2 h-8 text-xs" onClick={() => openOther(item.value)}>Thêm ghi nhận</Button></>}</div>;
+        return <div key={item.value} className="rounded-lg border border-border p-3"><div className="flex items-center justify-between gap-2"><span className="text-sm font-semibold">{item.label}</span><span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">{count}</span></div><p className="mt-1 min-h-8 text-xs text-muted-foreground">{item.description}</p>{isToothCategory ? <p className="mt-2 text-xs font-medium text-primary">Chọn răng trên sơ đồ</p> : <><div className="mt-2 space-y-1.5">{categoryFindings.map((finding) => <div key={finding.id} className="rounded-md bg-muted/50 px-2 py-1.5 text-xs"><div className="flex items-start gap-1"><div className="min-w-0 flex-1"><p className="font-medium text-foreground">{getFindingConditionLabel(finding.category, finding.condition)}</p><p className="mt-0.5 text-muted-foreground">{findingLocation(finding)}</p>{finding.notes && <p className="mt-1 text-muted-foreground">{finding.notes}</p>}</div><div className="flex shrink-0"><Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => editOther(finding)} disabled={saving}>Sửa</Button><Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-destructive hover:text-destructive" onClick={() => void removeOther(finding)} disabled={saving}>Xóa</Button></div></div></div>)}</div><Button size="sm" variant="outline" className="mt-2 h-8 text-xs" onClick={() => openOther(item.value)}>Thêm ghi nhận</Button></>}</div>;
       })}
     </div>
 
@@ -266,7 +305,7 @@ export function FdiToothChart({ visitId, findings, onCreated }: FdiToothChartPro
     </Dialog>
 
     <Dialog open={otherCategory !== null} onOpenChange={(open) => !open && setOtherCategory(null)}>
-      <DialogHeader><DialogTitle>Thêm finding: {otherDefinition?.label}</DialogTitle><p className="mt-1 text-xs text-muted-foreground">{otherDefinition?.description}</p></DialogHeader>
+      <DialogHeader><DialogTitle>{editingOther ? "Sửa" : "Thêm"} finding: {otherDefinition?.label}</DialogTitle><p className="mt-1 text-xs text-muted-foreground">{otherDefinition?.description}</p></DialogHeader>
         {otherDefinition && <><DialogBody className="space-y-4">{savedMessage && <div role="status" className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">{savedMessage}</div>}<div className="grid gap-4 md:grid-cols-2"><div className="grid gap-1.5"><Label htmlFor="other-condition">Tình trạng</Label><select id="other-condition" value={otherCondition} onChange={(event) => setOtherCondition(event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">{otherDefinition.conditions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>{otherDefinition.scope === "region" && <div className="grid gap-1.5"><Label htmlFor="anatomical-site">Vùng giải phẫu</Label><select id="anatomical-site" value={anatomicalSite} onChange={(event) => { setAnatomicalSite(event.target.value as AnatomicalSite); setLaterality(""); setVerticalPosition(""); setSurfaceOrientation(""); }} className="h-9 rounded-md border border-input bg-background px-3 text-sm">{selectableSites(otherCategory as FindingCategory).map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>}</div>
         {otherDefinition.scope === "region" && anatomicalSite && <ExistingFindingsNotice items={existingFindings({ site: anatomicalSite })} location={getAnatomicalSiteLabel(anatomicalSite)} />}
         {otherDefinition.scope === "region" && anatomicalSite && <div className="grid gap-3 rounded-lg border border-border bg-muted/20 p-3 sm:grid-cols-3">{supportsLaterality(anatomicalSite) && <div className="grid gap-1.5"><Label htmlFor="laterality">Bên</Label><select id="laterality" value={laterality} onChange={(event) => setLaterality(event.target.value as typeof laterality)} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="">Không chỉ định</option><option value="right">Phải</option><option value="left">Trái</option><option value="bilateral">Hai bên</option><option value="midline">Đường giữa</option></select></div>}{supportsVerticalAndOrientation(anatomicalSite) && <><div className="grid gap-1.5"><Label htmlFor="vertical-position">Trên/dưới</Label><select id="vertical-position" value={verticalPosition} onChange={(event) => setVerticalPosition(event.target.value as typeof verticalPosition)} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="">Không chỉ định</option><option value="upper">Trên</option><option value="lower">Dưới</option></select></div><div className="grid gap-1.5"><Label htmlFor="surface-orientation">Bề mặt</Label><select id="surface-orientation" value={surfaceOrientation} onChange={(event) => setSurfaceOrientation(event.target.value as typeof surfaceOrientation)} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="">Không chỉ định</option><option value="internal">Trong</option><option value="external">Ngoài</option></select></div></>}</div>}

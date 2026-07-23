@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
+import { getFindingConditionLabel } from "@shared/constants/clinical-findings";
 import type { ClinicalConcept, ClinicalDiagnosis, ClinicalDiagnosisStatus, Icd10Code, ClinicalFinding } from "@shared/types";
 
 const statusLabel: Record<ClinicalDiagnosisStatus, string> = {
@@ -119,7 +120,7 @@ export function ClinicalDiagnosesCard({ visitId, findings }: Props) {
         {items.map((diagnosis) => <div key={diagnosis.id} className="flex flex-wrap items-start gap-2 rounded-lg border border-border p-3">
           <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{diagnosis.concept_display_vi_snapshot}</p><Badge variant={statusVariant(diagnosis.status)}>{statusLabel[diagnosis.status]}</Badge></div>
             {diagnosis.icd10_code_snapshot ? <p className="mt-1 text-sm text-muted-foreground"><span className="font-mono">{diagnosis.icd10_code_snapshot}</span> · {diagnosis.icd10_display_vi_snapshot}</p> : <p className="mt-1 text-sm text-muted-foreground">Chưa xác nhận mã ICD-10</p>}
-            {diagnosis.source_finding_id && <p className="mt-1 text-xs text-muted-foreground">Từ finding #{findings.findIndex((finding) => finding.id === diagnosis.source_finding_id) + 1 || ""}</p>}
+            {diagnosis.source_finding_id && <p className="mt-1 text-xs text-muted-foreground">Từ ghi nhận lâm sàng #{findings.findIndex((finding) => finding.id === diagnosis.source_finding_id) + 1 || ""}</p>}
             {diagnosis.notes && <p className="mt-1 whitespace-pre-wrap text-sm">{diagnosis.notes}</p>}</div>
           <Button variant="outline" size="sm" onClick={() => openEdit(diagnosis)}>Cập nhật</Button>
         </div>)}
@@ -130,7 +131,7 @@ export function ClinicalDiagnosesCard({ visitId, findings }: Props) {
       <DialogBody className="space-y-4">
         <div className="grid gap-1.5"><Label htmlFor="diagnosis-concept">Chẩn đoán</Label><Select id="diagnosis-concept" value={form.concept_id} onChange={(event) => selectConcept(event.target.value)}><option value="">Chọn khái niệm chẩn đoán</option>{concepts.map((concept) => <option key={concept.id} value={concept.id}>{concept.display_vi}</option>)}</Select></div>
         <div className="grid gap-1.5"><Label htmlFor="diagnosis-icd10">Mã ICD-10 Việt Nam</Label><Select id="diagnosis-icd10" value={form.icd10_code_id} onChange={(event) => setForm({ ...form, icd10_code_id: event.target.value })}><option value="">Chưa chọn (chỉ dùng khi nghi ngờ)</option>{icd10.map((code) => <option key={code.id} value={code.id}>{code.code} · {code.display_vi}</option>)}</Select></div>
-        {!editing && <div className="grid gap-1.5"><Label htmlFor="diagnosis-finding">Finding nguồn (tùy chọn)</Label><Select id="diagnosis-finding" value={form.source_finding_id} onChange={(event) => setForm({ ...form, source_finding_id: event.target.value })}><option value="">Chẩn đoán độc lập</option>{findings.map((finding) => <option key={finding.id} value={finding.id}>{finding.code ?? finding.id} · {finding.condition}{finding.tooth_number ? ` răng #${finding.tooth_number}` : ""}</option>)}</Select></div>}
+        {!editing && <div className="grid gap-1.5"><Label htmlFor="diagnosis-finding">Ghi nhận lâm sàng nguồn (tùy chọn)</Label><Select id="diagnosis-finding" value={form.source_finding_id} onChange={(event) => setForm({ ...form, source_finding_id: event.target.value })}><option value="">Chẩn đoán độc lập</option>{findings.map((finding) => <option key={finding.id} value={finding.id}>{finding.code ?? finding.id} · {getFindingConditionLabel(finding.category, finding.condition)}{finding.tooth_number ? ` răng #${finding.tooth_number}` : ""}</option>)}</Select></div>}
         <div className="grid gap-1.5"><Label htmlFor="diagnosis-status">Trạng thái</Label><Select id="diagnosis-status" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ClinicalDiagnosisStatus })}><option value="suspected">Nghi ngờ</option><option value="confirmed">Đã xác nhận</option><option value="ruled_out">Đã loại trừ</option><option value="resolved">Đã giải quyết</option></Select></div>
         <div className="grid gap-1.5"><Label htmlFor="diagnosis-notes">Ghi chú</Label><Textarea id="diagnosis-notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} rows={3} /></div>
         {editing && <div className="grid gap-1.5"><Label htmlFor="diagnosis-reason">Lý do cập nhật</Label><Textarea id="diagnosis-reason" value={form.change_reason} onChange={(event) => setForm({ ...form, change_reason: event.target.value })} rows={2} required /></div>}

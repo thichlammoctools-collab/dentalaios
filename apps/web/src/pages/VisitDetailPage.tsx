@@ -785,7 +785,7 @@ export function VisitDetailPage() {
            <Card>
              <CardHeader className="pb-3"><CardTitle>Khám răng hàm mặt</CardTitle></CardHeader>
              <CardContent>
-               <FdiToothChart visitId={visit.id} findings={findings} onCreated={(f) => setFindings((prev) => [...prev, f])} onCreatedBatch={onFindingsBatchCreated} />
+               <FdiToothChart visitId={visit.id} findings={findings} onCreated={(f) => setFindings((prev) => [...prev, f])} onCreatedBatch={onFindingsBatchCreated} onUpdated={(updated) => setFindings((prev) => prev.map((finding) => finding.id === updated.id ? updated : finding))} onDeleted={(findingId) => setFindings((prev) => prev.filter((finding) => finding.id !== findingId))} />
              </CardContent>
            </Card>
            <Card id="findings">
