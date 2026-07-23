@@ -572,8 +572,8 @@ export function PatientImageGallery({
                       setViewError("Định dạng hình ảnh này không thể xem trước trong trình duyệt");
                     }}
                   />
-                  <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 1 1" preserveAspectRatio="none" aria-label="Ghi chú trên ảnh">
-                    <defs><marker id="annotation-arrow" markerWidth="0.06" markerHeight="0.06" refX="0.045" refY="0.03" orient="auto"><path d="M0,0 L0.06,0.03 L0,0.06 Z" fill="#ef4444" /></marker><marker id="annotation-arrow-active" markerWidth="0.06" markerHeight="0.06" refX="0.045" refY="0.03" orient="auto"><path d="M0,0 L0.06,0.03 L0,0.06 Z" fill="#2563eb" /></marker><marker id="annotation-arrow-draft" markerWidth="0.06" markerHeight="0.06" refX="0.045" refY="0.03" orient="auto"><path d="M0,0 L0.06,0.03 L0,0.06 Z" fill="#f59e0b" /></marker></defs>
+                  <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-label="Ghi chú trên ảnh">
+                    <defs><marker id="annotation-arrow" markerWidth="22" markerHeight="22" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse" viewBox="0 0 10 10"><path d="M0,0 L10,5 L0,10 Z" fill="#ef4444" /></marker><marker id="annotation-arrow-active" markerWidth="22" markerHeight="22" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse" viewBox="0 0 10 10"><path d="M0,0 L10,5 L0,10 Z" fill="#2563eb" /></marker><marker id="annotation-arrow-draft" markerWidth="22" markerHeight="22" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse" viewBox="0 0 10 10"><path d="M0,0 L10,5 L0,10 Z" fill="#f59e0b" /></marker></defs>
                     {annotations.map((annotation) => <AnnotationOverlay key={annotation.id} shape={annotation.current_version.shape_type} geometry={annotation.current_version.geometry} active={selectedAnnotationVersionId === annotation.current_version.id} />)}
                     {annotationGeometry && <AnnotationOverlay shape={annotationShape} geometry={annotationGeometry} draft />}
                   </svg>
@@ -779,13 +779,15 @@ function AnnotationOverlay({ shape, geometry, active, draft }: { shape: ImageAnn
   const color = draft ? "#f59e0b" : active ? "#2563eb" : "#ef4444";
   const marker = draft ? "url(#annotation-arrow-draft)" : active ? "url(#annotation-arrow-active)" : "url(#annotation-arrow)";
   if (shape === "pin" && "x" in geometry && "y" in geometry) {
-    const tailX = Math.max(0.03, geometry.x - 0.09);
-    const tailY = Math.max(0.03, geometry.y - 0.09);
-    return <line x1={tailX} y1={tailY} x2={geometry.x} y2={geometry.y} stroke={color} strokeWidth="0.009" strokeLinecap="round" markerEnd={marker} vectorEffect="non-scaling-stroke" />;
+    const x = geometry.x * 1000;
+    const y = geometry.y * 1000;
+    const tailX = Math.max(30, x - 90);
+    const tailY = Math.max(30, y - 90);
+    return <line x1={tailX} y1={tailY} x2={x} y2={y} stroke={color} strokeWidth="4" strokeLinecap="round" markerEnd={marker} vectorEffect="non-scaling-stroke" />;
   }
-  if (shape === "freehand" && "points" in geometry) return <polyline points={geometry.points.map((point) => `${point.x},${point.y}`).join(" ")} fill="none" stroke={color} strokeWidth="0.01" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />;
+  if (shape === "freehand" && "points" in geometry) return <polyline points={geometry.points.map((point) => `${point.x * 1000},${point.y * 1000}`).join(" ")} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />;
   if (!("width" in geometry) || !("height" in geometry)) return null;
-  return <rect x={geometry.x} y={geometry.y} width={geometry.width} height={geometry.height} fill="none" stroke={color} strokeWidth="0.008" vectorEffect="non-scaling-stroke" />;
+  return <rect x={geometry.x * 1000} y={geometry.y * 1000} width={geometry.width * 1000} height={geometry.height * 1000} fill="none" stroke={color} strokeWidth="4" vectorEffect="non-scaling-stroke" />;
 }
 
 function statusLabel(status: ClinicalDiagnosis["status"]): string {
