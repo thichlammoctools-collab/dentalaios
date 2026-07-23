@@ -124,7 +124,15 @@ export function getFindingCategory(category: FindingCategory): ClinicalFindingCa
 }
 
 export function getFindingConditionLabel(category: FindingCategory, condition: string): string {
-  return getFindingCategory(category).conditions.find((item) => item.value === condition)?.label ?? condition;
+  const categoryLabel = CLINICAL_FINDING_CATEGORIES
+    .find((item) => item.value === category)
+    ?.conditions.find((item) => item.value === condition)?.label;
+  if (categoryLabel) return categoryLabel;
+
+  // Legacy records may predate the current category taxonomy.
+  return CLINICAL_FINDING_CATEGORIES
+    .flatMap((item) => item.conditions)
+    .find((item) => item.value === condition)?.label ?? condition;
 }
 
 export function getAnatomicalSiteLabel(site?: AnatomicalSite): string {
