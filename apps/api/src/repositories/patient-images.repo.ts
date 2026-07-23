@@ -8,6 +8,7 @@ import type { D1Row, Pagination } from "./base";
 
 export interface PatientImagesRepository {
   listByPatient(tenantId: string, patientId: string, opts?: Pagination): Promise<PatientImage[]>;
+  countByPatient(tenantId: string, patientId: string): Promise<number>;
   listByVisit(tenantId: string, visitId: string, opts?: Pagination): Promise<PatientImage[]>;
   getById(tenantId: string, id: string): Promise<PatientImage | null>;
   create(tenantId: string, data: Omit<PatientImage, "id" | "tenant_id" | "created_at">): Promise<PatientImage>;
@@ -31,6 +32,13 @@ export function createPatientImagesRepository(db: D1Database): PatientImagesRepo
         .bind(tenantId, patientId, limit, offset)
         .all();
       return (result.results as D1Row[]).map(mapImage);
+    },
+
+    async countByPatient(tenantId, patientId) {
+      const row = await db.prepare("SELECT COUNT(*) AS count FROM patient_images WHERE tenant_id = ? AND patient_id = ?")
+        .bind(tenantId, patientId)
+        .first<{ count: number }>();
+      return Number(row?.count ?? 0);
     },
 
     async listByVisit(tenantId, visitId, opts = {}) {
@@ -68,9 +76,9 @@ export function createPatientImagesRepository(db: D1Database): PatientImagesRepo
       await db
         .prepare(
           `INSERT INTO patient_images
-             (id, tenant_id, patient_id, visit_id, uploaded_by, image_type,
+             (id, tenant_id, patient_id, visit_id, uploaded_by, image_type, image_purpose,
               description, file_id, thumb_key, original_name, original_size)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
@@ -79,6 +87,7 @@ export function createPatientImagesRepository(db: D1Database): PatientImagesRepo
           data.visit_id ?? null,
           data.uploaded_by,
           data.image_type,
+          data.image_purpose,
           data.description ?? null,
           data.file_id,
           data.thumb_key ?? null,
@@ -109,6 +118,7 @@ function mapImage(row: D1Row): PatientImage {
     visit_id: (row.visit_id as string | null) ?? undefined,
     uploaded_by: row.uploaded_by as string,
     image_type: row.image_type as PatientImage["image_type"],
+    image_purpose: (row.image_purpose as PatientImage["image_purpose"] | null) ?? "clinical_record",
     description: (row.description as string | null) ?? undefined,
     file_id: row.file_id as string,
     thumb_key: (row.thumb_key as string | null) ?? undefined,

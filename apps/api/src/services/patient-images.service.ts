@@ -28,6 +28,10 @@ export const patientImagesService = {
     return createPatientImagesRepository(db).listByPatient(tenantId, patientId, opts);
   },
 
+  async countByPatient(db: D1Database, tenantId: string, patientId: string): Promise<number> {
+    return createPatientImagesRepository(db).countByPatient(tenantId, patientId);
+  },
+
   async listByVisit(
     db: D1Database,
     tenantId: string,
@@ -93,7 +97,9 @@ export const patientImagesService = {
       patient_id: string;
       visit_id?: string;
       image_type: PatientImage["image_type"];
+      image_purpose: PatientImage["image_purpose"];
       description?: string;
+
       filename: string;
       content_type: string;
       original_size: number;
@@ -127,6 +133,7 @@ export const patientImagesService = {
         patient_id: input.patient_id,
         visit_id: input.visit_id,
         image_type: input.image_type,
+        image_purpose: input.image_purpose,
         description: input.description,
         file_id: fileId,
         original_name: input.filename,

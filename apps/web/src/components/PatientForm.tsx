@@ -200,7 +200,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange} size="workspace">
-      <form ref={formRef} onSubmit={onSubmit}>
+      <form ref={formRef} onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Sửa bệnh nhân" : "Tạo bệnh nhân mới"}</DialogTitle>
           <div className="mt-4 flex items-center gap-3" aria-label="Tiến trình biểu mẫu">
@@ -210,7 +210,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
           </div>
         </DialogHeader>
 
-        <DialogBody className="grid gap-4 lg:gap-5">
+        <DialogBody className="min-h-0 grid gap-4 lg:gap-5">
 
           {step === 1 && <>
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
@@ -290,11 +290,18 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
               required
               inputMode="numeric"
               maxLength={12}
-              pattern="[0-9]*"
+              minLength={12}
+              pattern="[0-9]{12}"
               value={cccd}
               onChange={(e) => setCccd(e.target.value.replace(/\D/g, "").slice(0, 12))}
               placeholder="VD: 012345678912"
+              aria-describedby="pf-cccd-help"
+              onInvalid={(e) => e.currentTarget.setCustomValidity("Vui lòng nhập CCCD gồm đúng 12 chữ số.")}
+              onInput={(e) => e.currentTarget.setCustomValidity("")}
             />
+            <p id="pf-cccd-help" className="text-xs text-muted-foreground">
+              Nhập đủ 12 chữ số trên CCCD. Không dùng số CMND cũ 9 số; hệ thống tự bỏ dấu cách và dấu gạch ngang.
+            </p>
           </div>
           </>}
 

@@ -1234,6 +1234,14 @@ export const PATIENT_IMAGE_TYPE_LABELS: Record<PatientImageType, string> = {
   other: "Khác",
 };
 
+export type PatientImagePurpose = "clinical_record" | "treatment_before" | "treatment_after";
+
+export const PATIENT_IMAGE_PURPOSE_LABELS: Record<PatientImagePurpose, string> = {
+  clinical_record: "Bệnh án / chẩn đoán",
+  treatment_before: "Trước điều trị",
+  treatment_after: "Sau điều trị",
+};
+
 export interface PatientImage {
   id: string;
   tenant_id: string;
@@ -1241,6 +1249,7 @@ export interface PatientImage {
   visit_id?: string;
   uploaded_by: string;
   image_type: PatientImageType;
+  image_purpose: PatientImagePurpose;
   description?: string;
   file_id: string;
   thumb_key?: string;

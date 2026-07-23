@@ -688,6 +688,7 @@ export const patientImageCreateSchema = z.object({
   patient_id: z.string().min(1),
   visit_id: z.string().min(1).optional(),
   image_type: z.enum(["cbct","scan_3d","dicom","photo_before","photo_after","xray","intraoral","other"]),
+  image_purpose: z.enum(["clinical_record", "treatment_before", "treatment_after"]).default("clinical_record"),
   description: optionalText(500),
   file_id: z.string().min(1),
   thumb_key: z.string().optional(),

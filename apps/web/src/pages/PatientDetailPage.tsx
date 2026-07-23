@@ -48,6 +48,7 @@ import type {
   TreatmentPlan,
   Payment,
   Appointment,
+  PatientImage,
   PatientNote,
 } from "@shared/types";
 
@@ -67,6 +68,7 @@ export function PatientDetailPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [notes, setNotes] = useState<PatientNote[]>([]);
+  const [imageCount, setImageCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [openEdit, setOpenEdit] = useState(false);
   const [openVisit, setOpenVisit] = useState(false);
@@ -88,13 +90,14 @@ export function PatientDetailPage() {
     setLoading(true);
     try {
       const p = await apiGet<Patient>(`/api/patients/${id}`);
-      const [a, v, tp, pay, apt, pn] = await Promise.all([
+      const [a, v, tp, pay, apt, pn, imageResponse] = await Promise.all([
         apiGet<ListResponse<MedicalAlert>>(`/api/patients/${id}/alerts`),
         apiGet<ListResponse<Visit>>(`/api/visits?patient_id=${id}`),
         apiGet<ListResponse<TreatmentPlan>>(`/api/treatment-plans?patient_id=${id}`),
         apiGet<ListResponse<Payment>>(`/api/payments?patient_id=${id}`),
         apiGet<ListResponse<Appointment>>(`/api/appointments?patient_id=${id}`),
         apiGet<ListResponse<PatientNote>>(`/api/patients/${id}/notes`),
+        apiGet<ListResponse<PatientImage>>(`/api/patient-images?patient_id=${id}`),
       ]);
       setPatient(p);
       setAlerts(a.items);
@@ -103,6 +106,7 @@ export function PatientDetailPage() {
       setPayments(pay.items);
       setAppointments(apt.items);
       setNotes(pn.items);
+      setImageCount(imageResponse.total);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi tải");
     } finally {
@@ -242,38 +246,33 @@ export function PatientDetailPage() {
                 Sửa
               </Button>
             </div>
-            <div className="overflow-x-auto pb-1 lg:hidden">
-              <TabsList className="min-w-max">
-                <TabsTrigger value="overview">Tổng quan</TabsTrigger>
-                <TabsTrigger value="alerts">Cảnh báo ({alerts.length})</TabsTrigger>
-                <TabsTrigger value="visits">Lượt khám ({visits.length})</TabsTrigger>
-                <TabsTrigger value="plans">Kế hoạch ({plans.length})</TabsTrigger>
-                <TabsTrigger value="payments">Tài chính ({payments.length})</TabsTrigger>
-                <TabsTrigger value="appointments">Lịch hẹn ({appointments.length})</TabsTrigger>
-                <TabsTrigger value="journey">Hành trình</TabsTrigger>
-                <TabsTrigger value="teeth">Sơ đồ răng</TabsTrigger>
-                <TabsTrigger value="images">Hình ảnh</TabsTrigger>
+            <div className="border-t border-border pt-3">
+              <TabsList className="grid h-auto w-full grid-cols-3 items-stretch gap-1 rounded-lg bg-muted/60 p-1 sm:grid-cols-5 xl:grid-cols-9">
+                <TabsTrigger value="overview" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">Tổng quan</TabsTrigger>
+                <TabsTrigger value="alerts" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">
+                  <span className="flex flex-wrap items-center justify-center gap-1">Cảnh báo <Count value={alerts.length} urgent /></span>
+                </TabsTrigger>
+                <TabsTrigger value="visits" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">
+                  <span className="flex flex-wrap items-center justify-center gap-1">Lượt khám <Count value={visits.length} /></span>
+                </TabsTrigger>
+                <TabsTrigger value="plans" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">
+                  <span className="flex flex-wrap items-center justify-center gap-1">Kế hoạch <Count value={plans.length} /></span>
+                </TabsTrigger>
+                <TabsTrigger value="appointments" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">
+                  <span className="flex flex-wrap items-center justify-center gap-1">Lịch hẹn <Count value={appointments.length} /></span>
+                </TabsTrigger>
+                <TabsTrigger value="journey" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">Hành trình</TabsTrigger>
+                <TabsTrigger value="payments" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">
+                  <span className="flex flex-wrap items-center justify-center gap-1">Tài chính <Count value={payments.length} /></span>
+                </TabsTrigger>
+                <TabsTrigger value="teeth" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">Sơ đồ răng</TabsTrigger>
+                <TabsTrigger value="images" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm"><span className="flex flex-wrap items-center justify-center gap-1">Hình ảnh <Count value={imageCount} /></span></TabsTrigger>
               </TabsList>
             </div>
           </div>
         </div>
 
-        <div className="mt-6 grid items-start gap-6 lg:grid-cols-[13.5rem_minmax(0,1fr)] xl:gap-x-8">
-          <aside className="sticky top-28 hidden rounded-xl border border-border bg-card p-2 shadow-sm lg:block">
-            <p className="px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Hồ sơ bệnh nhân</p>
-            <TabsList className="h-auto w-full flex-col items-stretch justify-start gap-1 bg-transparent p-0">
-              <TabsTrigger value="overview" className="w-full justify-between px-3 py-2 text-left">Tổng quan</TabsTrigger>
-              <TabsTrigger value="alerts" className="w-full justify-between px-3 py-2 text-left">Cảnh báo <Count value={alerts.length} urgent /></TabsTrigger>
-              <TabsTrigger value="visits" className="w-full justify-between px-3 py-2 text-left">Lượt khám <Count value={visits.length} /></TabsTrigger>
-              <TabsTrigger value="plans" className="w-full justify-between px-3 py-2 text-left">Kế hoạch <Count value={plans.length} /></TabsTrigger>
-              <TabsTrigger value="appointments" className="w-full justify-between px-3 py-2 text-left">Lịch hẹn <Count value={appointments.length} /></TabsTrigger>
-              <TabsTrigger value="journey" className="w-full justify-between px-3 py-2 text-left">Hành trình lâm sàng</TabsTrigger>
-              <TabsTrigger value="payments" className="w-full justify-between px-3 py-2 text-left">Tài chính <Count value={payments.length} /></TabsTrigger>
-              <TabsTrigger value="teeth" className="w-full justify-between px-3 py-2 text-left">Sơ đồ răng</TabsTrigger>
-              <TabsTrigger value="images" className="w-full justify-between px-3 py-2 text-left">Hình ảnh</TabsTrigger>
-            </TabsList>
-          </aside>
-
+        <div className="mt-6">
           <main className="min-w-0">
         <TabsContent className="mt-0" value="overview">
           <Card>
@@ -772,7 +771,7 @@ export function PatientDetailPage() {
         <TabsContent className="mt-0" value="images">
           <Card>
             <CardContent className="pt-4">
-              <PatientImageGallery patientId={patient.id} />
+              <PatientImageGallery patientId={patient.id} onImagesChanged={load} />
             </CardContent>
           </Card>
         </TabsContent>
