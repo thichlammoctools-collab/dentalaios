@@ -82,9 +82,11 @@ export const patientService = {
           referral_type: data.referral_type,
           referral_user_id: data.referral_user_id ?? undefined,
           referral_notes: data.referral_notes,
-          height_cm: data.height_cm ?? undefined,
-          weight_kg: data.weight_kg ?? undefined,
-          cccd: data.cccd,
+           height_cm: data.height_cm ?? undefined,
+           weight_kg: data.weight_kg ?? undefined,
+           has_disability: data.has_disability ?? false,
+           disability_notes: data.has_disability ? data.disability_notes : undefined,
+           cccd: data.cccd,
         });
         if (referrer) await referralService.createCaseForNewPatient(db, tenantId, userId ?? "system", created, referrer, data.referral_code ? "code" : "manual");
         return created;
@@ -145,9 +147,11 @@ export const patientService = {
           referral_type: data.referral_type,
           referral_user_id: data.referral_user_id ?? undefined,
           referral_notes: data.referral_notes,
-          height_cm: data.height_cm ?? undefined,
-          weight_kg: data.weight_kg ?? undefined,
-          cccd: data.cccd,
+           height_cm: data.height_cm ?? undefined,
+           weight_kg: data.weight_kg ?? undefined,
+           has_disability: data.has_disability,
+           disability_notes: data.has_disability === false ? null : data.disability_notes,
+           cccd: data.cccd,
         });
       } catch (err) {
         if (isUniqueConstraintError(err)) {

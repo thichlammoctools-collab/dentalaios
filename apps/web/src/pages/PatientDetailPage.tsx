@@ -323,6 +323,7 @@ export function PatientDetailPage() {
                   <OverviewField label="Chiều cao" value={patient.height_cm ? `${patient.height_cm} cm` : "—"} />
                   <OverviewField label="Cân nặng" value={patient.weight_kg ? `${patient.weight_kg} kg` : "—"} />
                   <OverviewField label="BMI" value={formatPatientBmi(patient)} />
+                  <OverviewField className="sm:col-span-3" label="Khuyết tật" value={patient.has_disability ? patient.disability_notes || "Có" : "Không"} />
                 </div>
               </section>
               </div>
@@ -333,7 +334,7 @@ export function PatientDetailPage() {
                 <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
                   <OverviewField label="Nguồn bệnh nhân" value={patient.marketing_source ? MARKETING_SOURCE_LABELS[patient.marketing_source as MarketingSource] ?? patient.marketing_source : "—"} />
                   <OverviewField label="Loại giới thiệu" value={patient.referral_type === "doctor" ? "Bác sĩ giới thiệu" : patient.referral_type === "staff" ? "Nhân viên" : patient.referral_type === "ad" ? "Quảng cáo" : patient.referral_type === "other" ? "Người giới thiệu" : "—"} />
-                  <OverviewField label="Người giới thiệu" value={patient.referral_user_name || "—"} />
+                  <OverviewField label="Người giới thiệu" value={patient.referral_referrer_name ? `${patient.referral_referrer_name}${patient.referral_referrer_code ? ` (${patient.referral_referrer_code})` : ""}` : patient.referral_user_name || "—"} />
                   <OverviewField label="Ghi chú giới thiệu" value={patient.referral_notes || "—"} />
                 </div>
               </section>

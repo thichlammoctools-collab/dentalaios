@@ -196,7 +196,7 @@ export type ReferralRecoveryInput = z.infer<typeof referralRecoverySchema>;
 
 // ──────────────── Patient ────────────────
 
-export const patientCreateSchema = z.object({
+const patientSchemaFields = z.object({
   branch_id: z.string().min(1),
   name: nonEmpty(200),
   date_of_birth: dateString,
@@ -231,12 +231,22 @@ export const patientCreateSchema = z.object({
   // Body metrics
   height_cm: z.number().positive().max(300).optional(),
   weight_kg: z.number().positive().max(500).optional(),
+  has_disability: z.boolean().optional(),
+  disability_notes: optionalText(500),
   cccd: z.string().regex(/^[0-9]{12}$/, "CCCD phải có đúng 12 chữ số"),
 });
 
-export const patientUpdateSchema = patientCreateSchema.partial().extend({
+function validateDisability(data: { has_disability?: boolean; disability_notes?: string }, ctx: z.RefinementCtx) {
+  if (data.has_disability && !data.disability_notes) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["disability_notes"], message: "Vui lòng mô tả khuyết tật" });
+  }
+}
+
+export const patientCreateSchema = patientSchemaFields.superRefine(validateDisability);
+
+export const patientUpdateSchema = patientSchemaFields.partial().extend({
   cccd: z.string().regex(/^[0-9]{12}$/, "CCCD phải có đúng 12 chữ số"),
-});
+}).superRefine(validateDisability);
 
 export type PatientCreateInput = z.infer<typeof patientCreateSchema>;
 export type PatientUpdateInput = z.infer<typeof patientUpdateSchema>;
@@ -814,7 +824,7 @@ export type ManagementDashboardQuery = z.infer<typeof managementDashboardQuerySc
 
 // ──────────────── Dental chairs ────────────────
 
-const chairTypeSchema = z.enum(["general", "surgery", "orthodontic", "pediatric", "hygiene"]);
+const chairTypeSchema = z.enum(["general", "surgery", "orthodontic", "pediatric", "prosthodontics"]);
 const chairOperationalStatusSchema = z.enum(["available", "cleaning", "maintenance", "out_of_service"]);
 
 export const chairCreateSchema = z.object({

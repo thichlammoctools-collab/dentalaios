@@ -218,10 +218,14 @@ export interface Patient {
   referral_type?: ReferralType;
   referral_user_id?: string;
   referral_user_name?: string;
+  referral_referrer_name?: string;
+  referral_referrer_code?: string;
   referral_notes?: string;
   // Body metrics
   height_cm?: number;
   weight_kg?: number;
+  has_disability?: boolean;
+  disability_notes?: string;
   cccd?: string;
 }
 
@@ -1077,7 +1081,7 @@ export type AppointmentStatus =
 
 export type AppointmentSource = "manual" | "ai_chat" | "ai_next_visit" | "reschedule";
 
-export type DentalChairType = "general" | "surgery" | "orthodontic" | "pediatric" | "hygiene";
+export type DentalChairType = "general" | "surgery" | "orthodontic" | "pediatric" | "prosthodontics";
 export type ChairOperationalStatus = "available" | "cleaning" | "maintenance" | "out_of_service";
 
 export interface DentalRoom {
