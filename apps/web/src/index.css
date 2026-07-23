@@ -105,6 +105,12 @@ html[data-theme="dark"] {
 .platform-control .text-emerald-800 { color: #86efac; }
 .platform-control .text-cyan-700 { color: #67e8f9; }
 
+/* The referrer portal has its own shell but shares the workspace width. */
+main.min-h-svh.bg-muted\/20 > header > .mx-auto,
+main.min-h-svh.bg-muted\/20 > .mx-auto {
+  max-width: 90rem;
+}
+
 
 /* ─── Map CSS variables → Tailwind utility classes via @theme ─── */
 @theme inline {
