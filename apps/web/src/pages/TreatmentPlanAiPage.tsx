@@ -74,7 +74,7 @@ export function TreatmentPlanAiPage() {
 
   if (loading || !plan) {
     return (
-      <PageContainer size="detail">
+      <PageContainer size="workspace">
         <p className="text-sm text-muted-foreground">Đang tải…</p>
       </PageContainer>
     );
@@ -82,7 +82,7 @@ export function TreatmentPlanAiPage() {
 
   if (!plan.visit_id) {
     return (
-      <PageContainer size="detail">
+      <PageContainer size="workspace">
         <Breadcrumbs
           items={[
             { label: "Bệnh nhân", href: `/patients/${plan.patient_id}` },
@@ -109,7 +109,7 @@ export function TreatmentPlanAiPage() {
   }
 
   return (
-    <PageContainer size="detail">
+    <PageContainer size="workspace">
       <Breadcrumbs
         items={[
           { label: "Bệnh nhân", href: `/patients/${plan.patient_id}` },

@@ -51,7 +51,7 @@ export function ChairRevenueReportPage() {
 
   const totalRevenue = report?.items.reduce((total, item) => total + item.confirmed_revenue, 0) ?? 0;
   const totalMinutes = report?.items.reduce((total, item) => total + item.completed_minutes, 0) ?? 0;
-  return <PageContainer>
+  return <PageContainer size="data">
     <section className="overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-700 via-teal-700 to-cyan-800 p-5 text-white shadow-lg sm:p-7">
       <div className="flex flex-wrap items-end justify-between gap-4"><div><h1 className="text-2xl font-semibold tracking-tight">Hiệu quả doanh thu ghế</h1><p className="mt-1 text-sm text-emerald-100">Doanh thu xác nhận theo thời điểm thanh toán, tại chi nhánh hiện tại.</p></div><Button variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white" asChild><Link to={ROUTES.CHAIRS}>Điều hành ghế</Link></Button></div>
       <div className="mt-5 flex flex-wrap gap-2">{([7, 30, 90] as Range[]).map((value) => <Button key={value} size="sm" variant="outline" className={range === value ? "border-white bg-white text-emerald-800 hover:bg-emerald-50" : "border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white"} onClick={() => setSearchParams(value === 30 ? {} : { range: String(value) })}>{value} ngày</Button>)}</div>

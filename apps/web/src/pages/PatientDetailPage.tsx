@@ -199,7 +199,7 @@ export function PatientDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-6">
+    <div className="mx-auto w-full max-w-[90rem] px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8 2xl:px-10">
       <Tabs
         defaultValue="overview"
         value={activeSection}
@@ -209,8 +209,8 @@ export function PatientDetailPage() {
           }
         }}
       >
-        <div className="sticky top-0 z-10 -mx-6 border-b border-border bg-background px-6 pb-4 pt-6 shadow-sm">
-          <div className="mx-auto max-w-6xl space-y-6">
+        <div className="sticky top-0 z-10 -mx-4 border-b border-border bg-background px-4 pb-4 pt-4 shadow-sm sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 lg:pt-6 2xl:-mx-10 2xl:px-10">
+          <div className="mx-auto max-w-[90rem] space-y-6">
             <Breadcrumbs
               items={[
                 { label: "Bệnh nhân", href: "/patients" },
@@ -258,7 +258,7 @@ export function PatientDetailPage() {
           </div>
         </div>
 
-        <div className="mt-6 grid items-start gap-6 lg:grid-cols-[13.5rem_minmax(0,1fr)]">
+        <div className="mt-6 grid items-start gap-6 lg:grid-cols-[13.5rem_minmax(0,1fr)] xl:gap-x-8">
           <aside className="sticky top-28 hidden rounded-xl border border-border bg-card p-2 shadow-sm lg:block">
             <p className="px-3 pb-2 pt-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Hồ sơ bệnh nhân</p>
             <TabsList className="h-auto w-full flex-col items-stretch justify-start gap-1 bg-transparent p-0">

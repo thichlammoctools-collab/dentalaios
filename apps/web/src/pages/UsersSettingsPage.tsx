@@ -112,7 +112,7 @@ export function UsersSettingsPage() {
   }
 
   return (
-    <PageContainer>
+    <PageContainer size="data">
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>

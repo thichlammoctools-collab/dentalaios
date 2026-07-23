@@ -278,7 +278,7 @@ export function TreatmentPlanDetailPage() {
 
   if (loading || !plan) {
     return (
-      <PageContainer size="detail">
+      <PageContainer size="workspace">
         {error ? (
           <Card>
             <CardContent className="p-6">
@@ -302,7 +302,7 @@ export function TreatmentPlanDetailPage() {
   const returnPath = patientReturnPath(searchParams.get("return_to"), plan.patient_id, "plans");
 
   return (
-    <PageContainer size="detail">
+    <PageContainer size="workspace">
       <Breadcrumbs
         items={[
           { label: "Bệnh nhân", href: "/patients" },

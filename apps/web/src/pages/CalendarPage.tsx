@@ -325,7 +325,7 @@ export function CalendarPage() {
   }
 
   return (
-    <PageContainer size="wide" className="space-y-4">
+    <PageContainer size="workspace" className="space-y-4">
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -371,7 +371,7 @@ export function CalendarPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 lg:grid-cols-3">
               {threeDayDates.map((day) => (
                 <div key={day.iso} className={`min-h-[180px] rounded-md border p-3 ${day.isToday ? "border-primary bg-primary/5" : ""}`}>
                   <div className={`mb-3 text-sm font-semibold ${day.isToday ? "text-primary" : ""}`}>
@@ -407,12 +407,12 @@ export function CalendarPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-7">
+            <div className="grid grid-cols-1 gap-2 lg:grid-cols-7">
               {weekDays.map((day) => (
                 <div key={day.iso} className={`rounded-md border p-2 ${day.isSelected ? "border-primary bg-primary/5" : ""}`}>
                   <div className={`mb-1 text-center text-sm font-medium ${day.isToday ? "text-primary" : ""}`}>
-                    <span className="sm:hidden">{day.date.getDate()}</span>
-                    <span className="hidden sm:block">
+                    <span className="lg:hidden">{day.date.getDate()}</span>
+                    <span className="hidden lg:block">
                       {DAY_NAMES[day.date.getDay()]} {day.date.getDate()}/{day.date.getMonth() + 1}
                     </span>
                   </div>
@@ -464,7 +464,7 @@ export function CalendarPage() {
                   key={day.iso + idx}
                   onClick={() => day.isCurrentMonth && setSelectedDate(day.date)}
                   className={`
-                    min-h-[72px] sm:min-h-[90px] border-b border-r border-border p-1.5 text-left
+                    min-h-[72px] lg:min-h-[90px] border-b border-r border-border p-1.5 text-left
                     transition-colors hover:bg-accent/50
                     ${!day.isCurrentMonth ? "bg-muted/30 text-muted-foreground" : ""}
                     ${day.isToday ? "bg-primary/5" : ""}

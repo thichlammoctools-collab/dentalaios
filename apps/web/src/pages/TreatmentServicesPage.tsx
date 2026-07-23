@@ -129,7 +129,7 @@ export function TreatmentServicesPage() {
   }
 
   return (
-    <PageContainer>
+    <PageContainer size="data">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Danh mục dịch vụ điều trị</h1>

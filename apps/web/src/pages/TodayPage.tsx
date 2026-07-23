@@ -137,7 +137,7 @@ export function TodayPage() {
   const hasActions = actions.some((group) => group.count > 0);
 
   return (
-    <PageContainer size="wide" className="space-y-5 sm:space-y-6">
+    <PageContainer size="workspace" className="space-y-5 sm:space-y-6">
       <section className="overflow-hidden rounded-2xl bg-gradient-to-br from-blue-700 via-indigo-700 to-violet-800 p-5 text-white shadow-lg sm:p-7">
         <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
           <div>
@@ -177,7 +177,7 @@ export function TodayPage() {
               <div><h3 className="text-lg font-semibold">Luồng khách hôm nay</h3><p className="text-sm text-muted-foreground">Theo dõi lịch, khách đến và tiến độ khám tại chi nhánh.</p></div>
               <span className="text-xs text-muted-foreground">Scope cố định theo chi nhánh đăng nhập</span>
             </div>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-8">
               <MetricCard label="Đã đặt lịch" value={formatNumber(snapshot.today.scheduled)} />
               <MetricCard label="Chưa xác nhận" value={formatNumber(snapshot.today.unconfirmed)} risk="warning" />
               <MetricCard label="Đã đến" value={formatNumber(snapshot.today.arrived)} />
@@ -288,7 +288,7 @@ function DailyChart({ data }: { data: ManagementDashboardDailyPoint[] }) {
 }
 
 function DashboardSkeleton() {
-  return <div className="space-y-6"><div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">{Array.from({ length: 8 }, (_, index) => <div key={index} className="h-28 animate-pulse rounded-xl bg-muted" />)}</div><div className="grid gap-5 lg:grid-cols-3"><div className="h-72 animate-pulse rounded-xl bg-muted lg:col-span-2" /><div className="h-72 animate-pulse rounded-xl bg-muted" /></div></div>;
+  return <div className="space-y-6"><div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-8">{Array.from({ length: 8 }, (_, index) => <div key={index} className="h-28 animate-pulse rounded-xl bg-muted" />)}</div><div className="grid gap-5 lg:grid-cols-3"><div className="h-72 animate-pulse rounded-xl bg-muted lg:col-span-2" /><div className="h-72 animate-pulse rounded-xl bg-muted" /></div></div>;
 }
 
 function RefreshIcon({ spinning }: { spinning: boolean }) { return <svg className={`h-4 w-4 ${spinning ? "animate-spin" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 11a8 8 0 10.85 3.87M20 4v7h-7" /></svg>; }

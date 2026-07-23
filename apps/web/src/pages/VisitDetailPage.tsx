@@ -648,7 +648,7 @@ export function VisitDetailPage() {
   const toothFindings = findings.filter((finding) => finding.category === "tooth_hard_tissue" || finding.category === "periodontal");
 
   return (
-    <PageContainer size="wide" className="space-y-5">
+    <PageContainer size="workspace" className="space-y-5">
       {/* Header */}
       <div>
         <Breadcrumbs items={[

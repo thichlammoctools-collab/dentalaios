@@ -165,7 +165,7 @@ export function ChairBoardPage() {
   const statusCount = (status: ChairBoardItem["current_status"]) => board?.chairs.filter((item) => item.current_status === status).length ?? 0;
 
   return (
-    <PageContainer size="wide">
+    <PageContainer size="workspace">
       <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-cyan-600 via-blue-600 to-indigo-700 p-5 text-white shadow-lg sm:p-8">
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Điều hành ghế nha</h1>
         <p className="mt-1 text-sm text-blue-100">Theo dõi trạng thái ghế, lịch đang diễn ra và lịch tiếp theo theo thời gian thực.</p>
@@ -202,7 +202,7 @@ export function ChairBoardPage() {
       ) : !board || board.chairs.length === 0 ? (
         <Card><CardContent className="py-12 text-center text-sm text-muted-foreground"><p>Chưa có ghế nha nào tại chi nhánh này.</p>{canManage && <Button className="mt-4" asChild><Link to={ROUTES.CHAIRS_SETTINGS}>Tạo ghế đầu tiên</Link></Button>}</CardContent></Card>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {board.chairs.map((item) => {
             const { chair } = item;
             return (

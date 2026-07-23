@@ -196,7 +196,7 @@ export function SchedulePage() {
 
 
   return (
-    <PageContainer>
+    <PageContainer size="workspace">
       {/* Header */}
       <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-700 p-5 text-white shadow-lg sm:p-8">
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Lịch hẹn</h1>
@@ -437,7 +437,7 @@ export function SchedulePage() {
               ) : (
                 <div className="overflow-x-auto pb-1">
                   <div
-                    className="grid grid-cols-1 gap-3 md:min-w-[960px] md:[grid-template-columns:var(--week-grid-columns)]"
+                    className="grid grid-cols-1 gap-3 lg:min-w-[960px] lg:[grid-template-columns:var(--week-grid-columns)]"
                     style={{ "--week-grid-columns": weekGridColumns } as CSSProperties}
                   >
                     {weekDays.map((day) => {
@@ -464,7 +464,7 @@ export function SchedulePage() {
                             </div>
                             <button
                               type="button"
-                              className="hidden rounded p-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary md:inline-flex"
+                               className="hidden rounded p-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary lg:inline-flex"
                               aria-label={`${isExpanded ? "Thu gọn" : "Mở rộng"} cột ${weekdayLabel(day.getDay() === 0 ? 7 : day.getDay())}, ngày ${day.getDate()}`}
                               aria-pressed={isExpanded}
                               title={isExpanded ? "Thu gọn cột ngày" : "Mở rộng cột ngày"}

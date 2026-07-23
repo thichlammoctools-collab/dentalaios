@@ -213,7 +213,7 @@ export function ChairSettingsPage() {
   }
 
   return (
-    <PageContainer>
+    <PageContainer size="data">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Cấu hình ghế nha</h1>

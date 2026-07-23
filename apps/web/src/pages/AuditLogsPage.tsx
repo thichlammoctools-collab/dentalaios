@@ -50,7 +50,7 @@ export function AuditLogsPage() {
   }, [page]);
 
   return (
-    <PageContainer className="space-y-4">
+    <PageContainer size="data" className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Audit logs</h1>
         <p className="text-sm text-muted-foreground">

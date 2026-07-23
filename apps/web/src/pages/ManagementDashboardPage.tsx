@@ -110,7 +110,7 @@ export function ManagementDashboardPage() {
     : undefined;
   const noActivity = !loading && !error && !!snapshot && daily.every((point) => !point.visits && !(point.revenue ?? point.confirmed_revenue));
 
-  return <PageContainer size="wide" className="space-y-5 sm:space-y-6">
+  return <PageContainer size="workspace" className="space-y-5 sm:space-y-6">
     <section className="overflow-hidden rounded-2xl bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-900 p-5 text-white shadow-lg sm:p-7">
       <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end"><div><p className="text-sm font-medium text-blue-200">{session?.tenant.name}</p><h2 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">Quản trị tổng quan</h2><p className="mt-2 text-sm text-blue-100">Vận hành toàn hệ thống · {hcmDate(snapshot?.today_start)}</p></div>
         <div className="grid gap-2 sm:grid-cols-[140px_minmax(190px,1fr)_auto]"><label className="text-xs font-medium text-blue-100">Kỳ báo cáo<Select value={range} onChange={(event) => setFilters(Number(event.target.value) as DashboardRange, branchId)} className="mt-1 border-white/20 bg-white/10 text-white"><option className="text-foreground" value="7">7 ngày hoàn tất</option><option className="text-foreground" value="30">30 ngày hoàn tất</option><option className="text-foreground" value="90">90 ngày hoàn tất</option></Select></label>

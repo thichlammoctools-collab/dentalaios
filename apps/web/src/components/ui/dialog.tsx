@@ -50,8 +50,8 @@ export function Dialog({ open, onOpenChange, children, className, size = "lg" }:
           "max-h-[94dvh]",
           "transition-all duration-200",
           open
-            ? "opacity-100 translate-y-0 sm:scale-100"
-            : "opacity-0 translate-y-4 sm:scale-95",
+            ? "opacity-100 translate-y-0 lg:scale-100"
+            : "opacity-0 translate-y-4 lg:scale-95",
           sizeClasses[size],
           className,
         )}
@@ -106,7 +106,7 @@ export function DialogBody({ className, children }: { className?: string; childr
 export function DialogFooter({ className, children }: DialogHeaderProps) {
   return (
     <div className={cn("flex-shrink-0 border-t border-border px-5 pb-5 pt-4 lg:px-8 lg:pb-6", className)}>
-      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+      <div className="flex flex-col-reverse gap-2 lg:flex-row lg:justify-end">
         {children}
       </div>
     </div>
