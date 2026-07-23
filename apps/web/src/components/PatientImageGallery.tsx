@@ -156,9 +156,7 @@ export function PatientImageGallery({
     ? images
     : images.filter((i) => i.image_type === filterType);
 
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  async function uploadImage(file: File) {
     setUploading(true);
     setUploadProgress(0);
     try {
@@ -191,9 +189,35 @@ export function PatientImageGallery({
     } finally {
       setUploading(false);
       setUploadProgress(0);
-      e.target.value = "";
     }
   }
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Reset immediately so selecting the same file again triggers onChange.
+    e.target.value = "";
+    if (!file || uploading) return;
+    await uploadImage(file);
+  }
+
+  useEffect(() => {
+    function handlePaste(event: ClipboardEvent) {
+      if (uploading) return;
+      const image = Array.from(event.clipboardData?.items ?? []).find((item) =>
+        item.kind === "file" && item.type.startsWith("image/"),
+      );
+      const blob = image?.getAsFile();
+      if (!blob) return;
+
+      event.preventDefault();
+      const extension = blob.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
+      const file = new File([blob], `anh-da-dan-${Date.now()}.${extension}`, { type: blob.type });
+      void uploadImage(file);
+    }
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [uploading, patientId, visitId]);
 
   async function handleDelete(img: PatientImage) {
     if (!confirm("Xóa hình ảnh này?")) return;
@@ -417,6 +441,9 @@ export function PatientImageGallery({
           <p className="text-sm text-muted-foreground">Chưa có hình ảnh</p>
           <p className="text-xs text-muted-foreground/60 mt-1">
             Tải lên phim CBCT, scan 3D, hình trước/sau điều trị
+          </p>
+          <p className="text-xs text-muted-foreground/60 mt-1">
+            Hoặc sao chép ảnh và nhấn Ctrl+V để tải lên
           </p>
           {!compact && (
             <label className="mt-3 cursor-pointer">
