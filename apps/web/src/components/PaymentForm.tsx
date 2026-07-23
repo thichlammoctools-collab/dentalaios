@@ -48,6 +48,10 @@ export function PaymentForm({ open, onOpenChange, patientId, plans, onCreated }:
   const selectedNetOutstanding = selectedOutstanding - selectedDiscount;
 
   useEffect(() => {
+    setAmount(selectedItems.length > 0 ? Math.max(0, selectedNetOutstanding) : "");
+  }, [selectedItems.length, selectedNetOutstanding]);
+
+  useEffect(() => {
     if (!open || !planId) {
       setItems([]);
       setSelectedItemIds([]);
