@@ -52,7 +52,6 @@ export function PatientImageGallery({
   const [uploadType, setUploadType] = useState<PatientImageType>("other");
   const [uploadVisitId, setUploadVisitId] = useState(visitId ?? "");
   const [selected, setSelected] = useState<PatientImage | null>(null);
-  const [comparisonImages, setComparisonImages] = useState<{ before: PatientImage | null; after: PatientImage | null }>({ before: null, after: null });
   const [comparisonOpen, setComparisonOpen] = useState(false);
   const [viewUrl, setViewUrl] = useState<string | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
@@ -183,6 +182,19 @@ export function PatientImageGallery({
   const uploadVisitOptions = visitId ? [] : visits;
   const beforeImages = images.filter((image) => image.image_purpose === "treatment_before");
   const afterImages = images.filter((image) => image.image_purpose === "treatment_after");
+  const visitById = new Map(visits.map((visit) => [visit.id, visit]));
+  const imageGroups = visitId || filterVisitId !== "all"
+    ? [{ key: "filtered", label: "Ảnh đang hiển thị", items: filtered }]
+    : Array.from(filtered.reduce((groups, image) => {
+      const key = image.visit_id ?? "unlinked";
+      const group = groups.get(key) ?? [];
+      group.push(image);
+      groups.set(key, group);
+      return groups;
+    }, new Map<string, PatientImage[]>())).map(([key, items]) => {
+      const visit = visitById.get(key);
+      return { key, label: key === "unlinked" ? "Chưa gắn lượt khám" : visit ? `Lượt khám ${new Date(visit.date).toLocaleDateString("vi-VN")}` : "Lượt khám", items };
+    });
 
   function openUpload(files: File[]) {
     if (!files.length || uploading) return;
@@ -511,7 +523,7 @@ export function PatientImageGallery({
       {beforeImages.length > 0 && afterImages.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 bg-teal-50/50 p-3 dark:border-teal-900 dark:bg-teal-950/20">
           <div><p className="text-sm font-medium">Đối chiếu trước – sau điều trị</p><p className="mt-0.5 text-xs text-muted-foreground">Chọn một ảnh mỗi bên để xem song song.</p></div>
-          <Button size="sm" variant="outline" onClick={() => { setComparisonImages({ before: beforeImages[0], after: afterImages[0] }); setComparisonOpen(true); }}>So sánh ảnh</Button>
+          <Button size="sm" variant="outline" onClick={() => setComparisonOpen(true)}>So sánh ảnh</Button>
         </div>
       )}
 
@@ -546,31 +558,16 @@ export function PatientImageGallery({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          {filtered.map((img) => (
-            <button
-              key={img.id}
-              onClick={() => setSelected(img)}
-              className="group relative aspect-square rounded-xl overflow-hidden border border-border bg-muted/30 hover:border-teal-400 transition-all hover:shadow-md"
-            >
-              {/* Thumbnail image */}
-              <ImageThumbnail img={img} />
-
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-2">
-                <p className="text-white text-[10px] font-medium truncate">
-                  {PATIENT_IMAGE_PURPOSE_LABELS[img.image_purpose]} · {PATIENT_IMAGE_TYPE_LABELS[img.image_type]}
-                </p>
-                <p className="text-white/70 text-[9px]">
-                  {img.original_size ? `${(img.original_size / 1024).toFixed(0)}KB` : ""}
-                </p>
-              </div>
-              <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="bg-black/50 text-white text-[9px] px-1.5 py-0.5 rounded">
-                  {img.image_type === "cbct" ? "CBCT" : img.image_type === "scan_3d" ? "3D" : img.image_type === "photo_before" ? "TR" : img.image_type === "photo_after" ? "SAU" : ""}
-                </span>
-              </div>
-            </button>
-          ))}
+        <div className="space-y-6">
+          {imageGroups.map((group) => <section key={group.key}>
+            {!visitId && filterVisitId === "all" && <div className="mb-2 flex items-center gap-2"><p className="text-sm font-semibold">{group.label}</p><span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{group.items.length}</span></div>}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              {group.items.map((img) => <button key={img.id} onClick={() => setSelected(img)} className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-muted/30 transition-all hover:border-teal-400 hover:shadow-md">
+                <ImageThumbnail img={img} />
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-2"><p className="truncate text-[10px] font-medium text-white">{PATIENT_IMAGE_PURPOSE_LABELS[img.image_purpose]} · {PATIENT_IMAGE_TYPE_LABELS[img.image_type]}</p><p className="text-[9px] text-white/70">{img.original_size ? `${(img.original_size / 1024).toFixed(0)}KB` : ""}</p></div>
+              </button>)}
+            </div>
+          </section>)}
         </div>
       )}
 
@@ -739,8 +736,110 @@ export function PatientImageGallery({
           )}
         </DialogFooter>
       </Dialog>
+
+      {/* Upload Confirmation Dialog */}
+      <Dialog open={uploadDialogOpen} onOpenChange={(o) => { if (!o) setUploadDialogOpen(false); }}>
+        <DialogHeader><DialogTitle>Xác nhận tải lên hình ảnh</DialogTitle></DialogHeader>
+        <DialogBody>
+          <div className="mb-4 flex max-h-64 flex-col gap-2 overflow-y-auto rounded-lg border border-border p-3">
+            {pendingFiles.map((file, index) => (
+              <label key={index} className="flex items-center gap-3 text-sm">
+                <span className="text-muted-foreground">{index + 1}</span>
+                <span className="min-w-0 truncate font-medium">{file.name}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{(file.size / 1024).toFixed(0)} KB</span>
+              </label>
+            ))}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1 text-sm font-medium"><span>Mục đích lâm sàng</span>
+              <select value={uploadPurpose} onChange={(event) => setUploadPurpose(event.target.value as PatientImagePurpose)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+                <option value="clinical_record">Bệnh án / hỗ trợ chẩn đoán — Ảnh X-quang, CBCT, hoặc trong miệng phục vụ đánh giá và liên kết chẩn đoán.</option>
+                <option value="treatment_before">Trước điều trị — Hình nền để so sánh tình trạng trước can thiệp.</option>
+                <option value="treatment_after">Sau điều trị — Theo dõi kết quả sau can thiệp.</option>
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm font-medium"><span>Loại kỹ thuật</span>
+              <select value={uploadType} onChange={(event) => setUploadType(event.target.value as PatientImageType)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+                <option value="other">Tự nhận diện từ tên / MIME</option>
+                {imageTypes.filter(([type]) => type !== "other").map(([type, label]) => <option key={type} value={type}>{label}</option>)}
+              </select>
+            </label>
+          </div>
+          {!visitId && (
+            <div className="mt-3">
+              <label className="grid gap-1 text-sm font-medium"><span>Gắn với lượt khám</span>
+                <select value={uploadVisitId} onChange={(event) => setUploadVisitId(event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+                  <option value="">Không gắn</option>
+                  {uploadVisitOptions.map((v) => <option key={v.id} value={v.id}>{new Date(v.date).toLocaleDateString("vi-VN")} — {v.status === "completed" ? "Hoàn tất" : v.status === "cancelled" ? "Đã hủy" : "Đang thực hiện"}</option>)}
+                </select>
+              </label>
+            </div>
+          )}
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => { setUploadDialogOpen(false); setPendingFiles([]); }}>Hủy</Button>
+          <Button onClick={confirmUpload}>Tải lên</Button>
+        </DialogFooter>
+      </Dialog>
+
+      {/* Image Comparison Dialog */}
+      <Dialog open={comparisonOpen} onOpenChange={(o) => { if (!o) setComparisonOpen(false); }}>
+        <DialogHeader><DialogTitle>Đối chiếu trước – sau</DialogTitle></DialogHeader>
+        <DialogBody>
+          <TreatmentImageComparison beforeImages={beforeImages} afterImages={afterImages} />
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setComparisonOpen(false)}>Đóng</Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
+}
+
+function TreatmentImageComparison({ beforeImages, afterImages }: { beforeImages: PatientImage[]; afterImages: PatientImage[] }) {
+  const [beforeId, setBeforeId] = useState(beforeImages[0]?.id ?? "");
+  const [afterId, setAfterId] = useState(afterImages[0]?.id ?? "");
+  const before = beforeImages.find((image) => image.id === beforeId) ?? null;
+  const after = afterImages.find((image) => image.id === afterId) ?? null;
+  return <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+    <ComparisonPane label="Trước điều trị" images={beforeImages} selectedId={beforeId} onChange={setBeforeId} image={before} />
+    <ComparisonPane label="Sau điều trị" images={afterImages} selectedId={afterId} onChange={setAfterId} image={after} />
+  </div>;
+}
+
+function ComparisonPane({ label, images, selectedId, onChange, image }: { label: string; images: PatientImage[]; selectedId: string; onChange: (value: string) => void; image: PatientImage | null }) {
+  return <div className="rounded-xl border border-border p-3">
+    <p className="mb-2 text-sm font-semibold">{label} ({images.length})</p>
+    <select value={selectedId} onChange={(event) => onChange(event.target.value)} className="mb-2 h-8 w-full rounded-md border border-input bg-background px-2 text-xs">
+      {images.map((item) => <option key={item.id} value={item.id}>{PATIENT_IMAGE_TYPE_LABELS[item.image_type]} · {formatDate(item.created_at)}</option>)}
+    </select>
+    {image ? <PatientImageViewer image={image} /> : <div className="aspect-square flex items-center justify-center rounded-lg bg-muted/30 text-xs text-muted-foreground">Chưa chọn ảnh</div>}
+  </div>;
+}
+
+/** Sub-component for rendering a full-size view in the comparison dialog. */
+function PatientImageViewer({ image }: { image: PatientImage }) {
+  const [viewUrl, setViewUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    setViewUrl(null);
+    apiBlob(`/api/patient-images/${image.id}/file`)
+      .then((blob) => {
+        objectUrl = URL.createObjectURL(blob);
+        if (!cancelled) setViewUrl(objectUrl);
+        else URL.revokeObjectURL(objectUrl);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [image.id]);
+  return <div className="relative aspect-square rounded-lg overflow-hidden bg-black">
+    {viewUrl && <img src={viewUrl} alt={image.original_name || "Image"} className="absolute inset-0 m-auto max-h-full max-w-full object-contain" />}
+    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5">
+      <p className="text-white text-[10px] truncate">{image.original_name}</p>
+      <p className="text-white/60 text-[9px]">{formatDate(image.created_at)}</p>
+    </div>
+  </div>;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────
