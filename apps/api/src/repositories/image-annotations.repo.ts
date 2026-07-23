@@ -2,7 +2,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import type { ClinicalDiagnosisImageEvidence, ImageAnnotation, ImageAnnotationVersion, PatientImage } from "@shared/types";
 import type { D1Row } from "./base";
 
-const annotationVersionSelect = `SELECT av.id AS version_id, av.tenant_id AS version_tenant_id, av.annotation_id,
+const annotationVersionColumns = `av.id AS version_id, av.tenant_id AS version_tenant_id, av.annotation_id,
   av.version_no, av.shape_type, av.geometry_json, av.note, av.tooth_number, av.anatomical_site,
   av.created_by AS version_created_by, av.created_at AS version_created_at`;
 const imageSelect = `pi.id AS image_id, pi.tenant_id AS image_tenant_id, pi.patient_id AS image_patient_id,
@@ -15,7 +15,7 @@ export function createImageAnnotationsRepository(db: D1Database) {
   return {
     async listByImage(tenantId: string, imageId: string): Promise<ImageAnnotation[]> {
       const result = await db.prepare(`SELECT a.id, a.tenant_id, a.patient_image_id, a.current_version_no,
-        a.created_by, a.created_at, a.updated_at, ${annotationVersionSelect}
+        a.created_by, a.created_at, a.updated_at, ${annotationVersionColumns}
         FROM image_annotations a
         JOIN image_annotation_versions av ON av.annotation_id = a.id AND av.version_no = a.current_version_no
         WHERE a.tenant_id = ? AND a.patient_image_id = ?
@@ -24,14 +24,14 @@ export function createImageAnnotationsRepository(db: D1Database) {
     },
 
     async getVersion(tenantId: string, versionId: string): Promise<ImageAnnotationVersion | null> {
-      const row = await db.prepare(`${annotationVersionSelect} FROM image_annotation_versions av
+      const row = await db.prepare(`SELECT ${annotationVersionColumns} FROM image_annotation_versions av
         WHERE av.tenant_id = ? AND av.id = ? LIMIT 1`).bind(tenantId, versionId).first<D1Row>();
       return row ? mapVersion(row) : null;
     },
 
     async getAnnotation(tenantId: string, annotationId: string): Promise<ImageAnnotation | null> {
       const row = await db.prepare(`SELECT a.id, a.tenant_id, a.patient_image_id, a.current_version_no,
-        a.created_by, a.created_at, a.updated_at, ${annotationVersionSelect}
+        a.created_by, a.created_at, a.updated_at, ${annotationVersionColumns}
         FROM image_annotations a
         JOIN image_annotation_versions av ON av.annotation_id = a.id AND av.version_no = a.current_version_no
         WHERE a.tenant_id = ? AND a.id = ? LIMIT 1`).bind(tenantId, annotationId).first<D1Row>();
@@ -81,7 +81,7 @@ export function createImageAnnotationsRepository(db: D1Database) {
     async getEvidence(tenantId: string, evidenceId: string): Promise<ClinicalDiagnosisImageEvidence | null> {
       const row = await db.prepare(`SELECT e.id, e.tenant_id, e.diagnosis_id, e.patient_image_id, e.annotation_version_id,
         e.relation, e.note, e.linked_by, e.linked_at, ${imageSelect},
-        ${annotationVersionSelect}
+        ${annotationVersionColumns}
         FROM clinical_diagnosis_image_evidence e
         JOIN patient_images pi ON pi.id = e.patient_image_id
         JOIN users u ON u.id = pi.uploaded_by
@@ -92,7 +92,7 @@ export function createImageAnnotationsRepository(db: D1Database) {
 
     async listEvidenceByDiagnosis(tenantId: string, diagnosisId: string): Promise<ClinicalDiagnosisImageEvidence[]> {
       const result = await db.prepare(`SELECT e.id, e.tenant_id, e.diagnosis_id, e.patient_image_id, e.annotation_version_id,
-        e.relation, e.note, e.linked_by, e.linked_at, ${imageSelect}, ${annotationVersionSelect}
+        e.relation, e.note, e.linked_by, e.linked_at, ${imageSelect}, ${annotationVersionColumns}
         FROM clinical_diagnosis_image_evidence e
         JOIN patient_images pi ON pi.id = e.patient_image_id
         JOIN users u ON u.id = pi.uploaded_by
@@ -103,7 +103,7 @@ export function createImageAnnotationsRepository(db: D1Database) {
 
     async listEvidenceByImage(tenantId: string, imageId: string): Promise<ClinicalDiagnosisImageEvidence[]> {
       const result = await db.prepare(`SELECT e.id, e.tenant_id, e.diagnosis_id, e.patient_image_id, e.annotation_version_id,
-        e.relation, e.note, e.linked_by, e.linked_at, ${imageSelect}, ${annotationVersionSelect}
+        e.relation, e.note, e.linked_by, e.linked_at, ${imageSelect}, ${annotationVersionColumns}
         FROM clinical_diagnosis_image_evidence e
         JOIN patient_images pi ON pi.id = e.patient_image_id
         JOIN users u ON u.id = pi.uploaded_by
