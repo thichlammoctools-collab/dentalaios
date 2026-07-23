@@ -11,6 +11,7 @@ import { apiPost, apiPut, apiGet, ApiError } from "@/lib/api";
 import { referrersApi } from "@/lib/referral-api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
+import { calculateAge } from "@/lib/utils";
 import type { Patient, Referrer } from "@shared/types";
 import type { UserWithDetails } from "@shared/types";
 import type { PatientCreateInput } from "@shared/validation";
@@ -179,6 +180,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
   const bmiLabel = bmi !== null
     ? bmi < 18.5 ? "Gầy" : bmi < 23 ? "Bình thường" : bmi < 25 ? "Thừa cân" : "Béo phì"
     : null;
+  const age = calculateAge(dateOfBirth);
 
   function goToNextStep() {
     const stepOne = stepOneRef.current;
@@ -254,7 +256,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
             Nhập thông tin cần thiết để nhận diện và liên hệ bệnh nhân. Các mục có dấu <span className="font-semibold text-red-500">*</span> là bắt buộc.
           </div>
-          <SectionDivider icon={<UserIcon />}>Thông tin chính</SectionDivider>
+          <SectionDivider icon={<UserIcon />}>Nhận diện & liên hệ</SectionDivider>
 
           <div className="grid gap-1.5">
             <Label htmlFor="pf-name">
@@ -269,7 +271,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
             />
           </div>
 
-          <div className="grid gap-3 lg:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <div className="grid gap-1.5">
               <Label htmlFor="pf-dob">
                 Ngày sinh <span className="text-red-500">*</span>
@@ -280,6 +282,17 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
                 value={dateOfBirth}
                 onChange={setDateOfBirth}
               />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="pf-age">Tuổi</Label>
+              <Input
+                id="pf-age"
+                value={age === undefined ? "—" : `${age} tuổi`}
+                readOnly
+                aria-live="polite"
+                className="bg-muted/40 text-muted-foreground"
+              />
+              <p className="text-xs text-muted-foreground">Tự tính theo ngày sinh.</p>
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="pf-gender">
@@ -293,29 +306,31 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
             </div>
           </div>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="pf-phone">
-              Số điện thoại <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="pf-phone"
-              type="tel"
-              required
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="VD: 0901234567"
-            />
-          </div>
+          <div className="grid gap-3 lg:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="pf-phone">
+                Số điện thoại <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="pf-phone"
+                type="tel"
+                required
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="VD: 0901234567"
+              />
+            </div>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="pf-email">Email</Label>
-            <Input
-              id="pf-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="VD: nguyenvana@email.com"
-            />
+            <div className="grid gap-1.5">
+              <Label htmlFor="pf-email">Email</Label>
+              <Input
+                id="pf-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="VD: nguyenvana@email.com"
+              />
+            </div>
           </div>
 
           <div className="grid gap-1.5">
