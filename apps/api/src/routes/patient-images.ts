@@ -14,6 +14,8 @@ import { PERMISSIONS } from "@shared/constants";
 import {
   patientImagePresignSchema,
   patientImageCreateSchema,
+  imageAnnotationCreateSchema,
+  imageAnnotationVersionCreateSchema,
 } from "@shared/validation";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
@@ -23,6 +25,7 @@ import type { AuthContext } from "../middleware/auth";
 import { patientImagesService } from "../services/patient-images.service";
 import { filesService } from "../services/files.service";
 import { buildPrivateFileHeaders } from "../lib/file-response";
+import { imageAnnotationsService } from "../services/image-annotations.service";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -107,6 +110,63 @@ router.post(
       thumb_key: thumb.fileId,
       thumb_upload_url: thumb.uploadUrl,
     });
+  },
+);
+
+router.get(
+  "/:id/annotations",
+  requireAuth(),
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const items = await imageAnnotationsService.listAnnotations(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    return c.json({ items, total: items.length });
+  },
+);
+
+router.post(
+  "/:id/annotations",
+  requireAuth(),
+  requirePermission(PERMISSIONS.WRITE_FINDINGS),
+  auditLog("create", "image_annotation"),
+  zValidator("json", imageAnnotationCreateSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    return c.json(await imageAnnotationsService.createAnnotation(c.env.DB, jwt.tenant_id, c.req.param("id"), jwt.sub, c.req.valid("json")), 201);
+  },
+);
+
+router.post(
+  "/:id/annotations/:annotationId/versions",
+  requireAuth(),
+  requirePermission(PERMISSIONS.WRITE_FINDINGS),
+  auditLog("update", "image_annotation"),
+  zValidator("json", imageAnnotationVersionCreateSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    return c.json(await imageAnnotationsService.createVersion(c.env.DB, jwt.tenant_id, c.req.param("id"), c.req.param("annotationId"), jwt.sub, c.req.valid("json")));
+  },
+);
+
+router.get(
+  "/:id/diagnosis-options",
+  requireAuth(),
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const items = await imageAnnotationsService.listDiagnosisOptions(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    return c.json({ items, total: items.length });
+  },
+);
+
+router.get(
+  "/:id/evidence",
+  requireAuth(),
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const items = await imageAnnotationsService.listImageEvidence(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    return c.json({ items, total: items.length });
   },
 );
 

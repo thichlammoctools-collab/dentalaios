@@ -7,7 +7,7 @@
  *   compact    — hide the "Hình ảnh" header (for embedding inside another section)
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { apiBlob, apiDelete, apiGet, apiPost, apiUpload, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
-import type { PatientImage, PatientImageType, AnalyzeImageResult } from "@shared/types";
+import type { ClinicalDiagnosis, ClinicalDiagnosisImageEvidence, ImageAnnotation, ImageAnnotationGeometry, ImageAnnotationShapeType, PatientImage, PatientImageType, AnalyzeImageResult } from "@shared/types";
 import { PATIENT_IMAGE_TYPE_LABELS } from "@shared/types";
 
 interface PatientImageGalleryProps {
@@ -50,6 +50,20 @@ export function PatientImageGallery({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalyzeImageResult | null>(null);
+  const [annotations, setAnnotations] = useState<ImageAnnotation[]>([]);
+  const [imageEvidence, setImageEvidence] = useState<ClinicalDiagnosisImageEvidence[]>([]);
+  const [diagnosisOptions, setDiagnosisOptions] = useState<Array<ClinicalDiagnosis & { visit_date: string }>>([]);
+  const [annotationShape, setAnnotationShape] = useState<ImageAnnotationShapeType>("pin");
+  const [annotationGeometry, setAnnotationGeometry] = useState<ImageAnnotationGeometry | null>(null);
+  const [annotationNote, setAnnotationNote] = useState("");
+  const [rectangleStart, setRectangleStart] = useState<{ x: number; y: number } | null>(null);
+  const [savingAnnotation, setSavingAnnotation] = useState(false);
+  const [selectedDiagnosisId, setSelectedDiagnosisId] = useState("");
+  const [selectedAnnotationVersionId, setSelectedAnnotationVersionId] = useState("");
+  const [evidenceRelation, setEvidenceRelation] = useState<"supports" | "contradicts" | "incidental">("supports");
+  const [evidenceNote, setEvidenceNote] = useState("");
+  const [linkingEvidence, setLinkingEvidence] = useState(false);
+  const imageContainerRef = useRef<HTMLDivElement>(null);
 
   async function load() {
     setLoading(true);
@@ -120,6 +134,24 @@ export function PatientImageGallery({
     };
   }, [selected?.id]);
 
+  useEffect(() => {
+    if (!selected) {
+      setAnnotations([]);
+      setImageEvidence([]);
+      setDiagnosisOptions([]);
+      return;
+    }
+    void Promise.all([
+      apiGet<{ items: ImageAnnotation[] }>(`/api/patient-images/${selected.id}/annotations`),
+      apiGet<{ items: ClinicalDiagnosisImageEvidence[] }>(`/api/patient-images/${selected.id}/evidence`),
+      apiGet<{ items: Array<ClinicalDiagnosis & { visit_date: string }> }>(`/api/patient-images/${selected.id}/diagnosis-options`),
+    ]).then(([annotationResponse, evidenceResponse, diagnosisResponse]) => {
+      setAnnotations(annotationResponse.items);
+      setImageEvidence(evidenceResponse.items);
+      setDiagnosisOptions(diagnosisResponse.items);
+    }).catch((error) => toast.error(error instanceof ApiError ? error.message : "Không thể tải ghi chú trên ảnh"));
+  }, [selected?.id]);
+
   const filtered = filterType === "all"
     ? images
     : images.filter((i) => i.image_type === filterType);
@@ -174,6 +206,86 @@ export function PatientImageGallery({
       onImagesChanged?.();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi xóa hình ảnh");
+    }
+  }
+
+  function coordinateFromPointer(event: React.PointerEvent<HTMLDivElement>) {
+    const bounds = imageContainerRef.current?.getBoundingClientRect();
+    if (!bounds) return null;
+    return {
+      x: Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width)),
+      y: Math.min(1, Math.max(0, (event.clientY - bounds.top) / bounds.height)),
+    };
+  }
+
+  function handleAnnotationPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (!viewUrl) return;
+    const point = coordinateFromPointer(event);
+    if (!point) return;
+    if (annotationShape === "pin") setAnnotationGeometry(point);
+    else setRectangleStart(point);
+  }
+
+  function handleAnnotationPointerUp(event: React.PointerEvent<HTMLDivElement>) {
+    if (annotationShape !== "rectangle" || !rectangleStart) return;
+    const end = coordinateFromPointer(event);
+    if (!end) return;
+    const x = Math.min(rectangleStart.x, end.x);
+    const y = Math.min(rectangleStart.y, end.y);
+    setAnnotationGeometry({ x, y, width: Math.abs(end.x - rectangleStart.x), height: Math.abs(end.y - rectangleStart.y) });
+    setRectangleStart(null);
+  }
+
+  async function saveAnnotation() {
+    if (!selected || !annotationGeometry || !annotationNote.trim()) {
+      toast.error("Đặt ghim hoặc khung trên ảnh và nhập ghi chú");
+      return;
+    }
+    setSavingAnnotation(true);
+    try {
+      const annotation = await apiPost<ImageAnnotation>(`/api/patient-images/${selected.id}/annotations`, {
+        shape_type: annotationShape,
+        geometry: annotationGeometry,
+        note: annotationNote,
+      });
+      setAnnotations((current) => [...current, annotation]);
+      setAnnotationGeometry(null);
+      setAnnotationNote("");
+      setSelectedAnnotationVersionId(annotation.current_version.id);
+      toast.success("Đã lưu ghi chú trên ảnh");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Không thể lưu ghi chú trên ảnh");
+    } finally {
+      setSavingAnnotation(false);
+    }
+  }
+
+  async function linkEvidence() {
+    if (!selected || !selectedDiagnosisId) {
+      toast.error("Chọn chẩn đoán để liên kết");
+      return;
+    }
+    const diagnosis = diagnosisOptions.find((item) => item.id === selectedDiagnosisId);
+    if (!diagnosis) return;
+    if (evidenceRelation === "contradicts" && !evidenceNote.trim()) {
+      toast.error("Bằng chứng mâu thuẫn cần ghi chú giải thích");
+      return;
+    }
+    setLinkingEvidence(true);
+    try {
+      const evidence = await apiPost<ClinicalDiagnosisImageEvidence>(`/api/visits/${diagnosis.visit_id}/diagnoses/${diagnosis.id}/image-evidence`, {
+        patient_image_id: selected.id,
+        annotation_version_id: selectedAnnotationVersionId || null,
+        relation: evidenceRelation,
+        note: evidenceNote || undefined,
+      });
+      setImageEvidence((current) => [evidence, ...current]);
+      setEvidenceNote("");
+      toast.success("Đã liên kết bằng chứng hình ảnh");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Không thể liên kết bằng chứng hình ảnh");
+    } finally {
+      setLinkingEvidence(false);
     }
   }
 
@@ -379,17 +491,23 @@ export function PatientImageGallery({
         </DialogHeader>
         <DialogBody className="px-5 py-5">
           {/* Image */}
-          <div className="relative rounded-xl overflow-hidden bg-black/5 mb-4">
+          <div className="rounded-xl overflow-hidden bg-black/5 mb-4">
             {viewUrl ? (
-              <img
-                src={viewUrl}
-                alt={selected?.original_name || "Medical image"}
-                className="w-full max-h-[60vh] object-contain"
-                onError={() => {
-                  setViewUrl(null);
-                  setViewError("Định dạng hình ảnh này không thể xem trước trong trình duyệt");
-                }}
-              />
+              <div ref={imageContainerRef} className="relative mx-auto w-fit max-w-full touch-none" onPointerDown={handleAnnotationPointerDown} onPointerUp={handleAnnotationPointerUp}>
+                <img
+                  src={viewUrl}
+                  alt={selected?.original_name || "Medical image"}
+                  className="block max-h-[60vh] max-w-full object-contain"
+                  onError={() => {
+                    setViewUrl(null);
+                    setViewError("Định dạng hình ảnh này không thể xem trước trong trình duyệt");
+                  }}
+                />
+                <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 1 1" preserveAspectRatio="none" aria-label="Ghi chú trên ảnh">
+                  {annotations.map((annotation) => <AnnotationOverlay key={annotation.id} shape={annotation.current_version.shape_type} geometry={annotation.current_version.geometry} active={selectedAnnotationVersionId === annotation.current_version.id} />)}
+                  {annotationGeometry && <AnnotationOverlay shape={annotationShape} geometry={annotationGeometry} draft />}
+                </svg>
+              </div>
             ) : viewError ? (
               <div className="w-full min-h-48 flex items-center justify-center px-6 py-10 text-center text-sm text-destructive">
                 {viewError}
@@ -400,6 +518,24 @@ export function PatientImageGallery({
               </div>
             )}
           </div>
+
+          {viewUrl && selected && <section className="mb-4 rounded-xl border border-border p-3">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold">Ghi chú trên ảnh</p><p className="text-xs text-muted-foreground">Chọn ghim hoặc khung, sau đó bấm/chạm trực tiếp lên ảnh.</p></div><div className="flex gap-1"><Button size="sm" variant={annotationShape === "pin" ? "default" : "outline"} onClick={() => { setAnnotationShape("pin"); setAnnotationGeometry(null); }}>Ghim</Button><Button size="sm" variant={annotationShape === "rectangle" ? "default" : "outline"} onClick={() => { setAnnotationShape("rectangle"); setAnnotationGeometry(null); }}>Khung</Button></div></div>
+            <textarea value={annotationNote} onChange={(event) => setAnnotationNote(event.target.value)} rows={2} placeholder="Mô tả dấu hiệu quan sát được trên ảnh" className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            <div className="mt-2 flex items-center justify-between gap-2"><p className="text-xs text-muted-foreground">{annotationGeometry ? "Đã đặt vùng đánh dấu, nhập ghi chú để lưu." : "Chưa đặt vùng đánh dấu."}</p><Button size="sm" onClick={() => void saveAnnotation()} disabled={!annotationGeometry || !annotationNote.trim() || savingAnnotation}>{savingAnnotation ? "Đang lưu..." : "Lưu ghi chú"}</Button></div>
+            {annotations.length > 0 && <div className="mt-3 space-y-1 border-t pt-3">{annotations.map((annotation) => <button type="button" key={annotation.id} onClick={() => setSelectedAnnotationVersionId(annotation.current_version.id)} className={`block w-full rounded-md px-2 py-1.5 text-left text-xs ${selectedAnnotationVersionId === annotation.current_version.id ? "bg-primary/10 text-primary" : "hover:bg-muted"}`}><span className="font-medium">V{annotation.current_version.version_no}</span> · {annotation.current_version.note}</button>)}</div>}
+          </section>}
+
+          {selected && <section className="mb-4 rounded-xl border border-border p-3">
+            <p className="text-sm font-semibold">Liên kết làm bằng chứng chẩn đoán</p><p className="mt-0.5 text-xs text-muted-foreground">Có thể liên kết ảnh hoặc ghi chú đã chọn với chẩn đoán ở bất kỳ lượt khám nào của bệnh nhân.</p>
+            <div className="mt-3 grid gap-2"><select value={selectedDiagnosisId} onChange={(event) => setSelectedDiagnosisId(event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="">Chọn chẩn đoán</option>{diagnosisOptions.map((diagnosis) => <option key={diagnosis.id} value={diagnosis.id}>{formatDate(diagnosis.visit_date)} · {diagnosis.concept_display_vi_snapshot} · {statusLabel(diagnosis.status)}</option>)}</select>
+              <select value={selectedAnnotationVersionId} onChange={(event) => setSelectedAnnotationVersionId(event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="">Toàn bộ ảnh (không có ghim/khung)</option>{annotations.map((annotation) => <option key={annotation.current_version.id} value={annotation.current_version.id}>Ghi chú V{annotation.current_version.version_no} · {annotation.current_version.note}</option>)}</select>
+              <select value={evidenceRelation} onChange={(event) => setEvidenceRelation(event.target.value as "supports" | "contradicts" | "incidental")} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="supports">Ủng hộ chẩn đoán</option><option value="contradicts">Mâu thuẫn với chẩn đoán</option><option value="incidental">Phát hiện kèm theo</option></select>
+              <textarea value={evidenceNote} onChange={(event) => setEvidenceNote(event.target.value)} rows={2} placeholder={evidenceRelation === "contradicts" ? "Giải thích bằng chứng mâu thuẫn" : "Ghi chú liên kết (tùy chọn)"} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Button size="sm" onClick={() => void linkEvidence()} disabled={!selectedDiagnosisId || linkingEvidence}>{linkingEvidence ? "Đang liên kết..." : "Liên kết bằng chứng"}</Button>
+            </div>
+            {imageEvidence.length > 0 && <div className="mt-3 border-t pt-3"><p className="text-xs font-medium text-muted-foreground">Đang được dùng làm bằng chứng ({imageEvidence.length})</p>{imageEvidence.map((evidence) => <p key={evidence.id} className="mt-1 text-xs">{evidence.relation === "supports" ? "Ủng hộ" : evidence.relation === "contradicts" ? "Mâu thuẫn" : "Kèm theo"} · {evidence.diagnosis_id}</p>)}</div>}
+          </section>}
 
           {/* AI Analysis Result */}
           {analysisResult && (
@@ -556,6 +692,17 @@ function ImageThumbnail({ img }: { img: PatientImage }) {
       }}
     />
   );
+}
+
+function AnnotationOverlay({ shape, geometry, active, draft }: { shape: ImageAnnotationShapeType; geometry: ImageAnnotationGeometry; active?: boolean; draft?: boolean }) {
+  const color = draft ? "#f59e0b" : active ? "#2563eb" : "#ef4444";
+  if (shape === "pin") return <circle cx={geometry.x} cy={geometry.y} r="0.018" fill={color} stroke="white" strokeWidth="0.006" />;
+  if (!("width" in geometry) || !("height" in geometry)) return null;
+  return <rect x={geometry.x} y={geometry.y} width={geometry.width} height={geometry.height} fill="none" stroke={color} strokeWidth="0.008" vectorEffect="non-scaling-stroke" />;
+}
+
+function statusLabel(status: ClinicalDiagnosis["status"]): string {
+  return { suspected: "Nghi ngờ", confirmed: "Đã xác nhận", ruled_out: "Đã loại trừ", resolved: "Đã giải quyết" }[status];
 }
 
 // ─── Utilities ───────────────────────────────────────────────────

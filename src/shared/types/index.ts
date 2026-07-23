@@ -1250,6 +1250,52 @@ export interface PatientImage {
   created_at: string;
 }
 
+export type ImageAnnotationShapeType = "pin" | "rectangle";
+export type ImageEvidenceRelation = "supports" | "contradicts" | "incidental";
+
+export type ImageAnnotationGeometry =
+  | { x: number; y: number }
+  | { x: number; y: number; width: number; height: number };
+
+export interface ImageAnnotationVersion {
+  id: string;
+  tenant_id: string;
+  annotation_id: string;
+  version_no: number;
+  shape_type: ImageAnnotationShapeType;
+  geometry: ImageAnnotationGeometry;
+  note: string;
+  tooth_number?: number;
+  anatomical_site?: AnatomicalSite;
+  created_by: string;
+  created_at: string;
+}
+
+export interface ImageAnnotation {
+  id: string;
+  tenant_id: string;
+  patient_image_id: string;
+  current_version_no: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  current_version: ImageAnnotationVersion;
+}
+
+export interface ClinicalDiagnosisImageEvidence {
+  id: string;
+  tenant_id: string;
+  diagnosis_id: string;
+  patient_image_id: string;
+  annotation_version_id?: string;
+  relation: ImageEvidenceRelation;
+  note?: string;
+  linked_by: string;
+  linked_at: string;
+  image?: PatientImage;
+  annotation_version?: ImageAnnotationVersion;
+}
+
 export interface ImageAnalysisFinding {
   tooth_number: number | null;
   category: FindingCategory;

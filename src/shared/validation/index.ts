@@ -703,6 +703,37 @@ export const patientImagePresignSchema = z.object({
 });
 export type PatientImagePresignInput = z.infer<typeof patientImagePresignSchema>;
 
+const normalizedCoordinate = z.number().finite().min(0).max(1);
+const imageAnnotationSchemaBase = z.object({
+  shape_type: z.enum(["pin", "rectangle"]),
+  geometry: z.union([
+    z.object({ x: normalizedCoordinate, y: normalizedCoordinate }).strict(),
+    z.object({ x: normalizedCoordinate, y: normalizedCoordinate, width: z.number().finite().gt(0).max(1), height: z.number().finite().gt(0).max(1) })
+      .strict()
+      .refine((value) => value.x + value.width <= 1 && value.y + value.height <= 1, "Khung đánh dấu phải nằm trong ảnh"),
+  ]),
+  note: nonEmpty(2000),
+  tooth_number: z.number().int().refine(isValidFdiTooth, "Số răng FDI không hợp lệ").optional(),
+  anatomical_site: z.enum(ANATOMICAL_SITES).optional(),
+}).strict();
+function validateImageAnnotationShape(value: z.infer<typeof imageAnnotationSchemaBase>, ctx: z.RefinementCtx) {
+  if (value.shape_type === "pin" && ("width" in value.geometry || "height" in value.geometry)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["geometry"], message: "Ghim chỉ dùng tọa độ điểm" });
+  if (value.shape_type === "rectangle" && (!("width" in value.geometry) || !("height" in value.geometry))) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["geometry"], message: "Khung cần chiều rộng và chiều cao" });
+}
+export const imageAnnotationCreateSchema = imageAnnotationSchemaBase.superRefine(validateImageAnnotationShape);
+export const imageAnnotationVersionCreateSchema = imageAnnotationSchemaBase.extend({ change_reason: nonEmpty(1000) }).superRefine(validateImageAnnotationShape);
+export const diagnosisImageEvidenceCreateSchema = z.object({
+  patient_image_id: z.string().min(1),
+  annotation_version_id: z.string().min(1).nullable().optional(),
+  relation: z.enum(["supports", "contradicts", "incidental"]).default("supports"),
+  note: optionalText(2000),
+}).strict().superRefine((value, ctx) => {
+  if (value.relation === "contradicts" && !value.note) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["note"], message: "Bằng chứng mâu thuẫn cần ghi chú giải thích" });
+});
+export type ImageAnnotationCreateInput = z.infer<typeof imageAnnotationCreateSchema>;
+export type ImageAnnotationVersionCreateInput = z.infer<typeof imageAnnotationVersionCreateSchema>;
+export type DiagnosisImageEvidenceCreateInput = z.infer<typeof diagnosisImageEvidenceCreateSchema>;
+
 export const aiAnalyzeImageSchema = z.object({
   file_id: z.string().min(1),
   visit_id: z.string().min(1).optional(),

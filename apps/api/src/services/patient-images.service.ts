@@ -14,6 +14,7 @@ import { filesService } from "./files.service";
 import { NotFoundError } from "../lib/errors";
 import { assertAllInTenant } from "../lib/tenant-scope";
 import { newId } from "../lib/ids";
+import { imageAnnotationsService } from "./image-annotations.service";
 
 const MAX_IMAGE_SIZE = 50 * 1024 * 1024; // 50 MB
 
@@ -141,6 +142,7 @@ export const patientImagesService = {
   async remove(db: D1Database, env: Env, tenantId: string, id: string): Promise<boolean> {
     const img = await createPatientImagesRepository(db).getById(tenantId, id);
     if (!img) return false;
+    await imageAnnotationsService.assertImageCanBeDeleted(db, tenantId, id);
     // Look up r2_key from file_objects before deleting (R2 expects r2_key, not file_id UUID)
     const fileObj = await filesService.getById(db, tenantId, img.file_id);
     if (fileObj) {

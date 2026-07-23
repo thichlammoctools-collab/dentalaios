@@ -870,7 +870,7 @@ export function VisitDetailPage() {
            </Card>
          </div>
          <aside className="space-y-6 lg:sticky lg:top-4">
-           <ClinicalDiagnosesCard visitId={visit.id} findings={findings} />
+            <ClinicalDiagnosesCard visitId={visit.id} patientId={visit.patient_id} findings={findings} />
            <Card>
              <CardContent className="pt-4">
                <PatientImageGallery patientId={visit.patient_id} visitId={visit.id} />

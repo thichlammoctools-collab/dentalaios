@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { diagnosisCreateSchema, diagnosisUpdateSchema, visitCreateSchema, visitUpdateSchema, findingCreateSchema, findingUpdateSchema } from "@shared/validation";
+import { diagnosisCreateSchema, diagnosisImageEvidenceCreateSchema, diagnosisUpdateSchema, visitCreateSchema, visitUpdateSchema, findingCreateSchema, findingUpdateSchema } from "@shared/validation";
 import { PERMISSIONS } from "@shared/constants";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
@@ -9,6 +9,7 @@ import { auditLog } from "../middleware/audit";
 import type { AuthContext } from "../middleware/auth";
 import { visitService } from "../services/visit.service";
 import { diagnosisService } from "../services/diagnosis.service";
+import { imageAnnotationsService } from "../services/image-annotations.service";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -27,6 +28,38 @@ router.get(
       status: (url.searchParams.get("status") as "in_progress" | "completed" | "cancelled" | null) ?? undefined,
     });
     return c.json({ items, total: items.length });
+  },
+);
+
+router.get(
+  "/:visitId/diagnoses/:diagnosisId/image-evidence",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const items = await imageAnnotationsService.listDiagnosisEvidence(c.env.DB, jwt.tenant_id, c.req.param("visitId"), c.req.param("diagnosisId"));
+    return c.json({ items, total: items.length });
+  },
+);
+
+router.post(
+  "/:visitId/diagnoses/:diagnosisId/image-evidence",
+  requirePermission(PERMISSIONS.WRITE_FINDINGS),
+  auditLog("create", "clinical_diagnosis_image_evidence"),
+  zValidator("json", diagnosisImageEvidenceCreateSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    return c.json(await imageAnnotationsService.createEvidence(c.env.DB, jwt.tenant_id, c.req.param("visitId"), c.req.param("diagnosisId"), jwt.sub, c.req.valid("json")), 201);
+  },
+);
+
+router.delete(
+  "/:visitId/diagnoses/:diagnosisId/image-evidence/:evidenceId",
+  requirePermission(PERMISSIONS.WRITE_FINDINGS),
+  auditLog("delete", "clinical_diagnosis_image_evidence"),
+  async (c) => {
+    const jwt = getJwt(c);
+    await imageAnnotationsService.removeEvidence(c.env.DB, jwt.tenant_id, c.req.param("visitId"), c.req.param("diagnosisId"), c.req.param("evidenceId"));
+    return c.json({ id: c.req.param("evidenceId"), ok: true });
   },
 );
 

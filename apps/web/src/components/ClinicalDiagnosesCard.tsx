@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { getFindingConditionLabel } from "@shared/constants/clinical-findings";
-import type { ClinicalConcept, ClinicalDiagnosis, ClinicalDiagnosisStatus, Icd10Code, ClinicalFinding } from "@shared/types";
+import type { ClinicalConcept, ClinicalDiagnosis, ClinicalDiagnosisImageEvidence, ClinicalDiagnosisStatus, Icd10Code, ImageAnnotation, PatientImage, ClinicalFinding } from "@shared/types";
 
 const statusLabel: Record<ClinicalDiagnosisStatus, string> = {
   suspected: "Nghi ngờ",
@@ -26,10 +26,11 @@ function statusVariant(status: ClinicalDiagnosisStatus) {
 
 interface Props {
   visitId: string;
+  patientId: string;
   findings: ClinicalFinding[];
 }
 
-export function ClinicalDiagnosesCard({ visitId, findings }: Props) {
+export function ClinicalDiagnosesCard({ visitId, patientId, findings }: Props) {
   const [items, setItems] = useState<ClinicalDiagnosis[]>([]);
   const [concepts, setConcepts] = useState<ClinicalConcept[]>([]);
   const [icd10, setIcd10] = useState<Icd10Code[]>([]);
@@ -37,19 +38,31 @@ export function ClinicalDiagnosesCard({ visitId, findings }: Props) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ClinicalDiagnosis | null>(null);
   const [saving, setSaving] = useState(false);
+  const [evidenceCounts, setEvidenceCounts] = useState<Record<string, number>>({});
+  const [patientImages, setPatientImages] = useState<PatientImage[]>([]);
+  const [imageAnnotations, setImageAnnotations] = useState<ImageAnnotation[]>([]);
+  const [diagnosisEvidence, setDiagnosisEvidence] = useState<ClinicalDiagnosisImageEvidence[]>([]);
+  const [evidenceForm, setEvidenceForm] = useState({ imageId: "", annotationVersionId: "", relation: "supports" as "supports" | "contradicts" | "incidental", note: "" });
   const [form, setForm] = useState({ concept_id: "", icd10_code_id: "", source_finding_id: "", status: "suspected" as ClinicalDiagnosisStatus, notes: "", change_reason: "" });
 
   async function load() {
     setLoading(true);
     try {
-      const [diagnosisResponse, conceptResponse, icdResponse] = await Promise.all([
+      const [diagnosisResponse, conceptResponse, icdResponse, imageResponse] = await Promise.all([
         apiGet<{ items: ClinicalDiagnosis[] }>(`/api/visits/${visitId}/diagnoses`),
         apiGet<{ items: ClinicalConcept[] }>("/api/clinical-terminology/concepts"),
         apiGet<{ items: Icd10Code[] }>("/api/clinical-terminology/icd10"),
+        apiGet<{ items: PatientImage[] }>(`/api/patient-images?patient_id=${patientId}`),
       ]);
       setItems(diagnosisResponse.items);
       setConcepts(conceptResponse.items.filter((concept) => concept.kind === "diagnosis"));
       setIcd10(icdResponse.items);
+      setPatientImages(imageResponse.items);
+      const evidence = await Promise.all(diagnosisResponse.items.map(async (diagnosis) => {
+        const response = await apiGet<{ items: ClinicalDiagnosisImageEvidence[] }>(`/api/visits/${visitId}/diagnoses/${diagnosis.id}/image-evidence`);
+        return [diagnosis.id, response.items.length] as const;
+      }));
+      setEvidenceCounts(Object.fromEntries(evidence));
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Không thể tải chẩn đoán");
     } finally {
@@ -57,17 +70,40 @@ export function ClinicalDiagnosesCard({ visitId, findings }: Props) {
     }
   }
 
-  useEffect(() => { void load(); }, [visitId]);
+  useEffect(() => { void load(); }, [visitId, patientId]);
+
+  async function selectEvidenceImage(imageId: string) {
+    setEvidenceForm((current) => ({ ...current, imageId, annotationVersionId: "" }));
+    setImageAnnotations([]);
+    if (!imageId) return;
+    try {
+      const response = await apiGet<{ items: ImageAnnotation[] }>(`/api/patient-images/${imageId}/annotations`);
+      setImageAnnotations(response.items);
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Không thể tải ghi chú trên ảnh");
+    }
+  }
+
+  async function loadDiagnosisEvidence(diagnosisId: string) {
+    const response = await apiGet<{ items: ClinicalDiagnosisImageEvidence[] }>(`/api/visits/${visitId}/diagnoses/${diagnosisId}/image-evidence`);
+    setDiagnosisEvidence(response.items);
+  }
 
   function openCreate() {
     setEditing(null);
     setForm({ concept_id: "", icd10_code_id: "", source_finding_id: "", status: "suspected", notes: "", change_reason: "" });
+    setEvidenceForm({ imageId: "", annotationVersionId: "", relation: "supports", note: "" });
+    setImageAnnotations([]);
+    setDiagnosisEvidence([]);
     setOpen(true);
   }
 
   function openEdit(diagnosis: ClinicalDiagnosis) {
     setEditing(diagnosis);
     setForm({ concept_id: diagnosis.concept_id, icd10_code_id: diagnosis.icd10_code_id ?? "", source_finding_id: diagnosis.source_finding_id ?? "", status: diagnosis.status, notes: diagnosis.notes ?? "", change_reason: "" });
+    setEvidenceForm({ imageId: "", annotationVersionId: "", relation: "supports", note: "" });
+    setImageAnnotations([]);
+    void loadDiagnosisEvidence(diagnosis.id).catch((error) => toast.error(error instanceof ApiError ? error.message : "Không thể tải bằng chứng hình ảnh"));
     setOpen(true);
   }
 
@@ -93,24 +129,31 @@ export function ClinicalDiagnosesCard({ visitId, findings }: Props) {
     if (!form.concept_id) { toast.error("Chọn chẩn đoán trước khi lưu"); return; }
     if (form.status === "confirmed" && !form.icd10_code_id) { toast.error("Chẩn đoán xác nhận cần mã ICD-10 được ánh xạ"); return; }
     if (editing && !form.change_reason.trim()) { toast.error("Nêu lý do cập nhật chẩn đoán"); return; }
+    if (evidenceForm.imageId && evidenceForm.relation === "contradicts" && !evidenceForm.note.trim()) { toast.error("Bằng chứng mâu thuẫn cần ghi chú giải thích"); return; }
     setSaving(true);
     try {
-      if (editing) {
-        await apiPatch<ClinicalDiagnosis>(`/api/visits/${visitId}/diagnoses/${editing.id}`, {
+      const diagnosis = editing
+        ? await apiPatch<ClinicalDiagnosis>(`/api/visits/${visitId}/diagnoses/${editing.id}`, {
           concept_id: form.concept_id,
           icd10_code_id: form.icd10_code_id || null,
           status: form.status,
           notes: form.notes || undefined,
           change_reason: form.change_reason,
-        });
-      } else {
-        await apiPost<ClinicalDiagnosis>(`/api/visits/${visitId}/diagnoses`, {
+        })
+        : await apiPost<ClinicalDiagnosis>(`/api/visits/${visitId}/diagnoses`, {
           concept_id: form.concept_id,
           icd10_code_id: form.icd10_code_id || null,
           source_finding_id: form.source_finding_id || null,
           status: form.status,
           source: form.source_finding_id ? "finding_confirmed" : "manual",
           notes: form.notes || undefined,
+        });
+      if (evidenceForm.imageId) {
+        await apiPost(`/api/visits/${visitId}/diagnoses/${diagnosis.id}/image-evidence`, {
+          patient_image_id: evidenceForm.imageId,
+          annotation_version_id: evidenceForm.annotationVersionId || null,
+          relation: evidenceForm.relation,
+          note: evidenceForm.note || undefined,
         });
       }
       setOpen(false);
@@ -134,6 +177,7 @@ export function ClinicalDiagnosesCard({ visitId, findings }: Props) {
           <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{diagnosis.concept_display_vi_snapshot}</p><Badge variant={statusVariant(diagnosis.status)}>{statusLabel[diagnosis.status]}</Badge></div>
             {diagnosis.icd10_code_snapshot ? <p className="mt-1 text-sm text-muted-foreground"><span className="font-mono">{diagnosis.icd10_code_snapshot}</span> · {diagnosis.icd10_display_vi_snapshot}</p> : <p className="mt-1 text-sm text-muted-foreground">Chưa xác nhận mã ICD-10</p>}
             {diagnosis.source_finding_id && <p className="mt-1 text-xs text-muted-foreground">Từ ghi nhận lâm sàng #{findings.findIndex((finding) => finding.id === diagnosis.source_finding_id) + 1 || ""}</p>}
+            <p className="mt-1 text-xs text-muted-foreground">Bằng chứng hình ảnh: {evidenceCounts[diagnosis.id] ?? 0}. Thêm hoặc quản lý từ phần Hình ảnh của lượt khám.</p>
             {diagnosis.notes && <p className="mt-1 whitespace-pre-wrap text-sm">{diagnosis.notes}</p>}</div>
           <Button variant="outline" size="sm" onClick={() => openEdit(diagnosis)}>Cập nhật</Button>
         </div>)}
@@ -145,6 +189,7 @@ export function ClinicalDiagnosesCard({ visitId, findings }: Props) {
         <div className="grid gap-1.5"><Label htmlFor="diagnosis-concept">Kết luận chẩn đoán</Label><p className="text-xs text-muted-foreground">Bệnh lý được bác sĩ đánh giá sau khi khám, có thể lập độc lập với ghi nhận.</p><Select id="diagnosis-concept" value={form.concept_id} onChange={(event) => selectConcept(event.target.value)}><option value="">Chọn chẩn đoán</option>{concepts.map((concept) => <option key={concept.id} value={concept.id}>{concept.display_vi}</option>)}</Select></div>
         <div className="grid gap-1.5"><Label htmlFor="diagnosis-icd10">Mã ICD-10 Việt Nam</Label><p className="text-xs text-muted-foreground">Bắt buộc khi chẩn đoán được xác nhận.</p><Select id="diagnosis-icd10" value={form.icd10_code_id} onChange={(event) => setForm({ ...form, icd10_code_id: event.target.value })}><option value="">Chưa chọn (chỉ dùng khi nghi ngờ)</option>{icd10.map((code) => <option key={code.id} value={code.id}>{code.code} · {code.display_vi}</option>)}</Select></div>
         {!editing && <div className="grid gap-1.5"><Label htmlFor="diagnosis-finding">Ghi nhận làm cơ sở (tùy chọn)</Label><p className="text-xs text-muted-foreground">Dấu hiệu hoặc quan sát hỗ trợ kết luận. Chỉ hiển thị ghi nhận cùng nhóm lâm sàng với chẩn đoán.</p><Select id="diagnosis-finding" value={form.source_finding_id} onChange={(event) => setForm({ ...form, source_finding_id: event.target.value })} disabled={!selectedConcept}><option value="">Không liên kết ghi nhận</option>{compatibleFindings.map((finding) => <option key={finding.id} value={finding.id}>{finding.code ?? finding.id} · {getFindingConditionLabel(finding.category, finding.condition)}{finding.tooth_number ? ` răng #${finding.tooth_number}` : ""}</option>)}</Select>{selectedConcept && compatibleFindings.length === 0 && <p className="text-xs text-muted-foreground">Chưa có ghi nhận phù hợp. Bạn vẫn có thể lưu chẩn đoán độc lập.</p>}</div>}
+        <div className="rounded-lg border border-border bg-muted/20 p-3"><p className="text-sm font-medium">Bằng chứng hình ảnh (tùy chọn)</p><p className="mt-1 text-xs text-muted-foreground">Chọn ảnh cùng bệnh nhân và ghi chú trên ảnh nếu có. Ảnh không thuộc lượt khám này được ghi rõ là ảnh lịch sử.</p><div className="mt-3 grid gap-2"><Select value={evidenceForm.imageId} onChange={(event) => void selectEvidenceImage(event.target.value)}><option value="">Không thêm bằng chứng hình ảnh</option>{patientImages.map((image) => <option key={image.id} value={image.id}>{image.visit_id === visitId ? "Ảnh lượt khám này" : `Ảnh lịch sử ${new Date(image.created_at).toLocaleDateString("vi-VN")}`} · {image.original_name ?? image.image_type}</option>)}</Select>{evidenceForm.imageId && <Select value={evidenceForm.annotationVersionId} onChange={(event) => setEvidenceForm({ ...evidenceForm, annotationVersionId: event.target.value })}><option value="">Toàn bộ ảnh (không có ghim/khung)</option>{imageAnnotations.map((annotation) => <option key={annotation.current_version.id} value={annotation.current_version.id}>Ghi chú V{annotation.current_version.version_no} · {annotation.current_version.note}</option>)}</Select>} {evidenceForm.imageId && <Select value={evidenceForm.relation} onChange={(event) => setEvidenceForm({ ...evidenceForm, relation: event.target.value as "supports" | "contradicts" | "incidental" })}><option value="supports">Ủng hộ chẩn đoán</option><option value="contradicts">Mâu thuẫn với chẩn đoán</option><option value="incidental">Phát hiện kèm theo</option></Select>} {evidenceForm.imageId && <Textarea value={evidenceForm.note} onChange={(event) => setEvidenceForm({ ...evidenceForm, note: event.target.value })} rows={2} placeholder={evidenceForm.relation === "contradicts" ? "Giải thích bằng chứng mâu thuẫn" : "Ghi chú bằng chứng (tùy chọn)"} />}</div>{editing && diagnosisEvidence.length > 0 && <p className="mt-2 text-xs text-muted-foreground">Đã có {diagnosisEvidence.length} bằng chứng hình ảnh liên kết.</p>}</div>
         <div className="grid gap-1.5"><Label htmlFor="diagnosis-status">Trạng thái chẩn đoán</Label><Select id="diagnosis-status" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ClinicalDiagnosisStatus })}><option value="suspected">Nghi ngờ</option><option value="confirmed">Đã xác nhận</option><option value="ruled_out">Đã loại trừ</option><option value="resolved">Đã giải quyết</option></Select></div>
         <div className="grid gap-1.5"><Label htmlFor="diagnosis-notes">Ghi chú</Label><Textarea id="diagnosis-notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} rows={3} /></div>
         {editing && <div className="grid gap-1.5"><Label htmlFor="diagnosis-reason">Lý do cập nhật</Label><Textarea id="diagnosis-reason" value={form.change_reason} onChange={(event) => setForm({ ...form, change_reason: event.target.value })} rows={2} required /></div>}
