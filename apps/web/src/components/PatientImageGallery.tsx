@@ -66,7 +66,7 @@ export function PatientImageGallery({
   const [evidenceRelation, setEvidenceRelation] = useState<"supports" | "contradicts" | "incidental">("supports");
   const [evidenceNote, setEvidenceNote] = useState("");
   const [linkingEvidence, setLinkingEvidence] = useState(false);
-  const imageRef = useRef<HTMLImageElement>(null);
+  const annotationSurfaceRef = useRef<HTMLDivElement>(null);
   const freehandPointsRef = useRef<Array<{ x: number; y: number }>>([]);
   const drawingFreehandRef = useRef(false);
 
@@ -241,8 +241,8 @@ export function PatientImageGallery({
     }
   }
 
-  function coordinateFromPointer(event: React.PointerEvent<HTMLImageElement>) {
-    const bounds = imageRef.current?.getBoundingClientRect();
+  function coordinateFromPointer(event: React.PointerEvent<HTMLDivElement>) {
+    const bounds = annotationSurfaceRef.current?.getBoundingClientRect();
     if (!bounds || bounds.width === 0 || bounds.height === 0) return null;
     return {
       x: Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width)),
@@ -250,8 +250,9 @@ export function PatientImageGallery({
     };
   }
 
-  function handleAnnotationPointerDown(event: React.PointerEvent<HTMLImageElement>) {
+  function handleAnnotationPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (!viewUrl) return;
+    if (event.button !== 0) return;
     event.preventDefault();
     const point = coordinateFromPointer(event);
     if (!point) return;
@@ -264,7 +265,7 @@ export function PatientImageGallery({
     }
   }
 
-  function handleAnnotationPointerMove(event: React.PointerEvent<HTMLImageElement>) {
+  function handleAnnotationPointerMove(event: React.PointerEvent<HTMLDivElement>) {
     if (annotationShape !== "freehand" || !drawingFreehandRef.current) return;
     event.preventDefault();
     const point = coordinateFromPointer(event);
@@ -276,7 +277,7 @@ export function PatientImageGallery({
     setAnnotationGeometry({ points: next });
   }
 
-  function handleAnnotationPointerUp(event: React.PointerEvent<HTMLImageElement>) {
+  function handleAnnotationPointerUp(event: React.PointerEvent<HTMLDivElement>) {
     if (annotationShape !== "freehand" || !drawingFreehandRef.current) return;
     event.preventDefault();
     const point = coordinateFromPointer(event);
@@ -287,7 +288,7 @@ export function PatientImageGallery({
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
 
-  function handleAnnotationPointerCancel(event: React.PointerEvent<HTMLImageElement>) {
+  function handleAnnotationPointerCancel(event: React.PointerEvent<HTMLDivElement>) {
     drawingFreehandRef.current = false;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
   }
@@ -562,27 +563,30 @@ export function PatientImageGallery({
               <div className="mx-auto max-w-full text-center">
                 <div className="relative inline-block max-w-full">
                   <img
-                    ref={imageRef}
                     src={viewUrl}
                     alt={selected?.original_name || "Medical image"}
-                    className={`block max-h-[60vh] max-w-full touch-none select-none object-contain ${annotationShape === "freehand" ? "cursor-crosshair" : "cursor-pointer"}`}
-                    aria-label="Vùng đánh dấu ảnh"
+                    className="block max-h-[60vh] max-w-full select-none object-contain"
                     draggable={false}
+                    onError={() => {
+                      setViewUrl(null);
+                      setViewError("Định dạng hình ảnh này không thể xem trước trong trình duyệt");
+                    }}
+                  />
+                  <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 1 1" preserveAspectRatio="none" aria-label="Ghi chú trên ảnh">
+                    <defs><marker id="annotation-arrow" markerWidth="0.06" markerHeight="0.06" refX="0.045" refY="0.03" orient="auto"><path d="M0,0 L0.06,0.03 L0,0.06 Z" fill="#ef4444" /></marker><marker id="annotation-arrow-active" markerWidth="0.06" markerHeight="0.06" refX="0.045" refY="0.03" orient="auto"><path d="M0,0 L0.06,0.03 L0,0.06 Z" fill="#2563eb" /></marker><marker id="annotation-arrow-draft" markerWidth="0.06" markerHeight="0.06" refX="0.045" refY="0.03" orient="auto"><path d="M0,0 L0.06,0.03 L0,0.06 Z" fill="#f59e0b" /></marker></defs>
+                    {annotations.map((annotation) => <AnnotationOverlay key={annotation.id} shape={annotation.current_version.shape_type} geometry={annotation.current_version.geometry} active={selectedAnnotationVersionId === annotation.current_version.id} />)}
+                    {annotationGeometry && <AnnotationOverlay shape={annotationShape} geometry={annotationGeometry} draft />}
+                  </svg>
+                  <div
+                    ref={annotationSurfaceRef}
+                    className={`absolute inset-0 z-10 touch-none ${annotationShape === "freehand" ? "cursor-crosshair" : "cursor-pointer"}`}
+                    aria-label="Vùng đánh dấu ảnh"
                     onPointerDown={handleAnnotationPointerDown}
                     onPointerMove={handleAnnotationPointerMove}
                     onPointerUp={handleAnnotationPointerUp}
                     onPointerCancel={handleAnnotationPointerCancel}
                     onLostPointerCapture={handleAnnotationPointerCancel}
-                  onError={() => {
-                    setViewUrl(null);
-                    setViewError("Định dạng hình ảnh này không thể xem trước trong trình duyệt");
-                  }}
-                />
-                <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 1 1" preserveAspectRatio="none" aria-label="Ghi chú trên ảnh">
-                  <defs><marker id="annotation-arrow" markerWidth="0.06" markerHeight="0.06" refX="0.045" refY="0.03" orient="auto"><path d="M0,0 L0.06,0.03 L0,0.06 Z" fill="#ef4444" /></marker><marker id="annotation-arrow-active" markerWidth="0.06" markerHeight="0.06" refX="0.045" refY="0.03" orient="auto"><path d="M0,0 L0.06,0.03 L0,0.06 Z" fill="#2563eb" /></marker><marker id="annotation-arrow-draft" markerWidth="0.06" markerHeight="0.06" refX="0.045" refY="0.03" orient="auto"><path d="M0,0 L0.06,0.03 L0,0.06 Z" fill="#f59e0b" /></marker></defs>
-                  {annotations.map((annotation) => <AnnotationOverlay key={annotation.id} shape={annotation.current_version.shape_type} geometry={annotation.current_version.geometry} active={selectedAnnotationVersionId === annotation.current_version.id} />)}
-                  {annotationGeometry && <AnnotationOverlay shape={annotationShape} geometry={annotationGeometry} draft />}
-                  </svg>
+                  />
                 </div>
               </div>
             ) : viewError ? (

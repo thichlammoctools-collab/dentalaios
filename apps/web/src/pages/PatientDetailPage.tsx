@@ -126,11 +126,17 @@ export function PatientDetailPage() {
     const scrollKey = `patient-workspace:${patient.id}:${activeSection}:scroll`;
     const savedPosition = Number(sessionStorage.getItem(scrollKey));
 
-    if (Number.isFinite(savedPosition)) {
-      window.requestAnimationFrame(() => window.scrollTo({ top: savedPosition }));
+    const scrollContainer = document.getElementById("app-content");
+
+    if (Number.isFinite(savedPosition) && scrollContainer) {
+      window.requestAnimationFrame(() => {
+        scrollContainer.scrollTop = savedPosition;
+      });
     }
 
-    return () => sessionStorage.setItem(scrollKey, String(window.scrollY));
+    return () => {
+      sessionStorage.setItem(scrollKey, String(scrollContainer?.scrollTop ?? 0));
+    };
   }, [activeSection, patient, section]);
 
   async function confirmDeletePlan() {
@@ -213,7 +219,7 @@ export function PatientDetailPage() {
           }
         }}
       >
-        <div className="sticky top-0 z-10 -mx-4 border-b border-border bg-background px-4 pb-4 pt-4 shadow-sm sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 lg:pt-6 2xl:-mx-10 2xl:px-10">
+        <div className="-mx-4 px-4 pb-4 pt-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 lg:pt-6 2xl:-mx-10 2xl:px-10">
           <div className="mx-auto max-w-[90rem] space-y-6">
             <Breadcrumbs
               items={[
@@ -246,29 +252,34 @@ export function PatientDetailPage() {
                 Sửa
               </Button>
             </div>
-            <div className="border-t border-border pt-3">
-              <TabsList className="grid h-auto w-full grid-cols-3 items-stretch gap-1 rounded-lg bg-muted/60 p-1 sm:grid-cols-5 xl:grid-cols-9">
-                <TabsTrigger value="overview" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">Tổng quan</TabsTrigger>
-                <TabsTrigger value="alerts" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">
-                  <span className="flex flex-wrap items-center justify-center gap-1">Cảnh báo <Count value={alerts.length} urgent /></span>
-                </TabsTrigger>
-                <TabsTrigger value="visits" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">
-                  <span className="flex flex-wrap items-center justify-center gap-1">Lượt khám <Count value={visits.length} /></span>
-                </TabsTrigger>
-                <TabsTrigger value="plans" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">
-                  <span className="flex flex-wrap items-center justify-center gap-1">Kế hoạch <Count value={plans.length} /></span>
-                </TabsTrigger>
-                <TabsTrigger value="appointments" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">
-                  <span className="flex flex-wrap items-center justify-center gap-1">Lịch hẹn <Count value={appointments.length} /></span>
-                </TabsTrigger>
-                <TabsTrigger value="journey" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">Hành trình</TabsTrigger>
-                <TabsTrigger value="payments" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">
-                  <span className="flex flex-wrap items-center justify-center gap-1">Tài chính <Count value={payments.length} /></span>
-                </TabsTrigger>
-                <TabsTrigger value="teeth" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">Sơ đồ răng</TabsTrigger>
-                <TabsTrigger value="images" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm"><span className="flex flex-wrap items-center justify-center gap-1">Hình ảnh <Count value={imageCount} /></span></TabsTrigger>
-              </TabsList>
-            </div>
+          </div>
+        </div>
+
+        <div className="sticky top-0 z-10 -mx-4 border-y border-border bg-background px-4 py-3 shadow-sm sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 2xl:-mx-10 2xl:px-10">
+          <div className="mx-auto max-w-[90rem]">
+            <TabsList className="grid h-auto w-full grid-cols-3 items-stretch gap-1 rounded-lg bg-muted/60 p-1 sm:grid-cols-5 xl:grid-cols-9">
+              <TabsTrigger value="overview" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">Tổng quan</TabsTrigger>
+              <TabsTrigger value="alerts" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">
+                <span className="flex flex-wrap items-center justify-center gap-1">Cảnh báo <Count value={alerts.length} urgent /></span>
+              </TabsTrigger>
+              <TabsTrigger value="visits" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">
+                <span className="flex flex-wrap items-center justify-center gap-1">Lượt khám <Count value={visits.length} /></span>
+              </TabsTrigger>
+              <TabsTrigger value="plans" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">
+                <span className="flex flex-wrap items-center justify-center gap-1">Kế hoạch <Count value={plans.length} /></span>
+              </TabsTrigger>
+              <TabsTrigger value="appointments" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">
+                <span className="flex flex-wrap items-center justify-center gap-1">Lịch hẹn <Count value={appointments.length} /></span>
+              </TabsTrigger>
+              <TabsTrigger value="journey" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">Hành trình</TabsTrigger>
+              <TabsTrigger value="payments" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">
+                <span className="flex flex-wrap items-center justify-center gap-1">Tài chính <Count value={payments.length} /></span>
+              </TabsTrigger>
+              <TabsTrigger value="teeth" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">Sơ đồ răng</TabsTrigger>
+              <TabsTrigger value="images" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">
+                <span className="flex flex-wrap items-center justify-center gap-1">Hình ảnh <Count value={imageCount} /></span>
+              </TabsTrigger>
+            </TabsList>
           </div>
         </div>
 
