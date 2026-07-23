@@ -34,7 +34,7 @@ import {
 import { apiGet, apiPost, apiDelete, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
+import { calculateAge, formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import {
   isPatientWorkspaceSection,
   patientWorkspacePath,
@@ -180,6 +180,7 @@ export function PatientDetailPage() {
   const totalPaid = payments
     .filter((p) => p.status === "confirmed")
     .reduce((sum, p) => sum + p.amount, 0);
+  const patientAge = calculateAge(patient.date_of_birth, now);
   const sortedAppointments = [...appointments].sort(
     (left, right) => new Date(left.scheduled_at).getTime() - new Date(right.scheduled_at).getTime(),
   );
@@ -241,7 +242,7 @@ export function PatientDetailPage() {
                 <div className="min-w-0">
                   <h1 className="mt-1 truncate text-2xl font-semibold tracking-tight">{patient.name}</h1>
                   <p className="truncate text-sm text-muted-foreground">
-                    {formatDate(patient.date_of_birth)} ·{" "}
+                    {formatDate(patient.date_of_birth)}{patientAge !== undefined && ` (${patientAge} tuổi)`} ·{" "}
                     {patient.gender === "M" ? "Nam" : patient.gender === "F" ? "Nữ" : "Khác"} ·{" "}
                     {patient.phone}
                     {patient.email && ` · ${patient.email}`}
@@ -288,53 +289,57 @@ export function PatientDetailPage() {
         <TabsContent className="mt-0" value="overview">
           <Card>
             <CardHeader>
-              <CardTitle>Thông tin chi tiết</CardTitle>
+              <CardTitle>Tổng quan hồ sơ</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 text-sm">
-
-              {/* ─── 1. Thông tin cơ bản ─── */}
-              <div>
-                <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-2">Thông tin cơ bản</p>
-                <div className="rounded-lg border border-border bg-muted/20 p-4">
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                    <div>
-                      <p className="text-muted-foreground text-xs">Họ tên</p>
-                      <p className="font-medium">{patient.name}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Ngày sinh</p>
-                      <p className="font-medium">{formatDate(patient.date_of_birth)}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Giới tính</p>
-                      <p className="font-medium">{patient.gender === "M" ? "Nam" : patient.gender === "F" ? "Nữ" : "Khác"}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Số điện thoại</p>
-                      <p className="font-medium">{patient.phone}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <p className="text-muted-foreground text-xs">Email</p>
-                      <p className="font-medium">{patient.email || "—"}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <p className="text-muted-foreground text-xs">Địa chỉ</p>
-                      <p className="font-medium">{formatPatientAddress(patient) || "—"}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <p className="text-muted-foreground text-xs">Số CCCD</p>
-                      <p className="font-medium">{patient.cccd || "—"}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <p className="text-muted-foreground text-xs">Ngày tạo</p>
-                      <p className="font-medium">{new Date(patient.created_at).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" })}</p>
-                    </div>
-                  </div>
+            <CardContent className="space-y-5 text-sm">
+              <section className="rounded-xl border border-border bg-muted/20 p-4 sm:p-5">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Nhận diện & liên hệ</p>
+                <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <OverviewField label="Họ tên" value={patient.name} />
+                  <OverviewField label="Ngày sinh" value={formatDate(patient.date_of_birth)} />
+                  <OverviewField label="Tuổi" value={patientAge === undefined ? "—" : `${patientAge} tuổi`} />
+                  <OverviewField label="Giới tính" value={patient.gender === "M" ? "Nam" : patient.gender === "F" ? "Nữ" : "Khác"} />
+                  <OverviewField label="Số điện thoại" value={patient.phone} />
+                  <OverviewField label="Email" value={patient.email || "—"} />
+                  <OverviewField label="Số CCCD" value={patient.cccd || "—"} />
+                  <OverviewField label="Ngày tạo hồ sơ" value={formatDate(patient.created_at)} />
+                  <OverviewField className="sm:col-span-2 xl:col-span-4" label="Địa chỉ" value={formatPatientAddress(patient) || "—"} />
                 </div>
+              </section>
+
+              <div className="grid gap-5 xl:grid-cols-2">
+              <section className="rounded-xl border border-border p-4 sm:p-5">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Người nhà</p>
+                <div className="grid gap-x-6 gap-y-4 sm:grid-cols-3">
+                  <OverviewField label="Họ tên" value={patient.family_name || "—"} />
+                  <OverviewField label="Mối quan hệ" value={patient.family_relation || "—"} />
+                  <OverviewField label="Số điện thoại" value={patient.family_phone || "—"} />
+                </div>
+              </section>
+
+              <section className="rounded-xl border border-border p-4 sm:p-5">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Chỉ số cơ thể</p>
+                <div className="grid gap-x-6 gap-y-4 sm:grid-cols-3">
+                  <OverviewField label="Chiều cao" value={patient.height_cm ? `${patient.height_cm} cm` : "—"} />
+                  <OverviewField label="Cân nặng" value={patient.weight_kg ? `${patient.weight_kg} kg` : "—"} />
+                  <OverviewField label="BMI" value={formatPatientBmi(patient)} />
+                </div>
+              </section>
               </div>
 
-              <div>
-                <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-2">Chi nhánh đã điều trị</p>
+              <div className="grid gap-5 xl:grid-cols-2">
+              <section className="rounded-xl border border-border p-4 sm:p-5">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Nguồn & giới thiệu</p>
+                <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                  <OverviewField label="Nguồn bệnh nhân" value={patient.marketing_source ? MARKETING_SOURCE_LABELS[patient.marketing_source as MarketingSource] ?? patient.marketing_source : "—"} />
+                  <OverviewField label="Loại giới thiệu" value={patient.referral_type === "doctor" ? "Bác sĩ giới thiệu" : patient.referral_type === "staff" ? "Nhân viên" : patient.referral_type === "ad" ? "Quảng cáo" : patient.referral_type === "other" ? "Người giới thiệu" : "—"} />
+                  <OverviewField label="Người giới thiệu" value={patient.referral_user_name || "—"} />
+                  <OverviewField label="Ghi chú giới thiệu" value={patient.referral_notes || "—"} />
+                </div>
+              </section>
+
+              <section className="rounded-xl border border-border p-4 sm:p-5">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Chi nhánh đã điều trị</p>
                 {treatedBranches.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-border px-4 py-3 text-sm text-muted-foreground">Chưa có lượt khám nào được ghi nhận.</p>
                 ) : (
@@ -347,102 +352,19 @@ export function PatientDetailPage() {
                     ))}
                   </div>
                 )}
+              </section>
               </div>
 
-              {/* ─── 2. Người nhà ─── */}
-              <div>
-                <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-2">Người nhà</p>
-                <div className="rounded-lg border border-border bg-muted/20 p-4">
-                  <div className="grid grid-cols-3 gap-x-6 gap-y-3">
-                    <div>
-                      <p className="text-muted-foreground text-xs">Họ tên</p>
-                      <p className="font-medium">{patient.family_name || "—"}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Mối quan hệ</p>
-                      <p className="font-medium">{patient.family_relation || "—"}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Số điện thoại</p>
-                      <p className="font-medium">{patient.family_phone || "—"}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* ─── 3. Chỉ số cơ thể ─── */}
-              <div>
-                <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-2">Chỉ số cơ thể</p>
-                <div className="rounded-lg border border-border bg-muted/20 p-4">
-                  <div className="grid grid-cols-3 gap-x-6 gap-y-3">
-                    <div>
-                      <p className="text-muted-foreground text-xs">Chiều cao</p>
-                      <p className="font-medium">{patient.height_cm ? `${patient.height_cm} cm` : "—"}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Cân nặng</p>
-                      <p className="font-medium">{patient.weight_kg ? `${patient.weight_kg} kg` : "—"}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">BMI</p>
-                      {patient.height_cm && patient.weight_kg ? (
-                        (() => {
-                          const b = parseFloat((patient.weight_kg! / ((patient.height_cm! / 100) ** 2)).toFixed(1));
-                          const label = b < 18.5 ? "Gầy" : b < 23 ? "Bình thường" : b < 25 ? "Thừa cân" : "Béo phì";
-                          return <p className="font-medium">{b} — {label}</p>;
-                        })()
-                      ) : <p className="font-medium">—</p>}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* ─── 4. Nguồn bệnh nhân & giới thiệu ─── */}
-              <div>
-                <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-2">Nguồn & Giới thiệu</p>
-                <div className="rounded-lg border border-border bg-muted/20 p-4">
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                    <div>
-                      <p className="text-muted-foreground text-xs">Nguồn bệnh nhân</p>
-                      <p className="font-medium">
-                        {patient.marketing_source
-                          ? MARKETING_SOURCE_LABELS[patient.marketing_source as MarketingSource] ?? patient.marketing_source
-                          : "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Loại giới thiệu</p>
-                      <p className="font-medium">
-                        {patient.referral_type === "doctor" ? "Bác sĩ giới thiệu"
-                          : patient.referral_type === "staff" ? "Nhân viên"
-                          : patient.referral_type === "ad" ? "Quảng cáo"
-                          : patient.referral_type === "other" ? "Khác"
-                          : "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Người giới thiệu</p>
-                      <p className="font-medium">{patient.referral_user_name || "—"}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground text-xs">Ghi chú giới thiệu</p>
-                      <p className="font-medium">{patient.referral_notes || "—"}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* ─── 5. Ghi chú ─── */}
-              <div>
-                <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-2">Ghi chú</p>
-                <div className="rounded-lg border border-border bg-muted/20 p-4">
+              <section className="rounded-xl border border-border p-4 sm:p-5">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ghi chú</p>
+                <div>
                   <PatientNotesTimeline
                     patientId={patient.id}
                     notes={notes}
                     onCreated={(note) => setNotes((current) => [note, ...current])}
                   />
                 </div>
-              </div>
+              </section>
 
             </CardContent>
           </Card>
@@ -871,6 +793,22 @@ function Count({ value, urgent = false }: { value: number; urgent?: boolean }) {
   return (
     <span className={className}>{value}</span>
   );
+}
+
+function OverviewField({ label, value, className }: { label: string; value: string; className?: string }) {
+  return (
+    <div className={className}>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 break-words font-medium text-foreground">{value}</p>
+    </div>
+  );
+}
+
+function formatPatientBmi(patient: Patient): string {
+  if (!patient.height_cm || !patient.weight_kg) return "—";
+  const bmi = Number((patient.weight_kg / ((patient.height_cm / 100) ** 2)).toFixed(1));
+  const label = bmi < 18.5 ? "Gầy" : bmi < 23 ? "Bình thường" : bmi < 25 ? "Thừa cân" : "Béo phì";
+  return `${bmi} · ${label}`;
 }
 
 function canStartAppointmentVisit(appointment: Appointment, now: Date): boolean {

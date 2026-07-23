@@ -115,3 +115,18 @@ export function isoToTime(iso: string): string {
   const mm = String(d.getMinutes()).padStart(2, "0");
   return `${hh}:${mm}`;
 }
+
+/** Calculates completed years from a YYYY-MM-DD birth date in local time. */
+export function calculateAge(dateOfBirth: string | undefined, today = new Date()): number | undefined {
+  if (!dateOfBirth) return undefined;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateOfBirth);
+  if (!match) return undefined;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const birthday = new Date(year, month - 1, day);
+  if (birthday.getFullYear() !== year || birthday.getMonth() !== month - 1 || birthday.getDate() !== day || birthday > today) return undefined;
+  let age = today.getFullYear() - year;
+  if (today.getMonth() < month - 1 || (today.getMonth() === month - 1 && today.getDate() < day)) age -= 1;
+  return age;
+}
