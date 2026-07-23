@@ -18,7 +18,7 @@ export function PlaceholderPage({
   children,
 }: PlaceholderPageProps) {
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10">
+    <main className="mx-auto w-full max-w-[90rem] px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10 2xl:px-10">
       {breadcrumb && (
         <p className="mb-2 text-sm text-muted-foreground">{breadcrumb}</p>
       )}

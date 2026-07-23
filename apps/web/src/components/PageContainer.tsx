@@ -7,16 +7,16 @@ interface PageContainerProps {
   size?: "compact" | "reading" | "detail" | "standard" | "wide" | "workspace" | "data";
 }
 
-/** Consistent page gutters with widths matched to the information density. */
+/** All authenticated workspaces share a consistent desktop content width. */
 export function PageContainer({ children, className, size = "standard" }: PageContainerProps) {
   const widths = {
-    compact: "max-w-2xl",
-    reading: "max-w-3xl",
-    detail: "max-w-5xl",
-    standard: "max-w-6xl",
-    wide: "max-w-7xl",
+    compact: "max-w-[90rem]",
+    reading: "max-w-[90rem]",
+    detail: "max-w-[90rem]",
+    standard: "max-w-[90rem]",
+    wide: "max-w-[90rem]",
     workspace: "max-w-[90rem]",
-    data: "max-w-none",
+    data: "max-w-[90rem]",
   };
 
   return (

@@ -105,6 +105,7 @@ html[data-theme="dark"] {
 .platform-control .text-emerald-800 { color: #86efac; }
 .platform-control .text-cyan-700 { color: #67e8f9; }
 
+
 /* ─── Map CSS variables → Tailwind utility classes via @theme ─── */
 @theme inline {
   --color-background: var(--color-background);

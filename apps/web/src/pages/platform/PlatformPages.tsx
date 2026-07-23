@@ -19,7 +19,7 @@ function PageHeader({ title, description, action }: { title: string; description
   return <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#67e8f9]">Platform Control</p><h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">{title}</h1><p className="mt-1 max-w-3xl text-sm text-muted-foreground">{description}</p></div>{action}</div>;
 }
 
-function Page({ children }: { children: ReactNode }) { return <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-7">{children}</div>; }
+function Page({ children }: { children: ReactNode }) { return <div className="mx-auto w-full max-w-[90rem] space-y-6 p-4 sm:p-7 lg:px-8 lg:py-8 2xl:px-10">{children}</div>; }
 function ErrorNotice({ error }: { error: string | null }) { return error ? <div role="alert" className="rounded-lg border border-[#7f3448] bg-[#401e29] px-3 py-2 text-sm text-[#fda4af]">{error}</div> : null; }
 function Loading({ label = "Đang tải dữ liệu..." }: { label?: string }) { return <div className="grid min-h-48 place-items-center text-sm text-muted-foreground">{label}</div>; }
 function formatDate(value?: string | null) { return value ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "--"; }

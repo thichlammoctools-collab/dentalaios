@@ -320,7 +320,7 @@ export function ClinicSettingsPage() {
   );
 
   return (
-    <PageContainer>
+    <PageContainer size="workspace">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Cài đặt phòng khám</h1>
         <p className="text-sm text-muted-foreground mt-1">
