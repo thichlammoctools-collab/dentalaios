@@ -104,6 +104,7 @@ export const patientService = {
     tenantId: string,
     id: string,
     data: PatientUpdateInput,
+    userId?: string,
   ): Promise<Patient | null> {
     return (async () => {
       await assertAllInTenant(db, tenantId, [
@@ -122,7 +123,7 @@ export const patientService = {
           referrerId: data.referrer_id,
           referralCode: data.referral_code,
         });
-        if (referrer) await referralService.createCaseForNewPatient(db, tenantId, "system", existing, referrer, data.referral_code ? "code" : "manual");
+        if (referrer) await referralService.createCaseForNewPatient(db, tenantId, userId ?? "system", existing, referrer, data.referral_code ? "code" : "manual");
       }
       const address = displayAddress({
         address: data.address ?? existing.address,

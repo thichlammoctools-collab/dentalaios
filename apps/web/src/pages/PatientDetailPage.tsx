@@ -333,9 +333,8 @@ export function PatientDetailPage() {
                 <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Nguồn & giới thiệu</p>
                 <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
                   <OverviewField label="Nguồn bệnh nhân" value={patient.marketing_source ? MARKETING_SOURCE_LABELS[patient.marketing_source as MarketingSource] ?? patient.marketing_source : "—"} />
-                  <OverviewField label="Loại giới thiệu" value={patient.referral_type === "doctor" ? "Bác sĩ giới thiệu" : patient.referral_type === "staff" ? "Nhân viên" : patient.referral_type === "ad" ? "Quảng cáo" : patient.referral_type === "other" ? "Người giới thiệu" : "—"} />
                   <OverviewField label="Người giới thiệu" value={patient.referral_referrer_name ? `${patient.referral_referrer_name}${patient.referral_referrer_code ? ` (${patient.referral_referrer_code})` : ""}` : patient.referral_user_name || "—"} />
-                  <OverviewField label="Ghi chú giới thiệu" value={patient.referral_notes || "—"} />
+                  <OverviewField className="sm:col-span-2" label="Ghi chú giới thiệu" value={patient.referral_notes || "—"} />
                 </div>
               </section>
 
