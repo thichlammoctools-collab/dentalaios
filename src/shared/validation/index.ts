@@ -760,6 +760,7 @@ export type RoleUpdateInput = z.infer<typeof roleUpdateSchema>;
 // ──────────────── Appointment ────────────────
 
 export const appointmentCreateSchema = z.object({
+  branch_id: z.string().min(1).optional(),
   patient_id: z.string().min(1),
   clinician_id: z.string().min(1),
   assistant_id: z.string().min(1).optional(),
@@ -901,6 +902,9 @@ export const clinicScheduleEntrySchema = z.object({
   open_time: z.string().regex(/^\d{2}:\d{2}$/),
   close_time: z.string().regex(/^\d{2}:\d{2}$/),
   is_closed: z.boolean().default(false),
+}).refine((entry) => entry.is_closed || entry.open_time < entry.close_time, {
+  message: "Giờ mở cửa phải trước giờ đóng cửa",
+  path: ["close_time"],
 });
 
 export const clinicScheduleBulkUpdateSchema = z.object({

@@ -1,7 +1,7 @@
 /**
  * Schedule service — clinic/doctor working hours management.
  *
- * Returns default 08:00-17:00 Mon-Fri when no config exists (Phase 1).
+ * Returns default 08:00-20:00 every day when no config exists.
  */
 
 import type { D1Database } from "@cloudflare/workers-types";
@@ -15,10 +15,10 @@ import { assertAllInTenant, assertRowInTenant } from "../lib/tenant-scope";
 const DEFAULT_SLOT_MINUTES = 30;
 
 /**
- * Default working days (Mon-Fri) when no clinic_schedules exist.
+ * Default operating hours for all days when no clinic_schedules exist.
  */
 function buildDefaultClinicSchedule(tenantId: string, branchId: string): ClinicSchedule[] {
-  return [1, 2, 3, 4, 5].map((weekday) => ({
+  return [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({
     id: `default-${tenantId}-${branchId}-${weekday}`,
     tenant_id: tenantId,
     branch_id: branchId,

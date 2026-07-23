@@ -121,6 +121,26 @@ describe("POST /api/appointments", () => {
     expect(res.status).toBe(403);
   });
 
+  it("rejects cross-branch creation without administrator permission", async () => {
+    const app = mountRoute("/api/appointments", appointmentsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/appointments",
+      new Map(),
+      {
+        permissions: ["write_appointments"],
+        body: {
+          branch_id: "other-branch",
+          patient_id: "patient-1",
+          clinician_id: "doc-1",
+          scheduled_at: "2099-07-15T08:00:00.000Z",
+        },
+      },
+    );
+    expect(res.status).toBe(403);
+  });
+
   it("returns 409 when an assigned chair has an overlapping appointment", async () => {
     const app = mountRoute("/api/appointments", appointmentsRoutes);
     const res = await authedRequestWithDB(

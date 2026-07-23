@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { PlatformRole, PlatformSession, PlatformUser } from "@shared/types";
 import {
+  PlatformApiError,
   platformPost,
   platformGet,
   PLATFORM_SESSION_EXPIRED_EVENT,
@@ -85,13 +86,19 @@ export function PlatformAuthProvider({ children }: { children: ReactNode }) {
     }
 
     setPlatformToken(remembered.token);
-    void platformGet<{ user: PlatformUser; role: PlatformRole }>("/api/platform/auth/me")
+    void platformGet<{ user: PlatformUser; role: PlatformRole }>(
+      "/api/platform/auth/me",
+      { notifySessionExpiry: false },
+    )
       .then(({ user, role }) => {
         if (!active) return;
         setSession({ ...remembered, user, role });
       })
-      .catch(() => {
+      .catch((cause) => {
         if (!active) return;
+        if (cause instanceof PlatformApiError && cause.status !== 401) {
+          return;
+        }
         setPlatformToken(null);
         clearRememberedSession();
       })

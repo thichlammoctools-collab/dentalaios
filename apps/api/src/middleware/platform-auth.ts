@@ -13,9 +13,12 @@ export type PlatformAuthContext = {
   platformJwt: PlatformJwtPayload;
   platformMfaVerifiedAt: string;
 };
-const valid = (value: string, maxAge?: number): boolean => {
+const valid = (value: string, maxAgeSeconds?: number): boolean => {
   const time = Date.parse(value);
-  return Number.isFinite(time) && time > Date.now() - (maxAge ?? 0);
+  const earliest = maxAgeSeconds === undefined
+    ? Date.now()
+    : Date.now() - maxAgeSeconds * 1_000;
+  return Number.isFinite(time) && time > earliest;
 };
 export function requirePlatformAuth(): MiddlewareHandler<{
   Bindings: Env;

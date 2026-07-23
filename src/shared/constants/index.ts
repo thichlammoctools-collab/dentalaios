@@ -143,9 +143,9 @@ export const APPOINTMENT_STATUS_LABELS: Record<(typeof APPOINTMENT_STATUSES)[num
   no_show: "Không đến",
 };
 
-/** Default clinic operating hours when clinic_schedules row is missing. */
+/** Default clinic operating hours when clinic_schedules rows are missing. */
 export const DEFAULT_CLINIC_OPEN = "08:00";
-export const DEFAULT_CLINIC_CLOSE = "17:00";
+export const DEFAULT_CLINIC_CLOSE = "20:00";
 
 /** Default currency for V1 — Vietnam. */
 export const DEFAULT_CURRENCY = "VND";

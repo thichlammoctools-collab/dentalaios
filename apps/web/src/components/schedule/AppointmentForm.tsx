@@ -20,6 +20,10 @@ interface AppointmentFormProps {
   onOpenChange: (open: boolean) => void;
   initialDate?: string;   // YYYY-MM-DD, defaults to today
   initialHour?: number;   // 0-23
+  initialTime?: string;
+  branchId?: string;
+  initialClinicianId?: string;
+  initialChairId?: string;
   onCreated?: () => void;
   milestone?: {
     planId: string;
@@ -52,10 +56,15 @@ export function AppointmentForm({
   onOpenChange,
   initialDate,
   initialHour,
+  initialTime,
+  branchId,
+  initialClinicianId,
+  initialChairId,
   onCreated,
   milestone,
 }: AppointmentFormProps) {
   const { session } = useAuth();
+  const targetBranchId = branchId ?? session?.branch?.id;
   const [users, setUsers] = useState<UserWithDetails[]>([]);
   const [patientId, setPatientId] = useState(milestone?.patientId ?? "");
   const [milestonePatient, setMilestonePatient] = useState<Patient | null>(null);
@@ -68,7 +77,7 @@ export function AppointmentForm({
   const [showChairSchedule, setShowChairSchedule] = useState(false);
   const defaultSlot = getNextAppointmentSlot();
   const [date, setDate] = useState(initialDate ?? defaultSlot.date);
-  const [time, setTime] = useState(initialHour != null ? `${String(initialHour).padStart(2, "0")}:00` : defaultSlot.time);
+  const [time, setTime] = useState(initialTime ?? (initialHour != null ? `${String(initialHour).padStart(2, "0")}:00` : defaultSlot.time));
   const [durationMin, setDurationMin] = useState(30);
   const [procedure, setProcedure] = useState(milestone?.procedure ?? "");
   const [selectedMilestoneIds, setSelectedMilestoneIds] = useState<string[]>(
@@ -83,11 +92,11 @@ export function AppointmentForm({
   const [step, setStep] = useState<1 | 2>(1);
 
   useEffect(() => {
-    if (!open || !session?.branch?.id) return;
-    apiGet<UsersResponse>(`/api/users/branch/${session.branch.id}`)
+    if (!open || !targetBranchId) return;
+    apiGet<UsersResponse>(`/api/users/branch/${targetBranchId}`)
       .then((res) => setUsers(res.items))
       .catch(() => setUsers([]));
-  }, [open, session]);
+  }, [open, targetBranchId]);
 
   useEffect(() => {
     if (!open) return;
@@ -157,32 +166,34 @@ export function AppointmentForm({
     const nextDate = initialDate ?? nextSlot.date;
     const nextTime = initialHour != null
       ? `${String(initialHour).padStart(2, "0")}:00`
-      : nextDate === nextSlot.date ? nextSlot.time : "09:00";
+      : initialTime ?? (nextDate === nextSlot.date ? nextSlot.time : "09:00");
     setDate(nextDate);
     setTime(nextTime);
-  }, [open, initialDate, initialHour]);
+    setClinicianId(initialClinicianId ?? "");
+    setChairId(initialChairId ?? "");
+  }, [open, initialDate, initialHour, initialTime, initialClinicianId, initialChairId]);
 
   useEffect(() => {
-    if (!open || !session?.branch?.id) return;
+    if (!open || !targetBranchId) return;
     const startAt = combineDateTime(date, time);
     const params = new URLSearchParams({
-      branch_id: session.branch.id,
+      branch_id: targetBranchId,
       start_at: startAt,
       duration_min: String(durationMin),
     });
     apiGet<ChairAvailabilityResponse>(`/api/chairs/availability?${params}`)
       .then((response) => setChairAvailability(response.items))
       .catch(() => setChairAvailability([]));
-  }, [open, session?.branch?.id, date, time, durationMin]);
+  }, [open, targetBranchId, date, time, durationMin]);
 
   useEffect(() => {
-    if (!open || !chairId || !session?.branch?.id) {
+    if (!open || !chairId || !targetBranchId) {
       setChairUtilization(null);
       return;
     }
     let cancelled = false;
     Promise.all(["today", "week"].map((period) =>
-      apiGet<ChairUtilizationResponse>(`/api/chairs/utilization?branch_id=${session.branch.id}&period=${period}`),
+      apiGet<ChairUtilizationResponse>(`/api/chairs/utilization?branch_id=${targetBranchId}&period=${period}`),
     )).then(([today, week]) => {
       if (cancelled) return;
       const todayMetrics = today.items.find((item) => item.chair.id === chairId);
@@ -195,15 +206,15 @@ export function AppointmentForm({
       if (!cancelled) setChairUtilization(null);
     });
     return () => { cancelled = true; };
-  }, [open, chairId, session?.branch?.id]);
+  }, [open, chairId, targetBranchId]);
 
   useEffect(() => {
-    if (!open || !chairId || !session?.branch?.id) {
+    if (!open || !chairId || !targetBranchId) {
       setChairSchedule([]);
       return;
     }
     let cancelled = false;
-    apiGet<ChairScheduleResponse>(`/api/chairs/schedule?branch_id=${session.branch.id}&date=${date}`)
+    apiGet<ChairScheduleResponse>(`/api/chairs/schedule?branch_id=${targetBranchId}&date=${date}`)
       .then((response) => {
         if (!cancelled) setChairSchedule(response.items.filter((item) => item.chair_id === chairId));
       })
@@ -211,7 +222,7 @@ export function AppointmentForm({
         if (!cancelled) setChairSchedule([]);
       });
     return () => { cancelled = true; };
-  }, [open, chairId, date, session?.branch?.id]);
+  }, [open, chairId, date, targetBranchId]);
 
   // Default clinician = currently logged-in user if doctor, else first doctor in branch
   useEffect(() => {
@@ -227,8 +238,9 @@ export function AppointmentForm({
 
   function resetForm() {
     setPatientId(milestone?.patientId ?? "");
+    setClinicianId(initialClinicianId ?? "");
     setAssistantId("");
-    setChairId("");
+    setChairId(initialChairId ?? "");
     setProcedure(milestone?.procedure ?? "");
     setSelectedMilestoneIds(milestone ? [milestone.milestoneId] : []);
     setPatientMilestones([]);
@@ -263,6 +275,7 @@ export function AppointmentForm({
     try {
       const scheduled_at = combineDateTime(date, time);
       const appointmentPayload = {
+        branch_id: branchId,
         clinician_id: clinicianId,
         assistant_id: assistantId || undefined,
         chair_id: chairId || undefined,

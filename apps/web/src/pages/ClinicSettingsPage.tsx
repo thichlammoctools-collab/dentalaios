@@ -4,7 +4,7 @@ import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import { BranchForm } from "@/components/BranchForm";
 import { Dialog, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogBody } from "@/components/ui/dialog";
-import type { Branch, Tenant } from "@shared/types";
+import type { Branch, ClinicSchedule, Tenant } from "@shared/types";
 import { PERMISSIONS } from "@shared/constants";
 import { PageContainer } from "@/components/PageContainer";
 
@@ -49,6 +49,10 @@ export function ClinicSettingsPage() {
   // Payment code prefix
   const [paymentPrefix, setPaymentPrefix] = useState("TT");
   const [savingPrefix, setSavingPrefix] = useState(false);
+  const [scheduleBranchId, setScheduleBranchId] = useState("");
+  const [operatingHours, setOperatingHours] = useState<ClinicSchedule[]>([]);
+  const [loadingOperatingHours, setLoadingOperatingHours] = useState(false);
+  const [savingOperatingHours, setSavingOperatingHours] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -268,6 +272,36 @@ export function ClinicSettingsPage() {
     }
   }
 
+  useEffect(() => {
+    if (!scheduleBranchId) return;
+    setLoadingOperatingHours(true);
+    apiGet<{ items: ClinicSchedule[] }>(`/api/schedules/clinic/${scheduleBranchId}`)
+      .then((response) => setOperatingHours(response.items))
+      .catch((error) => toast.error(error instanceof ApiError ? error.message : "Không thể tải giờ hoạt động"))
+      .finally(() => setLoadingOperatingHours(false));
+  }, [scheduleBranchId]);
+
+  useEffect(() => {
+    if (!scheduleBranchId && data?.branches[0]) setScheduleBranchId(data.branches[0].id);
+  }, [data, scheduleBranchId]);
+
+  async function saveOperatingHours() {
+    if (!scheduleBranchId) return;
+    setSavingOperatingHours(true);
+    try {
+      const response = await apiPut<{ items: ClinicSchedule[] }>(`/api/schedules/clinic/${scheduleBranchId}`, {
+        branch_id: scheduleBranchId,
+        entries: operatingHours.map(({ weekday, open_time, close_time, is_closed }) => ({ weekday, open_time, close_time, is_closed })),
+      });
+      setOperatingHours(response.items);
+      toast.success("Đã lưu giờ hoạt động chi nhánh");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Không thể lưu giờ hoạt động");
+    } finally {
+      setSavingOperatingHours(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-48">
@@ -280,6 +314,9 @@ export function ClinicSettingsPage() {
 
   const isAdmin = Boolean(
     session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.MANAGE_USERS),
+  );
+  const canManageSchedule = Boolean(
+    session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.MANAGE_SCHEDULE),
   );
 
   return (
@@ -363,6 +400,33 @@ export function ClinicSettingsPage() {
             <span>·</span>
             <span>Tạo: {new Date(data.tenant.created_at).toLocaleDateString("vi-VN")}</span>
           </div>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-base font-semibold">Giờ hoạt động</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Thiết lập giờ mở cửa theo từng ngày cho mỗi chi nhánh. Khi chưa lưu cấu hình, hệ thống mặc định 08:00 - 20:00 mỗi ngày.</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <label className="block max-w-sm text-sm font-medium">Chi nhánh
+            <select value={scheduleBranchId} onChange={(event) => setScheduleBranchId(event.target.value)} className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+              {data.branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+            </select>
+          </label>
+          {loadingOperatingHours ? <div className="flex h-32 items-center justify-center"><div className="h-6 w-6 animate-spin rounded-full border-3 border-muted border-t-primary" /></div> : (
+            <div className="mt-4 space-y-2">
+              {operatingHours.map((entry) => (
+                <div key={entry.weekday} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 rounded-md border p-3 text-sm">
+                  <span className="font-medium">{["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"][entry.weekday - 1]}</span>
+                  <input type="time" value={entry.open_time} disabled={!canManageSchedule || entry.is_closed} onChange={(event) => setOperatingHours((current) => current.map((item) => item.weekday === entry.weekday ? { ...item, open_time: event.target.value } : item))} className="rounded border border-input bg-background px-2 py-1.5 disabled:opacity-50" />
+                  <input type="time" value={entry.close_time} disabled={!canManageSchedule || entry.is_closed} onChange={(event) => setOperatingHours((current) => current.map((item) => item.weekday === entry.weekday ? { ...item, close_time: event.target.value } : item))} className="rounded border border-input bg-background px-2 py-1.5 disabled:opacity-50" />
+                  <label className="flex items-center gap-2 whitespace-nowrap"><input type="checkbox" checked={!entry.is_closed} disabled={!canManageSchedule} onChange={(event) => setOperatingHours((current) => current.map((item) => item.weekday === entry.weekday ? { ...item, is_closed: !event.target.checked } : item))} />Mở cửa</label>
+                </div>
+              ))}
+            </div>
+          )}
+          {canManageSchedule && <button type="button" onClick={() => void saveOperatingHours()} disabled={savingOperatingHours || loadingOperatingHours || operatingHours.length !== 7} className="mt-4 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">{savingOperatingHours ? "Đang lưu..." : "Lưu giờ hoạt động"}</button>}
         </div>
       </section>
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -10,13 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { AppointmentCard } from "@/components/schedule/AppointmentCard";
 import { AppointmentForm } from "@/components/schedule/AppointmentForm";
+import { AppointmentTimeline } from "@/components/schedule/AppointmentTimeline";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
-import { apiDelete, apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
+import { apiDelete, apiGet, apiPatch, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
-import type { Appointment, DentalChair, Patient, UserWithDetails, Visit } from "@shared/types";
+import type { Appointment, ClinicSchedule, DentalChair, Patient, UserWithDetails } from "@shared/types";
 import { isAssistantRole, isDoctorRole, ROUTES } from "@shared/constants";
 import { formatDate, formatTime, getWeekDays, isoToTime, isoToYmd, weekdayLabel, ymd, combineDateTime } from "@/lib/utils";
 import { getMinimumAppointmentTime, isAppointmentTimeInPast } from "@/lib/appointment-time";
@@ -26,32 +26,34 @@ interface AppointmentsResponse { items: Appointment[]; total: number }
 interface PatientsResponse { items: Patient[]; total: number }
 interface UsersResponse { items: UserWithDetails[]; total: number }
 interface ChairsResponse { items: DentalChair[]; total: number }
+interface ClinicSchedulesResponse { items: ClinicSchedule[]; total: number }
 
 export function SchedulePage() {
   const { session } = useAuth();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const selectedBranchId = searchParams.get("branch_id") ?? "";
+  const boardBranchId = selectedBranchId || session?.branch?.id || "";
   const requestedStatusValue = searchParams.get("status") ?? "";
   const requestedStatuses = requestedStatusValue.split(",").filter(Boolean);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [users, setUsers] = useState<UserWithDetails[]>([]);
   const [chairs, setChairs] = useState<DentalChair[]>([]);
+  const [clinicSchedules, setClinicSchedules] = useState<ClinicSchedule[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Appointment | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
-  const [startingAppointmentId, setStartingAppointmentId] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
   const [expandedWeekDay, setExpandedWeekDay] = useState<string | null>(null);
+  const [timelineMode, setTimelineMode] = useState<"doctor" | "chair">("doctor");
+  const [timelinePrefill, setTimelinePrefill] = useState<{ time?: string; clinicianId?: string; chairId?: string }>({});
 
   // Filters apply to both schedule views.
   const [filterStatuses, setFilterStatuses] = useState<Set<string>>(() => new Set(requestedStatuses));
   const [filterClinician, setFilterClinician] = useState("");
   const [filterAssistant, setFilterAssistant] = useState("");
-  const [hideFinishedAppointments, setHideFinishedAppointments] = useState(false);
 
   useEffect(() => {
     setFilterStatuses(new Set(requestedStatuses));
@@ -90,23 +92,27 @@ export function SchedulePage() {
     Promise.all([
       apiGet<AppointmentsResponse>(`/api/appointments?${appointmentQuery}`),
       apiGet<PatientsResponse>(`/api/patients?limit=200`),
-      session?.branch?.id
-        ? apiGet<UsersResponse>(`/api/users/branch/${session.branch.id}`)
+      boardBranchId
+        ? apiGet<UsersResponse>(`/api/users/branch/${boardBranchId}`)
         : Promise.resolve({ items: [] as UserWithDetails[] }),
-      session?.branch?.id
-        ? apiGet<ChairsResponse>(`/api/chairs?branch_id=${session.branch.id}`)
+      boardBranchId
+        ? apiGet<ChairsResponse>(`/api/chairs?branch_id=${boardBranchId}`)
         : Promise.resolve({ items: [] as DentalChair[], total: 0 }),
-    ]).then(([appts, pats, us, chairResponse]) => {
+      boardBranchId
+        ? apiGet<ClinicSchedulesResponse>(`/api/schedules/clinic/${boardBranchId}`)
+        : Promise.resolve({ items: [] as ClinicSchedule[], total: 0 }),
+    ]).then(([appts, pats, us, chairResponse, scheduleResponse]) => {
       if (!mounted) return;
       setAppointments(appts.items);
       setPatients(pats.items);
       setUsers(us.items);
       setChairs(chairResponse.items);
+      setClinicSchedules(scheduleResponse.items);
     }).catch((err) => console.error(err))
       .finally(() => mounted && setLoading(false));
 
     return () => { mounted = false; };
-  }, [weekDays, threeDayDates, refreshTick, selectedBranchId, session?.branch?.id]);
+  }, [weekDays, threeDayDates, refreshTick, selectedBranchId, boardBranchId]);
 
   const patientsById = useMemo(() => {
     const m = new Map<string, Patient>();
@@ -120,7 +126,6 @@ export function SchedulePage() {
     return m;
   }, [users]);
 
-  const chairsById = useMemo(() => new Map(chairs.map((chair) => [chair.id, chair])), [chairs]);
 
   const filteredAppointments = appointments
     .filter((a) => filterStatuses.size === 0 || filterStatuses.has(a.status))
@@ -130,21 +135,9 @@ export function SchedulePage() {
     ));
 
   // Day view: use the same filters as the week view.
-  const dayApptsAll = appointments.filter((a) => isoToYmd(a.scheduled_at) === ymd(selectedDate));
   const dayAppts = filteredAppointments
     .filter((a) => isoToYmd(a.scheduled_at) === ymd(selectedDate))
     .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
-  const dayAppointmentGroups = {
-    finished: dayAppts.filter((a) => appointmentTiming(a) === "finished"),
-    inProgress: dayAppts.filter((a) => appointmentTiming(a) === "in_progress"),
-    upcoming: dayAppts.filter((a) => appointmentTiming(a) === "upcoming"),
-  };
-  const visibleDayAppointmentGroups = {
-    ...dayAppointmentGroups,
-    finished: hideFinishedAppointments ? [] : dayAppointmentGroups.finished,
-  };
-  const visibleDayAppointmentCount = Object.values(visibleDayAppointmentGroups)
-    .reduce((total, group) => total + group.length, 0);
 
   function toggleStatus(s: string) {
     setFilterStatuses((prev) => {
@@ -201,111 +194,6 @@ export function SchedulePage() {
     }
   }
 
-  async function startVisit(appointment: Appointment) {
-    if (!session?.user?.id) return;
-    setStartingAppointmentId(appointment.id);
-    try {
-      const visit = await apiPost<Visit>("/api/visits", {
-        patient_id: appointment.patient_id,
-        branch_id: appointment.branch_id,
-        clinician_id: session.user.id,
-        source_appointment_id: appointment.id,
-      });
-      toast.success("Đã bắt đầu lượt khám");
-      navigate(`/visits/${visit.id}`);
-    } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : "Không thể bắt đầu lượt khám");
-    } finally {
-      setStartingAppointmentId(null);
-    }
-  }
-
-  function renderDayAppointmentGroup(
-    groupKey: keyof typeof visibleDayAppointmentGroups,
-    label: string,
-    dotClass: string,
-    options: { hideFinishedControl?: boolean } = {},
-  ) {
-    const group = visibleDayAppointmentGroups[groupKey];
-    if (group.length === 0 && !options.hideFinishedControl) return null;
-    return (
-      <section key={groupKey} className="space-y-2">
-        <div className="flex items-center justify-between gap-2 px-1">
-          <div className="flex items-center gap-2">
-            <span className={`h-2 w-2 rounded-full ${dotClass}`} />
-            <h2 className="text-sm font-semibold">{label}</h2>
-            {group.length > 0 && <Badge variant="outline" className="text-[10px]">{group.length}</Badge>}
-          </div>
-          {options.hideFinishedControl && dayAppointmentGroups.finished.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setHideFinishedAppointments((value) => !value)}
-              className="h-7 text-xs"
-            >
-              {hideFinishedAppointments ? "Hiện ca đã xong" : "Ẩn ca đã xong"}
-            </Button>
-          )}
-        </div>
-        {group.length > 0 && (
-          <div className="space-y-2">
-            {group.map((a) => {
-              const patient = patientsById.get(a.patient_id);
-              const doctor = usersById.get(a.clinician_id);
-              const assistant = a.assistant_id ? usersById.get(a.assistant_id) : null;
-              const chair = a.chair_id ? chairsById.get(a.chair_id) : null;
-              const endTime = new Date(new Date(a.scheduled_at).getTime() + a.duration_min * 60 * 1000);
-              const isFinished = appointmentTiming(a) === "finished";
-              return (
-                <div
-                  key={a.id}
-                  onClick={() => setEditing(a)}
-                  className={`cursor-pointer rounded-lg border-l-4 px-3 py-2.5 transition-all hover:bg-accent/40 hover:shadow-md ${statusBorderClass(a.status)} ${isFinished ? "opacity-55 saturate-50" : ""}`}
-                >
-                  <div className="flex items-stretch gap-3">
-                    <div className="min-w-[148px] shrink-0 text-left">
-                      <div className="font-mono text-xl font-bold leading-tight tabular-nums">
-                        {formatTime(a.scheduled_at)} → {formatTime(endTime.toISOString())}
-                      </div>
-                      <div className="font-mono text-sm font-medium tabular-nums text-muted-foreground">{a.duration_min} phút</div>
-                      <div className="mt-2 space-y-1.5 text-[11px] text-muted-foreground">
-                        <div className="flex items-center gap-1.5">
-                          {doctor && <ProfileAvatar subject="users" entityId={doctor.id} name={doctor.name} avatarFileId={doctor.avatar_file_id} size="sm" />}
-                          <span className="truncate font-semibold text-sky-700 dark:text-sky-300">{doctor?.name ?? "—"} (Dr)</span>
-                        </div>
-                        {assistant && (
-                          <div className="flex items-center gap-1.5">
-                            <ProfileAvatar subject="users" entityId={assistant.id} name={assistant.name} avatarFileId={assistant.avatar_file_id} size="sm" />
-                            <span className="truncate font-semibold text-emerald-700 dark:text-emerald-300">{assistant.name} (As)</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="self-stretch border-l border-border/60" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex min-w-0 flex-1 items-center gap-2"><ProfileAvatar subject="patients" entityId={patient?.id} name={patient?.name ?? a.patient_id} avatarFileId={patient?.avatar_file_id} size="sm" /><p className="min-w-0 flex-1 truncate font-semibold">{patient?.name ?? <span className="font-mono text-xs text-muted-foreground">{a.patient_id.slice(0, 8)}</span>}</p></div>
-                        <span className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-medium ${statusBgClass(a.status)}`}>{statusLabelVi(a.status)}</span>
-                      </div>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-                        {a.procedure && <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">{a.procedure}</span>}
-                        <span className="ml-auto text-[10px]">{a.source === "ai_chat" && "✨ AI chat"}{a.source === "ai_next_visit" && "🤖 AI suggest"}</span>
-                      </div>
-                      {a.notes && <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-muted-foreground italic">💬 {a.notes}</p>}
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end justify-end gap-2 text-right">
-                      {chair && <div className="rounded-md bg-muted px-2 py-1 text-[11px]"><span className="mr-1 text-[10px] uppercase text-muted-foreground">Ghế</span><span className="font-medium text-foreground">{chair.name}</span></div>}
-                      {canStartAppointmentVisit(a, now) && <Button size="sm" onClick={(event) => { event.stopPropagation(); void startVisit(a); }} disabled={startingAppointmentId === a.id}>{startingAppointmentId === a.id ? "Đang bắt đầu..." : "Bắt đầu khám"}</Button>}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-    );
-  }
 
   return (
     <PageContainer>
@@ -321,9 +209,12 @@ export function SchedulePage() {
           </p>
         )}
         <div className="mt-4 flex flex-wrap gap-2 sm:mt-6 sm:gap-3">
-          <Button
-            className="bg-white text-blue-700 hover:bg-blue-50"
-            onClick={() => setCreateOpen(true)}
+            <Button
+              className="bg-white text-blue-700 hover:bg-blue-50"
+              onClick={() => {
+                setTimelinePrefill({});
+                setCreateOpen(true);
+              }}
           >
             + Tạo lịch hẹn
           </Button>
@@ -424,8 +315,7 @@ export function SchedulePage() {
                 <span className="flex items-center gap-2">
                   {formatDate(selectedDate.toISOString())}
                   <Badge variant="outline" className="text-[10px]">
-                    {dayApptsAll.length} lịch
-                    {visibleDayAppointmentCount !== dayApptsAll.length && ` (hiện ${visibleDayAppointmentCount})`}
+                    {dayAppts.length} lịch
                   </Badge>
                 </span>
                 <div className="flex items-center gap-2">
@@ -436,33 +326,23 @@ export function SchedulePage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {loading ? (
-                <div className="h-40 flex items-center justify-center">
-                  <div className="h-6 w-6 animate-spin rounded-full border-3 border-muted border-t-primary" />
-                </div>
-              ) : visibleDayAppointmentCount === 0 ? (
-                <div className="py-10 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    {dayApptsAll.length === 0
-                      ? "Chưa có lịch hẹn nào trong ngày này"
-                      : hideFinishedAppointments && dayAppointmentGroups.finished.length > 0
-                        ? "Các ca trong ngày đã được ẩn"
-                        : "Không có lịch hẹn nào khớp với bộ lọc"}
-                  </p>
-                  <Button className="mt-4" onClick={() => setCreateOpen(true)}>
-                    + Tạo lịch hẹn
-                  </Button>
-                </div>
-              ) : (
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <div className="space-y-4">
-                    {renderDayAppointmentGroup("inProgress", "Đang làm", "bg-amber-500")}
-                    {renderDayAppointmentGroup("upcoming", "Sắp tới", "bg-blue-500")}
-                  </div>
-                  <div className="space-y-4 border-t border-border pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-                    {renderDayAppointmentGroup("finished", "Đã xong", "bg-muted-foreground/50", { hideFinishedControl: true })}
-                  </div>
-                </div>
+              {loading ? <div className="flex h-40 items-center justify-center"><div className="h-6 w-6 animate-spin rounded-full border-3 border-muted border-t-primary" /></div> : (
+                <AppointmentTimeline
+                  appointments={dayAppts}
+                  date={selectedDate}
+                  schedules={clinicSchedules}
+                  users={users}
+                  chairs={chairs}
+                  patientsById={patientsById}
+                  now={now}
+                  mode={timelineMode}
+                  onModeChange={setTimelineMode}
+                  onAppointmentClick={setEditing}
+                  onEmptySlotClick={({ time, clinicianId, chairId }) => {
+                    setTimelinePrefill({ time, clinicianId, chairId });
+                    setCreateOpen(true);
+                  }}
+                />
               )}
             </CardContent>
           </Card>
@@ -661,6 +541,10 @@ export function SchedulePage() {
           if (!open) setRefreshTick((t) => t + 1);
         }}
         initialDate={ymd(selectedDate)}
+        initialTime={timelinePrefill.time}
+        initialClinicianId={timelinePrefill.clinicianId}
+        initialChairId={timelinePrefill.chairId}
+        branchId={boardBranchId || undefined}
       />
 
       {editing && (
@@ -696,19 +580,6 @@ function statusBorderClass(status: string): string {
     case "no_show": return "border-l-slate-300 bg-slate-50/30 dark:bg-slate-900/20 opacity-60";
     default: return "border-l-border bg-card";
   }
-}
-
-function appointmentTiming(appointment: Appointment): "finished" | "in_progress" | "upcoming" {
-  if (["completed", "cancelled", "no_show"].includes(appointment.status)) return "finished";
-  if (["arrived", "in_progress"].includes(appointment.status)) return "in_progress";
-  return "upcoming";
-}
-
-function canStartAppointmentVisit(appointment: Appointment, now: Date): boolean {
-  if (appointment.status !== "arrived" || !appointment.chair_id) return false;
-  const startsAt = new Date(appointment.scheduled_at);
-  const endsAt = new Date(startsAt.getTime() + appointment.duration_min * 60_000);
-  return startsAt <= now && now < endsAt;
 }
 
 function statusBgClass(status: string): string {

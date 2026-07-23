@@ -8,6 +8,7 @@ import { requirePermission } from "../middleware/rbac";
 import { auditLog } from "../middleware/audit";
 import type { AuthContext } from "../middleware/auth";
 import { appointmentsService } from "../services/appointments.service";
+import { ForbiddenError } from "../lib/errors";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -41,9 +42,14 @@ router.post(
   async (c) => {
     const jwt = getJwt(c);
     const data = c.req.valid("json");
+    const branchId = data.branch_id ?? jwt.branch_id;
+    const canManageOtherBranches = jwt.permissions.includes(PERMISSIONS.ALL);
+    if (branchId !== jwt.branch_id && !canManageOtherBranches) {
+      throw new ForbiddenError("Chỉ quản trị viên hoặc quản lý mới có thể tạo lịch cho chi nhánh khác");
+    }
     const encKey = c.env.ENCRYPTION_KEY ?? undefined;
     const created = await appointmentsService.create(
-      c.env.DB, jwt.tenant_id, jwt.sub, jwt.branch_id,
+      c.env.DB, jwt.tenant_id, jwt.sub, branchId,
       data,
       encKey,
     );

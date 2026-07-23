@@ -1,4 +1,25 @@
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import type { LucideIcon } from "lucide-react";
+import {
+  Armchair,
+  BarChart3,
+  Building2,
+  CalendarCheck,
+  CalendarClock,
+  ChevronDown,
+  ChevronsLeft,
+  ChevronsRight,
+  ClipboardList,
+  FileText,
+  Handshake,
+  LayoutDashboard,
+  Settings,
+  Shield,
+  Stethoscope,
+  UserPlus,
+  Users,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { PERMISSIONS, ROUTES } from "@shared/constants";
@@ -7,187 +28,258 @@ interface NavItem {
   label: string;
   href: string;
   match: (path: string) => boolean;
-  icon: "calendar" | "patients" | "settings" | "users" | "clinic" | "roles" | "audit" | "schedule" | "chair" | "dashboard" | "referral" | "report";
+  icon: LucideIcon;
 }
 
-const ICONS: Record<NavItem["icon"], React.ReactNode> = {
-  calendar: (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <rect x="3" y="4" width="18" height="18" rx="2" />
-      <path d="M16 2v4M8 2v4M3 10h18" />
-    </svg>
-  ),
-  patients: (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
-    </svg>
-  ),
-  settings: (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
-    </svg>
-  ),
-  users: (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
-    </svg>
-  ),
-  clinic: (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path d="M3 21h18M9 21V10H3v11M9 3H3v7h6V3zM21 21V10h-6v11M21 3h-6v7h6V3z" />
-    </svg>
-  ),
-  roles: (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-    </svg>
-  ),
-  audit: (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-      <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
-    </svg>
-  ),
-  schedule: (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <rect x="3" y="4" width="18" height="18" rx="2" />
-      <path d="M16 2v4M8 2v4M3 10h18" />
-      <path d="M8 14h2v2H8zM14 14h2v2h-2z" />
-    </svg>
-  ),
-  chair: (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path d="M5 11h14v6H5zM7 17v4M17 17v4M8 11V7a4 4 0 018 0v4" />
-    </svg>
-  ),
-  dashboard: (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <rect x="3" y="3" width="7" height="7" rx="1" />
-      <rect x="14" y="3" width="7" height="7" rx="1" />
-      <rect x="3" y="14" width="7" height="7" rx="1" />
-      <rect x="14" y="14" width="7" height="7" rx="1" />
-    </svg>
-  ),
-  referral: (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <circle cx="8" cy="8" r="3" /><circle cx="17" cy="16" r="3" />
-      <path d="M10.5 9.5l4 4M12.5 14.5l2-1M11 12l2-1" />
-    </svg>
-  ),
-  report: (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M4 20V4M4 20h16M8 16v-4M12 16V8M16 16v-7" /></svg>
-  ),
-};
+interface NavGroup {
+  id: "operations" | "referrals" | "settings";
+  label: string;
+  icon: LucideIcon;
+  items: NavItem[];
+}
 
-const NAV: NavItem[] = [
-  { label: "Điều hành chi nhánh", href: ROUTES.TODAY, match: (p) => p === ROUTES.TODAY, icon: "calendar" },
-  { label: "Lịch hẹn", href: ROUTES.SCHEDULE, match: (p) => p.startsWith("/schedule"), icon: "schedule" },
-  { label: "Ghế nha", href: ROUTES.CHAIRS, match: (p) => p.startsWith(ROUTES.CHAIRS), icon: "chair" },
-  { label: "Bệnh nhân", href: ROUTES.PATIENTS, match: (p) => p.startsWith("/patients"), icon: "patients" },
-  { label: "Giới thiệu", href: ROUTES.REFERRALS, match: (p) => p === ROUTES.REFERRALS || p === ROUTES.REFERRERS || p === ROUTES.REFERRAL_REPORTS, icon: "referral" },
+type GroupState = Record<NavGroup["id"], boolean>;
+
+const GROUPS_STORAGE_KEY = "sidebar:groups";
+
+const NAV_GROUPS: NavGroup[] = [
   {
+    id: "operations",
+    label: "Vận hành",
+    icon: CalendarCheck,
+    items: [
+      { label: "Điều hành chi nhánh", href: ROUTES.TODAY, match: (path) => path === ROUTES.TODAY, icon: CalendarCheck },
+      { label: "Lịch hẹn", href: ROUTES.SCHEDULE, match: (path) => path.startsWith(ROUTES.SCHEDULE), icon: CalendarClock },
+      { label: "Ghế nha", href: ROUTES.CHAIRS, match: (path) => path.startsWith(ROUTES.CHAIRS), icon: Armchair },
+      {
+        label: "Bệnh nhân",
+        href: ROUTES.PATIENTS,
+        match: (path) => path.startsWith(ROUTES.PATIENTS) || path.startsWith("/visits/") || path.startsWith("/treatment-plans/"),
+        icon: Users,
+      },
+    ],
+  },
+  {
+    id: "referrals",
+    label: "Giới thiệu",
+    icon: UserPlus,
+    items: [
+      { label: "Tổng quan giới thiệu", href: ROUTES.REFERRALS, match: (path) => path === ROUTES.REFERRALS, icon: Handshake },
+      { label: "Người giới thiệu", href: ROUTES.REFERRERS, match: (path) => path === ROUTES.REFERRERS, icon: UserPlus },
+      {
+        label: "Chương trình giới thiệu",
+        href: ROUTES.SETTINGS_REFERRAL_PROGRAMS,
+        match: (path) => path === ROUTES.SETTINGS_REFERRAL_PROGRAMS,
+        icon: ClipboardList,
+      },
+      { label: "Báo cáo giới thiệu", href: ROUTES.REFERRAL_REPORTS, match: (path) => path === ROUTES.REFERRAL_REPORTS, icon: BarChart3 },
+    ],
+  },
+  {
+    id: "settings",
     label: "Cài đặt",
-    href: ROUTES.SETTINGS_USERS,
-    match: (p) => p.startsWith("/settings"),
-    icon: "settings",
+    icon: Settings,
+    items: [
+      { label: "Người dùng", href: ROUTES.SETTINGS_USERS, match: (path) => path === ROUTES.SETTINGS_USERS, icon: Users },
+      { label: "Phòng khám", href: ROUTES.SETTINGS_CLINIC, match: (path) => path === ROUTES.SETTINGS_CLINIC, icon: Building2 },
+      {
+        label: "Dịch vụ điều trị",
+        href: ROUTES.SETTINGS_TREATMENT_SERVICES,
+        match: (path) => path === ROUTES.SETTINGS_TREATMENT_SERVICES,
+        icon: Stethoscope,
+      },
+      { label: "Vai trò", href: ROUTES.SETTINGS_ROLES, match: (path) => path === ROUTES.SETTINGS_ROLES, icon: Shield },
+      { label: "Audit logs", href: ROUTES.SETTINGS_AUDIT_LOGS, match: (path) => path === ROUTES.SETTINGS_AUDIT_LOGS, icon: FileText },
+    ],
   },
 ];
 
-const SUB_NAV: NavItem[] = [
-  { label: "Người dùng", href: ROUTES.SETTINGS_USERS, match: (p) => p === ROUTES.SETTINGS_USERS, icon: "users" },
-  { label: "Phòng khám", href: ROUTES.SETTINGS_CLINIC, match: (p) => p === ROUTES.SETTINGS_CLINIC, icon: "clinic" },
-  { label: "Dịch vụ điều trị", href: ROUTES.SETTINGS_TREATMENT_SERVICES, match: (p) => p === ROUTES.SETTINGS_TREATMENT_SERVICES, icon: "clinic" },
-  { label: "Vai trò", href: ROUTES.SETTINGS_ROLES, match: (p) => p === ROUTES.SETTINGS_ROLES, icon: "roles" },
-  { label: "Audit logs", href: ROUTES.SETTINGS_AUDIT_LOGS, match: (p) => p === ROUTES.SETTINGS_AUDIT_LOGS, icon: "audit" },
-  { label: "Người giới thiệu", href: ROUTES.REFERRERS, match: (p) => p === ROUTES.REFERRERS, icon: "referral" },
-  { label: "Chương trình giới thiệu", href: ROUTES.SETTINGS_REFERRAL_PROGRAMS, match: (p) => p === ROUTES.SETTINGS_REFERRAL_PROGRAMS, icon: "referral" },
-  { label: "Báo cáo giới thiệu", href: ROUTES.REFERRAL_REPORTS, match: (p) => p === ROUTES.REFERRAL_REPORTS, icon: "report" },
-];
+function getInitialGroups(pathname: string): GroupState {
+  const isMobile = typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
+  const activeGroups = NAV_GROUPS.reduce<GroupState>(
+    (state, group) => ({ ...state, [group.id]: group.items.some((item) => item.match(pathname)) }),
+    { operations: false, referrals: false, settings: false },
+  );
+
+  if (isMobile) {
+    return { operations: true, referrals: true, settings: true };
+  }
+
+  try {
+    const stored = window.localStorage.getItem(GROUPS_STORAGE_KEY);
+    if (!stored) return activeGroups;
+
+    const parsed = JSON.parse(stored) as Partial<GroupState>;
+    return {
+      operations: parsed.operations ?? activeGroups.operations,
+      referrals: parsed.referrals ?? activeGroups.referrals,
+      settings: parsed.settings ?? activeGroups.settings,
+    };
+  } catch {
+    return activeGroups;
+  }
+}
 
 interface SidebarProps {
+  collapsed: boolean;
+  onCollapsedChange: (collapsed: boolean) => void;
   onNavigate?: () => void;
 }
 
-export function Sidebar({ onNavigate }: SidebarProps) {
+export function Sidebar({ collapsed, onCollapsedChange, onNavigate }: SidebarProps) {
   const { pathname } = useLocation();
   const { session } = useAuth();
+  const [openGroups, setOpenGroups] = useState<GroupState>(() => getInitialGroups(pathname));
   const dashboardRoute = ROUTES.MANAGEMENT_DASHBOARD;
   const canViewDashboard = Boolean(
     session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.VIEW_MANAGEMENT_DASHBOARD),
   );
-  const navigation: NavItem[] = canViewDashboard
-    ? [{ label: "Quản trị tổng quan", href: dashboardRoute, match: (p) => p === dashboardRoute, icon: "dashboard" }, ...NAV]
-    : NAV;
+
+  const activeGroupId = useMemo(
+    () => NAV_GROUPS.find((group) => group.items.some((item) => item.match(pathname)))?.id,
+    [pathname],
+  );
+
+  useEffect(() => {
+    if (!activeGroupId) return;
+    setOpenGroups((current) => (current[activeGroupId] ? current : { ...current, [activeGroupId]: true }));
+  }, [activeGroupId]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(openGroups));
+    } catch {
+      // Persisting expanded groups is optional; the in-memory state still works.
+    }
+  }, [openGroups]);
+
+  function toggleGroup(groupId: NavGroup["id"]) {
+    setOpenGroups((current) => ({ ...current, [groupId]: !current[groupId] }));
+  }
 
   return (
-    <div className="flex h-full w-60 flex-col">
-      <div className="flex h-16 items-center gap-2 border-b border-border px-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 text-lg font-bold text-white shadow-sm">
+    <div className="flex h-full w-full flex-col">
+      <div className={cn("flex h-16 shrink-0 items-center gap-2 border-b border-border px-5", collapsed && "md:justify-center md:px-0")}>
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 text-lg font-bold text-white shadow-sm">
           D
         </div>
-        <div>
-          <p className="text-sm font-semibold leading-tight text-foreground">Dental Empire</p>
+        <div className={cn("min-w-0", collapsed && "md:hidden")}>
+          <p className="truncate text-sm font-semibold leading-tight text-foreground">Dental Empire</p>
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">OS Clinic</p>
         </div>
       </div>
 
-      <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
-        {navigation.map((item) => {
-          const active = item.match(pathname);
+      <nav className="flex-1 overflow-y-auto p-3" aria-label="Điều hướng chính">
+        {canViewDashboard && (
+          <NavLink
+            item={{ label: "Quản trị tổng quan", href: dashboardRoute, match: (path) => path === dashboardRoute, icon: LayoutDashboard }}
+            collapsed={collapsed}
+            onNavigate={onNavigate}
+          />
+        )}
+
+        {NAV_GROUPS.map((group, groupIndex) => {
+          const isOpen = openGroups[group.id];
+          const isActiveGroup = group.id === activeGroupId;
+          const GroupIcon = group.icon;
+
           return (
-            <Link
-              key={item.href}
-              to={item.href}
-              onClick={onNavigate}
-              className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                active
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-              )}
+            <section
+              key={group.id}
+              className={cn("pt-4", (groupIndex > 0 || canViewDashboard) && "mt-3 border-t border-border", collapsed && "md:pt-3")}
+              aria-label={group.label}
             >
-              <span className={cn("shrink-0", !active && "text-muted-foreground")}>{ICONS[item.icon]}</span>
-              <span>{item.label}</span>
-            </Link>
+              <button
+                type="button"
+                onClick={() => toggleGroup(group.id)}
+                aria-expanded={isOpen}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground transition-colors duration-150 hover:bg-accent/50 hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  collapsed && "md:hidden",
+                )}
+              >
+                <GroupIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="flex-1">{group.label}</span>
+                <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", isOpen && "rotate-180")} aria-hidden="true" />
+              </button>
+
+              <div
+                className={cn(
+                  "grid overflow-hidden transition-[grid-template-rows,opacity] duration-200 ease-out",
+                  isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+                  collapsed && "md:grid-rows-[1fr] md:opacity-100",
+                )}
+              >
+                <div className="min-h-0 space-y-0.5 pt-1">
+                  {group.items.map((item, itemIndex) => (
+                    <NavLink key={item.href} item={item} collapsed={collapsed} onNavigate={onNavigate} style={{ transitionDelay: isOpen ? `${itemIndex * 30}ms` : "0ms" }} />
+                  ))}
+                </div>
+              </div>
+
+              {collapsed && isActiveGroup && <span className="sr-only">Nhóm đang chọn: {group.label}</span>}
+            </section>
           );
         })}
-
-        {pathname.startsWith("/settings") && (
-          <div className="mt-3 space-y-0.5 border-t border-border pt-3">
-            <p className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Quản trị
-            </p>
-            {SUB_NAV.map((item) => {
-              const active = item.match(pathname);
-              return (
-                <Link
-                  key={item.href}
-                  to={item.href}
-                  onClick={onNavigate}
-                  className={cn(
-                    "flex items-center gap-3 rounded-md px-3 py-2 pl-10 text-sm transition-colors",
-                    active
-                      ? "bg-accent font-medium text-accent-foreground"
-                      : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground",
-                  )}
-                >
-                  <span className={cn("shrink-0", !active && "text-muted-foreground")}>{ICONS[item.icon]}</span>
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-          </div>
-        )}
       </nav>
 
-      <div className="border-t border-border p-3 text-xs text-muted-foreground">
-        <p>v0.1.0 · MVP</p>
+      <div className={cn("shrink-0 border-t border-border p-3", collapsed && "md:px-2")}>
+        <button
+          type="button"
+          onClick={() => onCollapsedChange(!collapsed)}
+          className="hidden w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:flex"
+          aria-label={collapsed ? "Mở rộng thanh điều hướng" : "Thu gọn thanh điều hướng"}
+          title={collapsed ? "Mở rộng thanh điều hướng" : "Thu gọn thanh điều hướng"}
+        >
+          {collapsed ? <ChevronsRight className="h-4 w-4" aria-hidden="true" /> : <ChevronsLeft className="h-4 w-4" aria-hidden="true" />}
+          <span className={cn(collapsed && "hidden")}>Thu gọn</span>
+        </button>
+        <p className={cn("mt-2 text-xs text-muted-foreground", collapsed && "md:mt-0 md:text-center md:text-[10px]")}>
+          <span className={cn(collapsed && "md:hidden")}>v0.1.0 · MVP</span>
+          {collapsed && <span className="hidden md:inline">v0.1</span>}
+        </p>
       </div>
+    </div>
+  );
+}
+
+interface NavLinkProps {
+  item: NavItem;
+  collapsed: boolean;
+  onNavigate?: () => void;
+  style?: import("react").CSSProperties;
+}
+
+function NavLink({ item, collapsed, onNavigate, style }: NavLinkProps) {
+  const { pathname } = useLocation();
+  const active = item.match(pathname);
+  const Icon = item.icon;
+
+  return (
+    <div className="group relative" style={style}>
+      <Link
+        to={item.href}
+        onClick={onNavigate}
+        aria-label={item.label}
+        className={cn(
+          "flex items-center gap-3 rounded-md border-l-2 border-transparent px-3 py-2 text-sm font-medium transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          collapsed && "md:justify-center md:px-0",
+          active
+            ? "border-primary bg-accent text-primary"
+            : "text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground",
+        )}
+      >
+        <Icon className="h-5 w-5 shrink-0" strokeWidth={2} aria-hidden="true" />
+        <span className={cn("min-w-0 truncate", collapsed && "md:hidden")}>{item.label}</span>
+      </Link>
+      {collapsed && (
+        <span
+          role="tooltip"
+          className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 hidden -translate-x-1 -translate-y-1/2 whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground opacity-0 shadow-sm transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:translate-x-0 group-focus-within:opacity-100 md:block"
+        >
+          {item.label}
+        </span>
+      )}
     </div>
   );
 }

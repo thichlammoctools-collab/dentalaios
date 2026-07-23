@@ -22,6 +22,53 @@ async function makePlatformToken(userKey: string) {
 }
 
 describe("requirePlatformAuth middleware", () => {
+  it("keeps a session active when its last request was within the idle window", async () => {
+    const now = Date.now();
+    const db = createMockD1({
+      rowsByFragment: new Map([
+        ["FROM platform_sessions", [{
+          id: "platform-session-1",
+          platform_user_id: "user-1",
+          issued_at: new Date(now - 120_000).toISOString(),
+          expires_at: new Date(now + 60_000).toISOString(),
+          last_seen_at: new Date(now - 120_000).toISOString(),
+          revoked_at: null,
+          mfa_verified_at: new Date(now - 120_000).toISOString(),
+        }]],
+        ["FROM platform_users u JOIN platform_roles r", [{
+          u_id: "user-1",
+          u_role_id: "role-1",
+          u_name: "Owner",
+          u_password_hash: "unused",
+          u_is_active: 1,
+          u_mfa_secret_encrypted: null,
+          u_mfa_enabled_at: new Date(now - 120_000).toISOString(),
+          u_last_login_at: null,
+          u_created_at: new Date(now - 120_000).toISOString(),
+          u_updated_at: new Date(now - 120_000).toISOString(),
+          r_id: "role-1",
+          r_key: "platform_owner",
+          r_name: "Owner",
+          r_permissions: '["platform_dashboard.read"]',
+          r_created_at: new Date(now - 120_000).toISOString(),
+        }]],
+      ]),
+    });
+    const env = buildEnv(db as unknown as D1Database, { PLATFORM_JWT_SECRET: TEST_SECRET });
+    const app = createTestApp() as Hono<{ Bindings: Env }>;
+    app.use("*", requirePlatformAuth());
+    app.get("/test", (c) => c.json({ ok: true }));
+
+    const token = await makePlatformToken("user-1");
+    const res = await app.request(
+      "/test",
+      { headers: { Authorization: `Bearer ${token}` } },
+      env,
+    );
+
+    expect(res.status).toBe(200);
+  });
+
   it("does not turn downstream errors into session-expired responses", async () => {
     const db = createMockD1({
       rowsByFragment: new Map([
