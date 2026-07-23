@@ -26,6 +26,11 @@ router.patch("/:id", requirePermission(PERMISSIONS.MANAGE_REFERRERS), auditLog("
   const jwt = getJwt(c);
   return c.json(await referralService.updateReferrer(c.env.DB, jwt.tenant_id, jwt.sub, c.req.param("id"), c.req.valid("json")));
 });
+router.delete("/:id", requirePermission(PERMISSIONS.MANAGE_REFERRERS), auditLog("delete", "referrer"), async (c) => {
+  const jwt = getJwt(c);
+  await referralService.deleteReferrer(c.env.DB, jwt.tenant_id, jwt.sub, c.req.param("id"));
+  return c.body(null, 204);
+});
 router.post("/:id/regenerate-code", requirePermission(PERMISSIONS.MANAGE_REFERRERS), auditLog("regenerate_code", "referrer"), async (c) => {
   const jwt = getJwt(c);
   return c.json(await referralService.regenerateCode(c.env.DB, jwt.tenant_id, jwt.sub, c.req.param("id")));
