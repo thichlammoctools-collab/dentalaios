@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { apiBlob, apiDelete, apiGet, apiPost, apiUpload, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
-import type { ClinicalDiagnosis, ClinicalDiagnosisImageEvidence, ImageAnnotation, ImageAnnotationGeometry, ImageAnnotationShapeType, PatientImage, PatientImagePurpose, PatientImageType, AnalyzeImageResult } from "@shared/types";
+import type { ClinicalDiagnosis, ClinicalDiagnosisImageEvidence, ImageAnnotation, ImageAnnotationGeometry, ImageAnnotationShapeType, PatientImage, PatientImagePurpose, PatientImageType, AnalyzeImageResult, Visit } from "@shared/types";
 import { PATIENT_IMAGE_PURPOSE_LABELS, PATIENT_IMAGE_TYPE_LABELS } from "@shared/types";
 
 interface PatientImageGalleryProps {
@@ -44,9 +44,16 @@ export function PatientImageGallery({
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<string>("all");
   const [filterPurpose, setFilterPurpose] = useState<PatientImagePurpose | "all">("all");
-  const [uploadPurpose, setUploadPurpose] = useState<PatientImagePurpose>(visitId ? "clinical_record" : "clinical_record");
+  const [filterVisitId, setFilterVisitId] = useState<string>("all");
+  const [visits, setVisits] = useState<Visit[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploadPurpose, setUploadPurpose] = useState<PatientImagePurpose>("clinical_record");
   const [uploadType, setUploadType] = useState<PatientImageType>("other");
+  const [uploadVisitId, setUploadVisitId] = useState(visitId ?? "");
   const [selected, setSelected] = useState<PatientImage | null>(null);
+  const [comparisonImages, setComparisonImages] = useState<{ before: PatientImage | null; after: PatientImage | null }>({ before: null, after: null });
+  const [comparisonOpen, setComparisonOpen] = useState(false);
   const [viewUrl, setViewUrl] = useState<string | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
   const [viewError, setViewError] = useState<string | null>(null);
@@ -89,6 +96,16 @@ export function PatientImageGallery({
 
   useEffect(() => {
     load();
+  }, [patientId, visitId]);
+
+  useEffect(() => {
+    if (visitId) {
+      setUploadVisitId(visitId);
+      return;
+    }
+    void apiGet<{ items: Visit[] }>(`/api/visits?patient_id=${patientId}`)
+      .then((response) => setVisits(response.items))
+      .catch(() => setVisits([]));
   }, [patientId, visitId]);
 
   useEffect(() => {
@@ -160,8 +177,19 @@ export function PatientImageGallery({
 
   const filtered = images.filter((image) =>
     (filterType === "all" || image.image_type === filterType)
-    && (filterPurpose === "all" || image.image_purpose === filterPurpose),
+    && (filterPurpose === "all" || image.image_purpose === filterPurpose)
+    && (filterVisitId === "all" || (filterVisitId === "unlinked" ? !image.visit_id : image.visit_id === filterVisitId)),
   );
+  const uploadVisitOptions = visitId ? [] : visits;
+  const beforeImages = images.filter((image) => image.image_purpose === "treatment_before");
+  const afterImages = images.filter((image) => image.image_purpose === "treatment_after");
+
+  function openUpload(files: File[]) {
+    if (!files.length || uploading) return;
+    setPendingFiles(files);
+    setUploadVisitId(visitId ?? "");
+    setUploadDialogOpen(true);
+  }
 
   async function uploadImage(file: File) {
     setUploading(true);
@@ -176,7 +204,8 @@ export function PatientImageGallery({
         image_purpose: uploadPurpose,
         original_size: String(originalSize),
       });
-      if (visitId) params.set("visit_id", visitId);
+      const targetVisitId = visitId ?? uploadVisitId;
+      if (targetVisitId) params.set("visit_id", targetVisitId);
       await apiUpload(`/api/patient-images/file?${params}`, blob, {
         "Content-Type": blob.type || "image/jpeg",
         // HTTP headers only accept Latin-1 characters; preserve Unicode names safely.
@@ -200,12 +229,18 @@ export function PatientImageGallery({
     }
   }
 
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
     // Reset immediately so selecting the same file again triggers onChange.
     e.target.value = "";
-    if (!file || uploading) return;
-    await uploadImage(file);
+    openUpload(files);
+  }
+
+  async function confirmUpload() {
+    if (!pendingFiles.length) return;
+    setUploadDialogOpen(false);
+    for (const file of pendingFiles) await uploadImage(file);
+    setPendingFiles([]);
   }
 
   useEffect(() => {
@@ -219,8 +254,8 @@ export function PatientImageGallery({
 
       event.preventDefault();
       const extension = blob.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
-      const file = new File([blob], `anh-da-dan-${Date.now()}.${extension}`, { type: blob.type });
-      void uploadImage(file);
+       const file = new File([blob], `anh-da-dan-${Date.now()}.${extension}`, { type: blob.type });
+       openUpload([file]);
     }
 
     window.addEventListener("paste", handlePaste);
@@ -395,18 +430,14 @@ export function PatientImageGallery({
   return (
     <div>
       <section className="mb-4 rounded-xl border border-border bg-muted/20 p-3">
-        <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold">Phân loại ảnh lâm sàng</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Tách mục đích hồ sơ khỏi loại kỹ thuật để dễ đối chiếu trước–sau và truy xuất theo lượt khám.</p>
+            <p className="text-sm font-semibold">Hình ảnh lâm sàng</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Mỗi ảnh được phân loại khi tải lên theo mục đích điều trị, loại kỹ thuật và lượt khám liên quan.</p>
           </div>
           <span className="rounded-full bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground">{imageTotal} ảnh lưu trữ</span>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="grid gap-1 text-xs font-medium text-muted-foreground">Mục đích lâm sàng<select value={uploadPurpose} onChange={(event) => setUploadPurpose(event.target.value as PatientImagePurpose)} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="clinical_record">Bệnh án / hỗ trợ chẩn đoán</option><option value="treatment_before">Trước điều trị</option><option value="treatment_after">Sau điều trị</option></select></label>
-          <label className="grid gap-1 text-xs font-medium text-muted-foreground">Loại hình ảnh<select value={uploadType} onChange={(event) => setUploadType(event.target.value as PatientImageType)} className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"><option value="other">Tự nhận diện từ tệp</option>{imageTypes.filter(([type]) => type !== "other").map(([type, label]) => <option key={type} value={type}>{label}</option>)}</select></label>
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">{visitId ? "Ảnh tải tại đây sẽ tự động gắn với lượt khám hiện tại." : "Có thể liên kết ảnh với chẩn đoán sau khi tải lên; ảnh theo từng lượt khám được ghi nhận tại màn hình lượt khám."}</p>
+        {visitId && <p className="mt-2 text-xs text-muted-foreground">Ảnh tải tại đây sẽ tự động gắn với lượt khám hiện tại.</p>}
       </section>
       {!compact && (
         <div className="flex items-center justify-between mb-4">
@@ -415,6 +446,7 @@ export function PatientImageGallery({
             <input
               type="file"
               accept="image/*,.dcm"
+              multiple
               onChange={handleUpload}
               disabled={uploading}
               className="hidden"
@@ -459,6 +491,12 @@ export function PatientImageGallery({
             return <button key={purpose} onClick={() => setFilterPurpose(purpose)} className={`text-xs px-3 py-1 rounded-full border transition-colors ${filterPurpose === purpose ? "bg-teal-600 text-white border-teal-600" : "border-border text-muted-foreground hover:border-teal-400"}`}>{label} ({count})</button>;
           })}
         </div>
+        {!visitId && <div className="flex flex-wrap items-center gap-1">
+          <span className="mr-1 text-xs font-medium text-muted-foreground">Lượt khám:</span>
+          <button onClick={() => setFilterVisitId("all")} className={`text-xs px-3 py-1 rounded-full border transition-colors ${filterVisitId === "all" ? "bg-teal-600 text-white border-teal-600" : "border-border text-muted-foreground hover:border-teal-400"}`}>Tất cả</button>
+          <button onClick={() => setFilterVisitId("unlinked")} className={`text-xs px-3 py-1 rounded-full border transition-colors ${filterVisitId === "unlinked" ? "bg-teal-600 text-white border-teal-600" : "border-border text-muted-foreground hover:border-teal-400"}`}>Chưa gắn lượt khám</button>
+          {visits.map((visit) => <button key={visit.id} onClick={() => setFilterVisitId(visit.id)} className={`text-xs px-3 py-1 rounded-full border transition-colors ${filterVisitId === visit.id ? "bg-teal-600 text-white border-teal-600" : "border-border text-muted-foreground hover:border-teal-400"}`}>{new Date(visit.date).toLocaleDateString("vi-VN")}</button>)}
+        </div>}
         <div className="flex flex-wrap items-center gap-1">
           <span className="mr-1 text-xs font-medium text-muted-foreground">Loại ảnh:</span>
           <button onClick={() => setFilterType("all")} className={`text-xs px-3 py-1 rounded-full border transition-colors ${filterType === "all" ? "bg-teal-600 text-white border-teal-600" : "border-border text-muted-foreground hover:border-teal-400"}`}>Tất cả ({images.length})</button>
@@ -469,6 +507,13 @@ export function PatientImageGallery({
           })}
         </div>
       </div>
+
+      {beforeImages.length > 0 && afterImages.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 bg-teal-50/50 p-3 dark:border-teal-900 dark:bg-teal-950/20">
+          <div><p className="text-sm font-medium">Đối chiếu trước – sau điều trị</p><p className="mt-0.5 text-xs text-muted-foreground">Chọn một ảnh mỗi bên để xem song song.</p></div>
+          <Button size="sm" variant="outline" onClick={() => { setComparisonImages({ before: beforeImages[0], after: afterImages[0] }); setComparisonOpen(true); }}>So sánh ảnh</Button>
+        </div>
+      )}
 
       {/* Grid */}
       {loading ? (
@@ -781,8 +826,8 @@ function AnnotationOverlay({ shape, geometry, active, draft }: { shape: ImageAnn
   if (shape === "pin" && "x" in geometry && "y" in geometry) {
     const x = geometry.x * 1000;
     const y = geometry.y * 1000;
-    const tailX = Math.max(30, x - 90);
-    const tailY = Math.max(30, y - 90);
+    const tailX = Math.max(30, x - 45);
+    const tailY = Math.max(30, y - 45);
     return <line x1={tailX} y1={tailY} x2={x} y2={y} stroke={color} strokeWidth="4" strokeLinecap="round" markerEnd={marker} vectorEffect="non-scaling-stroke" />;
   }
   if (shape === "freehand" && "points" in geometry) return <polyline points={geometry.points.map((point) => `${point.x * 1000},${point.y * 1000}`).join(" ")} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />;

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,7 +72,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
   const [lookingUpReferral, setLookingUpReferral] = useState(false);
   const [users, setUsers] = useState<UserWithDetails[]>([]);
   const [step, setStep] = useState(1);
-  const formRef = useRef<HTMLFormElement>(null);
+  const stepOneRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open || !branchId) return;
@@ -109,13 +109,8 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
     }
   }, [open, patient]);
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function savePatient() {
     if (!session) return;
-    if (step === 1) {
-      goToNextStep();
-      return;
-    }
     setSaving(true);
     try {
       const payload: PatientCreateInput = {
@@ -178,10 +173,11 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
     : null;
 
   function goToNextStep() {
-    const form = formRef.current;
-    if (!form) return;
-    if (!form.checkValidity()) {
-      for (const el of Array.from(form.elements)) {
+    const stepOne = stepOneRef.current;
+    if (!stepOne) return;
+    const fields = Array.from(stepOne.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input, select, textarea"));
+    if (fields.some((el) => !el.checkValidity())) {
+      for (const el of fields) {
         if (!el.checkValidity()) el.reportValidity();
       }
       return;
@@ -208,7 +204,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange} size="workspace">
-      <form ref={formRef} onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Sửa bệnh nhân" : "Tạo bệnh nhân mới"}</DialogTitle>
           <div className="mt-4 flex items-center gap-3" aria-label="Tiến trình biểu mẫu">
@@ -220,7 +216,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
 
         <DialogBody className="min-h-0 grid gap-4 lg:gap-5">
 
-          {step === 1 && <>
+          {step === 1 && <div ref={stepOneRef} className="contents">
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
             Nhập thông tin cần thiết để nhận diện và liên hệ bệnh nhân. Các mục có dấu <span className="font-semibold text-red-500">*</span> là bắt buộc.
           </div>
@@ -311,7 +307,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
               Nhập đủ 12 chữ số trên CCCD. Không dùng số CMND cũ 9 số; hệ thống tự bỏ dấu cách và dấu gạch ngang.
             </p>
           </div>
-          </>}
+          </div>}
 
           {step === 2 && <>
           <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
@@ -490,12 +486,12 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
           {step === 1 ? (
             <Button type="button" onClick={goToNextStep}>Tiếp tục</Button>
           ) : (
-            <Button type="submit" disabled={saving}>
+            <Button type="button" onClick={() => void savePatient()} disabled={saving}>
               {saving ? "Đang lưu…" : isEdit ? "Lưu thay đổi" : "Tạo bệnh nhân"}
             </Button>
           )}
         </DialogFooter>
-      </form>
+      </div>
     </Dialog>
   );
 }
