@@ -149,7 +149,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
         referral_type: referralType || undefined,
         referral_user_id: referralUserId || undefined,
         referral_notes: referralNotes || undefined,
-        referrer_id: !isEdit && resolvedReferrer ? resolvedReferrer.id : undefined,
+        referrer_id: resolvedReferrer ? resolvedReferrer.id : undefined,
         cccd,
       };
       if (isEdit && patient) {
@@ -465,8 +465,8 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
             </section>
           </div>
 
-          {/* ─── 4. Giới thiệu ─── */}
-          <SectionDivider icon={<ReferralIcon />}>Giới thiệu</SectionDivider>
+          {/* ─── 4. Nguồn ─── */}
+          <SectionDivider icon={<ReferralIcon />}>Nguồn</SectionDivider>
 
           <div className="grid gap-1.5 xl:max-w-[calc(50%-0.5rem)]">
             <Label htmlFor="pf-mkt">Biết phòng khám qua kênh nào?</Label>
@@ -476,25 +476,19 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
             </Select>
           </div>
 
-          {marketingSource === "gioi_thieu" && !isEdit && (
+          {marketingSource === "gioi_thieu" && (
             <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
               <div className="flex flex-wrap items-end gap-2">
                 <div className="min-w-60 flex-1">
                   <Label htmlFor="pf-referrer-search">Tìm Người giới thiệu</Label>
-                  <Input id="pf-referrer-search" value={referrerQuery} disabled={Boolean(resolvedReferrer)} onChange={(event) => setReferrerQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void searchReferrers(); } }} placeholder="Mã, số điện thoại hoặc email" />
+                  <Input id="pf-referrer-search" value={referrerQuery} disabled={Boolean(resolvedReferrer) || (isEdit && Boolean(patient?.referral_referrer_name || patient?.referral_user_name))} onChange={(event) => setReferrerQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void searchReferrers(); } }} placeholder="Mã, số điện thoại hoặc email" />
                 </div>
-                <Button type="button" variant="outline" disabled={searchingReferrers || Boolean(resolvedReferrer) || referrerQuery.trim().length < 2} onClick={() => void searchReferrers()}>{searchingReferrers ? "Đang tìm..." : "Tìm"}</Button>
-                {resolvedReferrer && <Button type="button" variant="ghost" onClick={() => setResolvedReferrer(null)}>Đổi người</Button>}
+                <Button type="button" variant="outline" disabled={searchingReferrers || Boolean(resolvedReferrer) || (isEdit && Boolean(patient?.referral_referrer_name || patient?.referral_user_name)) || referrerQuery.trim().length < 2} onClick={() => void searchReferrers()}>{searchingReferrers ? "Đang tìm..." : "Tìm"}</Button>
+                {resolvedReferrer && !isEdit && <Button type="button" variant="ghost" onClick={() => setResolvedReferrer(null)}>Đổi người</Button>}
               </div>
               {referrerMatches.length > 0 && !resolvedReferrer && <div className="divide-y rounded-md border border-border bg-background">{referrerMatches.map((referrer) => <button type="button" key={referrer.id} className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { setResolvedReferrer(referrer); setReferralType("other"); setReferrerMatches([]); setReferrerQuery(""); }}><span><strong>{referrer.name}</strong><span className="ml-2 text-muted-foreground">{referrer.code}</span></span><span className="text-xs text-muted-foreground">{referrer.phone ?? referrer.email}</span></button>)}</div>}
-              {resolvedReferrer ? <p className="text-sm text-primary">Đã chọn: <strong>{resolvedReferrer.name}</strong> ({resolvedReferrer.code}). Người giới thiệu được ghi nhận cùng hồ sơ và không thể đổi sau khi lưu.</p> : <div><Button type="button" variant="ghost" size="sm" onClick={() => setShowQuickReferrer((current) => !current)}>{showQuickReferrer ? "Ẩn tạo mới" : "Chưa có? Tạo Người giới thiệu mới"}</Button>{showQuickReferrer && <div className="mt-2 grid gap-2 sm:grid-cols-3"><Input value={quickReferrer.name} onChange={(event) => setQuickReferrer((current) => ({ ...current, name: event.target.value }))} placeholder="Họ tên / đối tác" /><Input type="email" value={quickReferrer.email} onChange={(event) => setQuickReferrer((current) => ({ ...current, email: event.target.value }))} placeholder="Email" /><div className="flex gap-2"><Input type="tel" value={quickReferrer.phone} onChange={(event) => setQuickReferrer((current) => ({ ...current, phone: event.target.value }))} placeholder="Số điện thoại" /><Button type="button" disabled={creatingReferrer} onClick={() => void createQuickReferrer()}>{creatingReferrer ? "Đang tạo..." : "Tạo"}</Button></div></div>}</div>}
+              {resolvedReferrer || (isEdit && (patient?.referral_referrer_name || patient?.referral_user_name)) ? <p className="text-sm text-primary">Đã chọn: <strong>{resolvedReferrer?.name ?? patient?.referral_referrer_name ?? patient?.referral_user_name}</strong>{resolvedReferrer?.code || patient?.referral_referrer_code ? ` (${resolvedReferrer?.code ?? patient?.referral_referrer_code})` : ""}. Người giới thiệu được ghi nhận cùng hồ sơ và không thể đổi sau khi lưu.</p> : <div><Button type="button" variant="ghost" size="sm" onClick={() => setShowQuickReferrer((current) => !current)}>{showQuickReferrer ? "Ẩn tạo mới" : "Chưa có? Tạo Người giới thiệu mới"}</Button>{showQuickReferrer && <div className="mt-2 grid gap-2 sm:grid-cols-3"><Input value={quickReferrer.name} onChange={(event) => setQuickReferrer((current) => ({ ...current, name: event.target.value }))} placeholder="Họ tên / đối tác" /><Input type="email" value={quickReferrer.email} onChange={(event) => setQuickReferrer((current) => ({ ...current, email: event.target.value }))} placeholder="Email" /><div className="flex gap-2"><Input type="tel" value={quickReferrer.phone} onChange={(event) => setQuickReferrer((current) => ({ ...current, phone: event.target.value }))} placeholder="Số điện thoại" /><Button type="button" disabled={creatingReferrer} onClick={() => void createQuickReferrer()}>{creatingReferrer ? "Đang tạo..." : "Tạo"}</Button></div></div>}</div>}
             </div>
-          )}
-
-          {marketingSource === "gioi_thieu" && isEdit && referralType === "other" && (
-            <p className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-              Người giới thiệu đã được ghi nhận cùng hồ sơ và không thể thay đổi sau khi lưu.
-            </p>
           )}
 
           {marketingSource === "gioi_thieu" && isEdit && referralType && referralType !== "other" && (

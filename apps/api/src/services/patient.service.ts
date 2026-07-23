@@ -114,7 +114,15 @@ export const patientService = {
       const existing = await repository.getById(tenantId, id);
       if (!existing) return null;
       if (data.referrer_id || data.referral_code) {
-        throw new ConflictError("Chỉ có thể ghi nhận Người giới thiệu khi tạo hồ sơ bệnh nhân");
+        const existingCase = await db.prepare("SELECT id FROM referral_cases WHERE tenant_id = ? AND patient_id = ? LIMIT 1").bind(tenantId, id).first();
+        if (existingCase) throw new ConflictError("Không thể thay đổi Người giới thiệu khi hồ sơ đã có case giới thiệu");
+        const confirmedPayment = await db.prepare("SELECT id FROM payments WHERE tenant_id = ? AND patient_id = ? AND status = 'confirmed' LIMIT 1").bind(tenantId, id).first();
+        if (confirmedPayment) throw new ConflictError("Không thể ghi nhận Người giới thiệu sau khi đã có thanh toán xác nhận");
+        const referrer = await referralService.resolveReferrer(db, tenantId, {
+          referrerId: data.referrer_id,
+          referralCode: data.referral_code,
+        });
+        if (referrer) await referralService.createCaseForNewPatient(db, tenantId, "system", existing, referrer, data.referral_code ? "code" : "manual");
       }
       const address = displayAddress({
         address: data.address ?? existing.address,
