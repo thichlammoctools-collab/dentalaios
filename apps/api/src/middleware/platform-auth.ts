@@ -25,40 +25,41 @@ export function requirePlatformAuth(): MiddlewareHandler<{
     const header = c.req.header("Authorization");
     if (!header?.startsWith("Bearer "))
       throw new UnauthorizedError("Missing or invalid Authorization header");
+    let jwt: PlatformJwtPayload;
     try {
-      const jwt = await verifyPlatformJwt(
+      jwt = await verifyPlatformJwt(
         header.slice(7).trim(),
         c.env.PLATFORM_JWT_SECRET,
       );
-      const session = await createPlatformSessionsRepository(c.env.DB).find(
-        jwt.sid,
-      );
-      if (
-        !session ||
-        session.platform_user_id !== jwt.sub ||
-        session.revoked_at ||
-        !valid(session.expires_at) ||
-        !valid(session.last_seen_at, PLATFORM_SESSION_IDLE_SECONDS)
-      )
-        throw new UnauthorizedError("Platform session expired");
-      const user = await createPlatformUsersRepository(c.env.DB).findById(
-        jwt.sub,
-      );
-      if (!user || !user.user.is_active)
-        throw new UnauthorizedError("Platform account is inactive");
-      if (Date.now() - Date.parse(session.last_seen_at) > 60_000)
-        await createPlatformSessionsRepository(c.env.DB).touch(session.id);
-      c.set("platformJwt", {
-        ...jwt,
-        role_key: user.role.key,
-        permissions: user.role.permissions,
-      });
-      c.set("platformMfaVerifiedAt", session.mfa_verified_at);
-      await next();
-    } catch (error) {
-      if (error instanceof UnauthorizedError) throw error;
+    } catch {
       throw new UnauthorizedError("Invalid or expired platform token");
     }
+
+    const session = await createPlatformSessionsRepository(c.env.DB).find(
+      jwt.sid,
+    );
+    if (
+      !session ||
+      session.platform_user_id !== jwt.sub ||
+      session.revoked_at ||
+      !valid(session.expires_at) ||
+      !valid(session.last_seen_at, PLATFORM_SESSION_IDLE_SECONDS)
+    )
+      throw new UnauthorizedError("Platform session expired");
+    const user = await createPlatformUsersRepository(c.env.DB).findById(
+      jwt.sub,
+    );
+    if (!user || !user.user.is_active)
+      throw new UnauthorizedError("Platform account is inactive");
+    if (Date.now() - Date.parse(session.last_seen_at) > 60_000)
+      await createPlatformSessionsRepository(c.env.DB).touch(session.id);
+    c.set("platformJwt", {
+      ...jwt,
+      role_key: user.role.key,
+      permissions: user.role.permissions,
+    });
+    c.set("platformMfaVerifiedAt", session.mfa_verified_at);
+    await next();
   };
 }
 export function getPlatformJwt(c: {

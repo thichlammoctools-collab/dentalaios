@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { apiGet, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { createDashboardStream, type DashboardStreamStatus } from "@/lib/dashboard-stream";
+import { AppointmentForm } from "@/components/schedule/AppointmentForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
@@ -92,6 +93,7 @@ export function TodayPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [streamStatus, setStreamStatus] = useState<DashboardStreamStatus>("reconnecting");
+  const [createAppointmentOpen, setCreateAppointmentOpen] = useState(false);
   const requestId = useRef(0);
 
   async function loadSnapshot(manual = false) {
@@ -144,8 +146,8 @@ export function TodayPage() {
             <p className="mt-2 text-sm text-blue-100">{hcmDate(snapshot?.today_start)} · Theo giờ Hồ Chí Minh</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button asChild className="bg-white text-blue-700 hover:bg-blue-50">
-              <Link to={ROUTES.SCHEDULE_NEW}>+ Tạo lịch hẹn</Link>
+            <Button className="bg-white text-blue-700 hover:bg-blue-50" onClick={() => setCreateAppointmentOpen(true)}>
+              + Tạo lịch hẹn
             </Button>
             <Button asChild variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white">
               <Link to={ROUTES.PATIENTS}>+ Tạo bệnh nhân</Link>
@@ -220,6 +222,11 @@ export function TodayPage() {
           {hasActions && <ActionCenter groups={actions} branchId={snapshot.branch.id} />}
         </>
       ) : null}
+      <AppointmentForm
+        open={createAppointmentOpen}
+        onOpenChange={setCreateAppointmentOpen}
+        onCreated={() => void loadSnapshot(true)}
+      />
     </PageContainer>
   );
 }
