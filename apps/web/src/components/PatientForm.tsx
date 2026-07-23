@@ -113,7 +113,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
     e.preventDefault();
     if (!session) return;
     if (step === 1) {
-      if (formRef.current?.reportValidity()) setStep(2);
+      goToNextStep();
       return;
     }
     setSaving(true);
@@ -178,7 +178,15 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
     : null;
 
   function goToNextStep() {
-    if (formRef.current?.reportValidity()) setStep(2);
+    const form = formRef.current;
+    if (!form) return;
+    if (!form.checkValidity()) {
+      for (const el of Array.from(form.elements)) {
+        if (!el.checkValidity()) el.reportValidity();
+      }
+      return;
+    }
+    setStep(2);
   }
 
   async function lookupReferralCode() {
