@@ -154,6 +154,12 @@ export const referrerUpdateSchema = z.object({
   linked_user_id: z.string().min(1).nullable().optional(),
   status: z.enum(["active", "inactive"]).optional(),
 }).strict().refine((data) => Object.keys(data).length > 0, "Cần ít nhất một trường để cập nhật");
+export const referrerQuickCreateSchema = z.object({
+  type: z.enum(["patient", "doctor", "assistant", "partner"]).default("partner"),
+  name: nonEmpty(200),
+  email: optionalText(200).refine((value) => value === undefined || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value), "Email không hợp lệ"),
+  phone: optionalText(20),
+}).strict().refine((data) => Boolean(data.email || data.phone), "Cần email hoặc số điện thoại");
 export const referralProgramSchema = z.object({
   name: nonEmpty(200),
   status: z.enum(["draft", "active", "inactive"]).default("draft"),
@@ -181,6 +187,7 @@ export const referrerPortalLoginSchema = z.object({ clinic_slug: z.string().trim
 export const referrerPortalPasswordSchema = z.object({ token: z.string().min(32), password: referralPassword }).strict();
 export type ReferrerCreateInput = z.infer<typeof referrerCreateSchema>;
 export type ReferrerUpdateInput = z.infer<typeof referrerUpdateSchema>;
+export type ReferrerQuickCreateInput = z.infer<typeof referrerQuickCreateSchema>;
 export type ReferralProgramInput = z.infer<typeof referralProgramSchema>;
 export type ReferralCaseCreateInput = z.infer<typeof referralCaseCreateSchema>;
 export type ReferralRewardReviewInput = z.infer<typeof referralRewardReviewSchema>;

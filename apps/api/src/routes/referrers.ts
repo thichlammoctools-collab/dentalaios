@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { referrerAccountCreateSchema, referrerCreateSchema, referrerUpdateSchema } from "@shared/validation";
+import { referrerAccountCreateSchema, referrerCreateSchema, referrerQuickCreateSchema, referrerUpdateSchema } from "@shared/validation";
 import { PERMISSIONS } from "@shared/constants";
 import type { Env } from "../index";
 import { auditLog } from "../middleware/audit";
@@ -17,6 +17,25 @@ router.use("*", requireAuth());
 router.get("/", requirePermission(PERMISSIONS.MANAGE_REFERRERS), async (c) => {
   const jwt = getJwt(c);
   return c.json({ items: await referralService.listReferrers(c.env.DB, jwt.tenant_id) });
+});
+router.get("/search", requirePermission(PERMISSIONS.WRITE_PATIENTS), async (c) => {
+  const jwt = getJwt(c);
+  const query = new URL(c.req.url).searchParams.get("q")?.trim();
+  if (!query || query.length < 2) return c.json({ items: [] });
+  const pattern = `%${query.replace(/[%_\\]/g, "\\$&")}%`;
+  const result = await c.env.DB.prepare(
+    "SELECT * FROM referrers WHERE tenant_id = ? AND status = 'active' AND (code LIKE ? ESCAPE '\\' OR phone LIKE ? ESCAPE '\\' OR email LIKE ? ESCAPE '\\') ORDER BY name LIMIT 10",
+  ).bind(jwt.tenant_id, pattern, pattern, pattern).all();
+  return c.json({ items: result.results.map((row) => ({ id: row.id, code: row.code, name: row.name, type: row.type, email: row.email ?? undefined, phone: row.phone ?? undefined })) });
+});
+router.post("/quick", requirePermission(PERMISSIONS.WRITE_PATIENTS), auditLog("create", "referrer"), zValidator("json", referrerQuickCreateSchema), async (c) => {
+  const jwt = getJwt(c);
+  const input = c.req.valid("json");
+  const existing = await c.env.DB.prepare(
+    "SELECT id FROM referrers WHERE tenant_id = ? AND ((? IS NOT NULL AND email = ?) OR (? IS NOT NULL AND phone = ?)) LIMIT 1",
+  ).bind(jwt.tenant_id, input.email ?? null, input.email ?? null, input.phone ?? null, input.phone ?? null).first();
+  if (existing) return c.json({ error: "Người giới thiệu với email hoặc số điện thoại này đã tồn tại", code: "conflict" }, 409);
+  return c.json(await referralService.createReferrer(c.env.DB, jwt.tenant_id, jwt.sub, input), 201);
 });
 router.post("/", requirePermission(PERMISSIONS.MANAGE_REFERRERS), auditLog("create", "referrer"), zValidator("json", referrerCreateSchema), async (c) => {
   const jwt = getJwt(c);
