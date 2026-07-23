@@ -704,13 +704,15 @@ export const patientImagePresignSchema = z.object({
 export type PatientImagePresignInput = z.infer<typeof patientImagePresignSchema>;
 
 const normalizedCoordinate = z.number().finite().min(0).max(1);
+const normalizedPoint = z.object({ x: normalizedCoordinate, y: normalizedCoordinate }).strict();
 const imageAnnotationSchemaBase = z.object({
-  shape_type: z.enum(["pin", "rectangle"]),
+  shape_type: z.enum(["pin", "rectangle", "freehand"]),
   geometry: z.union([
-    z.object({ x: normalizedCoordinate, y: normalizedCoordinate }).strict(),
+    normalizedPoint,
     z.object({ x: normalizedCoordinate, y: normalizedCoordinate, width: z.number().finite().gt(0).max(1), height: z.number().finite().gt(0).max(1) })
       .strict()
       .refine((value) => value.x + value.width <= 1 && value.y + value.height <= 1, "Khung đánh dấu phải nằm trong ảnh"),
+    z.object({ points: z.array(normalizedPoint).min(2).max(1_000) }).strict(),
   ]),
   note: nonEmpty(2000),
   tooth_number: z.number().int().refine(isValidFdiTooth, "Số răng FDI không hợp lệ").optional(),
@@ -719,6 +721,7 @@ const imageAnnotationSchemaBase = z.object({
 function validateImageAnnotationShape(value: z.infer<typeof imageAnnotationSchemaBase>, ctx: z.RefinementCtx) {
   if (value.shape_type === "pin" && ("width" in value.geometry || "height" in value.geometry)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["geometry"], message: "Ghim chỉ dùng tọa độ điểm" });
   if (value.shape_type === "rectangle" && (!("width" in value.geometry) || !("height" in value.geometry))) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["geometry"], message: "Khung cần chiều rộng và chiều cao" });
+  if (value.shape_type === "freehand" && !("points" in value.geometry)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["geometry"], message: "Vẽ tự do cần ít nhất hai điểm" });
 }
 export const imageAnnotationCreateSchema = imageAnnotationSchemaBase.superRefine(validateImageAnnotationShape);
 export const imageAnnotationVersionCreateSchema = imageAnnotationSchemaBase.extend({ change_reason: nonEmpty(1000) }).superRefine(validateImageAnnotationShape);

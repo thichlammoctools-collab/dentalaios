@@ -1250,12 +1250,13 @@ export interface PatientImage {
   created_at: string;
 }
 
-export type ImageAnnotationShapeType = "pin" | "rectangle";
+export type ImageAnnotationShapeType = "pin" | "rectangle" | "freehand";
 export type ImageEvidenceRelation = "supports" | "contradicts" | "incidental";
 
 export type ImageAnnotationGeometry =
   | { x: number; y: number }
-  | { x: number; y: number; width: number; height: number };
+  | { x: number; y: number; width: number; height: number }
+  | { points: Array<{ x: number; y: number }> };
 
 export interface ImageAnnotationVersion {
   id: string;
