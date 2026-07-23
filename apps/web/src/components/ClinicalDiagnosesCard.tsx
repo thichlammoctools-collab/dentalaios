@@ -73,8 +73,21 @@ export function ClinicalDiagnosesCard({ visitId, findings }: Props) {
 
   function selectConcept(conceptId: string) {
     const concept = concepts.find((item) => item.id === conceptId);
-    setForm((current) => ({ ...current, concept_id: conceptId, icd10_code_id: concept?.default_icd10?.id ?? "" }));
+    setForm((current) => {
+      const sourceFinding = findings.find((finding) => finding.id === current.source_finding_id);
+      return {
+        ...current,
+        concept_id: conceptId,
+        icd10_code_id: concept?.default_icd10?.id ?? "",
+        source_finding_id: sourceFinding && sourceFinding.category !== concept?.category ? "" : current.source_finding_id,
+      };
+    });
   }
+
+  const selectedConcept = concepts.find((concept) => concept.id === form.concept_id);
+  const compatibleFindings = selectedConcept
+    ? findings.filter((finding) => finding.category === selectedConcept.category)
+    : [];
 
   async function save() {
     if (!form.concept_id) { toast.error("Chọn chẩn đoán trước khi lưu"); return; }
@@ -129,10 +142,10 @@ export function ClinicalDiagnosesCard({ visitId, findings }: Props) {
     <Dialog open={open} onOpenChange={setOpen} className="sm:max-w-xl">
       <DialogHeader><DialogTitle>{editing ? "Cập nhật chẩn đoán" : "Thêm chẩn đoán"}</DialogTitle></DialogHeader>
       <DialogBody className="space-y-4">
-        <div className="grid gap-1.5"><Label htmlFor="diagnosis-concept">Chẩn đoán</Label><Select id="diagnosis-concept" value={form.concept_id} onChange={(event) => selectConcept(event.target.value)}><option value="">Chọn khái niệm chẩn đoán</option>{concepts.map((concept) => <option key={concept.id} value={concept.id}>{concept.display_vi}</option>)}</Select></div>
-        <div className="grid gap-1.5"><Label htmlFor="diagnosis-icd10">Mã ICD-10 Việt Nam</Label><Select id="diagnosis-icd10" value={form.icd10_code_id} onChange={(event) => setForm({ ...form, icd10_code_id: event.target.value })}><option value="">Chưa chọn (chỉ dùng khi nghi ngờ)</option>{icd10.map((code) => <option key={code.id} value={code.id}>{code.code} · {code.display_vi}</option>)}</Select></div>
-        {!editing && <div className="grid gap-1.5"><Label htmlFor="diagnosis-finding">Ghi nhận lâm sàng nguồn (tùy chọn)</Label><Select id="diagnosis-finding" value={form.source_finding_id} onChange={(event) => setForm({ ...form, source_finding_id: event.target.value })}><option value="">Chẩn đoán độc lập</option>{findings.map((finding) => <option key={finding.id} value={finding.id}>{finding.code ?? finding.id} · {getFindingConditionLabel(finding.category, finding.condition)}{finding.tooth_number ? ` răng #${finding.tooth_number}` : ""}</option>)}</Select></div>}
-        <div className="grid gap-1.5"><Label htmlFor="diagnosis-status">Trạng thái</Label><Select id="diagnosis-status" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ClinicalDiagnosisStatus })}><option value="suspected">Nghi ngờ</option><option value="confirmed">Đã xác nhận</option><option value="ruled_out">Đã loại trừ</option><option value="resolved">Đã giải quyết</option></Select></div>
+        <div className="grid gap-1.5"><Label htmlFor="diagnosis-concept">Kết luận chẩn đoán</Label><p className="text-xs text-muted-foreground">Bệnh lý được bác sĩ đánh giá sau khi khám, có thể lập độc lập với ghi nhận.</p><Select id="diagnosis-concept" value={form.concept_id} onChange={(event) => selectConcept(event.target.value)}><option value="">Chọn chẩn đoán</option>{concepts.map((concept) => <option key={concept.id} value={concept.id}>{concept.display_vi}</option>)}</Select></div>
+        <div className="grid gap-1.5"><Label htmlFor="diagnosis-icd10">Mã ICD-10 Việt Nam</Label><p className="text-xs text-muted-foreground">Bắt buộc khi chẩn đoán được xác nhận.</p><Select id="diagnosis-icd10" value={form.icd10_code_id} onChange={(event) => setForm({ ...form, icd10_code_id: event.target.value })}><option value="">Chưa chọn (chỉ dùng khi nghi ngờ)</option>{icd10.map((code) => <option key={code.id} value={code.id}>{code.code} · {code.display_vi}</option>)}</Select></div>
+        {!editing && <div className="grid gap-1.5"><Label htmlFor="diagnosis-finding">Ghi nhận làm cơ sở (tùy chọn)</Label><p className="text-xs text-muted-foreground">Dấu hiệu hoặc quan sát hỗ trợ kết luận. Chỉ hiển thị ghi nhận cùng nhóm lâm sàng với chẩn đoán.</p><Select id="diagnosis-finding" value={form.source_finding_id} onChange={(event) => setForm({ ...form, source_finding_id: event.target.value })} disabled={!selectedConcept}><option value="">Không liên kết ghi nhận</option>{compatibleFindings.map((finding) => <option key={finding.id} value={finding.id}>{finding.code ?? finding.id} · {getFindingConditionLabel(finding.category, finding.condition)}{finding.tooth_number ? ` răng #${finding.tooth_number}` : ""}</option>)}</Select>{selectedConcept && compatibleFindings.length === 0 && <p className="text-xs text-muted-foreground">Chưa có ghi nhận phù hợp. Bạn vẫn có thể lưu chẩn đoán độc lập.</p>}</div>}
+        <div className="grid gap-1.5"><Label htmlFor="diagnosis-status">Trạng thái chẩn đoán</Label><Select id="diagnosis-status" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ClinicalDiagnosisStatus })}><option value="suspected">Nghi ngờ</option><option value="confirmed">Đã xác nhận</option><option value="ruled_out">Đã loại trừ</option><option value="resolved">Đã giải quyết</option></Select></div>
         <div className="grid gap-1.5"><Label htmlFor="diagnosis-notes">Ghi chú</Label><Textarea id="diagnosis-notes" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} rows={3} /></div>
         {editing && <div className="grid gap-1.5"><Label htmlFor="diagnosis-reason">Lý do cập nhật</Label><Textarea id="diagnosis-reason" value={form.change_reason} onChange={(event) => setForm({ ...form, change_reason: event.target.value })} rows={2} required /></div>}
       </DialogBody>

@@ -82,6 +82,52 @@ function procedureLabel(v: string) {
   return PROCEDURE_OPTIONS.find((o) => o.value === v)?.label ?? v;
 }
 
+type ClinicalWarningSeverity = "high" | "medium";
+
+interface ClinicalWarning {
+  severity: ClinicalWarningSeverity;
+  title: string;
+  detail: string;
+}
+
+function getClinicalWarnings({ systolic, diastolic, bloodSugar, bmi }: { systolic?: number; diastolic?: number; bloodSugar?: number; bmi: number | null }): ClinicalWarning[] {
+  const warnings: ClinicalWarning[] = [];
+
+  if (systolic != null || diastolic != null) {
+    if ((systolic ?? 0) >= 180 || (diastolic ?? 0) >= 120) {
+      warnings.push({ severity: "high", title: "Huyết áp rất cao", detail: "Đo lại sau khi bệnh nhân nghỉ. Hoãn thủ thuật không cấp cứu và đánh giá/chuyển khám khẩn theo tình trạng lâm sàng." });
+    } else if ((systolic ?? 0) >= 160 || (diastolic ?? 0) >= 100) {
+      warnings.push({ severity: "high", title: "Huyết áp cao", detail: "Đo lại đúng kỹ thuật sau khi nghỉ; cân nhắc hoãn điều trị chọn lọc và trao đổi bác sĩ điều trị nếu chỉ số vẫn cao." });
+    } else if ((systolic ?? 0) >= 140 || (diastolic ?? 0) >= 90) {
+      warnings.push({ severity: "medium", title: "Huyết áp tăng", detail: "Nên đo lại trước thủ thuật, ghi nhận chỉ số và hạn chế các yếu tố làm tăng huyết áp khi phù hợp." });
+    } else if ((systolic ?? Number.POSITIVE_INFINITY) < 90 || (diastolic ?? Number.POSITIVE_INFINITY) < 60) {
+      warnings.push({ severity: "medium", title: "Huyết áp thấp", detail: "Đánh giá triệu chứng như choáng, mệt hoặc ngất; để bệnh nhân nghỉ và đo lại trước khi điều trị." });
+    }
+  }
+
+  if (bloodSugar != null) {
+    if (bloodSugar >= 300) {
+      warnings.push({ severity: "high", title: "Đường huyết rất cao", detail: "Đánh giá triệu chứng tăng đường huyết; hoãn thủ thuật không cấp cứu và liên hệ bác sĩ điều trị/đánh giá khẩn khi cần." });
+    } else if (bloodSugar >= 200) {
+      warnings.push({ severity: "high", title: "Đường huyết cao", detail: "Xác nhận thời điểm đo và bữa ăn gần nhất; cân nhắc trì hoãn thủ thuật chọn lọc, kiểm soát nhiễm trùng và trao đổi bác sĩ điều trị." });
+    } else if (bloodSugar < 70) {
+      warnings.push({ severity: "high", title: "Đường huyết thấp", detail: "Kiểm tra triệu chứng hạ đường huyết, xử trí theo phác đồ cơ sở và chỉ tiếp tục điều trị khi bệnh nhân ổn định." });
+    }
+  }
+
+  if (bmi !== null) {
+    if (bmi >= 25) {
+      warnings.push({ severity: "medium", title: "BMI béo phì", detail: "Lưu ý nguy cơ bệnh nền và đánh giá tư thế ghế, đường thở, thời lượng điều trị phù hợp." });
+    } else if (bmi >= 23) {
+      warnings.push({ severity: "medium", title: "BMI thừa cân", detail: "Nên khai thác thêm bệnh nền chuyển hóa, huyết áp và thuốc đang sử dụng khi phù hợp." });
+    } else if (bmi < 18.5) {
+      warnings.push({ severity: "medium", title: "BMI thấp", detail: "Đánh giá tình trạng dinh dưỡng, khả năng ăn uống và nguyên nhân sụt cân nếu có triệu chứng liên quan." });
+    }
+  }
+
+  return warnings;
+}
+
 // ─── Summary parse & render ────────────────────────────────────
 
 interface SummarySection {
@@ -587,6 +633,12 @@ export function VisitDetailPage() {
     ? Number((patient.weight_kg / ((patient.height_cm / 100) ** 2)).toFixed(1))
     : null;
   const bmiLabel = bmi === null ? null : bmi < 18.5 ? "Gầy" : bmi < 23 ? "Bình thường" : bmi < 25 ? "Thừa cân" : "Béo phì";
+  const clinicalWarnings = getClinicalWarnings({
+    systolic: visit.blood_pressure_systolic,
+    diastolic: visit.blood_pressure_diastolic,
+    bloodSugar: visit.blood_sugar_mgdl,
+    bmi,
+  });
   const sortedPreviousVisits = [...previousVisits].sort(
     (left, right) => new Date(right.date).getTime() - new Date(left.date).getTime(),
   );
@@ -680,6 +732,28 @@ export function VisitDetailPage() {
                   </div>
                 </div>
               )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {clinicalWarnings.length > 0 && (
+        <Card className="border-amber-300 dark:border-amber-800">
+          <CardContent className="pt-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold">Cảnh báo chỉ số khám</p>
+                <p className="mt-1 text-xs text-muted-foreground">Gợi ý hỗ trợ quyết định lâm sàng, không thay thế đánh giá trực tiếp của bác sĩ.</p>
+              </div>
+              <Badge variant="warning">{clinicalWarnings.length} cần chú ý</Badge>
+            </div>
+            <div className="mt-3 space-y-2">
+              {clinicalWarnings.map((warning) => (
+                <div key={warning.title} className={`rounded-lg border px-3 py-2.5 text-sm ${warning.severity === "high" ? "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30" : "border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30"}`}>
+                  <div className="flex flex-wrap items-center gap-2"><Badge variant={warning.severity === "high" ? "destructive" : "warning"}>{warning.severity === "high" ? "Ưu tiên cao" : "Cần theo dõi"}</Badge><span className="font-medium">{warning.title}</span></div>
+                  <p className="mt-1.5 text-xs text-muted-foreground">{warning.detail}</p>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
