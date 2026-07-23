@@ -82,6 +82,7 @@ export const patientService = {
           referral_type: data.referral_type,
           referral_user_id: data.referral_user_id ?? undefined,
           referral_notes: data.referral_notes,
+          referrer_id: referrer?.id ?? data.referrer_id ?? undefined,
            height_cm: data.height_cm ?? undefined,
            weight_kg: data.weight_kg ?? undefined,
            has_disability: data.has_disability ?? false,
@@ -114,16 +115,17 @@ export const patientService = {
       const repository = createPatientsRepository(db);
       const existing = await repository.getById(tenantId, id);
       if (!existing) return null;
+      let resolvedReferrer;
       if (data.referrer_id || data.referral_code) {
         const existingCase = await db.prepare("SELECT id FROM referral_cases WHERE tenant_id = ? AND patient_id = ? LIMIT 1").bind(tenantId, id).first();
         if (existingCase) throw new ConflictError("Không thể thay đổi Người giới thiệu khi hồ sơ đã có case giới thiệu");
         const confirmedPayment = await db.prepare("SELECT id FROM payments WHERE tenant_id = ? AND patient_id = ? AND status = 'confirmed' LIMIT 1").bind(tenantId, id).first();
         if (confirmedPayment) throw new ConflictError("Không thể ghi nhận Người giới thiệu sau khi đã có thanh toán xác nhận");
-        const referrer = await referralService.resolveReferrer(db, tenantId, {
+        resolvedReferrer = await referralService.resolveReferrer(db, tenantId, {
           referrerId: data.referrer_id,
           referralCode: data.referral_code,
         });
-        if (referrer) await referralService.createCaseForNewPatient(db, tenantId, userId ?? "system", existing, referrer, data.referral_code ? "code" : "manual");
+        if (resolvedReferrer) await referralService.createCaseForNewPatient(db, tenantId, userId ?? "system", existing, resolvedReferrer, data.referral_code ? "code" : "manual");
       }
       const address = displayAddress({
         address: data.address ?? existing.address,
@@ -156,6 +158,7 @@ export const patientService = {
           referral_type: data.referral_type,
           referral_user_id: data.referral_user_id ?? undefined,
           referral_notes: data.referral_notes,
+          referrer_id: resolvedReferrer?.id ?? undefined,
            height_cm: data.height_cm ?? undefined,
            weight_kg: data.weight_kg ?? undefined,
            has_disability: data.has_disability,

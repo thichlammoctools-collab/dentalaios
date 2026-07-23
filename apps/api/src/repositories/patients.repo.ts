@@ -41,12 +41,13 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
       binds.push(limit, offset);
        const sql = `SELECT p.*,
                      ref.name AS referral_user_name,
-                     referral_referrer.name AS referral_referrer_name,
-                     referral_referrer.code AS referral_referrer_code
+                      COALESCE(direct_referrer.name, case_referrer.name) AS referral_referrer_name,
+                      COALESCE(direct_referrer.code, case_referrer.code) AS referral_referrer_code
                     FROM patients p
                     LEFT JOIN users ref ON ref.id = p.referral_user_id
+                    LEFT JOIN referrers direct_referrer ON direct_referrer.tenant_id = p.tenant_id AND direct_referrer.id = p.referrer_id
                     LEFT JOIN referral_cases referral_case ON referral_case.tenant_id = p.tenant_id AND referral_case.patient_id = p.id
-                    LEFT JOIN referrers referral_referrer ON referral_referrer.tenant_id = p.tenant_id AND referral_referrer.id = referral_case.referrer_id
+                    LEFT JOIN referrers case_referrer ON case_referrer.tenant_id = p.tenant_id AND case_referrer.id = referral_case.referrer_id
                    WHERE ${conditions.join(" AND ")}
                    ORDER BY p.created_at DESC
                    LIMIT ? OFFSET ?`;
@@ -76,12 +77,13 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
       const row = (await db
          .prepare(`SELECT p.*,
                      ref.name AS referral_user_name,
-                     referral_referrer.name AS referral_referrer_name,
-                     referral_referrer.code AS referral_referrer_code
+                      COALESCE(direct_referrer.name, case_referrer.name) AS referral_referrer_name,
+                      COALESCE(direct_referrer.code, case_referrer.code) AS referral_referrer_code
                     FROM patients p
                     LEFT JOIN users ref ON ref.id = p.referral_user_id
+                    LEFT JOIN referrers direct_referrer ON direct_referrer.tenant_id = p.tenant_id AND direct_referrer.id = p.referrer_id
                     LEFT JOIN referral_cases referral_case ON referral_case.tenant_id = p.tenant_id AND referral_case.patient_id = p.id
-                    LEFT JOIN referrers referral_referrer ON referral_referrer.tenant_id = p.tenant_id AND referral_referrer.id = referral_case.referrer_id
+                    LEFT JOIN referrers case_referrer ON case_referrer.tenant_id = p.tenant_id AND case_referrer.id = referral_case.referrer_id
                    WHERE p.tenant_id = ? AND p.id = ? LIMIT 1`)
         .bind(tenantId, id)
         .first()) as D1Row | null;
@@ -96,9 +98,9 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
              (id, tenant_id, branch_id, name, date_of_birth, gender, phone, email, notes, address,
               address_line, ward_name, ward_code, district_name, district_code, province_name, country_name, country_code,
               family_name, family_phone, family_relation, marketing_source,
-              referral_type, referral_user_id, referral_notes,
-               height_cm, weight_kg, has_disability, disability_notes, cccd)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               referral_type, referral_user_id, referral_notes, referrer_id,
+                height_cm, weight_kg, has_disability, disability_notes, cccd)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
@@ -123,10 +125,11 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
           data.family_phone ?? null,
           data.family_relation ?? null,
           data.marketing_source ?? null,
-          data.referral_type ?? null,
-          data.referral_user_id ?? null,
-          data.referral_notes ?? null,
-           data.height_cm ?? null,
+           data.referral_type ?? null,
+           data.referral_user_id ?? null,
+           data.referral_notes ?? null,
+           data.referrer_id ?? null,
+            data.height_cm ?? null,
            data.weight_kg ?? null,
            data.has_disability ? 1 : 0,
            data.disability_notes ?? null,
@@ -166,6 +169,7 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
         "referral_type",
         "referral_user_id",
         "referral_notes",
+        "referrer_id",
         "height_cm",
         "weight_kg",
         "has_disability",
@@ -237,6 +241,7 @@ function mapPatient(row: D1Row): Patient {
     referral_type: (row.referral_type as Patient["referral_type"]) ?? undefined,
     referral_user_id: (row.referral_user_id as string | null) ?? undefined,
     referral_user_name: (row.referral_user_name as string | null) ?? undefined,
+    referrer_id: (row.referrer_id as string | null) ?? undefined,
     referral_referrer_name: (row.referral_referrer_name as string | null) ?? undefined,
     referral_referrer_code: (row.referral_referrer_code as string | null) ?? undefined,
     referral_notes: (row.referral_notes as string | null) ?? undefined,

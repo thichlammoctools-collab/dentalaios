@@ -218,6 +218,7 @@ export interface Patient {
   referral_type?: ReferralType;
   referral_user_id?: string;
   referral_user_name?: string;
+  referrer_id?: string;
   referral_referrer_name?: string;
   referral_referrer_code?: string;
   referral_notes?: string;
