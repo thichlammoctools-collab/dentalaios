@@ -319,7 +319,7 @@ function ChairAppointmentsDialog({ item, date, patients, users, onOpenChange }: 
               const patient = patients.get(appointment.patient_id);
               const clinician = users.get(appointment.clinician_id);
               const end = new Date(new Date(appointment.scheduled_at).getTime() + appointment.duration_min * 60_000);
-              return <Link key={appointment.id} to={`/appointments/${appointment.id}?edit=1`} onClick={() => onOpenChange(false)} className="block rounded-lg border p-3 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div className="flex items-start justify-between gap-3"><div><p className="font-medium">{patient?.name ?? appointment.patient_id.slice(0, 8)}</p><p className="mt-1 text-xs text-muted-foreground">{formatTime(appointment.scheduled_at)} - {formatTime(end.toISOString())} · {appointment.duration_min} phút</p>{appointment.procedure && <p className="mt-1 text-xs text-muted-foreground">{appointment.procedure}</p>}</div><span className="rounded-full bg-muted px-2 py-1 text-[11px] font-medium">{APPOINTMENT_STATUS_LABEL[appointment.status]}</span></div><p className="mt-2 text-xs text-muted-foreground">{clinician?.name ?? "Chưa rõ bác sĩ"}</p></Link>;
+              return <Link key={appointment.id} to={`/appointments/${appointment.id}`} onClick={() => onOpenChange(false)} className="block rounded-lg border p-3 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div className="flex items-start justify-between gap-3"><div><p className="font-medium">{patient?.name ?? appointment.patient_id.slice(0, 8)}</p><p className="mt-1 text-xs text-muted-foreground">{formatTime(appointment.scheduled_at)} - {formatTime(end.toISOString())} · {appointment.duration_min} phút</p>{appointment.procedure && <p className="mt-1 text-xs text-muted-foreground">{appointment.procedure}</p>}</div><span className="rounded-full bg-muted px-2 py-1 text-[11px] font-medium">{APPOINTMENT_STATUS_LABEL[appointment.status]}</span></div><p className="mt-2 text-xs text-muted-foreground">{clinician?.name ?? "Chưa rõ bác sĩ"}</p></Link>;
             })}
           </div>
         )}
@@ -385,7 +385,7 @@ function AppointmentSummary({ title, appointment, patients, users, compact = fal
       {!compact && appointment.procedure && <p className="mt-1 text-xs text-muted-foreground">{appointment.procedure}</p>}
        {!compact && appointment.status === "arrived" && appointment.chair_id && new Date(appointment.scheduled_at) <= now && now < end && <Button size="sm" className="mt-3" onClick={(event) => { event.stopPropagation(); onStart(appointment); }} disabled={starting}>{starting ? "Đang bắt đầu..." : "Bắt đầu khám"}</Button>}
         {canEdit && new Date(appointment.scheduled_at) >= now && <Button size="sm" variant="outline" className="mt-3" onClick={(event) => { event.stopPropagation(); onQuickSeatTransfer(appointment); }}>Chuyển ghế nhanh</Button>}
-        {canEdit && <Button size="sm" variant="outline" className="mt-3 ml-2" asChild><Link to={`/appointments/${appointment.id}?edit=1`} onClick={(event) => event.stopPropagation()}>Sửa lịch</Link></Button>}
+        {canEdit && <Button size="sm" variant="outline" className="mt-3 ml-2" asChild><Link to={`/appointments/${appointment.id}`} onClick={(event) => event.stopPropagation()}>Xem lịch</Link></Button>}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties, type DragEvent } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ interface ClinicSchedulesResponse { items: ClinicSchedule[]; total: number }
 
 export function SchedulePage() {
   const { session } = useAuth();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const selectedBranchId = searchParams.get("branch_id") ?? "";
   const boardBranchId = selectedBranchId || session?.branch?.id || "";
@@ -232,7 +233,7 @@ export function SchedulePage() {
     const appointment = appointments.find((item) => item.id === appointmentId);
     if (!appointment || !canMoveAppointment(appointment)) return;
 
-    if (!confirm("Bạn có chắc chắn là muốn đổi ghế không?")) return;
+    if (!confirm("Bạn có chắc chắn muốn đổi lịch không?")) return;
 
     const original = new Date(appointment.scheduled_at);
     const requestedAt = new Date(date);
@@ -417,7 +418,7 @@ export function SchedulePage() {
                   now={now}
                   mode={timelineMode}
                   onModeChange={setTimelineMode}
-                  onAppointmentClick={setEditing}
+                  onAppointmentClick={(appointment) => navigate(`/appointments/${appointment.id}`)}
                   onEmptySlotClick={({ time, clinicianId, chairId }) => {
                     setTimelinePrefill({ time, clinicianId, chairId });
                     setCreateOpen(true);
@@ -479,7 +480,7 @@ export function SchedulePage() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    if (canMoveAppointment(appointment)) setEditing(appointment);
+                                    navigate(`/appointments/${appointment.id}`);
                                   }}
                                   draggable={canMoveAppointment(appointment)}
                                   onDragStart={(event) => {
@@ -588,7 +589,7 @@ export function SchedulePage() {
                                   key={a.id}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (canMoveAppointment(a)) setEditing(a);
+                                    navigate(`/appointments/${a.id}`);
                                   }}
                                   draggable={canMoveAppointment(a)}
                                   onDragStart={(event) => {

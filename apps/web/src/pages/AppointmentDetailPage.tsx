@@ -35,6 +35,7 @@ const STATUS_VARIANT: Record<string, "default" | "success" | "warning" | "destru
   booked: "outline",
   confirmed: "default",
   arrived: "warning",
+  in_progress: "default",
   completed: "success",
   cancelled: "destructive",
   no_show: "secondary",
@@ -98,10 +99,6 @@ export function AppointmentDetailPage() {
     return () => { mounted = false; };
   }, [id, session?.branch?.id]);
 
-  useEffect(() => {
-    if (searchParams.get("edit") === "1") setEditOpen(true);
-  }, [searchParams]);
-
   if (loading || !appt) {
     return <p className="px-6 py-6 text-sm text-muted-foreground">Đang tải…</p>;
   }
@@ -156,7 +153,7 @@ export function AppointmentDetailPage() {
   }
 
   return (
-    <PageContainer size="reading">
+    <PageContainer size="data">
       <Breadcrumbs
         items={[
           { label: "Bệnh nhân", href: "/patients" },
@@ -165,7 +162,7 @@ export function AppointmentDetailPage() {
         ]}
       />
 
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Button variant="ghost" size="sm" className="-ml-3 mb-2" onClick={() => navigate(returnPath)}>
             ← Quay lại lịch hẹn
@@ -189,40 +186,58 @@ export function AppointmentDetailPage() {
         </div>
       </div>
 
-      {/* Thông tin */}
-      <Card>
-        <CardHeader><CardTitle>Thông tin</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-          <Field label="Bệnh nhân" value={patient ? (
-             <Link to={`/patients/${patient.id}`} className="flex items-center gap-2 font-medium text-blue-600 hover:underline"><ProfileAvatar subject="patients" entityId={patient.id} name={patient.name} avatarFileId={patient.avatar_file_id} size="sm" />{patient.name}</Link>
-           ) : <span className="font-mono text-xs">{appt.patient_id.slice(0, 8)}…</span>} />
-           <Field label="Bác sĩ" value={doctor ? <div className="flex items-center gap-2"><ProfileAvatar subject="users" entityId={doctor.id} name={doctor.name} avatarFileId={doctor.avatar_file_id} size="sm" />{doctor.name}</div> : "—"} />
-           <Field label="Phụ tá chính" value={assistant ? <div className="flex items-center gap-2"><ProfileAvatar subject="users" entityId={assistant.id} name={assistant.name} avatarFileId={assistant.avatar_file_id} size="sm" />{assistant.name}</div> : "—"} />
-          <Field label="Ghế nha" value={chair ? `${chair.name}${chair.room_name ? ` · ${chair.room_name}` : ""}` : "—"} />
-          <Field label="Thời lượng" value={`${appt.duration_min} phút`} />
-          <Field label="Thủ thuật" value={appt.procedure ?? "—"} />
-          <Field label="Nguồn" value={SOURCE_LABEL[appt.source] ?? appt.source} />
-          <Field label="Ngày tạo" value={formatDateTime(appt.created_at)} />
-          <Field label="Cập nhật" value={formatDateTime(appt.updated_at)} />
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/10 via-card to-card">
+          <CardHeader>
+            <CardTitle>Thủ thuật</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-semibold leading-snug tracking-tight">
+              {appt.procedure?.trim() || "Chưa nhập thủ thuật"}
+            </p>
+            <div className="mt-5 grid gap-3 text-sm sm:grid-cols-3">
+              <Field label="Thời gian" value={`${formatTime(appt.scheduled_at)} - ${formatTime(endTime.toISOString())}`} />
+              <Field label="Thời lượng" value={`${appt.duration_min} phút`} />
+              <Field label="Ghế nha" value={chair ? `${chair.name}${chair.room_name ? ` · ${chair.room_name}` : ""}` : "Chưa gán"} />
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Ghi chú */}
-      {(appt.notes || appt.cancelled_reason) && (
         <Card>
           <CardHeader><CardTitle>Ghi chú</CardTitle></CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            {appt.notes && (
-              <p className="whitespace-pre-wrap rounded bg-muted/30 p-3">{appt.notes}</p>
+          <CardContent className="space-y-3 text-sm">
+            {appt.notes ? (
+              <p className="min-h-24 whitespace-pre-wrap rounded-lg bg-muted/40 p-4 leading-relaxed">
+                {appt.notes}
+              </p>
+            ) : (
+              <p className="min-h-24 rounded-lg border border-dashed p-4 text-muted-foreground">
+                Chưa có ghi chú cho lịch hẹn này.
+              </p>
             )}
             {appt.cancelled_reason && (
-              <p className="rounded bg-red-50 p-3 text-red-700 dark:bg-red-900/20 dark:text-red-300">
+              <p className="rounded-lg bg-red-50 p-3 text-red-700 dark:bg-red-900/20 dark:text-red-300">
                 <strong>Lý do hủy:</strong> {appt.cancelled_reason}
               </p>
             )}
           </CardContent>
         </Card>
-      )}
+      </div>
+
+      {/* Thông tin */}
+      <Card>
+        <CardHeader><CardTitle>Thông tin</CardTitle></CardHeader>
+        <CardContent className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="Bệnh nhân" value={patient ? (
+             <Link to={`/patients/${patient.id}`} className="flex items-center gap-2 font-medium text-blue-600 hover:underline"><ProfileAvatar subject="patients" entityId={patient.id} name={patient.name} avatarFileId={patient.avatar_file_id} size="sm" />{patient.name}</Link>
+           ) : <span className="font-mono text-xs">{appt.patient_id.slice(0, 8)}…</span>} />
+           <Field label="Bác sĩ" value={doctor ? <div className="flex items-center gap-2"><ProfileAvatar subject="users" entityId={doctor.id} name={doctor.name} avatarFileId={doctor.avatar_file_id} size="sm" />{doctor.name}</div> : "—"} />
+           <Field label="Phụ tá chính" value={assistant ? <div className="flex items-center gap-2"><ProfileAvatar subject="users" entityId={assistant.id} name={assistant.name} avatarFileId={assistant.avatar_file_id} size="sm" />{assistant.name}</div> : "—"} />
+          <Field label="Nguồn" value={SOURCE_LABEL[appt.source] ?? appt.source} />
+          <Field label="Ngày tạo" value={formatDateTime(appt.created_at)} />
+          <Field label="Cập nhật" value={formatDateTime(appt.updated_at)} />
+        </CardContent>
+      </Card>
 
       {/* Edit dialog */}
       {editOpen && (
