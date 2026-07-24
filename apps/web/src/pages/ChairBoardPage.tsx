@@ -270,7 +270,7 @@ export function ChairBoardPage() {
           })}
         </div>
       )}
-      <ChairAppointmentsDialog item={selectedChair} date={date} patients={patientsById} users={usersById} onView={(appointment) => { setSelectedChair(null); setViewingAppointment(appointment); }} onOpenChange={(open) => { if (!open) setSelectedChair(null); }} />
+      <ChairAppointmentsDialog item={selectedChair} date={date} patients={patientsById} users={usersById} canEdit={canEditAppointments} now={now} onTransfer={(appointment) => { setSelectedChair(null); openSeatTransfer(appointment); }} onView={(appointment) => { setSelectedChair(null); setViewingAppointment(appointment); }} onOpenChange={(open) => { if (!open) setSelectedChair(null); }} />
       <AppointmentQuickViewDialog appointment={viewingAppointment} patients={patientsById} users={usersById} onClose={() => setViewingAppointment(null)} />
       <QuickSeatTransferDialog
         appointment={transferAppointment}
@@ -297,11 +297,14 @@ function Metric({ label, value }: { label: string; value: string }) {
   return <div><p className="text-[11px] text-muted-foreground">{label}</p><p className="mt-0.5 font-semibold tabular-nums">{value}</p></div>;
 }
 
-function ChairAppointmentsDialog({ item, date, patients, users, onView, onOpenChange }: {
+function ChairAppointmentsDialog({ item, date, patients, users, canEdit, now, onTransfer, onView, onOpenChange }: {
   item: ChairBoardItem | null;
   date: string;
   patients: Map<string, Patient>;
   users: Map<string, UserWithDetails>;
+  canEdit: boolean;
+  now: Date;
+  onTransfer: (appointment: Appointment) => void;
   onView: (appointment: Appointment) => void;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -323,7 +326,7 @@ function ChairAppointmentsDialog({ item, date, patients, users, onView, onOpenCh
               const patient = patients.get(appointment.patient_id);
               const clinician = users.get(appointment.clinician_id);
               const end = new Date(new Date(appointment.scheduled_at).getTime() + appointment.duration_min * 60_000);
-              return <button key={appointment.id} type="button" onClick={() => onView(appointment)} className="block w-full rounded-lg border p-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div className="flex items-start justify-between gap-3"><div><p className="font-medium">{patient?.name ?? appointment.patient_id.slice(0, 8)}</p><p className="mt-1 text-xs text-muted-foreground">{formatTime(appointment.scheduled_at)} - {formatTime(end.toISOString())} · {appointment.duration_min} phút</p>{appointment.procedure && <p className="mt-1 text-xs text-muted-foreground">{appointment.procedure}</p>}</div><span className="rounded-full bg-muted px-2 py-1 text-[11px] font-medium">{APPOINTMENT_STATUS_LABEL[appointment.status]}</span></div><p className="mt-2 text-xs text-muted-foreground">{clinician?.name ?? "Chưa rõ bác sĩ"}</p></button>;
+              return <div key={appointment.id} className="rounded-lg border p-3 transition-colors hover:bg-muted/50"><button type="button" onClick={() => onView(appointment)} className="block w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div className="flex items-start justify-between gap-3"><div><p className="font-medium">{patient?.name ?? appointment.patient_id.slice(0, 8)}</p><p className="mt-1 text-xs text-muted-foreground">{formatTime(appointment.scheduled_at)} - {formatTime(end.toISOString())} · {appointment.duration_min} phút</p>{appointment.procedure && <p className="mt-1 text-xs text-muted-foreground">{appointment.procedure}</p>}</div><span className="rounded-full bg-muted px-2 py-1 text-[11px] font-medium">{APPOINTMENT_STATUS_LABEL[appointment.status]}</span></div><p className="mt-2 text-xs text-muted-foreground">{clinician?.name ?? "Chưa rõ bác sĩ"}</p></button>{canEdit && new Date(appointment.scheduled_at) >= now && <Button size="sm" variant="outline" className="mt-3" onClick={() => onTransfer(appointment)}>Chuyển ghế</Button>}</div>;
             })}
           </div>
         )}
