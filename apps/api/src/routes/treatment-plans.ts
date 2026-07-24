@@ -13,6 +13,7 @@ import {
   milestoneAppointmentCreateSchema,
   milestoneAppointmentExecutionSchema,
   milestoneAppointmentLinkSchema,
+  consentSignSchema,
 } from "@shared/validation";
 import { PERMISSIONS } from "@shared/constants";
 import type { Env } from "../index";
@@ -22,6 +23,7 @@ import { auditLog } from "../middleware/audit";
 import type { AuthContext } from "../middleware/auth";
 import { planService } from "../services/plan.service";
 import { treatmentCasesService } from "../services/treatment-cases.service";
+import { consentService } from "../services/consent.service";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -316,6 +318,17 @@ router.get(
     const jwt = getJwt(c);
     const items = await planService.listVersions(c.env.DB, jwt.tenant_id, c.req.param("id"));
     return c.json({ items, total: items.length });
+  },
+);
+
+router.post(
+  "/:id/versions/:versionId/consent/sign",
+  requirePermission(PERMISSIONS.MANAGE_CONSENTS),
+  auditLog("consent_signed", "consent_record"),
+  zValidator("json", consentSignSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    return c.json(await consentService.signPlanConsent(c.env.DB, jwt.tenant_id, c.req.param("id"), c.req.param("versionId"), jwt.sub, c.req.valid("json")), 201);
   },
 );
 

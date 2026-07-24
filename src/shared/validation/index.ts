@@ -508,6 +508,16 @@ export const visitAmendmentCreateSchema = z.object({
 }).strict();
 export type VisitAmendmentCreateInput = z.infer<typeof visitAmendmentCreateSchema>;
 
+export const consentSignSchema = z.object({
+  consent_template_id: z.string().min(1),
+  signer_name: nonEmpty(200),
+  signer_relationship: optionalText(100),
+  legal_representative_id: z.string().min(1).optional(),
+  signature_file_id: z.string().min(1),
+  device_metadata_json: optionalText(2000),
+}).strict();
+export type ConsentSignInput = z.infer<typeof consentSignSchema>;
+
 const clinicalConceptCategory = z.enum(["tooth_hard_tissue", "periodontal", "oral_soft_tissue", "occlusion_orthodontics", "tmj_function", "preventive_general"]);
 const clinicalFindingScope = z.enum(["tooth", "region", "full_mouth"]);
 
