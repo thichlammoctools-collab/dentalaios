@@ -10,6 +10,7 @@ import { appointmentsService } from "./appointments.service";
 import { assertAllInTenant } from "../lib/tenant-scope";
 import { ConflictError, NotFoundError, ValidationError } from "../lib/errors";
 import { isUniqueConstraintError } from "../lib/db-errors";
+import { createConsentRepository } from "../repositories/consent.repo";
 
 const CASE_LABELS = {
   general: "Ca điều trị tổng quát",
@@ -37,6 +38,13 @@ export const treatmentCasesService = {
     if (!plan) throw new NotFoundError("Kế hoạch điều trị không tồn tại");
     if (plan.status !== "approved") {
       throw new ValidationError("Chỉ có thể kích hoạt ca từ kế hoạch đã duyệt");
+    }
+    if (!plan.clinical_approved_version_id) {
+      throw new ValidationError("Kế hoạch chưa có phiên bản được bác sĩ phê duyệt để lấy consent");
+    }
+    const consent = await createConsentRepository(db).getActivePlanConsent(tenantId, plan.clinical_approved_version_id);
+    if (!consent || consent.patient_id !== plan.patient_id) {
+      throw new ValidationError("Cần consent đã ký cho đúng phiên bản kế hoạch trước khi kích hoạt ca điều trị");
     }
     const cases = createTreatmentCasesRepository(db);
     if (await cases.getByPlanId(tenantId, planId)) {

@@ -7,6 +7,7 @@ import { createTreatmentServicesRepository } from "../repositories/treatment-ser
 import { NotFoundError, ValidationError } from "../lib/errors";
 import { assertAllInTenant } from "../lib/tenant-scope";
 import { assertTreatmentPersonnel } from "../lib/personnel";
+import { createTreatmentPlanVersionsRepository, type TreatmentPlanVersionRecord } from "../repositories/treatment-plan-versions.repo";
 
 export const planService = {
   list(
@@ -313,7 +314,7 @@ export const planService = {
     return updated;
   },
 
-  async approve(db: D1Database, tenantId: string, planId: string): Promise<TreatmentPlan> {
+  async approve(db: D1Database, tenantId: string, planId: string, doctorId: string = ""): Promise<{ plan: TreatmentPlan; version: TreatmentPlanVersionRecord }> {
     const plan = await this.get(db, tenantId, planId);
     if (plan.status !== "draft") {
       throw new ValidationError(`Plan đang ở trạng thái ${plan.status}, không thể duyệt`);
@@ -322,9 +323,30 @@ export const planService = {
     if (items.length === 0) {
       throw new ValidationError("Plan phải có ít nhất 1 item trước khi duyệt");
     }
-    const approved = await createTreatmentPlansRepository(db).approve(tenantId, planId);
-    if (!approved) throw new NotFoundError("Treatment plan not found");
-    return approved;
+    const now = new Date().toISOString();
+    const nextVersionNo = (plan.current_version_no ?? 0) + 1;
+    const snapshotObj = { plan, items, approved_by: doctorId, approved_at: now, version_no: nextVersionNo };
+    const snapshotJson = JSON.stringify(snapshotObj);
+    const sha256 = await computeSha256Hex(snapshotJson);
+    const versionId = crypto.randomUUID();
+    await db.batch([
+      db.prepare(`INSERT INTO treatment_plan_versions
+        (id, tenant_id, treatment_plan_id, version_no, state, snapshot_json, sha256, created_by, approved_by, approved_at, archive_file_id, template_version, created_at)
+        VALUES (?, ?, ?, ?, 'clinically_approved', ?, ?, ?, ?, ?, NULL, '1.0', ?)`)
+        .bind(versionId, tenantId, planId, nextVersionNo, snapshotJson, sha256, doctorId || plan.patient_id, doctorId || null, now, now),
+      db.prepare(`UPDATE treatment_plans
+        SET status = 'approved', approved_by = ?, approved_at = ?, current_version_no = ?, clinical_approved_version_id = ?, updated_at = ?
+        WHERE tenant_id = ? AND id = ? AND status = 'draft'`)
+        .bind(doctorId || null, now, nextVersionNo, versionId, now, tenantId, planId),
+    ]);
+    const updatedPlan = await this.get(db, tenantId, planId);
+    const version = await createTreatmentPlanVersionsRepository(db).getApproved(tenantId, versionId);
+    if (!version) throw new Error("Plan approval succeeded but version read failed");
+    return { plan: updatedPlan, version };
+  },
+  async listVersions(db: D1Database, tenantId: string, planId: string): Promise<TreatmentPlanVersionRecord[]> {
+    await this.get(db, tenantId, planId);
+    return createTreatmentPlanVersionsRepository(db).listByPlan(tenantId, planId);
   },
 
   async deletePlan(db: D1Database, tenantId: string, planId: string): Promise<boolean> {
@@ -364,3 +386,9 @@ export const planService = {
     return createTreatmentPlansRepository(db).delete(tenantId, planId);
   },
 };
+
+async function computeSha256Hex(data: string): Promise<string> {
+  const bytes = new TextEncoder().encode(data);
+  const hash = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}

@@ -660,3 +660,55 @@ describe("Clinical pre-exam and review routes", () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe("POST /api/visits/:id/sign", () => {
+  it("requires the clinical record sign permission", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/visits/visit-1/sign",
+      new Map(),
+      { permissions: ["write_findings"] },
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("rejects sign-off while clinical drafts remain pending", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/visits/visit-1/sign",
+      new Map([
+        ["FROM visits", [visitRow({ visit_type: "follow_up", clinical_state: "awaiting_doctor_review" })]],
+        ["FROM clinical_review_events", [{ id: "review-1", tenant_id: "test-tenant", visit_id: "visit-1", entity_type: "finding", entity_id: "finding-1", review_status: "pending", entered_by: "assistant-1", created_at: "2026-01-01" }]],
+      ]),
+      { permissions: ["sign_clinical_records"] },
+    );
+    expect(res.status).toBe(422);
+    await expect(res.json()).resolves.toMatchObject({ code: "validation_error", details: { pending_count: 1 } });
+  });
+
+  it("creates an immutable SHA-256 snapshot before locking a visit", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/visits/visit-1/sign",
+      new Map([
+        ["FROM visits", [visitRow({ visit_type: "follow_up", clinical_state: "in_progress" })]],
+        ["FROM clinical_review_events", []],
+        ["FROM clinical_findings", []],
+        ["FROM clinical_diagnoses", []],
+      ]),
+      { permissions: ["sign_clinical_records"] },
+    );
+
+    expect(res.status).toBe(201);
+    const body = await res.json() as { record_type: string; version_no: number; sha256: string };
+    expect(body.record_type).toBe("signed_record");
+    expect(body.version_no).toBe(1);
+    expect(body.sha256).toMatch(/^[a-f0-9]{64}$/);
+  });
+});

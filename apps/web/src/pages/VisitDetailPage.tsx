@@ -356,6 +356,7 @@ export function VisitDetailPage() {
   const [preExamChiefComplaint, setPreExamChiefComplaint] = useState("");
   const [savingPreExam, setSavingPreExam] = useState(false);
   const [safetyAcknowledgements, setSafetyAcknowledgements] = useState<VisitSafetyAcknowledgement[]>([]);
+  const [signingVisit, setSigningVisit] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const [summarizing, setSummarizing] = useState(false);
@@ -395,6 +396,10 @@ export function VisitDetailPage() {
     session?.role.permissions.includes(PERMISSIONS.ALL) ||
     session?.role.permissions.includes(PERMISSIONS.WRITE_PRE_EXAM_DRAFTS) ||
     session?.role.permissions.includes(PERMISSIONS.WRITE_FINDINGS)
+  );
+  const canSign = Boolean(
+    session?.role.permissions.includes(PERMISSIONS.ALL) ||
+    session?.role.permissions.includes(PERMISSIONS.SIGN_CLINICAL_RECORDS)
   );
 
   async function load() {
@@ -495,6 +500,21 @@ export function VisitDetailPage() {
       toast.success("Đã ghi nhận đánh giá an toàn");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Không thể ghi nhận đánh giá an toàn");
+    }
+  }
+
+  async function signVisit() {
+    if (!visit || visit.locked_at) return;
+    if (!window.confirm("Ký và khóa hồ sơ lượt khám? Các thay đổi sau đó phải dùng amendment.")) return;
+    setSigningVisit(true);
+    try {
+      const version = await apiPost<{ sha256: string }>(`/api/visits/${visit.id}/sign`);
+      toast.success(`Đã ký và khóa hồ sơ. Hash: ${version.sha256.slice(0, 12)}...`);
+      void load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Không thể ký hồ sơ lượt khám");
+    } finally {
+      setSigningVisit(false);
     }
   }
 
@@ -777,8 +797,9 @@ export function VisitDetailPage() {
           </div>
         </div>
         {visit.status === "in_progress" && (
-          <div className="mt-3">
+          <div className="mt-3 flex flex-wrap gap-2">
             <Button size="sm" onClick={() => void completeVisit()}>Hoàn tất lượt khám</Button>
+            {canSign && !visit.locked_at && <Button size="sm" variant="outline" onClick={() => void signVisit()} disabled={signingVisit}>{signingVisit ? "Đang ký..." : "Ký và khóa hồ sơ"}</Button>}
           </div>
         )}
         <div className="mt-2 flex flex-wrap items-center gap-4 text-sm">

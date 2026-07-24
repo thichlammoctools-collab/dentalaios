@@ -626,7 +626,11 @@ export interface TreatmentPlan {
   estimated_duration_min: number; // sum of item duration snapshots, computed on read
   currency: string; // ISO 4217 e.g. "VND"
   notes?: string;
+  approved_by?: string;
   approved_at?: string;
+  current_version_no: number;
+  clinical_approved_version_id?: string;
+  legacy_at?: string;
   created_at: string;
   can_delete?: boolean;
   service_summary?: TreatmentPlanServiceSummary;

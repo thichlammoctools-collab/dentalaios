@@ -7,7 +7,7 @@ export interface TreatmentPlansRepository {
   list(tenantId: string, opts?: { patientId?: string; visitId?: string; status?: TreatmentPlan["status"] }): Promise<TreatmentPlan[]>;
   create(
     tenantId: string,
-    data: Omit<TreatmentPlan, "id" | "tenant_id" | "created_at" | "total_cost" | "estimated_duration_min" | "status" | "approved_at">,
+    data: Omit<TreatmentPlan, "id" | "tenant_id" | "created_at" | "total_cost" | "estimated_duration_min" | "status" | "approved_at" | "approved_by" | "current_version_no" | "clinical_approved_version_id" | "legacy_at">,
   ): Promise<TreatmentPlan>;
   approve(tenantId: string, id: string): Promise<TreatmentPlan | null>;
   recomputeTotal(tenantId: string, id: string): Promise<number>;
@@ -144,7 +144,11 @@ function mapPlan(row: D1Row): TreatmentPlan {
     estimated_duration_min: Number(row.estimated_duration_min ?? 0),
     currency: row.currency as string,
     notes: (row.notes as string | null) ?? undefined,
+    approved_by: (row.approved_by as string | null) ?? undefined,
     approved_at: (row.approved_at as string | null) ?? undefined,
+    current_version_no: Number(row.current_version_no ?? 0),
+    clinical_approved_version_id: (row.clinical_approved_version_id as string | null) ?? undefined,
+    legacy_at: (row.legacy_at as string | null) ?? undefined,
     created_at: row.created_at as string,
     can_delete: Number(row.can_delete ?? 0) === 1,
     service_summary: row.service_total_count === undefined

@@ -17,7 +17,11 @@ const planRow = (overrides: Record<string, unknown> = {}) => ({
   estimated_duration_min: 0,
   currency: "VND",
   notes: null,
+  approved_by: null,
   approved_at: null,
+  current_version_no: 0,
+  clinical_approved_version_id: null,
+  legacy_at: null,
   created_at: "2026-01-01",
   ...overrides,
 });
@@ -350,6 +354,11 @@ describe("POST /api/treatment-plans/:id/approve", () => {
         // Then final getById → approved
         ["FROM treatment_plans", (sql, idx) => (idx === 0 ? [planRow()] : [approved])],
         ["FROM treatment_plan_items", [itemRow()]],
+        ["FROM treatment_plan_versions", [{
+          id: "plan-version-1", tenant_id: "test-tenant", treatment_plan_id: "plan-1", version_no: 1,
+          state: "clinically_approved", snapshot_json: "{}", sha256: "a".repeat(64), created_by: "test-user",
+          approved_by: "test-user", approved_at: "2026-01-02", archive_file_id: null, template_version: "1.0", created_at: "2026-01-02",
+        }]],
       ]),
       {
         permissions: ["approve_plans"],

@@ -11,6 +11,8 @@ const approvedPlan = {
   total_cost: 30000000,
   currency: "VND",
   notes: null,
+  current_version_no: 1,
+  clinical_approved_version_id: "plan-version-1",
   approved_at: "2026-07-20T08:00:00.000Z",
   created_at: "2026-07-20T08:00:00.000Z",
 };
@@ -84,6 +86,7 @@ describe("treatment case lifecycle", () => {
       "/api/treatment-plans/plan-1/case/activate",
       new Map([
         ["FROM treatment_plans", [approvedPlan]],
+        ["FROM consent_records", [{ id: "consent-1", tenant_id: "test-tenant", patient_id: "patient-1", plan_version_id: "plan-version-1", consent_template_id: "template-1", status: "signed", created_by: "test-user", created_at: "2026-07-20", updated_at: "2026-07-20" }]],
         ["FROM branches", [{ id: "test-branch", tenant_id: "test-tenant" }]],
         ["FROM users", [{ id: "test-user", tenant_id: "test-tenant" }]],
         ["FROM treatment_plan_items", [planItem]],
@@ -115,6 +118,19 @@ describe("treatment case lifecycle", () => {
     );
 
     expect(res.status).toBe(422);
+  });
+
+  it("rejects activation when the approved plan version has no signed consent", async () => {
+    const app = mountRoute("/api/treatment-plans", treatmentPlansRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/treatment-plans/plan-1/case/activate",
+      new Map([["FROM treatment_plans", [approvedPlan]], ["FROM consent_records", []]]),
+      { permissions: ["approve_plans"], body: { case_type: "implant" } },
+    );
+    expect(res.status).toBe(422);
+    await expect(res.json()).resolves.toMatchObject({ error: expect.stringContaining("consent") });
   });
 
   it("requires a reason to pause an active case", async () => {

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { clinicalReviewEditAndAcceptSchema, clinicalReviewRejectSchema, clinicalReviewRouteParamsSchema, diagnosisCreateSchema, diagnosisImageEvidenceCreateSchema, diagnosisUpdateSchema, findingCreateSchema, findingUpdateSchema, findingsBatchCreateSchema, preExamSubmitSchema, visitCreateSchema, visitSafetyAcknowledgementSchema, visitUpdateSchema } from "@shared/validation";
+import { clinicalReviewEditAndAcceptSchema, clinicalReviewRejectSchema, clinicalReviewRouteParamsSchema, diagnosisCreateSchema, diagnosisImageEvidenceCreateSchema, diagnosisUpdateSchema, findingCreateSchema, findingUpdateSchema, findingsBatchCreateSchema, preExamSubmitSchema, visitAmendmentCreateSchema, visitCreateSchema, visitSafetyAcknowledgementSchema, visitUpdateSchema } from "@shared/validation";
 import { PERMISSIONS } from "@shared/constants";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
@@ -13,6 +13,7 @@ import { imageAnnotationsService } from "../services/image-annotations.service";
 import { clinicalReviewService } from "../services/clinical-review.service";
 import { createVisitInitialAssessmentsRepository } from "../repositories/visit-initial-assessments.repo";
 import { visitSafetyService } from "../services/visit-safety.service";
+import { visitSignoffService } from "../services/visit-signoff.service";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -102,6 +103,45 @@ router.patch(
     const data = c.req.valid("json");
     const updated = await visitService.update(c.env.DB, jwt.tenant_id, c.req.param("id"), data, jwt.sub);
     return c.json(updated, 200);
+  },
+);
+
+router.post(
+  "/:id/sign",
+  requirePermission(PERMISSIONS.SIGN_CLINICAL_RECORDS),
+  auditLog("visit_signed", "clinical_record_version", {
+    entityIdFrom: (body) => typeof body === "object" && body !== null && "id" in body && typeof body.id === "string"
+      ? body.id
+      : undefined,
+  }),
+  async (c) => {
+    const jwt = getJwt(c);
+    return c.json(await visitSignoffService.sign(c.env.DB, jwt.tenant_id, c.req.param("id"), jwt.sub), 201);
+  },
+);
+
+router.get(
+  "/:id/versions",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const items = await visitSignoffService.listVersions(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    return c.json({ items, total: items.length });
+  },
+);
+
+router.post(
+  "/:id/amendments",
+  requirePermission(PERMISSIONS.SIGN_CLINICAL_RECORDS),
+  auditLog("visit_amended", "clinical_record_version", {
+    entityIdFrom: (body) => typeof body === "object" && body !== null && "id" in body && typeof body.id === "string"
+      ? body.id
+      : undefined,
+  }),
+  zValidator("json", visitAmendmentCreateSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    return c.json(await visitSignoffService.amend(c.env.DB, jwt.tenant_id, c.req.param("id"), jwt.sub, c.req.valid("json")), 201);
   },
 );
 

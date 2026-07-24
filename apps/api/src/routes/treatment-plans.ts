@@ -298,11 +298,24 @@ router.delete(
 router.post(
   "/:id/approve",
   requirePermission(PERMISSIONS.APPROVE_PLANS),
-  auditLog("approve", "treatment_plan"),
+  auditLog("approve", "treatment_plan_version", {
+    entityIdFrom: (body) => typeof body === "object" && body !== null && "version" in body
+      && typeof body.version === "object" && body.version !== null && "id" in body.version
+      && typeof body.version.id === "string" ? body.version.id : undefined,
+  }),
   async (c) => {
     const jwt = getJwt(c);
-    const approved = await planService.approve(c.env.DB, jwt.tenant_id, c.req.param("id"));
-    return c.json(approved, 200);
+    const approved = await planService.approve(c.env.DB, jwt.tenant_id, c.req.param("id"), jwt.sub);
+    return c.json(approved.plan, 200);
+  },
+);
+router.get(
+  "/:id/versions",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const items = await planService.listVersions(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    return c.json({ items, total: items.length });
   },
 );
 
