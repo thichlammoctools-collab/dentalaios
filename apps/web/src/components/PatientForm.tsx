@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiPost, apiPut, apiGet, ApiError } from "@/lib/api";
 import { referrersApi } from "@/lib/referral-api";
+import { ReferrerQrScanner } from "@/components/referral/ReferrerQrScanner";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import { calculateAge } from "@/lib/utils";
@@ -214,6 +215,22 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
     } catch (error) {
       setReferrerMatches([]);
       toast.error(error instanceof ApiError ? error.message : "Không thể tìm Người giới thiệu");
+    } finally {
+      setSearchingReferrers(false);
+    }
+  }
+
+  async function selectReferrerFromQr(referrerId: string) {
+    setSearchingReferrers(true);
+    try {
+      const referrer = await referrersApi.lookupById<Pick<Referrer, "id" | "name" | "code" | "type">>(referrerId);
+      setResolvedReferrer(referrer);
+      setReferralType("other");
+      setReferrerQuery("");
+      setReferrerMatches([]);
+      toast.success(`Đã chọn Người giới thiệu ${referrer.name}`);
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Không tìm thấy Người giới thiệu từ QR");
     } finally {
       setSearchingReferrers(false);
     }
@@ -484,6 +501,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
                   <Input id="pf-referrer-search" value={referrerQuery} disabled={Boolean(resolvedReferrer) || (isEdit && Boolean(patient?.referral_referrer_name || patient?.referral_user_name))} onChange={(event) => setReferrerQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void searchReferrers(); } }} placeholder="Mã, số điện thoại hoặc email" />
                 </div>
                 <Button type="button" variant="outline" disabled={searchingReferrers || Boolean(resolvedReferrer) || (isEdit && Boolean(patient?.referral_referrer_name || patient?.referral_user_name)) || referrerQuery.trim().length < 2} onClick={() => void searchReferrers()}>{searchingReferrers ? "Đang tìm..." : "Tìm"}</Button>
+                <ReferrerQrScanner disabled={searchingReferrers || Boolean(resolvedReferrer) || (isEdit && Boolean(patient?.referral_referrer_name || patient?.referral_user_name))} onDetected={(referrerId) => void selectReferrerFromQr(referrerId)} />
                 {resolvedReferrer && !isEdit && <Button type="button" variant="ghost" onClick={() => setResolvedReferrer(null)}>Đổi người</Button>}
               </div>
               {referrerMatches.length > 0 && !resolvedReferrer && <div className="divide-y rounded-md border border-border bg-background">{referrerMatches.map((referrer) => <button type="button" key={referrer.id} className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { setResolvedReferrer(referrer); setReferralType("other"); setReferrerMatches([]); setReferrerQuery(""); }}><span><strong>{referrer.name}</strong><span className="ml-2 text-muted-foreground">{referrer.code}</span></span><span className="text-xs text-muted-foreground">{referrer.phone ?? referrer.email}</span></button>)}</div>}

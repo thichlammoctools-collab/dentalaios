@@ -28,6 +28,12 @@ router.get("/search", requirePermission(PERMISSIONS.WRITE_PATIENTS), async (c) =
   ).bind(jwt.tenant_id, pattern, pattern, pattern).all();
   return c.json({ items: result.results.map((row) => ({ id: row.id, code: row.code, name: row.name, type: row.type, email: row.email ?? undefined, phone: row.phone ?? undefined })) });
 });
+router.get("/lookup-id/:id", requirePermission(PERMISSIONS.WRITE_PATIENTS), async (c) => {
+  const jwt = getJwt(c);
+  const referrer = await createReferralsRepository(c.env.DB).getReferrer(jwt.tenant_id, c.req.param("id"));
+  if (!referrer || referrer.status !== "active") return c.json({ error: "Mã QR Người giới thiệu không hợp lệ hoặc đã ngừng hoạt động", code: "not_found" }, 404);
+  return c.json({ id: referrer.id, code: referrer.code, name: referrer.name, type: referrer.type });
+});
 router.post("/quick", requirePermission(PERMISSIONS.WRITE_PATIENTS), auditLog("create", "referrer"), zValidator("json", referrerQuickCreateSchema), async (c) => {
   const jwt = getJwt(c);
   const input = c.req.valid("json");

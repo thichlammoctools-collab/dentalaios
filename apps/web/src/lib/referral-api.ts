@@ -4,6 +4,7 @@ import { api, apiDelete, apiGet, apiPatch, apiPost } from "./api";
 export const referrersApi = {
   list: <T>() => apiGet<T>("/api/referrers"),
   search: <T>(query: string) => apiGet<T>(`/api/referrers/search?q=${encodeURIComponent(query)}`),
+  lookupById: <T>(id: string) => apiGet<T>(`/api/referrers/lookup-id/${encodeURIComponent(id)}`),
   quickCreate: <T>(body: unknown) => apiPost<T>("/api/referrers/quick", body),
   create: <T>(body: unknown) => apiPost<T>("/api/referrers", body),
   update: <T>(id: string, body: unknown) => apiPatch<T>(`/api/referrers/${encodeURIComponent(id)}`, body),
