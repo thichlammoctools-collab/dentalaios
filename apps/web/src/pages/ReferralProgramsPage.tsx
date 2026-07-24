@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogBody,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -44,6 +45,8 @@ type ProgramDraft = {
   review_window_days: number;
   rules: RuleDraft[];
 };
+type ProgramStatusFilter = "all" | ProgramDraft["status"];
+type ProgramSort = "priority" | "newest" | "name";
 const newRule = (): RuleDraft => ({
   referrer_type: "patient",
   min_net_revenue: 0,
@@ -72,6 +75,11 @@ export function ReferralProgramsPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<ProgramDraft>(emptyProgram());
   const [saving, setSaving] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<ProgramStatusFilter>("all");
+  const [referrerTypeFilter, setReferrerTypeFilter] = useState<
+    "all" | ReferrerType
+  >("all");
+  const [sort, setSort] = useState<ProgramSort>("priority");
   const canManage = Boolean(
     session?.role.permissions.includes(PERMISSIONS.ALL) ||
     session?.role.permissions.includes(PERMISSIONS.MANAGE_REFERRAL_PROGRAMS),
@@ -111,10 +119,41 @@ export function ReferralProgramsPage() {
       ),
     }));
   }
+  const duplicateTierIndexes = new Set<number>();
+  const tierKeys = new Map<string, number>();
+  form.rules.forEach((rule, index) => {
+    const key = `${rule.referrer_type}:${rule.min_net_revenue}`;
+    const firstIndex = tierKeys.get(key);
+    if (firstIndex === undefined) {
+      tierKeys.set(key, index);
+      return;
+    }
+    duplicateTierIndexes.add(firstIndex);
+    duplicateTierIndexes.add(index);
+  });
+  const hasInvalidDateRange = Boolean(
+    form.ends_at && new Date(form.ends_at) <= new Date(form.starts_at),
+  );
   async function save(event: FormEvent) {
     event.preventDefault();
     if (!form.name.trim() || !form.rules.length) {
       toast.error("Nhập tên và ít nhất một bậc thưởng");
+      return;
+    }
+    if (hasInvalidDateRange) {
+      toast.error("Ngày kết thúc phải sau ngày bắt đầu");
+      return;
+    }
+    if (
+      !Number.isInteger(form.priority) || form.priority < 0 || form.priority > 10_000 ||
+      !Number.isInteger(form.conversion_window_days) || form.conversion_window_days < 1 || form.conversion_window_days > 3650 ||
+      !Number.isInteger(form.review_window_days) || form.review_window_days < 1 || form.review_window_days > 365
+    ) {
+      toast.error("Kiểm tra ưu tiên, cửa sổ chuyển đổi và thời gian xét duyệt");
+      return;
+    }
+    if (duplicateTierIndexes.size > 0) {
+      toast.error("Mỗi loại người giới thiệu chỉ có một bậc cho cùng ngưỡng doanh thu");
       return;
     }
     if (
@@ -176,6 +215,28 @@ export function ReferralProgramsPage() {
       );
     }
   }
+  const visiblePrograms = programs
+    .filter(
+      (program) =>
+        statusFilter === "all" || program.status === statusFilter,
+    )
+    .filter(
+      (program) =>
+        referrerTypeFilter === "all" ||
+        program.rules?.some(
+          (rule) => rule.referrer_type === referrerTypeFilter,
+        ),
+    )
+    .sort((first, second) => {
+      if (sort === "name") return first.name.localeCompare(second.name, "vi");
+      if (sort === "newest") {
+        return (
+          new Date(second.starts_at).getTime() -
+          new Date(first.starts_at).getTime()
+        );
+      }
+      return second.priority - first.priority;
+    });
   if (loading)
     return (
       <PageContainer>
@@ -205,13 +266,69 @@ export function ReferralProgramsPage() {
           </Button>
         )}
       </div>
+      {programs.length > 0 && (
+        <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex flex-wrap gap-3">
+            <label className="grid gap-1.5 text-sm font-medium">
+              Trạng thái
+              <select
+                value={statusFilter}
+                onChange={(event) =>
+                  setStatusFilter(event.target.value as ProgramStatusFilter)
+                }
+                className="rounded-md border border-input bg-background px-3 py-2 font-normal"
+              >
+                <option value="all">Tất cả trạng thái</option>
+                <option value="active">Đang áp dụng</option>
+                <option value="draft">Nháp</option>
+                <option value="inactive">Ngừng</option>
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-sm font-medium">
+              Loại người giới thiệu
+              <select
+                value={referrerTypeFilter}
+                onChange={(event) =>
+                  setReferrerTypeFilter(event.target.value as "all" | ReferrerType)
+                }
+                className="rounded-md border border-input bg-background px-3 py-2 font-normal"
+              >
+                <option value="all">Tất cả đối tượng</option>
+                <option value="patient">Bệnh nhân</option>
+                <option value="doctor">Bác sĩ</option>
+                <option value="assistant">Phụ tá</option>
+                <option value="partner">Đối tác</option>
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-sm font-medium">
+              Phân loại theo
+              <select
+                value={sort}
+                onChange={(event) => setSort(event.target.value as ProgramSort)}
+                className="rounded-md border border-input bg-background px-3 py-2 font-normal"
+              >
+                <option value="priority">Ưu tiên cao nhất</option>
+                <option value="newest">Hiệu lực mới nhất</option>
+                <option value="name">Tên chương trình</option>
+              </select>
+            </label>
+          </div>
+          <p className="pb-2 text-sm text-muted-foreground">
+            Hiển thị {visiblePrograms.length}/{programs.length} chương trình
+          </p>
+        </div>
+      )}
       <div className="grid gap-4">
         {!programs.length ? (
           <div className="rounded-xl border border-border bg-card">
             <ReferralEmpty>Chưa có chương trình giới thiệu.</ReferralEmpty>
           </div>
+        ) : !visiblePrograms.length ? (
+          <div className="rounded-xl border border-border bg-card">
+            <ReferralEmpty>Không tìm thấy chương trình phù hợp bộ lọc.</ReferralEmpty>
+          </div>
         ) : (
-          programs.map((program) => (
+          visiblePrograms.map((program) => (
             <article
               key={program.id}
               className="rounded-xl border border-border bg-card p-5 shadow-sm"

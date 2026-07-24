@@ -99,7 +99,7 @@ export function AppointmentTimeline({
                       {outsideHours && <span className="block text-[10px] font-medium text-destructive">Ngoài giờ</span>}
                     </button>;
                   })}
-                  {hasCurrentMarker && <div className="pointer-events-none absolute z-30 left-0 right-0 border-t-2 border-red-500" style={{ top: timelineTop(nowMinutes, bounds) }}><span className="absolute -top-3 right-1 rounded bg-red-500 px-1 text-[9px] font-semibold text-white">Hiện tại</span></div>}
+                  {hasCurrentMarker && <div className="pointer-events-none absolute z-30 left-0 right-0 border-t border-dashed border-red-500" style={{ top: timelineTop(nowMinutes, bounds) }}><span className="absolute -top-3 right-1 rounded bg-red-500 px-1 text-[9px] font-semibold text-white">Hiện tại</span></div>}
                 </div>;
               })}
             </div>

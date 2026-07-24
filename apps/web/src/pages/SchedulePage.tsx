@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type DragEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { AppointmentForm } from "@/components/schedule/AppointmentForm";
 import { AppointmentTimeline } from "@/components/schedule/AppointmentTimeline";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
-import { apiDelete, apiGet, apiPatch, ApiError } from "@/lib/api";
+import { apiDelete, apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
 import type { Appointment, ClinicSchedule, DentalChair, Patient, UserWithDetails } from "@shared/types";
@@ -191,6 +191,86 @@ export function SchedulePage() {
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi hủy lịch hẹn");
       return false;
+    }
+  }
+
+  function canMoveAppointment(appointment: Appointment): boolean {
+    return appointment.status !== "cancelled" && !isPastAppointment(appointment);
+  }
+
+  function isPastAppointment(appointment: Appointment): boolean {
+    return new Date(appointment.scheduled_at).getTime() < now.getTime();
+  }
+
+  function resolveAvailableTime(appointment: Appointment, requestedAt: Date): Date {
+    const minimum = new Date(now.getTime() + 5 * 60_000);
+    minimum.setSeconds(0, 0);
+    const remainder = minimum.getMinutes() % 15;
+    if (remainder) minimum.setMinutes(minimum.getMinutes() + 15 - remainder);
+
+    let candidate = new Date(Math.max(requestedAt.getTime(), minimum.getTime()));
+    while (true) {
+      const candidateEnd = candidate.getTime() + appointment.duration_min * 60_000;
+      const conflicts = appointments.filter((item) => {
+        if (item.id === appointment.id || ["cancelled", "no_show"].includes(item.status)) return false;
+        const sharesResource = item.clinician_id === appointment.clinician_id
+          || item.patient_id === appointment.patient_id
+          || Boolean(appointment.chair_id && item.chair_id === appointment.chair_id);
+        if (!sharesResource) return false;
+        const itemStart = new Date(item.scheduled_at).getTime();
+        const itemEnd = itemStart + item.duration_min * 60_000;
+        return candidate.getTime() < itemEnd && candidateEnd > itemStart;
+      });
+      if (conflicts.length === 0) return candidate;
+      candidate = new Date(Math.max(...conflicts.map((item) => new Date(item.scheduled_at).getTime() + item.duration_min * 60_000)));
+    }
+  }
+
+  async function handleAppointmentDrop(event: DragEvent<HTMLElement>, date: Date) {
+    event.preventDefault();
+    const appointmentId = event.dataTransfer.getData("application/x-appointment-id");
+    const appointment = appointments.find((item) => item.id === appointmentId);
+    if (!appointment || !canMoveAppointment(appointment)) return;
+
+    if (!confirm("Bạn có chắc chắn là muốn đổi ghế không?")) return;
+
+    const original = new Date(appointment.scheduled_at);
+    const requestedAt = new Date(date);
+    requestedAt.setHours(original.getHours(), original.getMinutes(), 0, 0);
+    const scheduledAt = resolveAvailableTime(appointment, requestedAt);
+    try {
+      const updated = await apiPatch<Appointment>(`/api/appointments/${appointment.id}`, {
+        scheduled_at: scheduledAt.toISOString(),
+      });
+      setAppointments((current) => current.map((item) => item.id === updated.id ? updated : item));
+      if (scheduledAt.getTime() !== requestedAt.getTime()) {
+        toast.success(`Đã đổi lịch sang ${formatDate(scheduledAt.toISOString())} ${formatTime(scheduledAt.toISOString())} để tránh trùng lịch`);
+      } else {
+        toast.success("Đã đổi lịch hẹn");
+      }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Không thể đổi lịch hẹn");
+    }
+  }
+
+  async function handleDuplicate(appointment: Appointment) {
+    const scheduledAt = resolveAvailableTime(appointment, new Date());
+    try {
+      const created = await apiPost<Appointment>("/api/appointments", {
+        branch_id: appointment.branch_id,
+        patient_id: appointment.patient_id,
+        clinician_id: appointment.clinician_id,
+        assistant_id: appointment.assistant_id,
+        chair_id: appointment.chair_id,
+        scheduled_at: scheduledAt.toISOString(),
+        duration_min: appointment.duration_min,
+        procedure: appointment.procedure,
+        notes: appointment.notes,
+      });
+      setAppointments((current) => [...current, created]);
+      toast.success("Đã nhân bản lịch hẹn");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Không thể nhân bản lịch hẹn");
     }
   }
 
@@ -375,7 +455,12 @@ export function SchedulePage() {
                       .sort((left, right) => left.scheduled_at.localeCompare(right.scheduled_at));
                     const isToday = dayYmd === ymd(new Date());
                     return (
-                      <div key={dayYmd} className={`min-h-[280px] rounded-lg border p-3 ${isToday ? "border-primary bg-primary/5" : "border-border"}`}>
+                      <div
+                        key={dayYmd}
+                        className={`min-h-[280px] rounded-lg border p-3 ${isToday ? "border-primary bg-primary/5" : "border-border"}`}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={(event) => void handleAppointmentDrop(event, day)}
+                      >
                         <div className="mb-3 flex items-baseline justify-between gap-2">
                           <div>
                             <p className="text-sm font-semibold">{isToday ? "Hôm nay" : weekdayLabel(day.getDay() === 0 ? 7 : day.getDay())}</p>
@@ -393,16 +478,27 @@ export function SchedulePage() {
                                 <button
                                   key={appointment.id}
                                   type="button"
-                                  onClick={() => setEditing(appointment)}
-                                  className={`w-full rounded-lg border-l-2 px-3 py-2 text-left transition-colors hover:bg-accent/50 ${statusBorderClass(appointment.status)}`}
+                                  onClick={() => {
+                                    if (canMoveAppointment(appointment)) setEditing(appointment);
+                                  }}
+                                  draggable={canMoveAppointment(appointment)}
+                                  onDragStart={(event) => {
+                                    event.dataTransfer.effectAllowed = "move";
+                                    event.dataTransfer.setData("application/x-appointment-id", appointment.id);
+                                  }}
+                                  onDragEnd={(event) => event.currentTarget.blur()}
+                                  className={`w-full rounded-lg border-l-2 px-3 py-2 text-left transition-colors hover:bg-accent/50 ${statusBorderClass(appointment.status)} ${canMoveAppointment(appointment) ? "cursor-grab active:cursor-grabbing" : "cursor-default"}`}
                                 >
                                   <div className="flex items-center justify-between gap-2">
                                     <span className="font-mono text-sm font-semibold">{formatTime(appointment.scheduled_at)}</span>
                                     <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${statusBgClass(appointment.status)}`}>{statusLabelVi(appointment.status)}</span>
                                   </div>
                                   <p className="mt-1 truncate text-sm font-medium">{patient?.name ?? appointment.patient_id.slice(0, 8)}</p>
-                                  {appointment.procedure && <p className="mt-0.5 truncate text-xs text-muted-foreground">{appointment.procedure}</p>}
-                                </button>
+                                   {appointment.procedure && <p className="mt-0.5 truncate text-xs text-muted-foreground">{appointment.procedure}</p>}
+                                 </button>
+                                 {isPastAppointment(appointment) && (
+                                   <Button variant="ghost" size="sm" className="mt-1 h-6 w-full text-[10px]" onClick={() => void handleDuplicate(appointment)}>Nhân bản</Button>
+                                 )}
                               );
                             })}
                           </div>
@@ -453,6 +549,8 @@ export function SchedulePage() {
                         key={dayYmd}
                         className={`flex min-h-[320px] flex-col rounded-lg border p-2 transition-colors hover:bg-accent/30 ${isExpanded ? "border-primary bg-primary/5 ring-1 ring-primary/20" : isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : isToday ? "border-amber-400 bg-amber-50/30" : "border-border"}`}
                         onClick={() => setSelectedDate(day)}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={(event) => void handleAppointmentDrop(event, day)}
                       >
                         <div className="mb-2 flex items-baseline justify-between">
                           <div className="text-xs font-medium text-muted-foreground">
@@ -489,9 +587,14 @@ export function SchedulePage() {
                                   key={a.id}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setEditing(a);
+                                    if (canMoveAppointment(a)) setEditing(a);
                                   }}
-                                  className={`cursor-pointer rounded-md border-l-2 px-2 py-1.5 text-xs transition-colors hover:bg-accent/50 ${statusBorderClass(a.status)}`}
+                                  draggable={canMoveAppointment(a)}
+                                  onDragStart={(event) => {
+                                    event.dataTransfer.effectAllowed = "move";
+                                    event.dataTransfer.setData("application/x-appointment-id", a.id);
+                                  }}
+                                  className={`rounded-md border-l-2 px-2 py-1.5 text-xs transition-colors hover:bg-accent/50 ${statusBorderClass(a.status)} ${canMoveAppointment(a) ? "cursor-grab active:cursor-grabbing" : "cursor-default"}`}
                                 >
                                   <div className="flex items-center justify-between gap-1">
                                     <span className="font-mono font-semibold">{formatTime(a.scheduled_at)}</span>
@@ -505,12 +608,25 @@ export function SchedulePage() {
                                       {a.procedure}
                                     </div>
                                   )}
-                                  {isExpanded && doctor && (
-                                    <div className="mt-0.5 truncate text-[10px] text-muted-foreground">
-                                      BS: {doctor.name}
-                                    </div>
-                                  )}
-                                </div>
+                                   {isExpanded && doctor && (
+                                     <div className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                                       BS: {doctor.name}
+                                     </div>
+                                   )}
+                                   {isPastAppointment(a) && (
+                                     <Button
+                                       variant="ghost"
+                                       size="sm"
+                                       className="mt-1 h-5 w-full text-[9px]"
+                                       onClick={(event) => {
+                                         event.stopPropagation();
+                                         void handleDuplicate(a);
+                                       }}
+                                     >
+                                       Nhân bản
+                                     </Button>
+                                   )}
+                                 </div>
                               );
                             })
                           )}

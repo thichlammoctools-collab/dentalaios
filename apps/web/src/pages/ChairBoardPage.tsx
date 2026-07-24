@@ -216,6 +216,11 @@ export function ChairBoardPage() {
                       <span>{chair.room_name ?? "Chưa gán phòng"}</span>
                       <ChairTypeIndicator type={chair.chair_type} />
                     </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); void changeStatus(chair.id, "available"); }}>Trống</Button>
+                      <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); void changeStatus(chair.id, "cleaning"); }}>Vệ sinh</Button>
+                      <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); void changeStatus(chair.id, "maintenance"); }}>Bảo trì</Button>
+                    </div>
                     <p className="mt-2 text-xs font-medium text-primary">Xem {item.appointments.length} lịch trong ngày</p>
                 </CardHeader>
                 <CardContent className="space-y-4 pt-4">
@@ -234,11 +239,6 @@ export function ChairBoardPage() {
                       <Metric label="DT/giờ" value={item.revenue.revenue_per_completed_hour === null ? "--" : formatCurrency(item.revenue.revenue_per_completed_hour)} />
                     </div>
                   )}
-                  <div className="flex flex-wrap gap-2 border-t pt-3">
-                    <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); void changeStatus(chair.id, "available"); }}>Trống</Button>
-                    <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); void changeStatus(chair.id, "cleaning"); }}>Vệ sinh</Button>
-                    <Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); void changeStatus(chair.id, "maintenance"); }}>Bảo trì</Button>
-                  </div>
                 </CardContent>
               </Card>
             );

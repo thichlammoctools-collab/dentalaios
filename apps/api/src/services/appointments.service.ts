@@ -157,6 +157,11 @@ export const appointmentsService = {
       throw new ConflictError("Không thể cập nhật lịch hẹn đã hủy");
     }
 
+    const existingEndsAt = new Date(existing.scheduled_at).getTime() + existing.duration_min * 60_000;
+    if (input.scheduled_at !== undefined && existingEndsAt <= Date.now()) {
+      throw new ConflictError("Không thể đổi lịch hẹn đã qua");
+    }
+
     await assertAllInTenant(db, tenantId, [
       { table: "users", id: input.clinician_id ?? undefined },
       { table: "users", id: input.assistant_id ?? undefined },
