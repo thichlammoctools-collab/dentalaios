@@ -131,6 +131,18 @@ export function ReferralProgramsPage() {
     duplicateTierIndexes.add(firstIndex);
     duplicateTierIndexes.add(index);
   });
+  const outOfOrderTierIndexes = new Set<number>();
+  const highestThresholdByType = new Map<ReferrerType, number>();
+  form.rules.forEach((rule, index) => {
+    const previousThreshold = highestThresholdByType.get(rule.referrer_type);
+    if (previousThreshold !== undefined && rule.min_net_revenue < previousThreshold) {
+      outOfOrderTierIndexes.add(index);
+    }
+    highestThresholdByType.set(
+      rule.referrer_type,
+      Math.max(previousThreshold ?? 0, rule.min_net_revenue),
+    );
+  });
   const hasInvalidDateRange = Boolean(
     form.ends_at && new Date(form.ends_at) <= new Date(form.starts_at),
   );
@@ -154,6 +166,10 @@ export function ReferralProgramsPage() {
     }
     if (duplicateTierIndexes.size > 0) {
       toast.error("Mỗi loại người giới thiệu chỉ có một bậc cho cùng ngưỡng doanh thu");
+      return;
+    }
+    if (outOfOrderTierIndexes.size > 0) {
+      toast.error("Sắp xếp các bậc theo ngưỡng doanh thu tăng dần cho từng loại người giới thiệu");
       return;
     }
     if (
@@ -435,14 +451,31 @@ export function ReferralProgramsPage() {
           ))
         )}
       </div>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={setOpen} size="workspace">
         <form onSubmit={save}>
           <DialogHeader>
             <DialogTitle>Tạo chương trình giới thiệu</DialogTitle>
+            <DialogDescription>
+              Thiết lập theo thứ tự: phạm vi áp dụng, thời gian đánh giá, rồi đến các bậc thưởng.
+            </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-5">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="grid gap-1.5 text-sm font-medium sm:col-span-2">
+            <section className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+              <p className="text-sm font-semibold text-foreground">Trước khi cấu hình</p>
+              <ol className="mt-3 grid gap-3 text-sm text-muted-foreground lg:grid-cols-3">
+                <li><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">1</span><strong className="text-foreground">Phạm vi:</strong> xác định thời gian và ưu tiên khi có nhiều chương trình cùng hiệu lực.</li>
+                <li><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">2</span><strong className="text-foreground">Chuyển đổi:</strong> chỉ doanh thu xác nhận trong cửa sổ này được dùng để xét thưởng.</li>
+                <li><span className="mr-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">3</span><strong className="text-foreground">Bậc thưởng:</strong> hệ thống chọn ngưỡng cao nhất mà doanh thu thực tế đạt được.</li>
+              </ol>
+            </section>
+
+            <section className="space-y-3 rounded-xl border border-border p-4 lg:p-5">
+              <div>
+                <h3 className="font-semibold">1. Phạm vi và thứ tự áp dụng</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Khi nhiều chương trình cùng áp dụng cho một người giới thiệu, hệ thống chọn chương trình có ưu tiên cao hơn. Nếu bằng nhau, chương trình tạo mới hơn được chọn.</p>
+              </div>
+              <div className="grid gap-3 lg:grid-cols-2">
+              <label className="grid gap-1.5 text-sm font-medium lg:col-span-2">
                 Tên chương trình
                 <input
                   required
@@ -484,6 +517,7 @@ export function ReferralProgramsPage() {
                   }
                   className="rounded-md border border-input bg-background px-3 py-2"
                 />
+                {hasInvalidDateRange && <span className="text-xs font-medium text-destructive">Ngày kết thúc phải sau ngày bắt đầu.</span>}
               </label>
               <label className="grid gap-1.5 text-sm font-medium">
                 Ưu tiên
@@ -499,7 +533,17 @@ export function ReferralProgramsPage() {
                   }
                   className="rounded-md border border-input bg-background px-3 py-2"
                 />
+                <span className="text-xs font-normal text-muted-foreground">Số lớn hơn được ưu tiên trước. Dùng 0 khi không cần ghi đè chương trình khác.</span>
               </label>
+              </div>
+            </section>
+
+            <section className="space-y-3 rounded-xl border border-border p-4 lg:p-5">
+              <div>
+                <h3 className="font-semibold">2. Thời gian đánh giá</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Case được mở khi bệnh nhân mới được ghi nhận. Chỉ payment đã xác nhận trong cửa sổ chuyển đổi được cộng vào doanh thu ròng.</p>
+              </div>
+              <div className="grid gap-3 lg:grid-cols-2">
               <label className="grid gap-1.5 text-sm font-medium">
                 Cửa sổ chuyển đổi (ngày)
                 <input
@@ -514,11 +558,29 @@ export function ReferralProgramsPage() {
                   }
                   className="rounded-md border border-input bg-background px-3 py-2"
                 />
+                <span className="text-xs font-normal text-muted-foreground">Ví dụ 90 ngày: thanh toán xác nhận trong 90 ngày kể từ khi ghi nhận referral.</span>
               </label>
-            </div>
-            <div>
+              <label className="grid gap-1.5 text-sm font-medium">
+                Thời gian xét duyệt (ngày)
+                <input
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={form.review_window_days}
+                  onChange={(event) => setForm((current) => ({ ...current, review_window_days: Number(event.target.value) }))}
+                  className="rounded-md border border-input bg-background px-3 py-2"
+                />
+                <span className="text-xs font-normal text-muted-foreground">Sau khi đủ điều kiện, phần thưởng chờ duyệt trong khoảng thời gian này.</span>
+              </label>
+              </div>
+            </section>
+
+            <section className="space-y-3 rounded-xl border border-border p-4 lg:p-5">
               <div className="mb-2 flex items-center justify-between">
-                <h3 className="font-medium">Bậc thưởng</h3>
+                <div>
+                  <h3 className="font-semibold">3. Bậc thưởng</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">Tạo bậc riêng theo loại người giới thiệu. Không lặp ngưỡng trong cùng một loại; hãy tăng dần ngưỡng để chính sách dễ kiểm tra.</p>
+                </div>
                 <Button
                   type="button"
                   size="sm"
@@ -528,12 +590,19 @@ export function ReferralProgramsPage() {
                   Thêm bậc
                 </Button>
               </div>
+              <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                Ví dụ: Bệnh nhân đạt doanh thu ròng 3.000.000 vnđ sẽ nhận bậc 3.000.000, không cộng dồn tất cả các bậc thấp hơn.
+              </div>
               <div className="space-y-3">
                 {form.rules.map((rule, index) => (
                   <div
                     key={index}
-                    className="grid gap-3 rounded-lg border border-border p-3 md:grid-cols-12"
+                    className={`grid gap-3 rounded-lg border p-3 lg:grid-cols-12 ${duplicateTierIndexes.has(index) ? "border-destructive bg-destructive/5" : "border-border"}`}
                   >
+                    <div className="flex items-center justify-between lg:col-span-12">
+                      <p className="text-sm font-semibold">Bậc {index + 1}</p>
+                      <p className="text-xs text-muted-foreground">Áp dụng khi doanh thu ròng đạt từ ngưỡng bên dưới.</p>
+                    </div>
                     <select
                       value={rule.referrer_type}
                       onChange={(event) =>
@@ -541,7 +610,7 @@ export function ReferralProgramsPage() {
                           referrer_type: event.target.value as ReferrerType,
                         })
                       }
-                      className="min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm md:col-span-2"
+                      className="min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm lg:col-span-2"
                     >
                       <option value="patient">Bệnh nhân</option>
                       <option value="doctor">Bác sĩ</option>
@@ -559,9 +628,9 @@ export function ReferralProgramsPage() {
                           min_net_revenue: Number(event.target.value),
                         })
                       }
-                      className="min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm md:col-span-4"
+                      className="min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm lg:col-span-4"
                     />
-                    <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(7.5rem,0.9fr)_6rem_minmax(11rem,1.6fr)] md:col-span-6">
+                    <div className="grid min-w-0 gap-3 lg:col-span-6 lg:grid-cols-[minmax(7.5rem,0.9fr)_6rem_minmax(11rem,1.6fr)]">
                       <select
                         value={rule.reward_kind}
                         onChange={(event) =>
@@ -613,9 +682,10 @@ export function ReferralProgramsPage() {
                             voucher_valid_days: Number(event.target.value),
                           })
                         }
-                        className="min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm md:col-span-12"
+                        className="min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm lg:col-span-12"
                       />
                     )}
+                    {duplicateTierIndexes.has(index) && <p className="text-xs font-medium text-destructive lg:col-span-12">Ngưỡng này đã tồn tại cho cùng loại người giới thiệu. Mỗi ngưỡng chỉ được khai báo một lần.</p>}
                     {form.rules.length > 1 && (
                       <button
 
@@ -628,7 +698,7 @@ export function ReferralProgramsPage() {
                             ),
                           }))
                         }
-                        className="text-left text-xs text-destructive md:col-span-12"
+                        className="text-left text-xs text-destructive lg:col-span-12"
                       >
                         Xóa bậc này
                       </button>
@@ -637,7 +707,7 @@ export function ReferralProgramsPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
           </DialogBody>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>
