@@ -597,7 +597,7 @@ export function ReferralProgramsPage() {
                 {form.rules.map((rule, index) => (
                   <div
                     key={index}
-                    className={`grid gap-3 rounded-lg border p-3 lg:grid-cols-12 ${duplicateTierIndexes.has(index) ? "border-destructive bg-destructive/5" : "border-border"}`}
+                    className={`grid gap-3 rounded-lg border p-3 lg:grid-cols-12 ${duplicateTierIndexes.has(index) || outOfOrderTierIndexes.has(index) ? "border-destructive bg-destructive/5" : "border-border"}`}
                   >
                     <div className="flex items-center justify-between lg:col-span-12">
                       <p className="text-sm font-semibold">Bậc {index + 1}</p>
@@ -621,6 +621,7 @@ export function ReferralProgramsPage() {
                     <input
                       type="number"
                       min={0}
+                      aria-label={`Ngưỡng doanh thu cho bậc ${index + 1}`}
                       placeholder="Ngưỡng doanh thu"
                       value={rule.min_net_revenue}
                       onChange={(event) =>
@@ -660,6 +661,7 @@ export function ReferralProgramsPage() {
                       <input
                         type="number"
                         min={1}
+                        aria-label={`Giá trị thưởng cho bậc ${index + 1}`}
                         placeholder="Giá trị"
                         value={rule.value || ""}
                         onChange={(event) =>
@@ -686,6 +688,8 @@ export function ReferralProgramsPage() {
                       />
                     )}
                     {duplicateTierIndexes.has(index) && <p className="text-xs font-medium text-destructive lg:col-span-12">Ngưỡng này đã tồn tại cho cùng loại người giới thiệu. Mỗi ngưỡng chỉ được khai báo một lần.</p>}
+                    {!duplicateTierIndexes.has(index) && outOfOrderTierIndexes.has(index) && <p className="text-xs font-medium text-destructive lg:col-span-12">Ngưỡng phải lớn hơn hoặc bằng bậc trước đó của cùng loại người giới thiệu.</p>}
+                    {!duplicateTierIndexes.has(index) && !outOfOrderTierIndexes.has(index) && rule.value > 0 && <p className="text-xs text-muted-foreground lg:col-span-12">Khi doanh thu ròng đạt từ <strong className="text-foreground">{rule.min_net_revenue.toLocaleString("vi-VN")} vnđ</strong>, {rule.referrer_type === "patient" ? "bệnh nhân" : rule.referrer_type === "doctor" ? "bác sĩ" : rule.referrer_type === "assistant" ? "phụ tá" : "đối tác"} giới thiệu nhận <strong className="text-foreground">{rule.calculation_type === "percentage" ? `${rule.value}% doanh thu ròng` : `${rule.value.toLocaleString("vi-VN")} vnđ`}</strong>{rule.reward_kind === "voucher" ? ` dưới dạng voucher${rule.voucher_valid_days ? `, dùng trong ${rule.voucher_valid_days} ngày` : ""}` : " tiền mặt"}.</p>}
                     {form.rules.length > 1 && (
                       <button
 

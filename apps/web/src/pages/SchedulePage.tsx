@@ -475,8 +475,8 @@ export function SchedulePage() {
                             {dayAppts.map((appointment) => {
                               const patient = patientsById.get(appointment.patient_id);
                               return (
+                                <div key={appointment.id}>
                                 <button
-                                  key={appointment.id}
                                   type="button"
                                   onClick={() => {
                                     if (canMoveAppointment(appointment)) setEditing(appointment);
@@ -496,9 +496,10 @@ export function SchedulePage() {
                                   <p className="mt-1 truncate text-sm font-medium">{patient?.name ?? appointment.patient_id.slice(0, 8)}</p>
                                    {appointment.procedure && <p className="mt-0.5 truncate text-xs text-muted-foreground">{appointment.procedure}</p>}
                                  </button>
-                                 {isPastAppointment(appointment) && (
-                                   <Button variant="ghost" size="sm" className="mt-1 h-6 w-full text-[10px]" onClick={() => void handleDuplicate(appointment)}>Nhân bản</Button>
-                                 )}
+                                  {isPastAppointment(appointment) && (
+                                    <Button variant="ghost" size="sm" className="mt-1 h-6 w-full text-[10px]" onClick={() => void handleDuplicate(appointment)}>Nhân bản</Button>
+                                  )}
+                                </div>
                               );
                             })}
                           </div>
