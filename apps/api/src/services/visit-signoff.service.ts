@@ -27,8 +27,7 @@ export const visitSignoffService = {
     const canonicalObj = { visit, initial_assessment: initialAssessment, findings, diagnoses, signed_at: now, signed_by: doctorId };
     const canonicalJson = JSON.stringify(canonicalObj);
     const sha256 = await computeSha256Hex(canonicalJson);
-    const versionRepo = createClinicalRecordVersionsRepository(db);
-    const createdVersion = await versionRepo.createVersion({
+    const createdVersion: ClinicalRecordVersion = {
       id: crypto.randomUUID(),
       tenant_id: tenantId,
       visit_id: visitId,
@@ -38,14 +37,19 @@ export const visitSignoffService = {
       sha256,
       created_by: doctorId,
       created_at: now,
-    });
-    await visits.update(tenantId, visitId, {
-      clinical_state: "signed",
-      signed_by: doctorId,
-      signed_at: now,
-      locked_at: now,
-      effective_at: now,
-    });
+    };
+    // D1 batch is transactional: a record is never signed without its immutable
+    // snapshot, and a snapshot is never persisted for an unlocked visit.
+    await db.batch([
+      db.prepare(`INSERT INTO clinical_record_versions
+        (id, tenant_id, visit_id, version_no, record_type, canonical_json, sha256, reason, created_by, created_at, supersedes_version_id, archive_file_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(createdVersion.id, tenantId, visitId, 1, "signed_record", canonicalJson, sha256, null, doctorId, now, null, null),
+      db.prepare(`UPDATE visits
+        SET clinical_state = 'signed', signed_by = ?, signed_at = ?, locked_at = ?, effective_at = ?
+        WHERE tenant_id = ? AND id = ? AND locked_at IS NULL`)
+        .bind(doctorId, now, now, now, tenantId, visitId),
+    ]);
     return createdVersion;
   },
   async listVersions(db: D1Database, tenantId: string, visitId: string): Promise<ClinicalRecordVersion[]> {

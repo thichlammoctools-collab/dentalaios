@@ -502,6 +502,12 @@ export const visitSafetyAcknowledgementSchema = z.object({
 });
 export type VisitSafetyAcknowledgementInput = z.infer<typeof visitSafetyAcknowledgementSchema>;
 
+export const visitAmendmentCreateSchema = z.object({
+  reason: nonEmpty(1000),
+  correction_summary: nonEmpty(4000),
+}).strict();
+export type VisitAmendmentCreateInput = z.infer<typeof visitAmendmentCreateSchema>;
+
 const clinicalConceptCategory = z.enum(["tooth_hard_tissue", "periodontal", "oral_soft_tissue", "occlusion_orthodontics", "tmj_function", "preventive_general"]);
 const clinicalFindingScope = z.enum(["tooth", "region", "full_mouth"]);
 
