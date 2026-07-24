@@ -99,6 +99,7 @@ router.post(
       file_id,
       image_type ?? "other",
       prompt,
+      visit_id,
     );
     return c.json({ ...result, visit_id });
   },

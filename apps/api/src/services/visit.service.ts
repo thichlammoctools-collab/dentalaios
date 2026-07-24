@@ -165,19 +165,23 @@ export const visitService = {
     const visit = await createVisitsRepository(db).getById(tenantId, visitId);
     if (!visit) throw new NotFoundError("Visit not found");
     const terminology = createClinicalTerminologyRepository(db);
-    const resolved = await Promise.all(data.findings.map(async (finding) => {
+    const resolved: Array<{
+      finding: FindingCreateInput;
+      concept: Awaited<ReturnType<typeof terminology.getConcept>>;
+    }> = [];
+    for (const [itemIndex, finding] of data.findings.entries()) {
       const concept = finding.concept_id ? await terminology.getConcept(finding.concept_id) : null;
       if (finding.concept_id && (!concept || !concept.is_active)) {
-        throw new ValidationError("Khái niệm lâm sàng không còn hoạt động");
+        throw new ValidationError("Khái niệm lâm sàng không còn hoạt động", { item_index: itemIndex });
       }
       if (concept && (concept.category !== finding.category || concept.default_scope !== finding.scope)) {
-        throw new ValidationError("Khái niệm không phù hợp với nhóm hoặc phạm vi finding");
+        throw new ValidationError("Khái niệm không phù hợp với nhóm hoặc phạm vi finding", { item_index: itemIndex });
       }
       if (concept?.kind === "diagnosis") {
-        throw new ValidationError("Chẩn đoán cần được xác nhận qua hồ sơ diagnosis riêng");
+        throw new ValidationError("Chẩn đoán cần được xác nhận qua hồ sơ diagnosis riêng", { item_index: itemIndex });
       }
-      return { finding, concept };
-    }));
+      resolved.push({ finding, concept });
+    }
 
     const rows = [] as Array<{ id: string; code: string; finding: FindingCreateInput; concept: Awaited<ReturnType<typeof terminology.getConcept>> }>;
     for (const { finding, concept } of resolved) {

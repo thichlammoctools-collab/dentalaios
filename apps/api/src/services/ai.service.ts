@@ -253,6 +253,7 @@ QUY TẮC QUAN TRỌNG:
     fileId: string,
     imageType: string,
     optionalPrompt?: string,
+    visitId?: string,
   ): Promise<AnalyzeImageResult> {
     const { AI, FILES, db } = deps;
 
@@ -315,10 +316,13 @@ QUY TẮC QUAN TRỌNG:
     // Confirm this file is attached to a tenant patient-image record before
     // reading private storage. Arbitrary file_objects are never AI input.
     const imageRecord = await db
-      .prepare("SELECT id FROM patient_images WHERE tenant_id = ? AND file_id = ? LIMIT 1")
+      .prepare("SELECT id, visit_id FROM patient_images WHERE tenant_id = ? AND file_id = ? LIMIT 1")
       .bind(tenantId, fileId)
-      .first<{ id: string }>();
+      .first<{ id: string; visit_id: string | null }>();
     if (!imageRecord) throw new NotFoundError("Image file not found in patient records");
+    if (visitId && imageRecord.visit_id !== visitId) {
+      throw new ValidationError("Ảnh không thuộc lượt khám được yêu cầu");
+    }
 
     // Step 2: Fetch only a supported raster image from tenant-scoped R2 storage.
     let imageBase64: string | null = null;

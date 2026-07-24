@@ -164,7 +164,13 @@ router.post(
 router.post(
   "/batch",
   requirePermission(PERMISSIONS.WRITE_PLANS),
-  auditLog("create_batch", "treatment_plan"),
+  auditLog("create_batch", "treatment_plan", {
+    entityIdFrom: (body) => (
+      typeof body === "object" && body !== null && "plan" in body
+      && typeof body.plan === "object" && body.plan !== null && "id" in body.plan
+      && typeof body.plan.id === "string"
+    ) ? body.plan.id : undefined,
+  }),
   zValidator("json", planBatchCreateSchema),
   async (c) => {
     const jwt = getJwt(c);
@@ -221,7 +227,13 @@ router.get(
 router.post(
   "/:id/items/batch",
   requirePermission(PERMISSIONS.WRITE_PLANS),
-  auditLog("create_batch", "treatment_plan_item"),
+  auditLog("create_batch", "treatment_plan_item", {
+    entityIdFrom: (body) => (
+      typeof body === "object" && body !== null && "items" in body
+      && Array.isArray(body.items) && typeof body.items[0] === "object" && body.items[0] !== null
+      && "id" in body.items[0] && typeof body.items[0].id === "string"
+    ) ? body.items[0].id : undefined,
+  }),
   zValidator("json", planItemsBatchCreateSchema),
   async (c) => {
     const jwt = getJwt(c);

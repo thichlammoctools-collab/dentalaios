@@ -234,6 +234,47 @@ describe("POST /api/treatment-plans/:id/items", () => {
   });
 });
 
+describe("POST /api/treatment-plans/:id/items/batch", () => {
+  it("rejects a batch containing an invalid duration before item writes", async () => {
+    const app = mountRoute("/api/treatment-plans", treatmentPlansRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/treatment-plans/plan-1/items/batch",
+      new Map(),
+      {
+        permissions: ["write_plans"],
+        body: {
+          items: [{ tooth_number: 11, procedure: "filling", description: "Trám răng", unit_cost: 500000, estimated_duration_min: 0 }],
+        },
+      },
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("creates validated items through the batch route", async () => {
+    const app = mountRoute("/api/treatment-plans", treatmentPlansRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/treatment-plans/plan-1/items/batch",
+      new Map([
+        ["FROM treatment_plans", [planRow()]],
+        ["FROM treatment_plan_items", [itemRow()]],
+      ]),
+      {
+        permissions: ["write_plans"],
+        body: {
+          items: [{ tooth_number: 11, procedure: "filling", description: "Trám răng", unit_cost: 500000, estimated_duration_min: 30 }],
+        },
+      },
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { items: Array<{ id: string }> };
+    expect(body.items[0].id).toBe("item-1");
+  });
+});
+
 describe("PATCH /api/treatment-plans/:id/items/:itemId", () => {
   it("updates a draft-plan item and returns the edited item", async () => {
     const app = mountRoute("/api/treatment-plans", treatmentPlansRoutes);

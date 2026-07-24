@@ -499,3 +499,54 @@ describe("PATCH /api/visits/:visitId/findings/:findingId — integrity", () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe("POST /api/visits/:id/findings/batch", () => {
+  it("rejects the complete request before any write when one finding is invalid", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/visits/visit-1/findings/batch",
+      new Map([["FROM visits", [visitRow()]]]),
+      {
+        permissions: ["write_findings"],
+        body: {
+          findings: [
+            { tooth_number: 11, category: "tooth_hard_tissue", scope: "tooth", condition: "caries" },
+            { tooth_number: 99, category: "tooth_hard_tissue", scope: "tooth", condition: "caries" },
+          ],
+        },
+      },
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it("creates all valid findings through one batch write", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const findingRow = {
+      id: "finding-1", code: "FND-20260101-0001", tenant_id: "test-tenant", visit_id: "visit-1",
+      tooth_number: 11, tooth_system: "FDI", category: "tooth_hard_tissue", scope: "tooth",
+      anatomical_site: null, condition: "caries", notes: null, created_at: "2026-01-01",
+    };
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/visits/visit-1/findings/batch",
+      new Map([
+        ["FROM visits", [visitRow()]],
+        ["FROM clinical_findings", [findingRow]],
+      ]),
+      {
+        permissions: ["write_findings"],
+        body: {
+          findings: [{ tooth_number: 11, category: "tooth_hard_tissue", scope: "tooth", condition: "caries" }],
+        },
+      },
+    );
+
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { items: Array<{ id: string }> };
+    expect(body.items[0].id).toBe("finding-1");
+  });
+});

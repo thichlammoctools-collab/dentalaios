@@ -159,7 +159,13 @@ router.get(
 router.post(
   "/:id/findings/batch",
   requirePermission(PERMISSIONS.WRITE_FINDINGS),
-  auditLog("create_batch", "clinical_finding"),
+  auditLog("create_batch", "clinical_finding", {
+    entityIdFrom: (body) => (
+      typeof body === "object" && body !== null && "items" in body
+      && Array.isArray(body.items) && typeof body.items[0] === "object" && body.items[0] !== null
+      && "id" in body.items[0] && typeof body.items[0].id === "string"
+    ) ? body.items[0].id : undefined,
+  }),
   zValidator("json", findingsBatchCreateSchema),
   async (c) => {
     const jwt = getJwt(c);

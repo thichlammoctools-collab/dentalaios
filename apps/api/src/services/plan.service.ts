@@ -72,16 +72,35 @@ export const planService = {
     }
 
     const services = createTreatmentServicesRepository(db);
-    const resolvedItems = await Promise.all(data.items.map(async (item) => {
+    const resolvedItems = [] as Array<{
+      id: string;
+      tooth_number: number | null;
+      service_code?: string;
+      service_name?: string;
+      procedure: string;
+      description: string;
+      unit_cost: number;
+      estimated_duration_min: number;
+      treating_clinician_id: string | null;
+      assistant_id: string | null;
+    }>;
+    for (const [itemIndex, item] of data.items.entries()) {
       const service = item.service_code ? await services.getActiveByCode(tenantId, item.service_code) : null;
       if (item.service_code && !service) {
-        throw new ValidationError("Mã dịch vụ không hợp lệ hoặc đã ngừng áp dụng");
+        throw new ValidationError("Mã dịch vụ không hợp lệ hoặc đã ngừng áp dụng", { item_index: itemIndex });
       }
-      await assertTreatmentPersonnel(db, tenantId, {
-        treatingClinicianId: item.treating_clinician_id ?? undefined,
-        assistantId: item.assistant_id ?? undefined,
-      });
-      return {
+      try {
+        await assertTreatmentPersonnel(db, tenantId, {
+          treatingClinicianId: item.treating_clinician_id ?? undefined,
+          assistantId: item.assistant_id ?? undefined,
+        });
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          throw new ValidationError(error.message, { item_index: itemIndex });
+        }
+        throw error;
+      }
+      resolvedItems.push({
         id: crypto.randomUUID(),
         tooth_number: item.tooth_number,
         service_code: service?.code,
@@ -92,8 +111,8 @@ export const planService = {
         estimated_duration_min: service?.estimated_duration_min ?? item.estimated_duration_min,
         treating_clinician_id: item.treating_clinician_id ?? null,
         assistant_id: item.assistant_id ?? null,
-      };
-    }));
+      });
+    }
 
     const planId = crypto.randomUUID();
     const planCode = await allocateTreatmentPlanCode(db, tenantId);
@@ -184,19 +203,26 @@ export const planService = {
       service: Awaited<ReturnType<typeof services.getActiveByCode>>;
     }>;
 
-    for (const data of items) {
+    for (const [itemIndex, data] of items.entries()) {
       const service = data.service_code ? await services.getActiveByCode(tenantId, data.service_code) : null;
       if (data.service_code && !service) {
-        throw new ValidationError("Mã dịch vụ không hợp lệ hoặc đã ngừng áp dụng");
+        throw new ValidationError("Mã dịch vụ không hợp lệ hoặc đã ngừng áp dụng", { item_index: itemIndex });
       }
       await assertAllInTenant(db, tenantId, [
         { table: "users", id: data.treating_clinician_id ?? undefined },
         { table: "users", id: data.assistant_id ?? undefined },
       ]);
-      await assertTreatmentPersonnel(db, tenantId, {
-        treatingClinicianId: data.treating_clinician_id ?? undefined,
-        assistantId: data.assistant_id ?? undefined,
-      });
+      try {
+        await assertTreatmentPersonnel(db, tenantId, {
+          treatingClinicianId: data.treating_clinician_id ?? undefined,
+          assistantId: data.assistant_id ?? undefined,
+        });
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          throw new ValidationError(error.message, { item_index: itemIndex });
+        }
+        throw error;
+      }
       resolvedItems.push({ id: crypto.randomUUID(), data, service });
     }
 
