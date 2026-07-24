@@ -15,6 +15,7 @@ import { PERMISSIONS, ROUTES } from "@shared/constants";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { PageContainer } from "@/components/PageContainer";
 import { ChairTypeIndicator, chairTypeLabel } from "@/components/ChairTypeIndicator";
+import { SeatCard } from "@/components/schedule/SeatCard";
 
 interface ChairBoardItem {
   chair: DentalChair;
@@ -340,26 +341,59 @@ function QuickSeatTransferDialog({ appointment, chairs, selectedChairId, onSelec
   onConfirm: () => void;
   saving: boolean;
 }) {
-  const availableChairs = chairs.filter((item) => item.chair.id !== appointment?.chair_id && item.chair.is_active && !["maintenance", "out_of_service"].includes(item.current_status));
+  const seatOptions = appointment ? chairs
+    .map((item) => {
+      const current = item.chair.id === appointment.chair_id;
+      const hasConflict = item.appointments.some((candidate) => {
+        if (candidate.id === appointment.id || candidate.status === "cancelled" || candidate.status === "no_show") return false;
+        const candidateStart = new Date(candidate.scheduled_at).getTime();
+        const candidateEnd = candidateStart + candidate.duration_min * 60_000;
+        const transferStart = new Date(appointment.scheduled_at).getTime();
+        const transferEnd = transferStart + appointment.duration_min * 60_000;
+        return candidateStart < transferEnd && transferStart < candidateEnd;
+      });
+      const unavailableReason = !item.chair.is_active
+        ? "out_of_service"
+        : item.chair.operational_status !== "available"
+          ? item.chair.operational_status
+          : hasConflict
+            ? "reserved"
+            : undefined;
+      return { chair: item.chair, current, unavailableReason };
+    })
+    .sort((a, b) => a.chair.sort_order - b.chair.sort_order) : [];
+  const selectableChairs = seatOptions.filter((option) => !option.current && !option.unavailableReason);
+  const selectedChair = seatOptions.find((option) => option.chair.id === selectedChairId)?.chair;
   return (
-    <Dialog open={Boolean(appointment)} onOpenChange={(open) => { if (!open) onClose(); }} size="sm">
+    <Dialog open={Boolean(appointment)} onOpenChange={(open) => { if (!open) onClose(); }} size="md">
       <DialogHeader>
         <DialogTitle>Chuyển ghế nhanh</DialogTitle>
-        <DialogDescription>Chọn ghế mới cho lịch hẹn. Hệ thống sẽ kiểm tra trùng lịch trước khi chuyển.</DialogDescription>
+        <DialogDescription>Chọn một ghế mới cho lịch hẹn. Chỉ các ghế khả dụng trong khung giờ này mới có thể chọn.</DialogDescription>
       </DialogHeader>
       <DialogBody>
-        <label className="grid gap-2 text-sm font-medium">
-          Ghế mới
-          <select value={selectedChairId} onChange={(event) => onSelectedChairChange(event.target.value)} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
-            <option value="">Chọn ghế</option>
-            {availableChairs.map((item) => <option key={item.chair.id} value={item.chair.id}>{item.chair.name}{item.chair.room_name ? ` · ${item.chair.room_name}` : ""}</option>)}
-          </select>
-        </label>
-        {availableChairs.length === 0 && <p className="mt-3 text-sm text-muted-foreground">Không có ghế khả dụng để chuyển.</p>}
+        <fieldset>
+          <legend className="text-sm font-medium">Ghế mới</legend>
+          {seatOptions.length > 0 ? (
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {seatOptions.map((option) => <SeatCard
+                key={option.chair.id}
+                chair={option.chair}
+                current={option.current}
+                unavailableReason={option.unavailableReason}
+                selected={selectedChairId === option.chair.id}
+                onSelect={() => onSelectedChairChange(option.chair.id)}
+              />)}
+            </div>
+          ) : <p className="mt-3 text-sm text-muted-foreground">Chi nhánh chưa có ghế nha nào.</p>}
+        </fieldset>
+        {selectedChair && <div className="mt-4 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm dark:bg-primary/10">
+          Đã chọn: <span className="font-medium">{selectedChair.name}{selectedChair.room_name ? ` · ${selectedChair.room_name}` : ""}</span>
+        </div>}
+        {seatOptions.length > 0 && selectableChairs.length === 0 && <p className="mt-4 text-sm text-muted-foreground">Không có ghế khả dụng để chuyển trong khung giờ này.</p>}
       </DialogBody>
       <DialogFooter>
         <Button variant="outline" onClick={onClose} disabled={saving}>Hủy</Button>
-        <Button onClick={onConfirm} disabled={!selectedChairId || saving}>{saving ? "Đang chuyển..." : "Xác nhận chuyển ghế"}</Button>
+        <Button onClick={onConfirm} disabled={!selectedChairId || saving}>{saving ? "Đang chuyển..." : `Chuyển sang ${selectedChair?.name ?? "ghế đã chọn"}`}</Button>
       </DialogFooter>
     </Dialog>
   );
