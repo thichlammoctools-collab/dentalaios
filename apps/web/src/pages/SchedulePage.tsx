@@ -16,7 +16,7 @@ import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { apiDelete, apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
-import type { Appointment, ClinicSchedule, DentalChair, Patient, UserWithDetails } from "@shared/types";
+import type { Appointment, AppointmentStatus, ClinicSchedule, DentalChair, Patient, UserWithDetails } from "@shared/types";
 import { isAssistantRole, isDoctorRole, ROUTES } from "@shared/constants";
 import { formatDate, formatTime, getWeekDays, isoToTime, isoToYmd, weekdayLabel, ymd, combineDateTime } from "@/lib/utils";
 import { getMinimumAppointmentTime, isAppointmentTimeInPast } from "@/lib/appointment-time";
@@ -45,6 +45,7 @@ export function SchedulePage() {
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Appointment | null>(null);
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
   const [now, setNow] = useState(() => new Date());
   const [expandedWeekDay, setExpandedWeekDay] = useState<string | null>(null);
@@ -192,6 +193,27 @@ export function SchedulePage() {
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi hủy lịch hẹn");
       return false;
+    }
+  }
+
+  async function updateAppointmentStatus(appointment: Appointment, status: AppointmentStatus) {
+    if (status === appointment.status || updatingStatusId || new Date(appointment.scheduled_at) < now) return;
+    if (["cancelled", "no_show", "completed"].includes(status) && !confirm(`Bạn có chắc chắn muốn chuyển trạng thái thành ${statusLabelVi(status)} không?`)) {
+      return;
+    }
+
+    const previous = appointment;
+    setUpdatingStatusId(appointment.id);
+    setAppointments((current) => current.map((item) => item.id === appointment.id ? { ...item, status } : item));
+    try {
+      const updated = await apiPatch<Appointment>(`/api/appointments/${appointment.id}`, { status });
+      setAppointments((current) => current.map((item) => item.id === updated.id ? updated : item));
+      toast.success(`Đã cập nhật trạng thái thành ${statusLabelVi(updated.status)}`);
+    } catch (err) {
+      setAppointments((current) => current.map((item) => item.id === previous.id ? previous : item));
+      toast.error(err instanceof ApiError ? err.message : "Không thể cập nhật trạng thái lịch hẹn");
+    } finally {
+      setUpdatingStatusId(null);
     }
   }
 
@@ -492,7 +514,7 @@ export function SchedulePage() {
                                 >
                                   <div className="flex items-center justify-between gap-2">
                                     <span className="font-mono text-sm font-semibold">{formatTime(appointment.scheduled_at)}</span>
-                                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${statusBgClass(appointment.status)}`}>{statusLabelVi(appointment.status)}</span>
+                                    <QuickStatusSelect appointment={appointment} compact onStatusChange={updateAppointmentStatus} saving={updatingStatusId === appointment.id} />
                                   </div>
                                   <p className="mt-1 truncate text-sm font-medium">{patient?.name ?? appointment.patient_id.slice(0, 8)}</p>
                                    {appointment.procedure && <p className="mt-0.5 truncate text-xs text-muted-foreground">{appointment.procedure}</p>}
@@ -600,9 +622,7 @@ export function SchedulePage() {
                                 >
                                   <div className="flex items-center justify-between gap-1">
                                     <span className="font-mono font-semibold">{formatTime(a.scheduled_at)}</span>
-                                    <span className={`shrink-0 rounded px-1.5 py-0.5 text-[9px] font-medium ${statusBgClass(a.status)}`}>
-                                      {statusLabelVi(a.status)}
-                                    </span>
+                                    <QuickStatusSelect appointment={a} compact onStatusChange={updateAppointmentStatus} saving={updatingStatusId === a.id} />
                                   </div>
                                   <div className="mt-0.5 flex min-w-0 items-center gap-1.5"><ProfileAvatar subject="patients" entityId={patient?.id} name={patient?.name ?? a.patient_id} avatarFileId={patient?.avatar_file_id} size="sm" /><span className={isExpanded ? "font-medium leading-4" : "truncate font-medium"}>{patient?.name ?? a.patient_id.slice(0, 8)}</span></div>
                                   {a.procedure && (
@@ -724,6 +744,40 @@ function statusLabelVi(status: string): string {
     case "no_show": return "Không đến";
     default: return status;
   }
+}
+
+const QUICK_STATUS_TRANSITIONS: Partial<Record<AppointmentStatus, AppointmentStatus[]>> = {
+  booked: ["confirmed", "cancelled"],
+  confirmed: ["arrived", "cancelled", "no_show"],
+  arrived: ["in_progress", "no_show"],
+  in_progress: ["completed"],
+};
+
+function QuickStatusSelect({ appointment, compact, onStatusChange, saving }: {
+  appointment: Appointment;
+  compact?: boolean;
+  onStatusChange: (appointment: Appointment, status: AppointmentStatus) => Promise<void>;
+  saving: boolean;
+}) {
+  const nextStatuses = QUICK_STATUS_TRANSITIONS[appointment.status] ?? [];
+  const isPast = new Date(appointment.scheduled_at) < new Date();
+  const disabled = saving || isPast || nextStatuses.length === 0;
+  return (
+    <select
+      aria-label={`Cập nhật trạng thái lịch hẹn: ${statusLabelVi(appointment.status)}`}
+      value={appointment.status}
+      disabled={disabled}
+      draggable={false}
+      onClick={(event) => event.stopPropagation()}
+      onDragStart={(event) => event.preventDefault()}
+      onChange={(event) => void onStatusChange(appointment, event.target.value as AppointmentStatus)}
+      className={`shrink-0 cursor-pointer appearance-none rounded px-1.5 py-0.5 font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-70 ${compact ? "text-[9px]" : "text-[10px]"} ${statusBgClass(appointment.status)}`}
+      title={disabled ? statusLabelVi(appointment.status) : "Cập nhật nhanh trạng thái"}
+    >
+      <option value={appointment.status}>{saving ? "Đang lưu..." : statusLabelVi(appointment.status)}</option>
+      {nextStatuses.map((status) => <option key={status} value={status}>{statusLabelVi(status)}</option>)}
+    </select>
+  );
 }
 
 // ─── Edit Appointment Dialog ────────────────────────────────────────────────────

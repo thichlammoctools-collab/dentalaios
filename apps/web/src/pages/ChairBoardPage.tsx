@@ -73,6 +73,7 @@ export function ChairBoardPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [startingAppointmentId, setStartingAppointmentId] = useState<string | null>(null);
   const [selectedChair, setSelectedChair] = useState<ChairBoardItem | null>(null);
+  const [viewingAppointment, setViewingAppointment] = useState<Appointment | null>(null);
   const [transferAppointment, setTransferAppointment] = useState<Appointment | null>(null);
   const [transferChairId, setTransferChairId] = useState("");
   const [transferring, setTransferring] = useState(false);
@@ -248,12 +249,12 @@ export function ChairBoardPage() {
                 </CardHeader>
                 <CardContent className="space-y-4 pt-4">
                   {item.current_appointment ? (
-                    <AppointmentSummary title="Đang diễn ra" appointment={item.current_appointment} patients={patientsById} users={usersById} canEdit={canEditAppointments} onStart={startVisit} onQuickSeatTransfer={openSeatTransfer} starting={startingAppointmentId === item.current_appointment.id} now={now} />
+                    <AppointmentSummary title="Đang diễn ra" appointment={item.current_appointment} patients={patientsById} users={usersById} canEdit={canEditAppointments} onStart={startVisit} onQuickSeatTransfer={openSeatTransfer} onView={setViewingAppointment} starting={startingAppointmentId === item.current_appointment.id} now={now} />
                   ) : (
                     <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">Không có lịch đang diễn ra</p>
                   )}
                   {item.next_appointment && item.next_appointment.id !== item.current_appointment?.id && (
-                    <AppointmentSummary title="Lịch tiếp theo" appointment={item.next_appointment} patients={patientsById} users={usersById} compact canEdit={canEditAppointments} onStart={startVisit} onQuickSeatTransfer={openSeatTransfer} starting={startingAppointmentId === item.next_appointment.id} now={now} />
+                    <AppointmentSummary title="Lịch tiếp theo" appointment={item.next_appointment} patients={patientsById} users={usersById} compact canEdit={canEditAppointments} onStart={startVisit} onQuickSeatTransfer={openSeatTransfer} onView={setViewingAppointment} starting={startingAppointmentId === item.next_appointment.id} now={now} />
                   )}
                   {canViewRevenue && item.revenue && (
                     <div className="grid grid-cols-3 gap-2 rounded-lg bg-emerald-50 p-3 text-xs dark:bg-emerald-950/30">
@@ -268,7 +269,8 @@ export function ChairBoardPage() {
           })}
         </div>
       )}
-      <ChairAppointmentsDialog item={selectedChair} date={date} patients={patientsById} users={usersById} onOpenChange={(open) => { if (!open) setSelectedChair(null); }} />
+      <ChairAppointmentsDialog item={selectedChair} date={date} patients={patientsById} users={usersById} onView={(appointment) => { setSelectedChair(null); setViewingAppointment(appointment); }} onOpenChange={(open) => { if (!open) setSelectedChair(null); }} />
+      <AppointmentQuickViewDialog appointment={viewingAppointment} patients={patientsById} users={usersById} onClose={() => setViewingAppointment(null)} />
       <QuickSeatTransferDialog
         appointment={transferAppointment}
         chairs={board?.chairs ?? []}
@@ -294,11 +296,12 @@ function Metric({ label, value }: { label: string; value: string }) {
   return <div><p className="text-[11px] text-muted-foreground">{label}</p><p className="mt-0.5 font-semibold tabular-nums">{value}</p></div>;
 }
 
-function ChairAppointmentsDialog({ item, date, patients, users, onOpenChange }: {
+function ChairAppointmentsDialog({ item, date, patients, users, onView, onOpenChange }: {
   item: ChairBoardItem | null;
   date: string;
   patients: Map<string, Patient>;
   users: Map<string, UserWithDetails>;
+  onView: (appointment: Appointment) => void;
   onOpenChange: (open: boolean) => void;
 }) {
   const appointments = item?.appointments ?? [];
@@ -319,7 +322,7 @@ function ChairAppointmentsDialog({ item, date, patients, users, onOpenChange }: 
               const patient = patients.get(appointment.patient_id);
               const clinician = users.get(appointment.clinician_id);
               const end = new Date(new Date(appointment.scheduled_at).getTime() + appointment.duration_min * 60_000);
-              return <Link key={appointment.id} to={`/appointments/${appointment.id}`} onClick={() => onOpenChange(false)} className="block rounded-lg border p-3 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div className="flex items-start justify-between gap-3"><div><p className="font-medium">{patient?.name ?? appointment.patient_id.slice(0, 8)}</p><p className="mt-1 text-xs text-muted-foreground">{formatTime(appointment.scheduled_at)} - {formatTime(end.toISOString())} · {appointment.duration_min} phút</p>{appointment.procedure && <p className="mt-1 text-xs text-muted-foreground">{appointment.procedure}</p>}</div><span className="rounded-full bg-muted px-2 py-1 text-[11px] font-medium">{APPOINTMENT_STATUS_LABEL[appointment.status]}</span></div><p className="mt-2 text-xs text-muted-foreground">{clinician?.name ?? "Chưa rõ bác sĩ"}</p></Link>;
+              return <button key={appointment.id} type="button" onClick={() => onView(appointment)} className="block w-full rounded-lg border p-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><div className="flex items-start justify-between gap-3"><div><p className="font-medium">{patient?.name ?? appointment.patient_id.slice(0, 8)}</p><p className="mt-1 text-xs text-muted-foreground">{formatTime(appointment.scheduled_at)} - {formatTime(end.toISOString())} · {appointment.duration_min} phút</p>{appointment.procedure && <p className="mt-1 text-xs text-muted-foreground">{appointment.procedure}</p>}</div><span className="rounded-full bg-muted px-2 py-1 text-[11px] font-medium">{APPOINTMENT_STATUS_LABEL[appointment.status]}</span></div><p className="mt-2 text-xs text-muted-foreground">{clinician?.name ?? "Chưa rõ bác sĩ"}</p></button>;
             })}
           </div>
         )}
@@ -362,7 +365,52 @@ function QuickSeatTransferDialog({ appointment, chairs, selectedChairId, onSelec
   );
 }
 
-function AppointmentSummary({ title, appointment, patients, users, compact = false, canEdit = false, onStart, onQuickSeatTransfer, starting, now }: {
+function AppointmentQuickViewDialog({ appointment, patients, users, onClose }: {
+  appointment: Appointment | null;
+  patients: Map<string, Patient>;
+  users: Map<string, UserWithDetails>;
+  onClose: () => void;
+}) {
+  const patient = appointment ? patients.get(appointment.patient_id) : null;
+  const clinician = appointment ? users.get(appointment.clinician_id) : null;
+  const assistant = appointment?.assistant_id ? users.get(appointment.assistant_id) : null;
+  const end = appointment && new Date(new Date(appointment.scheduled_at).getTime() + appointment.duration_min * 60_000);
+
+  return (
+    <Dialog open={Boolean(appointment)} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogHeader>
+        <DialogTitle>Chi tiết lịch hẹn</DialogTitle>
+        {appointment && <DialogDescription>{formatTime(appointment.scheduled_at)} - {formatTime(end!.toISOString())} · {appointment.duration_min} phút</DialogDescription>}
+      </DialogHeader>
+      {appointment && (
+        <DialogBody className="space-y-4">
+          <section className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Thủ thuật</p>
+            <p className="mt-1 text-lg font-semibold">{appointment.procedure?.trim() || "Chưa nhập thủ thuật"}</p>
+          </section>
+          <section>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Ghi chú</p>
+            <p className="mt-2 min-h-20 whitespace-pre-wrap rounded-lg bg-muted/40 p-3 text-sm leading-relaxed">{appointment.notes?.trim() || "Chưa có ghi chú cho lịch hẹn này."}</p>
+          </section>
+          {appointment.cancelled_reason && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-300"><strong>Lý do hủy:</strong> {appointment.cancelled_reason}</p>}
+          <div className="grid gap-3 border-t pt-4 text-sm sm:grid-cols-2">
+            <AppointmentDetail label="Bệnh nhân" value={patient?.name ?? appointment.patient_id.slice(0, 8)} />
+            <AppointmentDetail label="Bác sĩ" value={clinician?.name ?? "Chưa rõ bác sĩ"} />
+            <AppointmentDetail label="Phụ tá" value={assistant?.name ?? "Chưa phân công"} />
+            <AppointmentDetail label="Trạng thái" value={APPOINTMENT_STATUS_LABEL[appointment.status]} />
+          </div>
+        </DialogBody>
+      )}
+      <DialogFooter><Button variant="outline" onClick={onClose}>Đóng</Button></DialogFooter>
+    </Dialog>
+  );
+}
+
+function AppointmentDetail({ label, value }: { label: string; value: string }) {
+  return <div><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 font-medium">{value}</p></div>;
+}
+
+function AppointmentSummary({ title, appointment, patients, users, compact = false, canEdit = false, onStart, onQuickSeatTransfer, onView, starting, now }: {
   title: string;
   appointment: Appointment;
   patients: Map<string, Patient>;
@@ -371,6 +419,7 @@ function AppointmentSummary({ title, appointment, patients, users, compact = fal
   canEdit?: boolean;
   onStart: (appointment: Appointment) => void;
   onQuickSeatTransfer: (appointment: Appointment) => void;
+  onView: (appointment: Appointment) => void;
   starting: boolean;
   now: Date;
 }) {
@@ -385,7 +434,7 @@ function AppointmentSummary({ title, appointment, patients, users, compact = fal
       {!compact && appointment.procedure && <p className="mt-1 text-xs text-muted-foreground">{appointment.procedure}</p>}
        {!compact && appointment.status === "arrived" && appointment.chair_id && new Date(appointment.scheduled_at) <= now && now < end && <Button size="sm" className="mt-3" onClick={(event) => { event.stopPropagation(); onStart(appointment); }} disabled={starting}>{starting ? "Đang bắt đầu..." : "Bắt đầu khám"}</Button>}
         {canEdit && new Date(appointment.scheduled_at) >= now && <Button size="sm" variant="outline" className="mt-3" onClick={(event) => { event.stopPropagation(); onQuickSeatTransfer(appointment); }}>Chuyển ghế nhanh</Button>}
-        {canEdit && <Button size="sm" variant="outline" className="mt-3 ml-2" asChild><Link to={`/appointments/${appointment.id}`} onClick={(event) => event.stopPropagation()}>Xem lịch</Link></Button>}
+        <Button size="sm" variant="outline" className="mt-3 ml-2" onClick={(event) => { event.stopPropagation(); onView(appointment); }}>Xem lịch</Button>
     </div>
   );
 }
