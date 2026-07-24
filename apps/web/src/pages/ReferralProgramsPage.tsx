@@ -67,6 +67,18 @@ const emptyProgram = (): ProgramDraft => ({
   rules: [newRule()],
 });
 
+function localDateTimeParts(value: string): { date: string; time: string } {
+  return {
+    date: value.slice(0, 10),
+    time: value.slice(11, 16),
+  };
+}
+
+function updateLocalDateTime(value: string, part: "date" | "time", next: string): string {
+  const { date, time } = localDateTimeParts(value);
+  return part === "date" ? `${next}T${time}` : `${date}T${next}`;
+}
+
 export function ReferralProgramsPage() {
   const { session } = useAuth();
   const [programs, setPrograms] = useState<
@@ -490,36 +502,68 @@ export function ReferralProgramsPage() {
                   className="rounded-md border border-input bg-background px-3 py-2"
                 />
               </label>
-              <label className="grid gap-1.5 text-sm font-medium">
-                Bắt đầu
-                <input
-                  type="datetime-local"
-                  required
-                  value={form.starts_at}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      starts_at: event.target.value,
-                    }))
-                  }
-                  className="rounded-md border border-input bg-background px-3 py-2"
-                />
-              </label>
-              <label className="grid gap-1.5 text-sm font-medium">
-                Kết thúc
-                <input
-                  type="datetime-local"
-                  value={form.ends_at}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      ends_at: event.target.value,
-                    }))
-                  }
-                  className="rounded-md border border-input bg-background px-3 py-2"
-                />
-                {hasInvalidDateRange && <span className="text-xs font-medium text-destructive">Ngày kết thúc phải sau ngày bắt đầu.</span>}
-              </label>
+               <fieldset className="grid gap-1.5 text-sm font-medium">
+                 <legend>Bắt đầu</legend>
+                 <div className="grid grid-cols-2 gap-2">
+                   <input
+                     type="date"
+                     required
+                     value={localDateTimeParts(form.starts_at).date}
+                     onChange={(event) =>
+                       setForm((current) => ({
+                         ...current,
+                         starts_at: updateLocalDateTime(current.starts_at, "date", event.target.value),
+                       }))
+                     }
+                     className="min-w-0 rounded-md border border-input bg-background px-3 py-2"
+                   />
+                   <input
+                     type="time"
+                     required
+                     step="60"
+                     value={localDateTimeParts(form.starts_at).time}
+                     onChange={(event) =>
+                       setForm((current) => ({
+                         ...current,
+                         starts_at: updateLocalDateTime(current.starts_at, "time", event.target.value),
+                       }))
+                     }
+                     className="min-w-0 rounded-md border border-input bg-background px-3 py-2"
+                   />
+                 </div>
+               </fieldset>
+               <fieldset className="grid gap-1.5 text-sm font-medium">
+                 <legend>Kết thúc</legend>
+                 <div className="grid grid-cols-2 gap-2">
+                   <input
+                     type="date"
+                     value={form.ends_at ? localDateTimeParts(form.ends_at).date : ""}
+                     min={localDateTimeParts(form.starts_at).date}
+                     onChange={(event) =>
+                       setForm((current) => ({
+                         ...current,
+                         ends_at: updateLocalDateTime(current.ends_at || current.starts_at, "date", event.target.value),
+                       }))
+                     }
+                     className="min-w-0 rounded-md border border-input bg-background px-3 py-2"
+                   />
+                   <input
+                     type="time"
+                     step="60"
+                     disabled={!form.ends_at}
+                     value={form.ends_at ? localDateTimeParts(form.ends_at).time : ""}
+                     onChange={(event) =>
+                       setForm((current) => ({
+                         ...current,
+                         ends_at: updateLocalDateTime(current.ends_at || current.starts_at, "time", event.target.value),
+                       }))
+                     }
+                     className="min-w-0 rounded-md border border-input bg-background px-3 py-2 disabled:cursor-not-allowed disabled:opacity-50"
+                   />
+                 </div>
+                 <span className="text-xs font-normal text-muted-foreground">Để trống nếu chương trình không có ngày kết thúc.</span>
+                 {hasInvalidDateRange && <span className="text-xs font-medium text-destructive">Ngày kết thúc phải sau ngày bắt đầu.</span>}
+               </fieldset>
               <label className="grid gap-1.5 text-sm font-medium">
                 Ưu tiên
                 <input
