@@ -257,6 +257,11 @@ export interface PatientNote {
 // ───────────────────────── Clinical ─────────────────────────
 
 export type VisitStatus = "in_progress" | "completed" | "cancelled";
+export type VisitType = "initial_exam" | "follow_up" | "treatment" | "emergency";
+export type ClinicalState = "pre_exam" | "awaiting_doctor_review" | "in_progress" | "signed" | "amended" | "cancelled";
+export type ClinicalEntrySource = "assistant" | "doctor" | "ai" | "legacy";
+export type ClinicalReviewEntityType = "finding" | "diagnosis" | "initial_assessment";
+export type ClinicalReviewStatus = "pending" | "accepted" | "rejected" | "superseded";
 
 export interface Visit {
   id: string;
@@ -268,6 +273,14 @@ export interface Visit {
   clinician_id: string; // FK to User — bác sĩ khám
   date: string; // ISO datetime
   status: VisitStatus;
+  visit_type: VisitType;
+  clinical_state: ClinicalState;
+  effective_at?: string;
+  signed_by?: string;
+  signed_at?: string;
+  locked_at?: string;
+  legacy_at?: string;
+  legacy_source?: string;
   completed_at?: string;
   completed_by?: string;
   notes?: string;
@@ -365,6 +378,9 @@ export interface ClinicalFinding {
   measurements?: FindingMeasurements;
   condition: string; // e.g. "caries", "fracture", "gingivitis", "ulcer"
   notes?: string;
+  entered_by?: string;
+  entry_source: ClinicalEntrySource;
+  clinical_effective_at?: string;
   created_at: string;
 }
 
@@ -454,10 +470,67 @@ export interface ClinicalDiagnosis {
   ruled_out_at?: string;
   resolved_at?: string;
   notes?: string;
+  entered_by?: string;
+  entry_source: ClinicalEntrySource;
+  clinical_effective_at?: string;
   created_by: string;
   created_at: string;
   updated_at: string;
   current_revision: number;
+}
+
+export interface VisitInitialAssessment {
+  id: string;
+  tenant_id: string;
+  visit_id: string;
+  chief_complaint?: string;
+  history_of_present_illness?: string;
+  dental_history?: string;
+  medical_conditions?: unknown[];
+  medications?: unknown[];
+  allergies?: unknown[];
+  pregnancy_lactation?: string;
+  tobacco_alcohol?: string;
+  asa_class?: "I" | "II" | "III" | "IV" | "V" | "VI";
+  examination_summary?: string;
+  preliminary_risk_notes?: string;
+  entered_by: string;
+  reviewed_by?: string;
+  reviewed_at?: string;
+  entry_source: Exclude<ClinicalEntrySource, "ai">;
+  clinical_effective_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClinicalReviewEvent {
+  id: string;
+  tenant_id: string;
+  visit_id: string;
+  entity_type: ClinicalReviewEntityType;
+  entity_id: string;
+  review_status: ClinicalReviewStatus;
+  entered_by: string;
+  reviewed_by?: string;
+  reviewed_at?: string;
+  review_note?: string;
+  created_at: string;
+}
+
+export type VisitSafetyWarningType = "blood_pressure" | "blood_sugar" | "bmi";
+export type VisitSafetyAcknowledgementOutcome = "acknowledged" | "continue_with_reason" | "defer_treatment" | "refer_or_escalate";
+
+export interface VisitSafetyAcknowledgement {
+  id: string;
+  tenant_id: string;
+  visit_id: string;
+  warning_type: VisitSafetyWarningType;
+  outcome: VisitSafetyAcknowledgementOutcome;
+  reason?: string;
+  acknowledged_by: string;
+  acknowledged_at: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ClinicalDiagnosisRevision {

@@ -102,8 +102,9 @@ export function createVisitsRepository(db: D1Database): VisitsRepository {
           `INSERT INTO visits
               (id, code, tenant_id, patient_id, branch_id, clinician_id, date, notes,
                treating_clinician_id, assistant_id, chair_id, source_appointment_id,
-               blood_pressure_systolic, blood_pressure_diastolic, blood_sugar_mgdl, vitals_recorded_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               blood_pressure_systolic, blood_pressure_diastolic, blood_sugar_mgdl, vitals_recorded_at,
+               visit_type, clinical_state)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id, code, tenantId, data.patient_id, data.branch_id, data.clinician_id, date,
@@ -116,6 +117,8 @@ export function createVisitsRepository(db: D1Database): VisitsRepository {
           data.blood_pressure_diastolic ?? null,
           data.blood_sugar_mgdl ?? null,
           data.vitals_recorded_at ?? null,
+          data.visit_type,
+          data.clinical_state,
         )
         .run();
       const created = await this.getById(tenantId, id);
@@ -138,6 +141,11 @@ export function createVisitsRepository(db: D1Database): VisitsRepository {
         "blood_pressure_diastolic",
         "blood_sugar_mgdl",
         "vitals_recorded_at",
+        "clinical_state",
+        "effective_at",
+        "signed_by",
+        "signed_at",
+        "locked_at",
       ];
       for (const key of allowed) {
         if (data[key] !== undefined) {
@@ -167,6 +175,14 @@ function mapVisit(row: D1Row): Visit {
     clinician_id: row.clinician_id as string,
     date: row.date as string,
     status: row.status as Visit["status"],
+    visit_type: ((row.visit_type as string | null) ?? "initial_exam") as Visit["visit_type"],
+    clinical_state: ((row.clinical_state as string | null) ?? "in_progress") as Visit["clinical_state"],
+    effective_at: (row.effective_at as string | null) ?? undefined,
+    signed_by: (row.signed_by as string | null) ?? undefined,
+    signed_at: (row.signed_at as string | null) ?? undefined,
+    locked_at: (row.locked_at as string | null) ?? undefined,
+    legacy_at: (row.legacy_at as string | null) ?? undefined,
+    legacy_source: (row.legacy_source as string | null) ?? undefined,
     completed_at: (row.completed_at as string | null) ?? undefined,
     completed_by: (row.completed_by as string | null) ?? undefined,
     notes: (row.notes as string | null) ?? undefined,

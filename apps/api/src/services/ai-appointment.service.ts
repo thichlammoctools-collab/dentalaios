@@ -200,7 +200,7 @@ Trả CHÍNH XÁC JSON, KHÔNG thêm text khác:
     const [patient, clinician, findings, planIds] = await Promise.all([
       patientsRepo.getById(tenantId, visit.patient_id),
       usersRepo.getById(tenantId, visit.clinician_id),
-      findingsRepo.listByVisit(tenantId, visitId),
+      findingsRepo.listEffectiveByVisit(tenantId, visitId),
       plansRepo.list(tenantId, { visitId }),
     ]);
 

@@ -121,8 +121,9 @@ export function ClinicalDiagnosesCard({ visitId, patientId, findings }: Props) {
   }
 
   const selectedConcept = concepts.find((concept) => concept.id === form.concept_id);
+  const effectiveFindings = findings.filter((finding) => Boolean(finding.clinical_effective_at) || finding.entry_source === "doctor" || finding.entry_source === "legacy");
   const compatibleFindings = selectedConcept
-    ? findings.filter((finding) => finding.category === selectedConcept.category)
+    ? effectiveFindings.filter((finding) => finding.category === selectedConcept.category)
     : [];
 
   async function save() {

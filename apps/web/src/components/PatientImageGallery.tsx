@@ -436,7 +436,10 @@ export function PatientImageGallery({
       toast.success(`Đã lưu ${result.findings.length} clinical finding(s)`);
       setAnalysisResult(null);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Không thể lưu findings; không có finding nào được tạo.");
+      const itemIndex = err instanceof ApiError && isItemIndexDetails(err.details)
+        ? ` Finding #${err.details.item_index + 1} cần được chỉnh sửa.`
+        : "";
+      toast.error(`${err instanceof ApiError ? err.message : "Không thể lưu findings; không có finding nào được tạo."}${itemIndex}`);
     }
   }
 
@@ -816,6 +819,11 @@ export function PatientImageGallery({
       </Dialog>
     </div>
   );
+}
+
+function isItemIndexDetails(details: unknown): details is { item_index: number } {
+  return typeof details === "object" && details !== null
+    && "item_index" in details && typeof details.item_index === "number";
 }
 
 function TreatmentImageComparison({ beforeImages, afterImages }: { beforeImages: PatientImage[]; afterImages: PatientImage[] }) {

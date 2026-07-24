@@ -95,7 +95,7 @@ export const aiService = {
     if (!visit) throw new NotFoundError("Visit not found");
 
     const patient = await patientsRepo.getById(tenantId, visit.patient_id);
-    const findings = await findingsRepo.listByVisit(tenantId, visitId);
+    const findings = await findingsRepo.listEffectiveByVisit(tenantId, visitId);
     const planIds = await plansRepo.list(tenantId, { visitId });
 
     const planItems: { plan: Awaited<ReturnType<typeof plansRepo.getById>>; items: Awaited<ReturnType<typeof itemsRepo.listByPlan>> }[] = [];
@@ -155,7 +155,7 @@ export const aiService = {
 
     const patient = await patientsRepo.getById(tenantId, visit.patient_id);
     const [findings, diagnoses, services] = await Promise.all([
-      findingsRepo.listByVisit(tenantId, visitId),
+      findingsRepo.listEffectiveByVisit(tenantId, visitId),
       diagnosesRepo.listConfirmedByVisit(tenantId, visitId),
       treatmentServicesRepo.list(tenantId),
     ]);

@@ -1,15 +1,18 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { diagnosisCreateSchema, diagnosisImageEvidenceCreateSchema, diagnosisUpdateSchema, findingCreateSchema, findingUpdateSchema, findingsBatchCreateSchema, visitCreateSchema, visitUpdateSchema } from "@shared/validation";
+import { clinicalReviewEditAndAcceptSchema, clinicalReviewRejectSchema, clinicalReviewRouteParamsSchema, diagnosisCreateSchema, diagnosisImageEvidenceCreateSchema, diagnosisUpdateSchema, findingCreateSchema, findingUpdateSchema, findingsBatchCreateSchema, preExamSubmitSchema, visitCreateSchema, visitSafetyAcknowledgementSchema, visitUpdateSchema } from "@shared/validation";
 import { PERMISSIONS } from "@shared/constants";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
-import { requirePermission } from "../middleware/rbac";
+import { requireAnyPermission, requirePermission } from "../middleware/rbac";
 import { auditLog } from "../middleware/audit";
 import type { AuthContext } from "../middleware/auth";
 import { visitService } from "../services/visit.service";
 import { diagnosisService } from "../services/diagnosis.service";
 import { imageAnnotationsService } from "../services/image-annotations.service";
+import { clinicalReviewService } from "../services/clinical-review.service";
+import { createVisitInitialAssessmentsRepository } from "../repositories/visit-initial-assessments.repo";
+import { visitSafetyService } from "../services/visit-safety.service";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -102,6 +105,113 @@ router.patch(
   },
 );
 
+// POST /api/visits/:id/pre-exam/submit - assistant/doctor drafts awaiting review.
+router.post(
+  "/:id/pre-exam/submit",
+  requireAnyPermission([PERMISSIONS.WRITE_PRE_EXAM_DRAFTS, PERMISSIONS.WRITE_FINDINGS]),
+  auditLog("pre_exam_submitted", "visit", {
+    entityIdFrom: (body) => typeof body === "object" && body !== null && "visit_id" in body && typeof body.visit_id === "string"
+      ? body.visit_id
+      : undefined,
+  }),
+  zValidator("json", preExamSubmitSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const entrySource = jwt.permissions.includes(PERMISSIONS.WRITE_PRE_EXAM_DRAFTS)
+      && !jwt.permissions.includes(PERMISSIONS.WRITE_FINDINGS)
+      ? "assistant" as const
+      : "doctor" as const;
+    return c.json(await clinicalReviewService.submitPreExam(
+      c.env.DB, jwt.tenant_id, c.req.param("id"), jwt.sub, entrySource, c.req.valid("json"),
+    ), 201);
+  },
+);
+
+router.get(
+  "/:id/review-queue",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const items = await clinicalReviewService.listPending(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    return c.json({ items, total: items.length });
+  },
+);
+
+router.get(
+  "/:id/initial-assessment",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const assessment = await createVisitInitialAssessmentsRepository(c.env.DB).getByVisit(jwt.tenant_id, c.req.param("id"));
+    return c.json({ assessment });
+  },
+);
+
+router.get(
+  "/:id/safety-acknowledgements",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const items = await visitSafetyService.list(c.env.DB, jwt.tenant_id, c.req.param("id"));
+    return c.json({ items, total: items.length });
+  },
+);
+
+router.post(
+  "/:id/safety-acknowledgements",
+  requirePermission(PERMISSIONS.REVIEW_CLINICAL_DRAFTS),
+  auditLog("visit_safety_acknowledged", "visit_safety_acknowledgement"),
+  zValidator("json", visitSafetyAcknowledgementSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    return c.json(await visitSafetyService.acknowledge(c.env.DB, jwt.tenant_id, c.req.param("id"), jwt.sub, c.req.valid("json")), 201);
+  },
+);
+
+router.post(
+  "/:id/reviews/:entityType/:entityId/accept",
+  requirePermission(PERMISSIONS.REVIEW_CLINICAL_DRAFTS),
+  auditLog("clinical_review_accepted", "clinical_review_event"),
+  zValidator("param", clinicalReviewRouteParamsSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const params = c.req.valid("param");
+    return c.json(await clinicalReviewService.accept(
+      c.env.DB, jwt.tenant_id, params.id, params.entityType, params.entityId, jwt.sub,
+    ));
+  },
+);
+
+router.post(
+  "/:id/reviews/:entityType/:entityId/reject",
+  requirePermission(PERMISSIONS.REVIEW_CLINICAL_DRAFTS),
+  auditLog("clinical_review_rejected", "clinical_review_event"),
+  zValidator("param", clinicalReviewRouteParamsSchema),
+  zValidator("json", clinicalReviewRejectSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const params = c.req.valid("param");
+    return c.json(await clinicalReviewService.reject(
+      c.env.DB, jwt.tenant_id, params.id, params.entityType, params.entityId, jwt.sub, c.req.valid("json"),
+    ));
+  },
+);
+
+router.post(
+  "/:id/reviews/:entityType/:entityId/edit-and-accept",
+  requirePermission(PERMISSIONS.REVIEW_CLINICAL_DRAFTS),
+  auditLog("clinical_review_edited_and_accepted", "clinical_review_event"),
+  zValidator("param", clinicalReviewRouteParamsSchema),
+  zValidator("json", clinicalReviewEditAndAcceptSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const params = c.req.valid("param");
+    return c.json(await clinicalReviewService.editAndAccept(
+      c.env.DB, jwt.tenant_id, params.id, params.entityType, params.entityId, jwt.sub, c.req.valid("json"),
+    ));
+  },
+);
+
 // GET /api/visits/:id/findings
 router.get(
   "/:id/findings",
@@ -169,7 +279,7 @@ router.post(
   zValidator("json", findingsBatchCreateSchema),
   async (c) => {
     const jwt = getJwt(c);
-    const created = await visitService.addFindings(c.env.DB, jwt.tenant_id, c.req.param("id"), c.req.valid("json"));
+    const created = await visitService.addFindings(c.env.DB, jwt.tenant_id, c.req.param("id"), c.req.valid("json"), { userId: jwt.sub });
     return c.json({ items: created, total: created.length }, 201);
   },
 );
@@ -183,7 +293,7 @@ router.post(
   async (c) => {
     const jwt = getJwt(c);
     const data = c.req.valid("json");
-    const created = await visitService.addFinding(c.env.DB, jwt.tenant_id, c.req.param("id"), data);
+    const created = await visitService.addFinding(c.env.DB, jwt.tenant_id, c.req.param("id"), data, { userId: jwt.sub });
     return c.json(created, 201);
   },
 );

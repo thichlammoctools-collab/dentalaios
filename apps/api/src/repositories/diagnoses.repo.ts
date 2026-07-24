@@ -5,7 +5,7 @@ import type { D1Row } from "./base";
 const select = `SELECT id, tenant_id, visit_id, patient_id, source_finding_id, concept_id, concept_version_id, status,
   icd10_code_id, icd10_version_id, icd10_code_snapshot, icd10_display_vi_snapshot, concept_code_snapshot,
   concept_display_vi_snapshot, mapping_id, mapping_role, source, source_text, confirmed_by, confirmed_at,
-  ruled_out_at, resolved_at, notes, created_by, created_at, updated_at, current_revision FROM clinical_diagnoses`;
+  ruled_out_at, resolved_at, notes, entered_by, entry_source, clinical_effective_at, created_by, created_at, updated_at, current_revision FROM clinical_diagnoses`;
 
 export function createDiagnosesRepository(db: D1Database) {
   return {
@@ -14,7 +14,9 @@ export function createDiagnosesRepository(db: D1Database) {
       return result.results.map(mapDiagnosis);
     },
     async listConfirmedByVisit(tenantId: string, visitId: string): Promise<ClinicalDiagnosis[]> {
-      const result = await db.prepare(`${select} WHERE tenant_id = ? AND visit_id = ? AND status = 'confirmed' ORDER BY created_at DESC`).bind(tenantId, visitId).all<D1Row>();
+      const result = await db.prepare(`${select} WHERE tenant_id = ? AND visit_id = ? AND status = 'confirmed'
+        AND (clinical_effective_at IS NOT NULL OR entry_source IN ('doctor', 'legacy'))
+        ORDER BY created_at DESC`).bind(tenantId, visitId).all<D1Row>();
       return result.results.map(mapDiagnosis);
     },
     async existsForSourceFinding(tenantId: string, findingId: string): Promise<boolean> {
@@ -66,6 +68,6 @@ export function createDiagnosesRepository(db: D1Database) {
   };
 }
 
-const columns = ["id", "tenant_id", "visit_id", "patient_id", "source_finding_id", "concept_id", "concept_version_id", "status", "icd10_code_id", "icd10_version_id", "icd10_code_snapshot", "icd10_display_vi_snapshot", "concept_code_snapshot", "concept_display_vi_snapshot", "mapping_id", "mapping_role", "source", "source_text", "confirmed_by", "confirmed_at", "ruled_out_at", "resolved_at", "notes", "created_by", "created_at", "updated_at", "current_revision"];
+const columns = ["id", "tenant_id", "visit_id", "patient_id", "source_finding_id", "concept_id", "concept_version_id", "status", "icd10_code_id", "icd10_version_id", "icd10_code_snapshot", "icd10_display_vi_snapshot", "concept_code_snapshot", "concept_display_vi_snapshot", "mapping_id", "mapping_role", "source", "source_text", "confirmed_by", "confirmed_at", "ruled_out_at", "resolved_at", "notes", "entered_by", "entry_source", "clinical_effective_at", "created_by", "created_at", "updated_at", "current_revision"];
 function optional(row: D1Row, key: string): string | undefined { const raw = row[key]; return typeof raw === "string" && raw ? raw : undefined; }
-function mapDiagnosis(row: D1Row): ClinicalDiagnosis { return { id: row.id as string, tenant_id: row.tenant_id as string, visit_id: row.visit_id as string, patient_id: row.patient_id as string, source_finding_id: optional(row, "source_finding_id"), concept_id: row.concept_id as string, concept_version_id: row.concept_version_id as string, status: row.status as ClinicalDiagnosis["status"], icd10_code_id: optional(row, "icd10_code_id"), icd10_version_id: optional(row, "icd10_version_id"), icd10_code_snapshot: optional(row, "icd10_code_snapshot"), icd10_display_vi_snapshot: optional(row, "icd10_display_vi_snapshot"), concept_code_snapshot: row.concept_code_snapshot as string, concept_display_vi_snapshot: row.concept_display_vi_snapshot as string, mapping_id: optional(row, "mapping_id"), mapping_role: optional(row, "mapping_role") as ClinicalDiagnosis["mapping_role"], source: row.source as ClinicalDiagnosis["source"], source_text: optional(row, "source_text"), confirmed_by: optional(row, "confirmed_by"), confirmed_at: optional(row, "confirmed_at"), ruled_out_at: optional(row, "ruled_out_at"), resolved_at: optional(row, "resolved_at"), notes: optional(row, "notes"), created_by: row.created_by as string, created_at: row.created_at as string, updated_at: row.updated_at as string, current_revision: Number(row.current_revision) }; }
+function mapDiagnosis(row: D1Row): ClinicalDiagnosis { return { id: row.id as string, tenant_id: row.tenant_id as string, visit_id: row.visit_id as string, patient_id: row.patient_id as string, source_finding_id: optional(row, "source_finding_id"), concept_id: row.concept_id as string, concept_version_id: row.concept_version_id as string, status: row.status as ClinicalDiagnosis["status"], icd10_code_id: optional(row, "icd10_code_id"), icd10_version_id: optional(row, "icd10_version_id"), icd10_code_snapshot: optional(row, "icd10_code_snapshot"), icd10_display_vi_snapshot: optional(row, "icd10_display_vi_snapshot"), concept_code_snapshot: row.concept_code_snapshot as string, concept_display_vi_snapshot: row.concept_display_vi_snapshot as string, mapping_id: optional(row, "mapping_id"), mapping_role: optional(row, "mapping_role") as ClinicalDiagnosis["mapping_role"], source: row.source as ClinicalDiagnosis["source"], source_text: optional(row, "source_text"), confirmed_by: optional(row, "confirmed_by"), confirmed_at: optional(row, "confirmed_at"), ruled_out_at: optional(row, "ruled_out_at"), resolved_at: optional(row, "resolved_at"), notes: optional(row, "notes"), entered_by: optional(row, "entered_by"), entry_source: (optional(row, "entry_source") ?? "doctor") as ClinicalDiagnosis["entry_source"], clinical_effective_at: optional(row, "clinical_effective_at"), created_by: row.created_by as string, created_at: row.created_at as string, updated_at: row.updated_at as string, current_revision: Number(row.current_revision) }; }

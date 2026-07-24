@@ -85,9 +85,10 @@ export const imageAnnotationsService = {
       status: row.status as ClinicalDiagnosis["status"], icd10_code_id: text(row.icd10_code_id), icd10_version_id: text(row.icd10_version_id),
       icd10_code_snapshot: text(row.icd10_code_snapshot), icd10_display_vi_snapshot: text(row.icd10_display_vi_snapshot),
       concept_code_snapshot: row.concept_code_snapshot as string, concept_display_vi_snapshot: row.concept_display_vi_snapshot as string,
-      mapping_id: text(row.mapping_id), mapping_role: text(row.mapping_role) as ClinicalDiagnosis["mapping_role"], source: row.source as ClinicalDiagnosis["source"], source_text: text(row.source_text),
-      confirmed_by: text(row.confirmed_by), confirmed_at: text(row.confirmed_at), ruled_out_at: text(row.ruled_out_at), resolved_at: text(row.resolved_at), notes: text(row.notes),
-      created_by: row.created_by as string, created_at: row.created_at as string, updated_at: row.updated_at as string, current_revision: Number(row.current_revision), visit_date: row.visit_date as string,
+       mapping_id: text(row.mapping_id), mapping_role: text(row.mapping_role) as ClinicalDiagnosis["mapping_role"], source: row.source as ClinicalDiagnosis["source"], source_text: text(row.source_text),
+       confirmed_by: text(row.confirmed_by), confirmed_at: text(row.confirmed_at), ruled_out_at: text(row.ruled_out_at), resolved_at: text(row.resolved_at), notes: text(row.notes),
+       entered_by: text(row.entered_by), entry_source: (text(row.entry_source) ?? "doctor") as ClinicalDiagnosis["entry_source"], clinical_effective_at: text(row.clinical_effective_at),
+       created_by: row.created_by as string, created_at: row.created_at as string, updated_at: row.updated_at as string, current_revision: Number(row.current_revision), visit_date: row.visit_date as string,
     }));
   },
 

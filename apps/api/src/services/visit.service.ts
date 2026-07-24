@@ -74,6 +74,8 @@ export const visitService = {
       assistant_id: data.assistant_id ?? undefined,
       chair_id: chairId,
       source_appointment_id: data.source_appointment_id,
+      visit_type: data.visit_type,
+      clinical_state: "in_progress",
       blood_pressure_systolic: data.blood_pressure_systolic,
       blood_pressure_diastolic: data.blood_pressure_diastolic,
       blood_sugar_mgdl: data.blood_sugar_mgdl,
@@ -96,6 +98,7 @@ export const visitService = {
     const visits = createVisitsRepository(db);
     const current = await visits.getById(tenantId, id);
     if (!current) throw new NotFoundError("Visit not found");
+    if (current.locked_at) throw new ConflictError("Hồ sơ lượt khám đã được ký và khóa; hãy tạo amendment");
     if (data.status) {
       if (current.status !== "in_progress" || !["completed", "cancelled"].includes(data.status)) {
         throw new ConflictError("Chỉ có thể hoàn tất hoặc hủy lượt khám đang thực hiện");
@@ -134,13 +137,17 @@ export const visitService = {
     tenantId: string,
     visitId: string,
     data: FindingCreateInput,
+    actor: { userId: string; entrySource?: "assistant" | "doctor" | "ai" } = { userId: "", entrySource: "doctor" },
   ): Promise<ClinicalFinding> {
     const visit = await createVisitsRepository(db).getById(tenantId, visitId);
     if (!visit) throw new NotFoundError("Visit not found");
+    if (visit.locked_at) throw new ConflictError("Hồ sơ lượt khám đã được ký và khóa; hãy tạo amendment");
     const concept = data.concept_id ? await createClinicalTerminologyRepository(db).getConcept(data.concept_id) : null;
     if (data.concept_id && (!concept || !concept.is_active)) throw new ValidationError("Khái niệm lâm sàng không còn hoạt động");
     if (concept && (concept.category !== data.category || concept.default_scope !== data.scope)) throw new ValidationError("Khái niệm không phù hợp với nhóm hoặc phạm vi finding");
     if (concept?.kind === "diagnosis") throw new ValidationError("Chẩn đoán cần được xác nhận qua hồ sơ diagnosis riêng");
+    const source = actor.entrySource ?? "doctor";
+    const effectiveAt = source === "doctor" ? new Date().toISOString() : undefined;
     return createFindingsRepository(db).create(tenantId, visitId, {
       tooth_number: data.tooth_number ?? undefined,
       tooth_system: data.scope === "tooth" ? "FDI" : undefined,
@@ -152,6 +159,9 @@ export const visitService = {
       measurements: data.measurements,
       condition: concept?.legacy_condition ?? data.condition,
       notes: data.notes,
+      entered_by: actor.userId || undefined,
+      entry_source: source,
+      clinical_effective_at: effectiveAt,
     });
   },
 
@@ -160,10 +170,12 @@ export const visitService = {
     tenantId: string,
     visitId: string,
     data: FindingsBatchCreateInput,
+    actor: { userId: string; entrySource?: "assistant" | "doctor" | "ai" } = { userId: "", entrySource: "doctor" },
   ): Promise<ClinicalFinding[]> {
     // Validate all foreign references/concepts before the first write.
     const visit = await createVisitsRepository(db).getById(tenantId, visitId);
     if (!visit) throw new NotFoundError("Visit not found");
+    if (visit.locked_at) throw new ConflictError("Hồ sơ lượt khám đã được ký và khóa; hãy tạo amendment");
     const terminology = createClinicalTerminologyRepository(db);
     const resolved: Array<{
       finding: FindingCreateInput;
@@ -187,10 +199,13 @@ export const visitService = {
     for (const { finding, concept } of resolved) {
       rows.push({ id: crypto.randomUUID(), code: await allocateFindingCode(db, tenantId), finding, concept });
     }
+    const source = actor.entrySource ?? "doctor";
+    const effectiveAt = source === "doctor" ? new Date().toISOString() : null;
+    const enteredBy = actor.userId || null;
     await db.batch(rows.map(({ id, code, finding, concept }) => db
       .prepare(`INSERT INTO clinical_findings
-        (id, code, tenant_id, visit_id, category, scope, tooth_number, tooth_system, anatomical_site, location_details_json, measurements_json, condition, concept_id, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        (id, code, tenant_id, visit_id, category, scope, tooth_number, tooth_system, anatomical_site, location_details_json, measurements_json, condition, concept_id, notes, entered_by, entry_source, clinical_effective_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(
         id, code, tenantId, visitId, finding.category, finding.scope, finding.tooth_number ?? null,
         finding.scope === "tooth" ? "FDI" : null,
@@ -198,6 +213,7 @@ export const visitService = {
         finding.location_details ? JSON.stringify(finding.location_details) : null,
         finding.measurements ? JSON.stringify(finding.measurements) : null,
         concept?.legacy_condition ?? finding.condition, concept?.id ?? null, finding.notes ?? null,
+        enteredBy, source, effectiveAt,
       ),
     ));
     return createFindingsRepository(db).listByVisit(tenantId, visitId);
@@ -212,6 +228,7 @@ export const visitService = {
   ): Promise<ClinicalFinding> {
     const visit = await createVisitsRepository(db).getById(tenantId, visitId);
     if (!visit) throw new NotFoundError("Visit not found");
+    if (visit.locked_at) throw new ConflictError("Hồ sơ lượt khám đã được ký và khóa; hãy tạo amendment");
     const findings = createFindingsRepository(db);
     if (!await findings.getByVisitAndId(tenantId, visitId, findingId)) {
       throw new NotFoundError("Finding not found");
@@ -237,6 +254,7 @@ export const visitService = {
     const visits = createVisitsRepository(db);
     const visit = await visits.getById(tenantId, visitId);
     if (!visit) throw new NotFoundError("Visit not found");
+    if (visit.locked_at) throw new ConflictError("Hồ sơ lượt khám đã được ký và khóa; hãy tạo amendment");
 
     const findings = createFindingsRepository(db);
     const finding = (await findings.listByVisit(tenantId, visitId)).find((item) => item.id === findingId);

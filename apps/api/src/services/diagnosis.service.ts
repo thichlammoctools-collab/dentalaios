@@ -18,11 +18,15 @@ export const diagnosisService = {
     visitId: string,
     actorId: string,
     data: DiagnosisCreateInput,
+    entry: { entrySource?: "assistant" | "doctor" | "ai"; clinicalEffective?: boolean } = {},
   ): Promise<ClinicalDiagnosis> {
     const visit = await requireVisit(db, tenantId, visitId);
+    if (visit.locked_at) throw new ConflictError("Hồ sơ lượt khám đã được ký và khóa; hãy tạo amendment");
     await assertSourceFinding(db, tenantId, visitId, data.source_finding_id ?? undefined);
     const resolved = await resolveDiagnosis(db, data.concept_id, data.icd10_code_id ?? undefined, data.status);
     const now = new Date().toISOString();
+    const entrySource = entry.entrySource ?? "doctor";
+    const clinicalEffective = entry.clinicalEffective ?? entrySource === "doctor";
     return createDiagnosesRepository(db).create({
       id: crypto.randomUUID(),
       tenant_id: tenantId,
@@ -47,6 +51,9 @@ export const diagnosisService = {
       ruled_out_at: data.status === "ruled_out" ? now : undefined,
       resolved_at: data.status === "resolved" ? now : undefined,
       notes: data.notes,
+      entered_by: actorId,
+      entry_source: entrySource,
+      clinical_effective_at: clinicalEffective ? now : undefined,
       created_by: actorId,
       created_at: now,
       updated_at: now,
@@ -62,7 +69,8 @@ export const diagnosisService = {
     actorId: string,
     data: DiagnosisUpdateInput,
   ): Promise<ClinicalDiagnosis> {
-    await requireVisit(db, tenantId, visitId);
+    const visit = await requireVisit(db, tenantId, visitId);
+    if (visit.locked_at) throw new ConflictError("Hồ sơ lượt khám đã được ký và khóa; hãy tạo amendment");
     const repo = createDiagnosesRepository(db);
     const current = await repo.get(tenantId, diagnosisId);
     if (!current || current.visit_id !== visitId) throw new NotFoundError("Diagnosis not found");

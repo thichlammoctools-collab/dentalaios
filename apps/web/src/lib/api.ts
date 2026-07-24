@@ -23,11 +23,13 @@ const BASE_URL =
 export class ApiError extends Error {
   status: number;
   code?: string;
-  constructor(message: string, status: number, code?: string) {
+  details?: unknown;
+  constructor(message: string, status: number, code?: string, details?: unknown) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -62,14 +64,16 @@ export async function api<T = unknown>(
   if (!res.ok) {
     let message = `HTTP ${res.status} ${res.statusText}`;
     let code: string | undefined;
+    let details: unknown;
     try {
-      const body = (await res.json()) as { error?: string; code?: string };
+      const body = (await res.json()) as { error?: string; code?: string; details?: unknown };
       if (body?.error) message = body.error;
       if (body?.code) code = body.code;
+      details = body?.details;
     } catch {
       // body wasn't JSON; keep default message
     }
-    throw new ApiError(message, res.status, code);
+    throw new ApiError(message, res.status, code, details);
   }
 
   // 204 No Content
@@ -115,13 +119,13 @@ export function apiUpload<T = unknown>(
 
     request.onerror = () => reject(new ApiError("Không thể kết nối đến máy chủ", 0));
     request.onload = () => {
-      const response = request.response as { error?: string; code?: string } | null;
+      const response = request.response as { error?: string; code?: string; details?: unknown } | null;
       if (request.status === 401) {
         reject(new ApiError(response?.error ?? "Phiên đăng nhập đã hết hạn — vui lòng đăng nhập lại", 401, "unauthorized"));
         return;
       }
       if (request.status < 200 || request.status >= 300) {
-        reject(new ApiError(response?.error ?? `HTTP ${request.status} ${request.statusText}`, request.status, response?.code));
+        reject(new ApiError(response?.error ?? `HTTP ${request.status} ${request.statusText}`, request.status, response?.code, response?.details));
         return;
       }
       resolve(response as T);

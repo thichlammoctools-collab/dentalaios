@@ -116,6 +116,10 @@ export const PERMISSIONS = {
   REVIEW_REFERRAL_REWARDS: "review_referral_rewards",
   PAY_REFERRAL_REWARDS: "pay_referral_rewards",
   VIEW_REFERRAL_REPORTS: "view_referral_reports",
+  WRITE_PRE_EXAM_DRAFTS: "write_pre_exam_drafts",
+  REVIEW_CLINICAL_DRAFTS: "review_clinical_drafts",
+  SIGN_CLINICAL_RECORDS: "sign_clinical_records",
+  MANAGE_CONSENTS: "manage_consents",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

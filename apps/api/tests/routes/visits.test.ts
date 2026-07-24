@@ -550,3 +550,113 @@ describe("POST /api/visits/:id/findings/batch", () => {
     expect(body.items[0].id).toBe("finding-1");
   });
 });
+
+describe("Clinical pre-exam and review routes", () => {
+  const pendingAssessmentEvent = {
+    id: "review-1", tenant_id: "test-tenant", visit_id: "visit-1", entity_type: "initial_assessment",
+    entity_id: "assessment-1", review_status: "pending", entered_by: "assistant-1", reviewed_by: null,
+    reviewed_at: null, review_note: null, created_at: "2026-01-01T10:00:00Z",
+  };
+  const assessmentRow = {
+    id: "assessment-1", tenant_id: "test-tenant", visit_id: "visit-1", chief_complaint: "Đau răng hàm",
+    history_of_present_illness: null, dental_history: null, medical_conditions_json: null, medications_json: null,
+    allergies_json: null, pregnancy_lactation: null, tobacco_alcohol: null, asa_class: null,
+    examination_summary: null, preliminary_risk_notes: null, entered_by: "assistant-1", entry_source: "assistant",
+    reviewed_by: null, reviewed_at: null, clinical_effective_at: null,
+    created_at: "2026-01-01T10:00:00Z", updated_at: "2026-01-01T10:00:00Z",
+  };
+
+  it("allows an assistant to submit a structured pre-exam draft", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/visits/visit-1/pre-exam/submit",
+      new Map([
+        ["FROM visits", [visitRow({ clinical_state: "pre_exam" })]],
+        ["FROM visit_initial_assessments", [assessmentRow]],
+        ["FROM clinical_review_events", [pendingAssessmentEvent]],
+      ]),
+      {
+        permissions: ["write_pre_exam_drafts"],
+        body: { initial_assessment: { chief_complaint: "Đau răng hàm" } },
+      },
+    );
+
+    expect(res.status).toBe(201);
+    const body = await res.json() as { visit_id: string; assessment?: { entry_source: string }; reviews: unknown[] };
+    expect(body.visit_id).toBe("visit-1");
+    expect(body.assessment?.entry_source).toBe("assistant");
+    expect(body.reviews).toHaveLength(1);
+  });
+
+  it("rejects pre-exam submission without draft or clinical-write permission", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/visits/visit-1/pre-exam/submit",
+      new Map(),
+      { permissions: ["read_patients"], body: { initial_assessment: { chief_complaint: "Đau" } } },
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("returns only pending review records for the visit", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "GET",
+      "/api/visits/visit-1/review-queue",
+      new Map([
+        ["FROM visits", [visitRow({ clinical_state: "awaiting_doctor_review" })]],
+        ["FROM clinical_review_events", [pendingAssessmentEvent]],
+        ["FROM visit_initial_assessments", [assessmentRow]],
+      ]),
+      { permissions: ["read_patients"] },
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as { items: Array<{ event: { id: string }; entity: { id: string } }> };
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0]).toMatchObject({ event: { id: "review-1" }, entity: { id: "assessment-1" } });
+  });
+
+  it("only permits a clinical reviewer to accept a pending draft", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const denied = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/visits/visit-1/reviews/initial_assessment/assessment-1/accept",
+      new Map(),
+      { permissions: ["write_findings"] },
+    );
+    expect(denied.status).toBe(403);
+
+    const accepted = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/visits/visit-1/reviews/initial_assessment/assessment-1/accept",
+      new Map([
+        ["FROM visits", [visitRow({ clinical_state: "awaiting_doctor_review" })]],
+        ["FROM clinical_review_events", [pendingAssessmentEvent]],
+        ["FROM visit_initial_assessments", [assessmentRow]],
+      ]),
+      { permissions: ["review_clinical_drafts"] },
+    );
+    expect(accepted.status).toBe(200);
+    await expect(accepted.json()).resolves.toMatchObject({ id: "review-1", review_status: "accepted", reviewed_by: "test-user" });
+  });
+
+  it("requires a reason when rejecting a draft", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const res = await authedRequestWithDB(
+      app,
+      "POST",
+      "/api/visits/visit-1/reviews/initial_assessment/assessment-1/reject",
+      new Map(),
+      { permissions: ["review_clinical_drafts"], body: {} },
+    );
+    expect(res.status).toBe(400);
+  });
+});

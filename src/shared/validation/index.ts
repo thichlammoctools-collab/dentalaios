@@ -265,6 +265,7 @@ export const visitCreateSchema = z.object({
   clinician_id: z.string().min(1),
   chair_id: z.string().min(1).optional(),
   source_appointment_id: z.string().min(1).optional(),
+  visit_type: z.enum(["initial_exam", "follow_up", "treatment", "emergency"]).default("initial_exam"),
   date: z.string().datetime({ offset: true }).optional(),
   notes: optionalText(2000),
   // Personnel
@@ -415,6 +416,27 @@ export const findingUpdateSchema = z.object({
 
 export type FindingUpdateInput = z.infer<typeof findingUpdateSchema>;
 
+const clinicalJsonEntrySchema = z.object({
+  name: nonEmpty(200),
+  detail: optionalText(1000),
+}).strict();
+
+export const visitInitialAssessmentSchema = z.object({
+  chief_complaint: optionalText(2000),
+  history_of_present_illness: optionalText(4000),
+  dental_history: optionalText(4000),
+  medical_conditions: z.array(clinicalJsonEntrySchema).max(100).optional(),
+  medications: z.array(clinicalJsonEntrySchema.extend({ dose: optionalText(200), frequency: optionalText(200) })).max(100).optional(),
+  allergies: z.array(clinicalJsonEntrySchema.extend({ reaction: optionalText(500), severity: z.enum(["low", "medium", "high"]).optional() })).max(100).optional(),
+  pregnancy_lactation: optionalText(500),
+  tobacco_alcohol: optionalText(1000),
+  asa_class: z.enum(["I", "II", "III", "IV", "V", "VI"]).optional(),
+  examination_summary: optionalText(4000),
+  preliminary_risk_notes: optionalText(4000),
+}).strict();
+
+export type VisitInitialAssessmentInput = z.infer<typeof visitInitialAssessmentSchema>;
+
 // ──────────────── Clinical terminology and diagnoses ────────────────
 
 const diagnosisStatuses = ["suspected", "confirmed", "ruled_out", "resolved"] as const;
@@ -442,6 +464,43 @@ export const diagnosisUpdateSchema = z.object({
 
 export type DiagnosisCreateInput = z.infer<typeof diagnosisCreateSchema>;
 export type DiagnosisUpdateInput = z.infer<typeof diagnosisUpdateSchema>;
+
+export const preExamSubmitSchema = z.object({
+  initial_assessment: visitInitialAssessmentSchema.optional(),
+  findings: z.array(findingCreateSchema).max(100).optional(),
+  diagnoses_suspected: z.array(diagnosisCreateSchema.omit({ status: true }).extend({
+    status: z.literal("suspected").optional(),
+  })).max(100).optional(),
+}).strict().refine((data) => Boolean(data.initial_assessment || data.findings?.length || data.diagnoses_suspected?.length), "Cần có ít nhất một dữ liệu pre-exam");
+
+export const clinicalReviewEntitySchema = z.enum(["finding", "diagnosis", "initial_assessment"]);
+export const clinicalReviewRouteParamsSchema = z.object({
+  id: z.string().min(1),
+  entityType: clinicalReviewEntitySchema,
+  entityId: z.string().min(1),
+});
+export const clinicalReviewRejectSchema = z.object({ review_note: nonEmpty(1000) }).strict();
+export const clinicalReviewEditAndAcceptSchema = z.object({
+  review_note: optionalText(1000),
+  finding: findingUpdateSchema.optional(),
+  diagnosis: diagnosisUpdateSchema.optional(),
+  initial_assessment: visitInitialAssessmentSchema.optional(),
+}).strict();
+
+export type PreExamSubmitInput = z.infer<typeof preExamSubmitSchema>;
+export type ClinicalReviewRejectInput = z.infer<typeof clinicalReviewRejectSchema>;
+export type ClinicalReviewEditAndAcceptInput = z.infer<typeof clinicalReviewEditAndAcceptSchema>;
+
+export const visitSafetyAcknowledgementSchema = z.object({
+  warning_type: z.enum(["blood_pressure", "blood_sugar", "bmi"]),
+  outcome: z.enum(["acknowledged", "continue_with_reason", "defer_treatment", "refer_or_escalate"]),
+  reason: optionalText(1000),
+}).strict().superRefine((data, ctx) => {
+  if (["continue_with_reason", "defer_treatment", "refer_or_escalate"].includes(data.outcome) && !data.reason) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["reason"], message: "Cần ghi lý do hoặc hướng xử trí" });
+  }
+});
+export type VisitSafetyAcknowledgementInput = z.infer<typeof visitSafetyAcknowledgementSchema>;
 
 const clinicalConceptCategory = z.enum(["tooth_hard_tissue", "periodontal", "oral_soft_tissue", "occlusion_orthodontics", "tmj_function", "preventive_general"]);
 const clinicalFindingScope = z.enum(["tooth", "region", "full_mouth"]);

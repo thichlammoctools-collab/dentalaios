@@ -21,8 +21,13 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { PageContainer } from "@/components/PageContainer";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { useAuth } from "@/lib/auth-context";
-import { isAssistantRole, isDoctorRole } from "@shared/constants";
-import type { Patient, MedicalAlert, Visit, ClinicalFinding, TreatmentPlan, GeneratePlanResult, ProcedureCatalogItem, UserWithDetails } from "@shared/types";
+import { isAssistantRole, isDoctorRole, PERMISSIONS } from "@shared/constants";
+import type { Patient, MedicalAlert, Visit, ClinicalFinding, TreatmentPlan, GeneratePlanResult, ProcedureCatalogItem, UserWithDetails, ClinicalReviewEvent, VisitSafetyAcknowledgement, VisitSafetyAcknowledgementOutcome, VisitSafetyWarningType } from "@shared/types";
+
+interface ReviewQueueItem {
+  event: ClinicalReviewEvent;
+  entity: ClinicalFinding | Record<string, unknown>;
+}
 
 interface UsersResponse {
   items: UserWithDetails[];
@@ -347,6 +352,10 @@ export function VisitDetailPage() {
   const [treatmentHistory, setTreatmentHistory] = useState<TreatmentPlan[]>([]);
   const [findings, setFindings] = useState<ClinicalFinding[]>([]);
   const [procedures, setProcedures] = useState<ProcedureCatalogItem[]>([]);
+  const [reviewQueue, setReviewQueue] = useState<ReviewQueueItem[]>([]);
+  const [preExamChiefComplaint, setPreExamChiefComplaint] = useState("");
+  const [savingPreExam, setSavingPreExam] = useState(false);
+  const [safetyAcknowledgements, setSafetyAcknowledgements] = useState<VisitSafetyAcknowledgement[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [summarizing, setSummarizing] = useState(false);
@@ -378,18 +387,30 @@ export function VisitDetailPage() {
   const [suggestNextDialogOpen, setSuggestNextDialogOpen] = useState(false);
   const [creatingAppointment, setCreatingAppointment] = useState(false);
 
+  const canReview = Boolean(
+    session?.role.permissions.includes(PERMISSIONS.ALL) ||
+    session?.role.permissions.includes(PERMISSIONS.REVIEW_CLINICAL_DRAFTS)
+  );
+  const canSubmitPreExam = Boolean(
+    session?.role.permissions.includes(PERMISSIONS.ALL) ||
+    session?.role.permissions.includes(PERMISSIONS.WRITE_PRE_EXAM_DRAFTS) ||
+    session?.role.permissions.includes(PERMISSIONS.WRITE_FINDINGS)
+  );
+
   async function load() {
     if (!id) return;
     setLoading(true);
     try {
       const v = await apiGet<Visit>(`/api/visits/${id}`);
-      const [f, procedureResponse, p, a, visitsResponse, plansResponse] = await Promise.all([
+      const [f, procedureResponse, p, a, visitsResponse, plansResponse, queueResponse, safetyResponse] = await Promise.all([
         apiGet<{ items: ClinicalFinding[] }>(`/api/visits/${id}/findings`),
         apiGet<{ items: ProcedureCatalogItem[] }>("/api/clinic/procedures"),
         apiGet<Patient>(`/api/patients/${v.patient_id}`),
         apiGet<ListResponse<MedicalAlert>>(`/api/patients/${v.patient_id}/alerts`),
         apiGet<ListResponse<Visit>>(`/api/visits?patient_id=${v.patient_id}`),
         apiGet<ListResponse<TreatmentPlan>>(`/api/treatment-plans?patient_id=${v.patient_id}`),
+        apiGet<{ items: ReviewQueueItem[] }>(`/api/visits/${id}/review-queue`).catch(() => ({ items: [] })),
+        apiGet<{ items: VisitSafetyAcknowledgement[] }>(`/api/visits/${id}/safety-acknowledgements`).catch(() => ({ items: [] })),
       ]);
       setVisit(v);
       setPatient(p);
@@ -398,6 +419,8 @@ export function VisitDetailPage() {
       setTreatmentHistory(plansResponse.items);
       setFindings(f.items);
       setProcedures(procedureResponse.items);
+      setReviewQueue(queueResponse.items);
+      setSafetyAcknowledgements(safetyResponse.items);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi tải visit");
     } finally {
@@ -413,6 +436,67 @@ export function VisitDetailPage() {
       .then((response) => setUsers(response.items))
       .catch((err) => toast.error(err instanceof ApiError ? err.message : "Không thể tải danh sách nhân sự"));
   }, [personnelDialogOpen, session?.branch?.id]);
+
+  async function acceptReview(item: ReviewQueueItem) {
+    if (!visit) return;
+    try {
+      await apiPost(`/api/visits/${visit.id}/reviews/${item.event.entity_type}/${item.event.entity_id}/accept`);
+      toast.success("Đã xác nhận dữ liệu lâm sàng");
+      void load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Không thể xác nhận");
+    }
+  }
+
+  async function rejectReview(item: ReviewQueueItem) {
+    if (!visit) return;
+    const reason = window.prompt("Lý do bác bỏ ghi nhận nháp này:");
+    if (!reason?.trim()) return;
+    try {
+      await apiPost(`/api/visits/${visit.id}/reviews/${item.event.entity_type}/${item.event.entity_id}/reject`, { review_note: reason });
+      toast.success("Đã bác bỏ ghi nhận nháp");
+      void load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Không thể bác bỏ");
+    }
+  }
+
+  async function submitPreExam() {
+    if (!visit || !preExamChiefComplaint.trim()) return;
+    setSavingPreExam(true);
+    try {
+      await apiPost(`/api/visits/${visit.id}/pre-exam/submit`, {
+        initial_assessment: { chief_complaint: preExamChiefComplaint },
+      });
+      setPreExamChiefComplaint("");
+      toast.success("Đã gửi pre-exam draft để bác sĩ duyệt");
+      void load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Không thể gửi pre-exam draft");
+    } finally {
+      setSavingPreExam(false);
+    }
+  }
+
+  async function acknowledgeSafetyWarning(warningType: VisitSafetyWarningType) {
+    if (!visit) return;
+    const outcome = window.prompt("Chọn outcome: acknowledged | continue_with_reason | defer_treatment | refer_or_escalate", "acknowledged") as VisitSafetyAcknowledgementOutcome | null;
+    if (!outcome || !["acknowledged", "continue_with_reason", "defer_treatment", "refer_or_escalate"].includes(outcome)) return;
+    const requiresReason = outcome !== "acknowledged";
+    const reason = requiresReason ? window.prompt("Lý do hoặc hướng xử trí:") : undefined;
+    if (requiresReason && !reason?.trim()) return;
+    try {
+      const saved = await apiPost<VisitSafetyAcknowledgement>(`/api/visits/${visit.id}/safety-acknowledgements`, {
+        warning_type: warningType,
+        outcome,
+        reason: reason || undefined,
+      });
+      setSafetyAcknowledgements((current) => [...current.filter((item) => item.warning_type !== warningType), saved]);
+      toast.success("Đã ghi nhận đánh giá an toàn");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Không thể ghi nhận đánh giá an toàn");
+    }
+  }
 
   async function onSuggestNext() {
     if (!visit) return;
@@ -654,7 +738,9 @@ export function VisitDetailPage() {
   const sortedTreatmentHistory = [...treatmentHistory].sort(
     (left, right) => new Date(right.created_at).getTime() - new Date(left.created_at).getTime(),
   );
-  const toothFindings = findings.filter((finding) => finding.category === "tooth_hard_tissue" || finding.category === "periodontal");
+  const effectiveFindings = findings.filter((finding) => Boolean(finding.clinical_effective_at) || finding.entry_source === "doctor" || finding.entry_source === "legacy");
+  const draftFindings = findings.filter((finding) => !effectiveFindings.some((effective) => effective.id === finding.id));
+  const toothFindings = effectiveFindings.filter((finding) => finding.category === "tooth_hard_tissue" || finding.category === "periodontal");
 
   return (
     <PageContainer size="workspace" className="space-y-5">
@@ -671,15 +757,24 @@ export function VisitDetailPage() {
         <div className="mt-1 flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Lượt khám</h1>
-            <p className="text-sm text-muted-foreground">{visit.code && <span className="font-mono">{visit.code} · </span>}{formatDateTime(visit.date)}</p>
+            <p className="text-sm text-muted-foreground">
+              {visit.code && <span className="font-mono">{visit.code} · </span>}
+              {formatDateTime(visit.date)}
+              <span className="ml-2 font-medium text-foreground">({visit.visit_type === "initial_exam" ? "Khám lần đầu" : visit.visit_type === "follow_up" ? "Tái khám" : visit.visit_type === "treatment" ? "Điều trị" : "Cấp cứu"})</span>
+            </p>
           </div>
-          <Badge
-            variant={
-              visit.status === "completed" ? "success" : visit.status === "cancelled" ? "destructive" : "warning"
-            }
-          >
-            {visit.status}
-          </Badge>
+          <div className="flex flex-col items-end gap-1">
+            <Badge
+              variant={
+                visit.status === "completed" ? "success" : visit.status === "cancelled" ? "destructive" : "warning"
+              }
+            >
+              {visit.status}
+            </Badge>
+            <Badge variant="outline" className="capitalize">
+              {visit.clinical_state === "pre_exam" ? "Pre-exam nháp" : visit.clinical_state === "awaiting_doctor_review" ? "Chờ bác sĩ duyệt" : visit.clinical_state === "signed" ? "Đã ký khóa" : visit.clinical_state === "amended" ? "Đã đính chính" : visit.clinical_state}
+            </Badge>
+          </div>
         </div>
         {visit.status === "in_progress" && (
           <div className="mt-3">
@@ -757,11 +852,11 @@ export function VisitDetailPage() {
               <Badge variant="warning">{clinicalWarnings.length} cần chú ý</Badge>
             </div>
             <div className="mt-3 space-y-2">
-              {clinicalWarnings.map((warning) => (
+               {clinicalWarnings.map((warning) => (
                 <div key={warning.title} className={`rounded-lg border px-3 py-2.5 text-sm ${warning.severity === "high" ? "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30" : "border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30"}`}>
-                  <div className="flex flex-wrap items-center gap-2"><Badge variant={warning.severity === "high" ? "destructive" : "warning"}>{warning.severity === "high" ? "Ưu tiên cao" : "Cần theo dõi"}</Badge><span className="font-medium">{warning.title}</span></div>
-                  <p className="mt-1.5 text-xs text-muted-foreground">{warning.detail}</p>
-                </div>
+                   <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex flex-wrap items-center gap-2"><Badge variant={warning.severity === "high" ? "destructive" : "warning"}>{warning.severity === "high" ? "Ưu tiên cao" : "Cần theo dõi"}</Badge><span className="font-medium">{warning.title}</span></div>{canReview && <Button size="sm" variant="outline" onClick={() => void acknowledgeSafetyWarning(warning.title.includes("Huyết áp") ? "blood_pressure" : warning.title.includes("Đường huyết") ? "blood_sugar" : "bmi")}>{safetyAcknowledgements.some((item) => item.warning_type === (warning.title.includes("Huyết áp") ? "blood_pressure" : warning.title.includes("Đường huyết") ? "blood_sugar" : "bmi")) ? "Cập nhật đánh giá" : "Bác sĩ xác nhận"}</Button>}</div>
+                   <p className="mt-1.5 text-xs text-muted-foreground">{warning.detail}</p>
+                 </div>
               ))}
             </div>
           </CardContent>
@@ -769,6 +864,73 @@ export function VisitDetailPage() {
       )}
 
       {/* Patient safety context */}
+
+      {/* Pre-exam & Doctor Review Queue */}
+      {canSubmitPreExam && (
+        <Card className="border-cyan-300 dark:border-cyan-800">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Pre-exam draft</CardTitle>
+            <p className="text-xs text-muted-foreground">Dữ liệu tại đây chưa là hồ sơ lâm sàng hiệu lực. Bác sĩ phải review trước khi dùng cho chẩn đoán và kế hoạch điều trị.</p>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            <Textarea
+              value={preExamChiefComplaint}
+              onChange={(event) => setPreExamChiefComplaint(event.target.value)}
+              rows={2}
+              maxLength={2000}
+              placeholder="Lý do đến khám / than phiền chính của bệnh nhân"
+            />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">{draftFindings.length > 0 ? `${draftFindings.length} finding draft đang chờ review.` : "Có thể nhập pre-exam trước khi bác sĩ khám."}</p>
+              <Button size="sm" onClick={() => void submitPreExam()} disabled={savingPreExam || !preExamChiefComplaint.trim()}>
+                {savingPreExam ? "Đang gửi..." : "Gửi bác sĩ duyệt"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {reviewQueue.length > 0 && (
+        <Card className="border-violet-300 dark:border-violet-800">
+          <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <CardTitle className="text-base">Dữ liệu nháp chờ bác sĩ duyệt ({reviewQueue.length})</CardTitle>
+                <p className="mt-1 text-xs text-muted-foreground">Phụ tá hoặc AI đã tạo bản ghi nháp. Bác sĩ cần xác nhận hoặc bác bỏ để đưa vào hồ sơ chính thức.</p>
+              </div>
+              <Badge variant="warning">{reviewQueue.length} mục pending</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
+            {reviewQueue.map((item) => (
+              <div key={item.event.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3 text-sm">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{item.event.entity_type === "finding" ? "Ghi nhận lâm sàng" : item.event.entity_type === "diagnosis" ? "Chẩn đoán nghi ngờ" : "Khám ban đầu"}</Badge>
+                    <span className="text-xs text-muted-foreground">Nhập bởi: {item.event.entered_by}</span>
+                  </div>
+                  <p className="font-medium text-foreground">
+                    {item.event.entity_type === "finding"
+                      ? `Condition: ${(item.entity as ClinicalFinding).condition}${(item.entity as ClinicalFinding).tooth_number ? ` (Răng #${(item.entity as ClinicalFinding).tooth_number})` : ""}`
+                      : item.event.entity_type === "diagnosis"
+                      ? `Concept: ${String((item.entity as Record<string, unknown>).concept_display_vi_snapshot ?? "")}`
+                      : `Chief complaint: ${String((item.entity as Record<string, unknown>).chief_complaint ?? "Khám tổng quát")}`}
+                  </p>
+                </div>
+                {canReview ? (
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => void acceptReview(item)}>Xác nhận</Button>
+                    <Button size="sm" variant="outline" onClick={() => void rejectReview(item)}>Bác bỏ</Button>
+                  </div>
+                ) : (
+                  <span className="text-xs italic text-muted-foreground">Chỉ bác sĩ mới có quyền duyệt</span>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
        <Card className={alerts.length > 0 ? "border-amber-300 dark:border-amber-800" : undefined}>
          <details open={alerts.length > 0}>
            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-4 [&::-webkit-details-marker]:hidden">
@@ -865,12 +1027,12 @@ export function VisitDetailPage() {
 
        <div className="grid items-start gap-6 lg:grid-cols-3">
          <div className="space-y-6 lg:col-span-2">
-           <Card>
-             <CardHeader className="pb-3"><CardTitle>Khám răng hàm mặt</CardTitle></CardHeader>
-             <CardContent>
-               <FdiToothChart visitId={visit.id} findings={findings} onCreated={(f) => setFindings((prev) => [...prev, f])} onCreatedBatch={onFindingsBatchCreated} onUpdated={(updated) => setFindings((prev) => prev.map((finding) => finding.id === updated.id ? updated : finding))} onDeleted={(findingId) => setFindings((prev) => prev.filter((finding) => finding.id !== findingId))} />
-             </CardContent>
-           </Card>
+            <Card>
+              <CardHeader className="pb-3"><CardTitle>Hồ sơ lâm sàng hiệu lực: Khám răng hàm mặt</CardTitle></CardHeader>
+              <CardContent>
+                <FdiToothChart visitId={visit.id} findings={effectiveFindings} onCreated={(f) => setFindings((prev) => [...prev, f])} onCreatedBatch={onFindingsBatchCreated} onUpdated={(updated) => setFindings((prev) => prev.map((finding) => finding.id === updated.id ? updated : finding))} onDeleted={(findingId) => setFindings((prev) => prev.filter((finding) => finding.id !== findingId))} />
+              </CardContent>
+            </Card>
            <Card id="findings">
              <CardHeader className="pb-3"><CardTitle>Ghi nhận theo răng ({toothFindings.length})</CardTitle></CardHeader>
              <CardContent>

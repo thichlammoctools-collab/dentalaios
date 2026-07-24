@@ -4,13 +4,18 @@ import type { D1Row } from "./base";
 
 export interface FindingsRepository {
   listByVisit(tenantId: string, visitId: string): Promise<ClinicalFinding[]>;
+  listEffectiveByVisit(tenantId: string, visitId: string): Promise<ClinicalFinding[]>;
   getByVisitAndId(tenantId: string, visitId: string, id: string): Promise<ClinicalFinding | null>;
   /** Cross-visit history of a single FDI tooth for one patient (findings + treatments). */
   listToothHistory(tenantId: string, patientId: string, toothNumber: number): Promise<ToothHistoryEntry[]>;
   create(
     tenantId: string,
     visitId: string,
-    data: Omit<ClinicalFinding, "id" | "tenant_id" | "visit_id" | "created_at">,
+    data: Omit<ClinicalFinding, "id" | "tenant_id" | "visit_id" | "created_at" | "entry_source"> & {
+      entry_source?: ClinicalFinding["entry_source"];
+      entered_by?: string;
+      clinical_effective_at?: string;
+    },
   ): Promise<ClinicalFinding>;
   update(
     tenantId: string,
@@ -29,6 +34,17 @@ export function createFindingsRepository(db: D1Database): FindingsRepository {
            WHERE tenant_id = ? AND visit_id = ?
            ORDER BY scope ASC, tooth_number ASC`,
         )
+        .bind(tenantId, visitId)
+        .all();
+      return (result.results as D1Row[]).map(mapFinding);
+    },
+
+    async listEffectiveByVisit(tenantId, visitId) {
+      const result = await db
+        .prepare(`SELECT * FROM clinical_findings
+          WHERE tenant_id = ? AND visit_id = ?
+            AND (clinical_effective_at IS NOT NULL OR entry_source IN ('doctor', 'legacy'))
+          ORDER BY scope ASC, tooth_number ASC`)
         .bind(tenantId, visitId)
         .all();
       return (result.results as D1Row[]).map(mapFinding);
@@ -109,8 +125,8 @@ export function createFindingsRepository(db: D1Database): FindingsRepository {
       await db
         .prepare(
           `INSERT INTO clinical_findings
-              (id, code, tenant_id, visit_id, category, scope, tooth_number, tooth_system, anatomical_site, location_details_json, measurements_json, condition, concept_id, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              (id, code, tenant_id, visit_id, category, scope, tooth_number, tooth_system, anatomical_site, location_details_json, measurements_json, condition, concept_id, notes, entered_by, entry_source, clinical_effective_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
@@ -127,6 +143,9 @@ export function createFindingsRepository(db: D1Database): FindingsRepository {
           data.condition,
           data.concept_id ?? null,
           data.notes ?? null,
+          data.entered_by ?? null,
+          data.entry_source ?? "doctor",
+          data.clinical_effective_at ?? null,
         )
         .run();
       const row = (await db
@@ -193,6 +212,9 @@ function mapFinding(row: D1Row): ClinicalFinding {
     measurements: parseJson<FindingMeasurements>(row.measurements_json),
     condition: row.condition as string,
     notes: (row.notes as string | null) ?? undefined,
+    entered_by: (row.entered_by as string | null) ?? undefined,
+    entry_source: ((row.entry_source as string | null) ?? "doctor") as ClinicalFinding["entry_source"],
+    clinical_effective_at: (row.clinical_effective_at as string | null) ?? undefined,
     created_at: row.created_at as string,
   };
 }

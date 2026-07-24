@@ -42,6 +42,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
   const [analyzing, setAnalyzing] = useState(false);
   const [recording, setRecording] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveErrorIndex, setSaveErrorIndex] = useState<number | null>(null);
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [manualEntry, setManualEntry] = useState("");
 
@@ -69,10 +70,10 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
   async function onSave() {
     if (parsedFindings.length === 0) return;
     setSaving(true);
+    setSaveErrorIndex(null);
     try {
-      const saved: ClinicalFinding[] = [];
-      for (const f of parsedFindings) {
-        const created = await apiPost<ClinicalFinding>(`/api/visits/${visitId}/findings`, {
+      const response = await apiPost<{ items: ClinicalFinding[] }>(`/api/visits/${visitId}/findings/batch`, {
+        findings: parsedFindings.map((f) => ({
           category: f.category,
           tooth_number: f.tooth_number,
           scope: f.scope,
@@ -81,13 +82,17 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
           measurements: f.measurements,
           condition: f.condition,
           notes: f.notes || undefined,
-        });
-        saved.push(created);
-      }
-      toast.success(`Đã lưu ${saved.length} findings`);
-      onSaved(saved);
+        })),
+      });
+      toast.success(`Đã lưu ${response.items.length} findings`);
+      onSaved(response.items);
       handleClose();
     } catch (err) {
+      const itemIndex = err instanceof ApiError && isItemIndexDetails(err.details)
+        ? err.details.item_index
+        : null;
+      setSaveErrorIndex(itemIndex);
+      if (itemIndex !== null) setEditingIdx(itemIndex);
       toast.error(err instanceof ApiError ? err.message : "Lỗi lưu findings");
     } finally {
       setSaving(false);
@@ -100,6 +105,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
     setAnalyzing(false);
     setRecording(false);
     setEditingIdx(null);
+    setSaveErrorIndex(null);
     setManualEntry("");
     onOpenChange(false);
   }
@@ -249,7 +255,9 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
                     key={idx}
                     className={cn(
                       "rounded-lg border p-3 transition-colors",
-                      isEditing
+                      saveErrorIndex === idx
+                        ? "border-destructive bg-destructive/5"
+                        : isEditing
                         ? "border-primary bg-primary/5"
                         : "border-border bg-background hover:border-primary/30",
                     )}
@@ -262,6 +270,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
                       <span className="text-xs text-muted-foreground">
                         {getFindingConditionLabel(f.category, f.condition)}
                       </span>
+                      {saveErrorIndex === idx && <span className="text-xs font-medium text-destructive">Cần chỉnh sửa mục này trước khi lưu lại</span>}
                       <div className="ml-auto flex gap-1">
                         <Button
                           size="sm"
@@ -410,4 +419,9 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
       </DialogFooter>
     </Dialog>
   );
+}
+
+function isItemIndexDetails(details: unknown): details is { item_index: number } {
+  return typeof details === "object" && details !== null
+    && "item_index" in details && typeof details.item_index === "number";
 }
