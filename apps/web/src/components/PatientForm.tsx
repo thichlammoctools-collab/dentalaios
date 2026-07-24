@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,8 +8,10 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { apiPost, apiPut, apiGet, ApiError } from "@/lib/api";
+import { referrersApi } from "@/lib/referral-api";
 import { toast } from "@/lib/toast";
 import { useAuth } from "@/lib/auth-context";
+import { calculateAge } from "@/lib/utils";
 import type { Patient, Referrer } from "@shared/types";
 import type { UserWithDetails } from "@shared/types";
 import type { PatientCreateInput } from "@shared/validation";
@@ -62,17 +64,23 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
   const [marketingSource, setMarketingSource] = useState(patient?.marketing_source ?? "");
   const [heightCm, setHeightCm] = useState(patient?.height_cm ?? "");
   const [weightKg, setWeightKg] = useState(patient?.weight_kg ?? "");
+  const [hasDisability, setHasDisability] = useState(patient?.has_disability ?? false);
+  const [disabilityNotes, setDisabilityNotes] = useState(patient?.disability_notes ?? "");
 
   // Referral
   const [referralType, setReferralType] = useState(patient?.referral_type ?? "");
   const [referralUserId, setReferralUserId] = useState(patient?.referral_user_id ?? "");
   const [referralNotes, setReferralNotes] = useState(patient?.referral_notes ?? "");
-  const [referralCode, setReferralCode] = useState("");
   const [resolvedReferrer, setResolvedReferrer] = useState<Pick<Referrer, "id" | "name" | "code" | "type"> | null>(null);
-  const [lookingUpReferral, setLookingUpReferral] = useState(false);
+  const [referrerQuery, setReferrerQuery] = useState("");
+  const [referrerMatches, setReferrerMatches] = useState<Array<Pick<Referrer, "id" | "name" | "code" | "type" | "email" | "phone">>>([]);
+  const [searchingReferrers, setSearchingReferrers] = useState(false);
+  const [showQuickReferrer, setShowQuickReferrer] = useState(false);
+  const [quickReferrer, setQuickReferrer] = useState({ name: "", email: "", phone: "" });
+  const [creatingReferrer, setCreatingReferrer] = useState(false);
   const [users, setUsers] = useState<UserWithDetails[]>([]);
   const [step, setStep] = useState(1);
-  const formRef = useRef<HTMLFormElement>(null);
+  const stepOneRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open || !branchId) return;
@@ -100,22 +108,22 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
       setMarketingSource(patient?.marketing_source ?? "");
       setHeightCm(patient?.height_cm ?? "");
       setWeightKg(patient?.weight_kg ?? "");
+      setHasDisability(patient?.has_disability ?? false);
+      setDisabilityNotes(patient?.disability_notes ?? "");
       setReferralType(patient?.referral_type ?? "");
       setReferralUserId(patient?.referral_user_id ?? "");
       setReferralNotes(patient?.referral_notes ?? "");
-      setReferralCode("");
       setResolvedReferrer(null);
+      setReferrerQuery("");
+      setReferrerMatches([]);
+      setShowQuickReferrer(false);
+      setQuickReferrer({ name: "", email: "", phone: "" });
       setStep(1);
     }
   }, [open, patient]);
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function savePatient() {
     if (!session) return;
-    if (step === 1) {
-      if (formRef.current?.reportValidity()) setStep(2);
-      return;
-    }
     setSaving(true);
     try {
       const payload: PatientCreateInput = {
@@ -136,10 +144,12 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
         marketing_source: marketingSource || undefined,
         height_cm: heightCm ? Number(heightCm) || undefined : undefined,
         weight_kg: weightKg ? Number(weightKg) || undefined : undefined,
+        has_disability: hasDisability,
+        disability_notes: hasDisability ? disabilityNotes || undefined : undefined,
         referral_type: referralType || undefined,
         referral_user_id: referralUserId || undefined,
         referral_notes: referralNotes || undefined,
-        referral_code: !isEdit && resolvedReferrer ? referralCode : undefined,
+        referrer_id: resolvedReferrer ? resolvedReferrer.id : undefined,
         cccd,
       };
       if (isEdit && patient) {
@@ -176,31 +186,68 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
   const bmiLabel = bmi !== null
     ? bmi < 18.5 ? "Gầy" : bmi < 23 ? "Bình thường" : bmi < 25 ? "Thừa cân" : "Béo phì"
     : null;
+  const age = calculateAge(dateOfBirth);
 
   function goToNextStep() {
-    if (formRef.current?.reportValidity()) setStep(2);
+    const stepOne = stepOneRef.current;
+    if (!stepOne) return;
+    const fields = Array.from(stepOne.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("input, select, textarea"));
+    if (fields.some((el) => !el.checkValidity())) {
+      for (const el of fields) {
+        if (!el.checkValidity()) el.reportValidity();
+      }
+      return;
+    }
+    setStep(2);
   }
 
-  async function lookupReferralCode() {
-    const normalized = referralCode.trim().toUpperCase();
-    if (!normalized || isEdit) return;
-    setLookingUpReferral(true);
+  async function searchReferrers() {
+    const query = referrerQuery.trim();
+    if (query.length < 2) {
+      setReferrerMatches([]);
+      return;
+    }
+    setSearchingReferrers(true);
     try {
-      const referrer = await apiGet<Pick<Referrer, "id" | "name" | "code" | "type">>(`/api/referrers/lookup/${encodeURIComponent(normalized)}`);
-      setReferralCode(referrer.code);
-      setResolvedReferrer(referrer);
-      toast.success(`Đã nhận mã của ${referrer.name}`);
+      const response = await referrersApi.search<{ items: Array<Pick<Referrer, "id" | "name" | "code" | "type" | "email" | "phone">> }>(query);
+      setReferrerMatches(response.items);
     } catch (error) {
-      setResolvedReferrer(null);
-      toast.error(error instanceof ApiError ? error.message : "Mã giới thiệu không hợp lệ");
+      setReferrerMatches([]);
+      toast.error(error instanceof ApiError ? error.message : "Không thể tìm Người giới thiệu");
     } finally {
-      setLookingUpReferral(false);
+      setSearchingReferrers(false);
+    }
+  }
+
+  async function createQuickReferrer() {
+    if (!quickReferrer.name.trim() || (!quickReferrer.email.trim() && !quickReferrer.phone.trim())) {
+      toast.error("Nhập tên và ít nhất email hoặc số điện thoại");
+      return;
+    }
+    setCreatingReferrer(true);
+    try {
+      const referrer = await referrersApi.quickCreate<Referrer>({
+        type: "partner",
+        name: quickReferrer.name.trim(),
+        email: quickReferrer.email.trim() || undefined,
+        phone: quickReferrer.phone.trim() || undefined,
+      });
+      setResolvedReferrer(referrer);
+      setReferralType("other");
+      setReferrerQuery("");
+      setReferrerMatches([]);
+      setShowQuickReferrer(false);
+      toast.success(`Đã tạo Người giới thiệu ${referrer.name}`);
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Không thể tạo Người giới thiệu");
+    } finally {
+      setCreatingReferrer(false);
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange} size="workspace">
-      <form ref={formRef} onSubmit={onSubmit}>
+      <div className="flex min-h-0 flex-1 flex-col">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Sửa bệnh nhân" : "Tạo bệnh nhân mới"}</DialogTitle>
           <div className="mt-4 flex items-center gap-3" aria-label="Tiến trình biểu mẫu">
@@ -210,13 +257,13 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
           </div>
         </DialogHeader>
 
-        <DialogBody className="grid gap-4 lg:gap-5">
+        <DialogBody className="min-h-0 grid gap-4 lg:gap-5">
 
-          {step === 1 && <>
+          {step === 1 && <div ref={stepOneRef} className="contents">
           <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
             Nhập thông tin cần thiết để nhận diện và liên hệ bệnh nhân. Các mục có dấu <span className="font-semibold text-red-500">*</span> là bắt buộc.
           </div>
-          <SectionDivider icon={<UserIcon />}>Thông tin chính</SectionDivider>
+          <SectionDivider icon={<UserIcon />}>Nhận diện & liên hệ</SectionDivider>
 
           <div className="grid gap-1.5">
             <Label htmlFor="pf-name">
@@ -231,7 +278,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
             />
           </div>
 
-          <div className="grid gap-3 lg:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <div className="grid gap-1.5">
               <Label htmlFor="pf-dob">
                 Ngày sinh <span className="text-red-500">*</span>
@@ -241,6 +288,16 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
                 required
                 value={dateOfBirth}
                 onChange={setDateOfBirth}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="pf-age">Tuổi <span className="font-normal text-muted-foreground">(tự tính)</span></Label>
+              <Input
+                id="pf-age"
+                value={age === undefined ? "—" : `${age} tuổi`}
+                readOnly
+                aria-live="polite"
+                className="bg-muted/40 text-muted-foreground"
               />
             </div>
             <div className="grid gap-1.5">
@@ -255,29 +312,31 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
             </div>
           </div>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="pf-phone">
-              Số điện thoại <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="pf-phone"
-              type="tel"
-              required
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="VD: 0901234567"
-            />
-          </div>
+          <div className="grid gap-3 lg:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="pf-phone">
+                Số điện thoại <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="pf-phone"
+                type="tel"
+                required
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="VD: 0901234567"
+              />
+            </div>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="pf-email">Email</Label>
-            <Input
-              id="pf-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="VD: nguyenvana@email.com"
-            />
+            <div className="grid gap-1.5">
+              <Label htmlFor="pf-email">Email</Label>
+              <Input
+                id="pf-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="VD: nguyenvana@email.com"
+              />
+            </div>
           </div>
 
           <div className="grid gap-1.5">
@@ -290,13 +349,20 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
               required
               inputMode="numeric"
               maxLength={12}
-              pattern="[0-9]*"
+              minLength={12}
+              pattern="[0-9]{12}"
               value={cccd}
               onChange={(e) => setCccd(e.target.value.replace(/\D/g, "").slice(0, 12))}
               placeholder="VD: 012345678912"
+              aria-describedby="pf-cccd-help"
+              onInvalid={(e) => e.currentTarget.setCustomValidity("Vui lòng nhập CCCD gồm đúng 12 chữ số.")}
+              onInput={(e) => e.currentTarget.setCustomValidity("")}
             />
+            <p id="pf-cccd-help" className="text-xs text-muted-foreground">
+              Nhập đủ 12 chữ số trên CCCD. Không dùng số CMND cũ 9 số; hệ thống tự bỏ dấu cách và dấu gạch ngang.
+            </p>
           </div>
-          </>}
+          </div>}
 
           {step === 2 && <>
           <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
@@ -376,14 +442,7 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
             </section>
 
             <section className="space-y-3 rounded-xl border border-border p-4 lg:p-5">
-              <SectionDivider icon={<MetricsIcon />}>Thông tin bổ sung</SectionDivider>
-              <div className="grid gap-1.5">
-                <Label htmlFor="pf-mkt">Biết phòng khám qua kênh nào?</Label>
-                <Select id="pf-mkt" value={marketingSource} onChange={(e) => setMarketingSource(e.target.value)}>
-                  <option value="">— Chưa chọn —</option>
-                  {MARKETING_SOURCES.map((src) => <option key={src} value={src}>{MARKETING_SOURCE_LABELS[src]}</option>)}
-                </Select>
-              </div>
+              <SectionDivider icon={<MetricsIcon />}>Chỉ số cơ thể</SectionDivider>
               <div className="grid gap-3 lg:grid-cols-2">
                 <div className="grid gap-1.5">
                   <Label htmlFor="pf-height">Chiều cao (cm)</Label>
@@ -395,39 +454,44 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
                 </div>
               </div>
               {bmi !== null && bmiLabel && <p className="rounded bg-muted px-2 py-1 text-xs text-muted-foreground">BMI: <strong className="text-foreground">{bmi}</strong> — {bmiLabel}</p>}
+              <div className="grid gap-1.5 border-t border-border pt-3">
+                <Label htmlFor="pf-has-disability">Khuyết tật</Label>
+                <Select id="pf-has-disability" value={hasDisability ? "yes" : "no"} onChange={(event) => { const next = event.target.value === "yes"; setHasDisability(next); if (!next) setDisabilityNotes(""); }}>
+                  <option value="no">Không</option>
+                  <option value="yes">Có</option>
+                </Select>
+              </div>
+              {hasDisability && <div className="grid gap-1.5"><Label htmlFor="pf-disability-notes">Thông tin khuyết tật</Label><Textarea id="pf-disability-notes" rows={2} required value={disabilityNotes} onChange={(event) => setDisabilityNotes(event.target.value)} placeholder="VD: Khó khăn vận động, cần hỗ trợ khi di chuyển" /></div>}
             </section>
           </div>
 
-          {/* ─── 4. Giới thiệu ─── */}
-          <SectionDivider icon={<ReferralIcon />}>Giới thiệu</SectionDivider>
-
-          {!isEdit && (
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-              <div className="flex flex-wrap gap-2">
-                <div className="min-w-48 flex-1">
-                  <Label htmlFor="pf-ref-code">Mã Người giới thiệu</Label>
-                  <Input id="pf-ref-code" value={referralCode} disabled={Boolean(resolvedReferrer)} onChange={(e) => setReferralCode(e.target.value.toUpperCase())} placeholder="VD: RF-ABC12345" />
-                </div>
-                <Button type="button" className="self-end" variant="outline" disabled={lookingUpReferral || Boolean(resolvedReferrer) || !referralCode.trim()} onClick={() => void lookupReferralCode()}>{lookingUpReferral ? "Đang kiểm tra..." : "Kiểm tra mã"}</Button>
-                {resolvedReferrer && <Button type="button" className="self-end" variant="ghost" onClick={() => { setResolvedReferrer(null); setReferralCode(""); }}>Bỏ mã</Button>}
-              </div>
-              {resolvedReferrer && <p className="mt-2 text-sm text-primary">Áp dụng cho: <strong>{resolvedReferrer.name}</strong> ({resolvedReferrer.code}). Thông tin này sẽ khóa sau khi có thanh toán xác nhận.</p>}
-            </div>
-          )}
+          {/* ─── 4. Nguồn ─── */}
+          <SectionDivider icon={<ReferralIcon />}>Nguồn</SectionDivider>
 
           <div className="grid gap-1.5 xl:max-w-[calc(50%-0.5rem)]">
-            <Label htmlFor="pf-ref-type">Nguồn giới thiệu</Label>
-            <Select id="pf-ref-type" value={referralType} onChange={(e) => setReferralType(e.target.value)}>
+            <Label htmlFor="pf-mkt">Biết phòng khám qua kênh nào?</Label>
+            <Select id="pf-mkt" value={marketingSource} onChange={(event) => { const next = event.target.value; setMarketingSource(next); if (next !== "gioi_thieu") { setResolvedReferrer(null); setReferrerMatches([]); setReferralType(""); } }}>
               <option value="">— Chưa chọn —</option>
-              <option value="none">Không</option>
-              <option value="doctor">Bác sĩ giới thiệu</option>
-              <option value="staff">Nhân viên</option>
-              <option value="ad">Quảng cáo</option>
-              <option value="other">Khác</option>
+              {MARKETING_SOURCES.map((src) => <option key={src} value={src}>{MARKETING_SOURCE_LABELS[src]}</option>)}
             </Select>
           </div>
 
-          {referralType && referralType !== "none" && (
+          {marketingSource === "gioi_thieu" && (
+            <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="min-w-60 flex-1">
+                  <Label htmlFor="pf-referrer-search">Tìm Người giới thiệu</Label>
+                  <Input id="pf-referrer-search" value={referrerQuery} disabled={Boolean(resolvedReferrer) || (isEdit && Boolean(patient?.referral_referrer_name || patient?.referral_user_name))} onChange={(event) => setReferrerQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void searchReferrers(); } }} placeholder="Mã, số điện thoại hoặc email" />
+                </div>
+                <Button type="button" variant="outline" disabled={searchingReferrers || Boolean(resolvedReferrer) || (isEdit && Boolean(patient?.referral_referrer_name || patient?.referral_user_name)) || referrerQuery.trim().length < 2} onClick={() => void searchReferrers()}>{searchingReferrers ? "Đang tìm..." : "Tìm"}</Button>
+                {resolvedReferrer && !isEdit && <Button type="button" variant="ghost" onClick={() => setResolvedReferrer(null)}>Đổi người</Button>}
+              </div>
+              {referrerMatches.length > 0 && !resolvedReferrer && <div className="divide-y rounded-md border border-border bg-background">{referrerMatches.map((referrer) => <button type="button" key={referrer.id} className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { setResolvedReferrer(referrer); setReferralType("other"); setReferrerMatches([]); setReferrerQuery(""); }}><span><strong>{referrer.name}</strong><span className="ml-2 text-muted-foreground">{referrer.code}</span></span><span className="text-xs text-muted-foreground">{referrer.phone ?? referrer.email}</span></button>)}</div>}
+              {resolvedReferrer || (isEdit && (patient?.referral_referrer_name || patient?.referral_user_name)) ? <p className="text-sm text-primary">Đã chọn: <strong>{resolvedReferrer?.name ?? patient?.referral_referrer_name ?? patient?.referral_user_name}</strong>{resolvedReferrer?.code || patient?.referral_referrer_code ? ` (${resolvedReferrer?.code ?? patient?.referral_referrer_code})` : ""}. Người giới thiệu được ghi nhận cùng hồ sơ và không thể đổi sau khi lưu.</p> : <div><Button type="button" variant="ghost" size="sm" onClick={() => setShowQuickReferrer((current) => !current)}>{showQuickReferrer ? "Ẩn tạo mới" : "Chưa có? Tạo Người giới thiệu mới"}</Button>{showQuickReferrer && <div className="mt-2 grid gap-2 sm:grid-cols-3"><Input value={quickReferrer.name} onChange={(event) => setQuickReferrer((current) => ({ ...current, name: event.target.value }))} placeholder="Họ tên / đối tác" /><Input type="email" value={quickReferrer.email} onChange={(event) => setQuickReferrer((current) => ({ ...current, email: event.target.value }))} placeholder="Email" /><div className="flex gap-2"><Input type="tel" value={quickReferrer.phone} onChange={(event) => setQuickReferrer((current) => ({ ...current, phone: event.target.value }))} placeholder="Số điện thoại" /><Button type="button" disabled={creatingReferrer} onClick={() => void createQuickReferrer()}>{creatingReferrer ? "Đang tạo..." : "Tạo"}</Button></div></div>}</div>}
+            </div>
+          )}
+
+          {marketingSource === "gioi_thieu" && isEdit && referralType && referralType !== "other" && (
             <div className="grid gap-3 xl:grid-cols-2">
               <div className="grid gap-1.5">
                 <Label htmlFor="pf-ref-user">Người giới thiệu</Label>
@@ -475,12 +539,12 @@ export function PatientForm({ open, onOpenChange, patient, onSaved }: PatientFor
           {step === 1 ? (
             <Button type="button" onClick={goToNextStep}>Tiếp tục</Button>
           ) : (
-            <Button type="submit" disabled={saving}>
+            <Button type="button" onClick={() => void savePatient()} disabled={saving}>
               {saving ? "Đang lưu…" : isEdit ? "Lưu thay đổi" : "Tạo bệnh nhân"}
             </Button>
           )}
         </DialogFooter>
-      </form>
+      </div>
     </Dialog>
   );
 }

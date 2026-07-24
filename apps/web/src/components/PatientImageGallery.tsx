@@ -18,8 +18,8 @@ import {
 } from "@/components/ui/dialog";
 import { apiBlob, apiDelete, apiGet, apiPost, apiUpload, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
-import type { ClinicalDiagnosis, ClinicalDiagnosisImageEvidence, ImageAnnotation, ImageAnnotationGeometry, ImageAnnotationShapeType, PatientImage, PatientImageType, AnalyzeImageResult } from "@shared/types";
-import { PATIENT_IMAGE_TYPE_LABELS } from "@shared/types";
+import type { ClinicalDiagnosis, ClinicalDiagnosisImageEvidence, ImageAnnotation, ImageAnnotationGeometry, ImageAnnotationShapeType, PatientImage, PatientImagePurpose, PatientImageType, AnalyzeImageResult, Visit } from "@shared/types";
+import { PATIENT_IMAGE_PURPOSE_LABELS, PATIENT_IMAGE_TYPE_LABELS } from "@shared/types";
 
 interface PatientImageGalleryProps {
   patientId: string;
@@ -40,9 +40,19 @@ export function PatientImageGallery({
   onImagesChanged,
 }: PatientImageGalleryProps) {
   const [images, setImages] = useState<PatientImage[]>([]);
+  const [imageTotal, setImageTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<string>("all");
+  const [filterPurpose, setFilterPurpose] = useState<PatientImagePurpose | "all">("all");
+  const [filterVisitId, setFilterVisitId] = useState<string>("all");
+  const [visits, setVisits] = useState<Visit[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploadPurpose, setUploadPurpose] = useState<PatientImagePurpose>("clinical_record");
+  const [uploadType, setUploadType] = useState<PatientImageType>("other");
+  const [uploadVisitId, setUploadVisitId] = useState(visitId ?? "");
   const [selected, setSelected] = useState<PatientImage | null>(null);
+  const [comparisonOpen, setComparisonOpen] = useState(false);
   const [viewUrl, setViewUrl] = useState<string | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
   const [viewError, setViewError] = useState<string | null>(null);
@@ -62,7 +72,7 @@ export function PatientImageGallery({
   const [evidenceRelation, setEvidenceRelation] = useState<"supports" | "contradicts" | "incidental">("supports");
   const [evidenceNote, setEvidenceNote] = useState("");
   const [linkingEvidence, setLinkingEvidence] = useState(false);
-  const imageContainerRef = useRef<HTMLDivElement>(null);
+  const annotationSurfaceRef = useRef<HTMLDivElement>(null);
   const freehandPointsRef = useRef<Array<{ x: number; y: number }>>([]);
   const drawingFreehandRef = useRef(false);
 
@@ -75,6 +85,7 @@ export function PatientImageGallery({
           : `/api/patient-images?patient_id=${patientId}`,
       );
       setImages(res.items);
+      setImageTotal(res.total);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi tải hình ảnh");
     } finally {
@@ -84,6 +95,16 @@ export function PatientImageGallery({
 
   useEffect(() => {
     load();
+  }, [patientId, visitId]);
+
+  useEffect(() => {
+    if (visitId) {
+      setUploadVisitId(visitId);
+      return;
+    }
+    void apiGet<{ items: Visit[] }>(`/api/visits?patient_id=${patientId}`)
+      .then((response) => setVisits(response.items))
+      .catch(() => setVisits([]));
   }, [patientId, visitId]);
 
   useEffect(() => {
@@ -153,9 +174,34 @@ export function PatientImageGallery({
     }).catch((error) => toast.error(error instanceof ApiError ? error.message : "Không thể tải ghi chú trên ảnh"));
   }, [selected?.id]);
 
-  const filtered = filterType === "all"
-    ? images
-    : images.filter((i) => i.image_type === filterType);
+  const filtered = images.filter((image) =>
+    (filterType === "all" || image.image_type === filterType)
+    && (filterPurpose === "all" || image.image_purpose === filterPurpose)
+    && (filterVisitId === "all" || (filterVisitId === "unlinked" ? !image.visit_id : image.visit_id === filterVisitId)),
+  );
+  const uploadVisitOptions = visitId ? [] : visits;
+  const beforeImages = images.filter((image) => image.image_purpose === "treatment_before");
+  const afterImages = images.filter((image) => image.image_purpose === "treatment_after");
+  const visitById = new Map(visits.map((visit) => [visit.id, visit]));
+  const imageGroups = visitId || filterVisitId !== "all"
+    ? [{ key: "filtered", label: "Ảnh đang hiển thị", items: filtered }]
+    : Array.from(filtered.reduce((groups, image) => {
+      const key = image.visit_id ?? "unlinked";
+      const group = groups.get(key) ?? [];
+      group.push(image);
+      groups.set(key, group);
+      return groups;
+    }, new Map<string, PatientImage[]>())).map(([key, items]) => {
+      const visit = visitById.get(key);
+      return { key, label: key === "unlinked" ? "Chưa gắn lượt khám" : visit ? `Lượt khám ${new Date(visit.date).toLocaleDateString("vi-VN")}` : "Lượt khám", items };
+    });
+
+  function openUpload(files: File[]) {
+    if (!files.length || uploading) return;
+    setPendingFiles(files);
+    setUploadVisitId(visitId ?? "");
+    setUploadDialogOpen(true);
+  }
 
   async function uploadImage(file: File) {
     setUploading(true);
@@ -166,10 +212,12 @@ export function PatientImageGallery({
 
       const params = new URLSearchParams({
         patient_id: patientId,
-        image_type: detectImageType(file.name, file.type),
+        image_type: uploadType === "other" ? detectImageType(file.name, file.type) : uploadType,
+        image_purpose: uploadPurpose,
         original_size: String(originalSize),
       });
-      if (visitId) params.set("visit_id", visitId);
+      const targetVisitId = visitId ?? uploadVisitId;
+      if (targetVisitId) params.set("visit_id", targetVisitId);
       await apiUpload(`/api/patient-images/file?${params}`, blob, {
         "Content-Type": blob.type || "image/jpeg",
         // HTTP headers only accept Latin-1 characters; preserve Unicode names safely.
@@ -193,12 +241,18 @@ export function PatientImageGallery({
     }
   }
 
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+  function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
     // Reset immediately so selecting the same file again triggers onChange.
     e.target.value = "";
-    if (!file || uploading) return;
-    await uploadImage(file);
+    openUpload(files);
+  }
+
+  async function confirmUpload() {
+    if (!pendingFiles.length) return;
+    setUploadDialogOpen(false);
+    for (const file of pendingFiles) await uploadImage(file);
+    setPendingFiles([]);
   }
 
   useEffect(() => {
@@ -212,8 +266,8 @@ export function PatientImageGallery({
 
       event.preventDefault();
       const extension = blob.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
-      const file = new File([blob], `anh-da-dan-${Date.now()}.${extension}`, { type: blob.type });
-      void uploadImage(file);
+       const file = new File([blob], `anh-da-dan-${Date.now()}.${extension}`, { type: blob.type });
+       openUpload([file]);
     }
 
     window.addEventListener("paste", handlePaste);
@@ -235,8 +289,8 @@ export function PatientImageGallery({
   }
 
   function coordinateFromPointer(event: React.PointerEvent<HTMLDivElement>) {
-    const bounds = imageContainerRef.current?.getBoundingClientRect();
-    if (!bounds) return null;
+    const bounds = annotationSurfaceRef.current?.getBoundingClientRect();
+    if (!bounds || bounds.width === 0 || bounds.height === 0) return null;
     return {
       x: Math.min(1, Math.max(0, (event.clientX - bounds.left) / bounds.width)),
       y: Math.min(1, Math.max(0, (event.clientY - bounds.top) / bounds.height)),
@@ -245,6 +299,7 @@ export function PatientImageGallery({
 
   function handleAnnotationPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (!viewUrl) return;
+    if (event.button !== 0) return;
     event.preventDefault();
     const point = coordinateFromPointer(event);
     if (!point) return;
@@ -382,16 +437,28 @@ export function PatientImageGallery({
   }
 
   const imageTypes = Object.entries(PATIENT_IMAGE_TYPE_LABELS) as [PatientImageType, string][];
+  const imagePurposes = Object.entries(PATIENT_IMAGE_PURPOSE_LABELS) as [PatientImagePurpose, string][];
 
   return (
     <div>
+      <section className="mb-4 rounded-xl border border-border bg-muted/20 p-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold">Hình ảnh lâm sàng</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Mỗi ảnh được phân loại khi tải lên theo mục đích điều trị, loại kỹ thuật và lượt khám liên quan.</p>
+          </div>
+          <span className="rounded-full bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground">{imageTotal} ảnh lưu trữ</span>
+        </div>
+        {visitId && <p className="mt-2 text-xs text-muted-foreground">Ảnh tải tại đây sẽ tự động gắn với lượt khám hiện tại.</p>}
+      </section>
       {!compact && (
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Hình ảnh</h2>
+          <h2 className="text-lg font-semibold">Hình ảnh ({imageTotal})</h2>
           <label className="cursor-pointer">
             <input
               type="file"
               accept="image/*,.dcm"
+              multiple
               onChange={handleUpload}
               disabled={uploading}
               className="hidden"
@@ -426,35 +493,39 @@ export function PatientImageGallery({
       )}
 
       {/* Filter tabs */}
-      <div className="flex gap-1 flex-wrap mb-3">
-        <button
-          onClick={() => setFilterType("all")}
-          className={`text-xs px-3 py-1 rounded-full border transition-colors ${
-            filterType === "all"
-              ? "bg-teal-600 text-white border-teal-600"
-              : "border-border text-muted-foreground hover:border-teal-400"
-          }`}
-        >
-          Tất cả ({images.length})
-        </button>
-        {imageTypes.map(([type, label]) => {
-          const count = images.filter((i) => i.image_type === type).length;
-          if (count === 0) return null;
-          return (
-            <button
-              key={type}
-              onClick={() => setFilterType(type)}
-              className={`text-xs px-3 py-1 rounded-full border transition-colors ${
-                filterType === type
-                  ? "bg-teal-600 text-white border-teal-600"
-                  : "border-border text-muted-foreground hover:border-teal-400"
-              }`}
-            >
-              {label} ({count})
-            </button>
-          );
-        })}
+      <div className="mb-3 space-y-2">
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="mr-1 text-xs font-medium text-muted-foreground">Mục đích:</span>
+          <button onClick={() => setFilterPurpose("all")} className={`text-xs px-3 py-1 rounded-full border transition-colors ${filterPurpose === "all" ? "bg-teal-600 text-white border-teal-600" : "border-border text-muted-foreground hover:border-teal-400"}`}>Tất cả ({images.length})</button>
+          {imagePurposes.map(([purpose, label]) => {
+            const count = images.filter((image) => image.image_purpose === purpose).length;
+            if (count === 0) return null;
+            return <button key={purpose} onClick={() => setFilterPurpose(purpose)} className={`text-xs px-3 py-1 rounded-full border transition-colors ${filterPurpose === purpose ? "bg-teal-600 text-white border-teal-600" : "border-border text-muted-foreground hover:border-teal-400"}`}>{label} ({count})</button>;
+          })}
+        </div>
+        {!visitId && <div className="flex flex-wrap items-center gap-1">
+          <span className="mr-1 text-xs font-medium text-muted-foreground">Lượt khám:</span>
+          <button onClick={() => setFilterVisitId("all")} className={`text-xs px-3 py-1 rounded-full border transition-colors ${filterVisitId === "all" ? "bg-teal-600 text-white border-teal-600" : "border-border text-muted-foreground hover:border-teal-400"}`}>Tất cả</button>
+          <button onClick={() => setFilterVisitId("unlinked")} className={`text-xs px-3 py-1 rounded-full border transition-colors ${filterVisitId === "unlinked" ? "bg-teal-600 text-white border-teal-600" : "border-border text-muted-foreground hover:border-teal-400"}`}>Chưa gắn lượt khám</button>
+          {visits.map((visit) => <button key={visit.id} onClick={() => setFilterVisitId(visit.id)} className={`text-xs px-3 py-1 rounded-full border transition-colors ${filterVisitId === visit.id ? "bg-teal-600 text-white border-teal-600" : "border-border text-muted-foreground hover:border-teal-400"}`}>{new Date(visit.date).toLocaleDateString("vi-VN")}</button>)}
+        </div>}
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="mr-1 text-xs font-medium text-muted-foreground">Loại ảnh:</span>
+          <button onClick={() => setFilterType("all")} className={`text-xs px-3 py-1 rounded-full border transition-colors ${filterType === "all" ? "bg-teal-600 text-white border-teal-600" : "border-border text-muted-foreground hover:border-teal-400"}`}>Tất cả ({images.length})</button>
+          {imageTypes.map(([type, label]) => {
+            const count = images.filter((i) => i.image_type === type).length;
+            if (count === 0) return null;
+            return <button key={type} onClick={() => setFilterType(type)} className={`text-xs px-3 py-1 rounded-full border transition-colors ${filterType === type ? "bg-teal-600 text-white border-teal-600" : "border-border text-muted-foreground hover:border-teal-400"}`}>{label} ({count})</button>;
+          })}
+        </div>
       </div>
+
+      {beforeImages.length > 0 && afterImages.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200 bg-teal-50/50 p-3 dark:border-teal-900 dark:bg-teal-950/20">
+          <div><p className="text-sm font-medium">Đối chiếu trước – sau điều trị</p><p className="mt-0.5 text-xs text-muted-foreground">Chọn một ảnh mỗi bên để xem song song.</p></div>
+          <Button size="sm" variant="outline" onClick={() => setComparisonOpen(true)}>So sánh ảnh</Button>
+        </div>
+      )}
 
       {/* Grid */}
       {loading ? (
@@ -487,31 +558,16 @@ export function PatientImageGallery({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          {filtered.map((img) => (
-            <button
-              key={img.id}
-              onClick={() => setSelected(img)}
-              className="group relative aspect-square rounded-xl overflow-hidden border border-border bg-muted/30 hover:border-teal-400 transition-all hover:shadow-md"
-            >
-              {/* Thumbnail image */}
-              <ImageThumbnail img={img} />
-
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-2">
-                <p className="text-white text-[10px] font-medium truncate">
-                  {PATIENT_IMAGE_TYPE_LABELS[img.image_type]}
-                </p>
-                <p className="text-white/70 text-[9px]">
-                  {img.original_size ? `${(img.original_size / 1024).toFixed(0)}KB` : ""}
-                </p>
-              </div>
-              <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="bg-black/50 text-white text-[9px] px-1.5 py-0.5 rounded">
-                  {img.image_type === "cbct" ? "CBCT" : img.image_type === "scan_3d" ? "3D" : img.image_type === "photo_before" ? "TR" : img.image_type === "photo_after" ? "SAU" : ""}
-                </span>
-              </div>
-            </button>
-          ))}
+        <div className="space-y-6">
+          {imageGroups.map((group) => <section key={group.key}>
+            {!visitId && filterVisitId === "all" && <div className="mb-2 flex items-center gap-2"><p className="text-sm font-semibold">{group.label}</p><span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{group.items.length}</span></div>}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              {group.items.map((img) => <button key={img.id} onClick={() => setSelected(img)} className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-muted/30 transition-all hover:border-teal-400 hover:shadow-md">
+                <ImageThumbnail img={img} />
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-2"><p className="truncate text-[10px] font-medium text-white">{PATIENT_IMAGE_PURPOSE_LABELS[img.image_purpose]} · {PATIENT_IMAGE_TYPE_LABELS[img.image_type]}</p><p className="text-[9px] text-white/70">{img.original_size ? `${(img.original_size / 1024).toFixed(0)}KB` : ""}</p></div>
+              </button>)}
+            </div>
+          </section>)}
         </div>
       )}
 
@@ -546,31 +602,34 @@ export function PatientImageGallery({
           {/* Image */}
           <div className="rounded-xl overflow-hidden bg-black/5 mb-4">
             {viewUrl ? (
-              <div
-                ref={imageContainerRef}
-                className={`relative mx-auto w-fit max-w-full touch-none select-none ${annotationShape === "freehand" ? "cursor-crosshair" : "cursor-pointer"}`}
-                aria-label="Vùng đánh dấu ảnh"
-                onPointerDown={handleAnnotationPointerDown}
-                onPointerMove={handleAnnotationPointerMove}
-                onPointerUp={handleAnnotationPointerUp}
-                onPointerCancel={handleAnnotationPointerCancel}
-                onLostPointerCapture={handleAnnotationPointerCancel}
-              >
-                <img
-                  src={viewUrl}
-                  alt={selected?.original_name || "Medical image"}
-                  className="block max-h-[60vh] max-w-full object-contain"
-                  draggable={false}
-                  onError={() => {
-                    setViewUrl(null);
-                    setViewError("Định dạng hình ảnh này không thể xem trước trong trình duyệt");
-                  }}
-                />
-                <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 1 1" preserveAspectRatio="none" aria-label="Ghi chú trên ảnh">
-                  <defs><marker id="annotation-arrow" markerWidth="0.06" markerHeight="0.06" refX="0.045" refY="0.03" orient="auto"><path d="M0,0 L0.06,0.03 L0,0.06 Z" fill="#ef4444" /></marker><marker id="annotation-arrow-active" markerWidth="0.06" markerHeight="0.06" refX="0.045" refY="0.03" orient="auto"><path d="M0,0 L0.06,0.03 L0,0.06 Z" fill="#2563eb" /></marker><marker id="annotation-arrow-draft" markerWidth="0.06" markerHeight="0.06" refX="0.045" refY="0.03" orient="auto"><path d="M0,0 L0.06,0.03 L0,0.06 Z" fill="#f59e0b" /></marker></defs>
-                  {annotations.map((annotation) => <AnnotationOverlay key={annotation.id} shape={annotation.current_version.shape_type} geometry={annotation.current_version.geometry} active={selectedAnnotationVersionId === annotation.current_version.id} />)}
-                  {annotationGeometry && <AnnotationOverlay shape={annotationShape} geometry={annotationGeometry} draft />}
-                </svg>
+              <div className="mx-auto max-w-full text-center">
+                <div className="relative inline-block max-w-full">
+                  <img
+                    src={viewUrl}
+                    alt={selected?.original_name || "Medical image"}
+                    className="block max-h-[60vh] max-w-full select-none object-contain"
+                    draggable={false}
+                    onError={() => {
+                      setViewUrl(null);
+                      setViewError("Định dạng hình ảnh này không thể xem trước trong trình duyệt");
+                    }}
+                  />
+                  <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-label="Ghi chú trên ảnh">
+                    <defs><marker id="annotation-arrow" markerWidth="22" markerHeight="22" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse" viewBox="0 0 10 10"><path d="M0,0 L10,5 L0,10 Z" fill="#ef4444" /></marker><marker id="annotation-arrow-active" markerWidth="22" markerHeight="22" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse" viewBox="0 0 10 10"><path d="M0,0 L10,5 L0,10 Z" fill="#2563eb" /></marker><marker id="annotation-arrow-draft" markerWidth="22" markerHeight="22" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse" viewBox="0 0 10 10"><path d="M0,0 L10,5 L0,10 Z" fill="#f59e0b" /></marker></defs>
+                    {annotations.map((annotation) => <AnnotationOverlay key={annotation.id} shape={annotation.current_version.shape_type} geometry={annotation.current_version.geometry} active={selectedAnnotationVersionId === annotation.current_version.id} />)}
+                    {annotationGeometry && <AnnotationOverlay shape={annotationShape} geometry={annotationGeometry} draft />}
+                  </svg>
+                  <div
+                    ref={annotationSurfaceRef}
+                    className={`absolute inset-0 z-10 touch-none ${annotationShape === "freehand" ? "cursor-crosshair" : "cursor-pointer"}`}
+                    aria-label="Vùng đánh dấu ảnh"
+                    onPointerDown={handleAnnotationPointerDown}
+                    onPointerMove={handleAnnotationPointerMove}
+                    onPointerUp={handleAnnotationPointerUp}
+                    onPointerCancel={handleAnnotationPointerCancel}
+                    onLostPointerCapture={handleAnnotationPointerCancel}
+                  />
+                </div>
               </div>
             ) : viewError ? (
               <div className="w-full min-h-48 flex items-center justify-center px-6 py-10 text-center text-sm text-destructive">
@@ -677,8 +736,110 @@ export function PatientImageGallery({
           )}
         </DialogFooter>
       </Dialog>
+
+      {/* Upload Confirmation Dialog */}
+      <Dialog open={uploadDialogOpen} onOpenChange={(o) => { if (!o) setUploadDialogOpen(false); }}>
+        <DialogHeader><DialogTitle>Xác nhận tải lên hình ảnh</DialogTitle></DialogHeader>
+        <DialogBody>
+          <div className="mb-4 flex max-h-64 flex-col gap-2 overflow-y-auto rounded-lg border border-border p-3">
+            {pendingFiles.map((file, index) => (
+              <label key={index} className="flex items-center gap-3 text-sm">
+                <span className="text-muted-foreground">{index + 1}</span>
+                <span className="min-w-0 truncate font-medium">{file.name}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{(file.size / 1024).toFixed(0)} KB</span>
+              </label>
+            ))}
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="grid gap-1 text-sm font-medium"><span>Mục đích lâm sàng</span>
+              <select value={uploadPurpose} onChange={(event) => setUploadPurpose(event.target.value as PatientImagePurpose)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+                <option value="clinical_record">Bệnh án / hỗ trợ chẩn đoán — Ảnh X-quang, CBCT, hoặc trong miệng phục vụ đánh giá và liên kết chẩn đoán.</option>
+                <option value="treatment_before">Trước điều trị — Hình nền để so sánh tình trạng trước can thiệp.</option>
+                <option value="treatment_after">Sau điều trị — Theo dõi kết quả sau can thiệp.</option>
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm font-medium"><span>Loại kỹ thuật</span>
+              <select value={uploadType} onChange={(event) => setUploadType(event.target.value as PatientImageType)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+                <option value="other">Tự nhận diện từ tên / MIME</option>
+                {imageTypes.filter(([type]) => type !== "other").map(([type, label]) => <option key={type} value={type}>{label}</option>)}
+              </select>
+            </label>
+          </div>
+          {!visitId && (
+            <div className="mt-3">
+              <label className="grid gap-1 text-sm font-medium"><span>Gắn với lượt khám</span>
+                <select value={uploadVisitId} onChange={(event) => setUploadVisitId(event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">
+                  <option value="">Không gắn</option>
+                  {uploadVisitOptions.map((v) => <option key={v.id} value={v.id}>{new Date(v.date).toLocaleDateString("vi-VN")} — {v.status === "completed" ? "Hoàn tất" : v.status === "cancelled" ? "Đã hủy" : "Đang thực hiện"}</option>)}
+                </select>
+              </label>
+            </div>
+          )}
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => { setUploadDialogOpen(false); setPendingFiles([]); }}>Hủy</Button>
+          <Button onClick={confirmUpload}>Tải lên</Button>
+        </DialogFooter>
+      </Dialog>
+
+      {/* Image Comparison Dialog */}
+      <Dialog open={comparisonOpen} onOpenChange={(o) => { if (!o) setComparisonOpen(false); }}>
+        <DialogHeader><DialogTitle>Đối chiếu trước – sau</DialogTitle></DialogHeader>
+        <DialogBody>
+          <TreatmentImageComparison beforeImages={beforeImages} afterImages={afterImages} />
+        </DialogBody>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setComparisonOpen(false)}>Đóng</Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
+}
+
+function TreatmentImageComparison({ beforeImages, afterImages }: { beforeImages: PatientImage[]; afterImages: PatientImage[] }) {
+  const [beforeId, setBeforeId] = useState(beforeImages[0]?.id ?? "");
+  const [afterId, setAfterId] = useState(afterImages[0]?.id ?? "");
+  const before = beforeImages.find((image) => image.id === beforeId) ?? null;
+  const after = afterImages.find((image) => image.id === afterId) ?? null;
+  return <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+    <ComparisonPane label="Trước điều trị" images={beforeImages} selectedId={beforeId} onChange={setBeforeId} image={before} />
+    <ComparisonPane label="Sau điều trị" images={afterImages} selectedId={afterId} onChange={setAfterId} image={after} />
+  </div>;
+}
+
+function ComparisonPane({ label, images, selectedId, onChange, image }: { label: string; images: PatientImage[]; selectedId: string; onChange: (value: string) => void; image: PatientImage | null }) {
+  return <div className="rounded-xl border border-border p-3">
+    <p className="mb-2 text-sm font-semibold">{label} ({images.length})</p>
+    <select value={selectedId} onChange={(event) => onChange(event.target.value)} className="mb-2 h-8 w-full rounded-md border border-input bg-background px-2 text-xs">
+      {images.map((item) => <option key={item.id} value={item.id}>{PATIENT_IMAGE_TYPE_LABELS[item.image_type]} · {formatDate(item.created_at)}</option>)}
+    </select>
+    {image ? <PatientImageViewer image={image} /> : <div className="aspect-square flex items-center justify-center rounded-lg bg-muted/30 text-xs text-muted-foreground">Chưa chọn ảnh</div>}
+  </div>;
+}
+
+/** Sub-component for rendering a full-size view in the comparison dialog. */
+function PatientImageViewer({ image }: { image: PatientImage }) {
+  const [viewUrl, setViewUrl] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    setViewUrl(null);
+    apiBlob(`/api/patient-images/${image.id}/file`)
+      .then((blob) => {
+        objectUrl = URL.createObjectURL(blob);
+        if (!cancelled) setViewUrl(objectUrl);
+        else URL.revokeObjectURL(objectUrl);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [image.id]);
+  return <div className="relative aspect-square rounded-lg overflow-hidden bg-black">
+    {viewUrl && <img src={viewUrl} alt={image.original_name || "Image"} className="absolute inset-0 m-auto max-h-full max-w-full object-contain" />}
+    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5">
+      <p className="text-white text-[10px] truncate">{image.original_name}</p>
+      <p className="text-white/60 text-[9px]">{formatDate(image.created_at)}</p>
+    </div>
+  </div>;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────
@@ -762,13 +923,15 @@ function AnnotationOverlay({ shape, geometry, active, draft }: { shape: ImageAnn
   const color = draft ? "#f59e0b" : active ? "#2563eb" : "#ef4444";
   const marker = draft ? "url(#annotation-arrow-draft)" : active ? "url(#annotation-arrow-active)" : "url(#annotation-arrow)";
   if (shape === "pin" && "x" in geometry && "y" in geometry) {
-    const tailX = Math.max(0.03, geometry.x - 0.09);
-    const tailY = Math.max(0.03, geometry.y - 0.09);
-    return <line x1={tailX} y1={tailY} x2={geometry.x} y2={geometry.y} stroke={color} strokeWidth="0.009" strokeLinecap="round" markerEnd={marker} vectorEffect="non-scaling-stroke" />;
+    const x = geometry.x * 1000;
+    const y = geometry.y * 1000;
+    const tailX = Math.max(30, x - 45);
+    const tailY = Math.max(30, y - 45);
+    return <line x1={tailX} y1={tailY} x2={x} y2={y} stroke={color} strokeWidth="4" strokeLinecap="round" markerEnd={marker} vectorEffect="non-scaling-stroke" />;
   }
-  if (shape === "freehand" && "points" in geometry) return <polyline points={geometry.points.map((point) => `${point.x},${point.y}`).join(" ")} fill="none" stroke={color} strokeWidth="0.01" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />;
+  if (shape === "freehand" && "points" in geometry) return <polyline points={geometry.points.map((point) => `${point.x * 1000},${point.y * 1000}`).join(" ")} fill="none" stroke={color} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />;
   if (!("width" in geometry) || !("height" in geometry)) return null;
-  return <rect x={geometry.x} y={geometry.y} width={geometry.width} height={geometry.height} fill="none" stroke={color} strokeWidth="0.008" vectorEffect="non-scaling-stroke" />;
+  return <rect x={geometry.x * 1000} y={geometry.y * 1000} width={geometry.width * 1000} height={geometry.height * 1000} fill="none" stroke={color} strokeWidth="4" vectorEffect="non-scaling-stroke" />;
 }
 
 function statusLabel(status: ClinicalDiagnosis["status"]): string {

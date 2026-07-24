@@ -5,7 +5,7 @@ import { authedRequestWithDB, mountRoute } from "../helpers/api";
 
 const imageRow = {
   id: "image-1", tenant_id: "test-tenant", patient_id: "patient-1", visit_id: "visit-1", uploaded_by: "test-user",
-  image_type: "xray", description: null, file_id: "file-1", thumb_key: null, original_name: "xray.png", original_size: 100,
+  image_type: "xray", image_purpose: "clinical_record", description: null, file_id: "file-1", thumb_key: null, original_name: "xray.png", original_size: 100,
   uploader_name: "Doctor", created_at: "2026-01-01T10:00:00Z",
 };
 

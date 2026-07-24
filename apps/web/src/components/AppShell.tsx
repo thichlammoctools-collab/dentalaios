@@ -29,7 +29,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [sidebarCollapsed]);
 
   return (
-    <div className="flex min-h-svh bg-background">
+    <div className="flex h-svh overflow-hidden bg-background">
       {mobileOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 opacity-100 transition-opacity duration-300 ease-out lg:hidden"
@@ -52,9 +52,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         />
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <Topbar onMenuClick={() => setMobileOpen(true)} />
-        <main className="flex-1 overflow-auto pb-20 lg:pb-0">{children}</main>
+        <main id="app-content" className="min-h-0 flex-1 overflow-y-auto pb-20 lg:pb-0">{children}</main>
       </div>
       <MobileBottomNav onMenuClick={() => setMobileOpen(true)} />
     </div>

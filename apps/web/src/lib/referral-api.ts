@@ -1,8 +1,10 @@
-import { api, apiDelete, apiGet, apiPatch, apiPost, apiPut } from "./api";
+import { api, apiDelete, apiGet, apiPatch, apiPost } from "./api";
 
 /** Internal referral endpoints always use the clinic workspace session. */
 export const referrersApi = {
   list: <T>() => apiGet<T>("/api/referrers"),
+  search: <T>(query: string) => apiGet<T>(`/api/referrers/search?q=${encodeURIComponent(query)}`),
+  quickCreate: <T>(body: unknown) => apiPost<T>("/api/referrers/quick", body),
   create: <T>(body: unknown) => apiPost<T>("/api/referrers", body),
   update: <T>(id: string, body: unknown) => apiPatch<T>(`/api/referrers/${encodeURIComponent(id)}`, body),
   remove: <T>(id: string) => apiDelete<T>(`/api/referrers/${encodeURIComponent(id)}`),
@@ -15,7 +17,6 @@ export const referrersApi = {
 export const referralProgramsApi = {
   list: <T>() => apiGet<T>("/api/referral-programs"),
   create: <T>(body: unknown) => apiPost<T>("/api/referral-programs", body),
-  update: <T>(id: string, body: unknown) => apiPut<T>(`/api/referral-programs/${encodeURIComponent(id)}`, body),
   updateStatus: <T>(id: string, status: string) => apiPatch<T>(`/api/referral-programs/${encodeURIComponent(id)}`, { status }),
 };
 

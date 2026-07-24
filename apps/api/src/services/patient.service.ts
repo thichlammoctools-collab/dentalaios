@@ -82,9 +82,12 @@ export const patientService = {
           referral_type: data.referral_type,
           referral_user_id: data.referral_user_id ?? undefined,
           referral_notes: data.referral_notes,
-          height_cm: data.height_cm ?? undefined,
-          weight_kg: data.weight_kg ?? undefined,
-          cccd: data.cccd,
+          referrer_id: referrer?.id ?? data.referrer_id ?? undefined,
+           height_cm: data.height_cm ?? undefined,
+           weight_kg: data.weight_kg ?? undefined,
+           has_disability: data.has_disability ?? false,
+           disability_notes: data.has_disability ? data.disability_notes : undefined,
+           cccd: data.cccd,
         });
         if (referrer) await referralService.createCaseForNewPatient(db, tenantId, userId ?? "system", created, referrer, data.referral_code ? "code" : "manual");
         return created;
@@ -102,6 +105,7 @@ export const patientService = {
     tenantId: string,
     id: string,
     data: PatientUpdateInput,
+    userId?: string,
   ): Promise<Patient | null> {
     return (async () => {
       await assertAllInTenant(db, tenantId, [
@@ -111,8 +115,17 @@ export const patientService = {
       const repository = createPatientsRepository(db);
       const existing = await repository.getById(tenantId, id);
       if (!existing) return null;
+      let resolvedReferrer;
       if (data.referrer_id || data.referral_code) {
-        throw new ConflictError("Chỉ có thể ghi nhận Người giới thiệu khi tạo hồ sơ bệnh nhân");
+        const existingCase = await db.prepare("SELECT id FROM referral_cases WHERE tenant_id = ? AND patient_id = ? LIMIT 1").bind(tenantId, id).first();
+        if (existingCase) throw new ConflictError("Không thể thay đổi Người giới thiệu khi hồ sơ đã có case giới thiệu");
+        const confirmedPayment = await db.prepare("SELECT id FROM payments WHERE tenant_id = ? AND patient_id = ? AND status = 'confirmed' LIMIT 1").bind(tenantId, id).first();
+        if (confirmedPayment) throw new ConflictError("Không thể ghi nhận Người giới thiệu sau khi đã có thanh toán xác nhận");
+        resolvedReferrer = await referralService.resolveReferrer(db, tenantId, {
+          referrerId: data.referrer_id,
+          referralCode: data.referral_code,
+        });
+        if (resolvedReferrer) await referralService.createCaseForNewPatient(db, tenantId, userId ?? "system", existing, resolvedReferrer, data.referral_code ? "code" : "manual");
       }
       const address = displayAddress({
         address: data.address ?? existing.address,
@@ -145,9 +158,12 @@ export const patientService = {
           referral_type: data.referral_type,
           referral_user_id: data.referral_user_id ?? undefined,
           referral_notes: data.referral_notes,
-          height_cm: data.height_cm ?? undefined,
-          weight_kg: data.weight_kg ?? undefined,
-          cccd: data.cccd,
+          referrer_id: resolvedReferrer?.id ?? undefined,
+           height_cm: data.height_cm ?? undefined,
+           weight_kg: data.weight_kg ?? undefined,
+           has_disability: data.has_disability,
+           disability_notes: data.has_disability === false ? null : data.disability_notes,
+           cccd: data.cccd,
         });
       } catch (err) {
         if (isUniqueConstraintError(err)) {

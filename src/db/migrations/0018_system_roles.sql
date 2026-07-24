@@ -23,7 +23,7 @@ SET permissions = CASE system_key
   WHEN 'admin' THEN '["all"]'
   WHEN 'doctor' THEN '["read_patients","write_findings","write_plans","approve_plans"]'
   WHEN 'assistant' THEN '["read_patients","write_visits"]'
-  WHEN 'receptionist' THEN '["read_patients","write_payments","write_appointments"]'
+  WHEN 'receptionist' THEN '["read_patients","write_patients","write_payments","write_appointments"]'
   WHEN 'manager' THEN '["all"]'
   WHEN 'accountant' THEN '["read_patients","write_payments"]'
   WHEN 'hr' THEN '["manage_users","read_patients"]'
@@ -38,7 +38,7 @@ WITH catalog(system_key, name, permissions) AS (
     ('admin', 'Quản trị viên', '["all"]'),
     ('doctor', 'Bác sĩ', '["read_patients","write_findings","write_plans","approve_plans"]'),
     ('assistant', 'Phụ tá', '["read_patients","write_visits"]'),
-    ('receptionist', 'Lễ tân', '["read_patients","write_payments","write_appointments"]'),
+    ('receptionist', 'Lễ tân', '["read_patients","write_patients","write_payments","write_appointments"]'),
     ('manager', 'Quản lý', '["all"]'),
     ('accountant', 'Kế toán', '["read_patients","write_payments"]'),
     ('hr', 'Nhân sự', '["manage_users","read_patients"]'),

@@ -123,7 +123,7 @@ router.put(
   async (c) => {
     const jwt = getJwt(c);
     const data = c.req.valid("json");
-    const updated = await patientService.update(c.env.DB, jwt.tenant_id, c.req.param("id"), data);
+    const updated = await patientService.update(c.env.DB, jwt.tenant_id, c.req.param("id"), data, jwt.sub);
     if (!updated) return c.json({ error: "Patient not found", code: "not_found" }, 404);
     return c.json(updated, 200);
   },

@@ -218,10 +218,15 @@ export interface Patient {
   referral_type?: ReferralType;
   referral_user_id?: string;
   referral_user_name?: string;
+  referrer_id?: string;
+  referral_referrer_name?: string;
+  referral_referrer_code?: string;
   referral_notes?: string;
   // Body metrics
   height_cm?: number;
   weight_kg?: number;
+  has_disability?: boolean;
+  disability_notes?: string;
   cccd?: string;
 }
 
@@ -1077,7 +1082,7 @@ export type AppointmentStatus =
 
 export type AppointmentSource = "manual" | "ai_chat" | "ai_next_visit" | "reschedule";
 
-export type DentalChairType = "general" | "surgery" | "orthodontic" | "pediatric" | "hygiene";
+export type DentalChairType = "general" | "surgery" | "orthodontic" | "pediatric" | "prosthodontics";
 export type ChairOperationalStatus = "available" | "cleaning" | "maintenance" | "out_of_service";
 
 export interface DentalRoom {
@@ -1234,6 +1239,14 @@ export const PATIENT_IMAGE_TYPE_LABELS: Record<PatientImageType, string> = {
   other: "Khác",
 };
 
+export type PatientImagePurpose = "clinical_record" | "treatment_before" | "treatment_after";
+
+export const PATIENT_IMAGE_PURPOSE_LABELS: Record<PatientImagePurpose, string> = {
+  clinical_record: "Bệnh án / chẩn đoán",
+  treatment_before: "Trước điều trị",
+  treatment_after: "Sau điều trị",
+};
+
 export interface PatientImage {
   id: string;
   tenant_id: string;
@@ -1241,6 +1254,7 @@ export interface PatientImage {
   visit_id?: string;
   uploaded_by: string;
   image_type: PatientImageType;
+  image_purpose: PatientImagePurpose;
   description?: string;
   file_id: string;
   thumb_key?: string;

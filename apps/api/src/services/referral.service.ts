@@ -89,6 +89,17 @@ export const referralService = {
     return (await createReferralsRepository(db).getReferrer(tenantId, id))!;
   },
 
+  async deleteReferrer(db: D1Database, tenantId: string, userId: string, id: string): Promise<void> {
+    const existing = await createReferralsRepository(db).getReferrer(tenantId, id);
+    if (!existing) throw new NotFoundError("Người giới thiệu không tồn tại");
+    if (existing.linked_user_id === userId) throw new ForbiddenError("Không thể tự xoá hồ sơ Người giới thiệu của mình");
+    const activeCase = await db.prepare(
+      `SELECT 1 FROM referral_cases WHERE tenant_id = ? AND referrer_id = ? AND status NOT IN ('cancelled', 'rejected', 'expired', 'recovered') LIMIT 1`,
+    ).bind(tenantId, id).first();
+    if (activeCase) throw new ConflictError("Không thể xoá Người giới thiệu đang có case giới thiệu hoạt động");
+    await db.prepare("DELETE FROM referrers WHERE tenant_id = ? AND id = ?").bind(tenantId, id).run();
+  },
+
   async regenerateCode(db: D1Database, tenantId: string, userId: string, id: string): Promise<Referrer> {
     const referrer = await createReferralsRepository(db).getReferrer(tenantId, id);
     if (!referrer) throw new NotFoundError("Người giới thiệu không tồn tại");

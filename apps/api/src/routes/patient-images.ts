@@ -38,8 +38,11 @@ router.get(
     const jwt = getJwt(c);
     const patientId = c.req.query("patient_id");
     if (!patientId) return c.json({ error: "patient_id required", code: "bad_request" }, 400);
-    const items = await patientImagesService.listByPatient(c.env.DB, jwt.tenant_id, patientId);
-    return c.json({ items, total: items.length });
+    const [items, total] = await Promise.all([
+      patientImagesService.listByPatient(c.env.DB, jwt.tenant_id, patientId),
+      patientImagesService.countByPatient(c.env.DB, jwt.tenant_id, patientId),
+    ]);
+    return c.json({ items, total });
   },
 );
 
@@ -59,6 +62,7 @@ const imageUploadQuerySchema = z.object({
   patient_id: z.string().min(1),
   visit_id: z.string().min(1).optional(),
   image_type: z.enum(["cbct", "scan_3d", "dicom", "photo_before", "photo_after", "xray", "intraoral", "other"]),
+  image_purpose: z.enum(["clinical_record", "treatment_before", "treatment_after"]).default("clinical_record"),
   description: z.string().max(500).optional(),
   original_size: z.coerce.number().int().positive(),
 });

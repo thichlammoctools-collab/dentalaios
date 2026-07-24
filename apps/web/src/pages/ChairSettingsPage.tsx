@@ -34,7 +34,7 @@ type ChairForm = {
   is_active: boolean;
 };
 
-const CHAIR_TYPES: DentalChairType[] = ["general", "surgery", "orthodontic", "pediatric", "hygiene"];
+const CHAIR_TYPES: DentalChairType[] = ["general", "surgery", "orthodontic", "pediatric", "prosthodontics"];
 
 const STATUS_LABELS: Record<ChairOperationalStatus, string> = {
   available: "Sẵn sàng",
