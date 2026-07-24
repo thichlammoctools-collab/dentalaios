@@ -47,8 +47,8 @@ export type RoleName = (typeof ROLES)[keyof typeof ROLES];
  */
 export const SYSTEM_ROLES = [
   { key: ROLES.ADMIN, name: "Quản trị viên", permissions: ["all"] },
-  { key: ROLES.DOCTOR, name: "Bác sĩ", permissions: ["read_patients", "write_findings", "write_plans", "approve_plans"] },
-  { key: ROLES.ASSISTANT, name: "Phụ tá", permissions: ["read_patients", "write_visits"] },
+  { key: ROLES.DOCTOR, name: "Bác sĩ", permissions: ["read_patients", "write_findings", "write_plans", "approve_plans", "review_clinical_drafts", "sign_clinical_records", "manage_consents"] },
+  { key: ROLES.ASSISTANT, name: "Phụ tá", permissions: ["read_patients", "write_visits", "write_pre_exam_drafts"] },
   { key: ROLES.RECEPTIONIST, name: "Lễ tân", permissions: ["read_patients", "write_patients", "write_payments", "write_appointments"] },
   { key: "manager", name: "Quản lý", permissions: ["all"] },
   { key: "accountant", name: "Kế toán", permissions: ["read_patients", "write_payments"] },

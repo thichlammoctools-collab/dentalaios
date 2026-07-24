@@ -4,6 +4,7 @@ import type { D1Row } from "./base";
 
 export interface FindingsRepository {
   listByVisit(tenantId: string, visitId: string): Promise<ClinicalFinding[]>;
+  getByVisitAndId(tenantId: string, visitId: string, id: string): Promise<ClinicalFinding | null>;
   /** Cross-visit history of a single FDI tooth for one patient (findings + treatments). */
   listToothHistory(tenantId: string, patientId: string, toothNumber: number): Promise<ToothHistoryEntry[]>;
   create(
@@ -31,6 +32,14 @@ export function createFindingsRepository(db: D1Database): FindingsRepository {
         .bind(tenantId, visitId)
         .all();
       return (result.results as D1Row[]).map(mapFinding);
+    },
+
+    async getByVisitAndId(tenantId, visitId, id) {
+      const row = (await db
+        .prepare("SELECT * FROM clinical_findings WHERE tenant_id = ? AND visit_id = ? AND id = ? LIMIT 1")
+        .bind(tenantId, visitId, id)
+        .first()) as D1Row | null;
+      return row ? mapFinding(row) : null;
     },
 
     async listToothHistory(tenantId, patientId, toothNumber) {
@@ -188,7 +197,7 @@ function mapFinding(row: D1Row): ClinicalFinding {
   };
 }
 
-async function allocateFindingCode(db: D1Database, tenantId: string): Promise<string> {
+export async function allocateFindingCode(db: D1Database, tenantId: string): Promise<string> {
   const dateKey = hoChiMinhDateKey();
   const row = await db.prepare(
     `INSERT INTO clinical_document_code_counters (tenant_id, document_type, date_key, last_seq)

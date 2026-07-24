@@ -160,7 +160,7 @@ function mapPlan(row: D1Row): TreatmentPlan {
   };
 }
 
-async function allocateTreatmentPlanCode(db: D1Database, tenantId: string): Promise<string> {
+export async function allocateTreatmentPlanCode(db: D1Database, tenantId: string): Promise<string> {
   const dateKey = new Date().toISOString().slice(0, 10).replaceAll("-", "");
   const row = await db.prepare(`INSERT INTO clinical_document_code_counters (tenant_id, document_type, date_key, last_seq)
     VALUES (?, 'treatment_plan', ?, 1)

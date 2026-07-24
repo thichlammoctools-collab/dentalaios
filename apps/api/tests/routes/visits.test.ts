@@ -479,3 +479,23 @@ describe("PATCH /api/visits/:id", () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe("PATCH /api/visits/:visitId/findings/:findingId — integrity", () => {
+  const visitRow = (overrides: Record<string, unknown> = {}) => ({ id: "visit-1", tenant_id: "test-tenant", patient_id: "patient-1", status: "in_progress", ...overrides });
+
+  it("returns 404 when updating a finding from another visit in the same tenant", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    // This finding belongs to visit-2, not visit-1.
+    const res = await authedRequestWithDB(
+      app,
+      "PATCH",
+      "/api/visits/visit-1/findings/cross-finding",
+      new Map([
+        ["FROM visits", [visitRow()]],
+        ["WHERE tenant_id = ? AND visit_id = ? AND id = ?", []],
+      ]),
+      { permissions: ["write_findings"], body: { condition: "updated" } },
+    );
+    expect(res.status).toBe(404);
+  });
+});

@@ -48,6 +48,7 @@ interface EditableItem {
   procedure: string;
   description: string;
   cost: number;
+  estimated_duration_min?: number;
 }
 
 const PROCEDURE_OPTIONS = [
@@ -564,6 +565,7 @@ export function VisitDetailPage() {
         procedure: item.procedure,
         description: item.description,
         cost: item.cost,
+        estimated_duration_min: item.estimated_duration_min,
       })));
       setPlanNotes(result.notes);
     } catch (err) {
@@ -576,29 +578,36 @@ export function VisitDetailPage() {
 
   async function onSavePlan() {
     if (!visit) return;
+    const invalidItems = editableItems.filter((item) => !Number.isInteger(item.estimated_duration_min) || (item.estimated_duration_min ?? 0) < 1 || (item.estimated_duration_min ?? 0) > 480);
+    if (invalidItems.length > 0) {
+      toast.error("Mỗi hạng mục cần có định mức từ 1 đến 480 phút trước khi lưu.");
+      return;
+    }
     setSavingPlan(true);
     try {
-      const plan = await apiPost<TreatmentPlan>("/api/treatment-plans", {
-        visit_id: visit.id,
-        patient_id: visit.patient_id,
-        currency: "VND",
+      const { plan } = await apiPost<{ plan: TreatmentPlan }>("/api/treatment-plans/batch", {
+        plan: {
+          visit_id: visit.id,
+          patient_id: visit.patient_id,
+          currency: "VND",
+          notes: planNotes || undefined,
+        },
+        items: editableItems.map((item) => ({
+          tooth_number: item.tooth,
+          service_code: item.service_code,
+          procedure: item.procedure,
+          description: item.description,
+          unit_cost: item.cost,
+          estimated_duration_min: item.estimated_duration_min,
+          treating_clinician_id: visit.treating_clinician_id ?? null,
+          assistant_id: visit.assistant_id ?? null,
+        })),
       });
-      for (const item of editableItems) {
-          await apiPost(`/api/treatment-plans/${plan.id}/items`, {
-            tooth_number: item.tooth,
-            service_code: item.service_code,
-            procedure: item.procedure,
-            description: item.description,
-            unit_cost: item.cost,
-            treating_clinician_id: visit.treating_clinician_id ?? null,
-            assistant_id: visit.assistant_id ?? null,
-          });
-      }
       toast.success("Đã lưu kế hoạch điều trị AI. Đang mở chi tiết kế hoạch.");
       setPlanDialogOpen(false);
       navigate(withPatientReturnContext(`/treatment-plans/${plan.id}`, visit.patient_id, "plans"));
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Loi luu kế hoạch");
+      toast.error(err instanceof ApiError ? err.message : "Loi luu ke hoach");
     } finally {
       setSavingPlan(false);
     }
@@ -607,7 +616,7 @@ export function VisitDetailPage() {
   function addItem() {
     setEditableItems((prev) => [
       ...prev,
-        { id: `temp-${Date.now()}`, tooth: null, procedure: "examination", description: "", cost: 0 },
+        { id: `temp-${Date.now()}`, tooth: null, procedure: "examination", description: "", cost: 0, estimated_duration_min: undefined },
     ]);
   }
 
@@ -1057,6 +1066,7 @@ export function VisitDetailPage() {
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-white/80 w-14">Rang</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-white/80 w-36">Thủ thuật</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-white/80">Mô tả</th>
+                        <th className="px-3 py-2.5 text-right text-xs font-semibold text-white/80 w-24">Phút</th>
                         <th className="px-3 py-2.5 text-right text-xs font-semibold text-white/80 w-32">Chi phí</th>
                         <th className="w-10"></th>
                       </tr>
@@ -1094,6 +1104,18 @@ export function VisitDetailPage() {
                                 onChange={(e) => updateItem(item.id, "description", e.target.value)}
                                 className="h-8 text-xs border-slate-200 dark:border-zinc-700 dark:bg-zinc-800 min-w-0"
                                 placeholder="Mô tả điều trị"
+                              />
+                            </td>
+                            <td className="px-3 py-2">
+                              <Input
+                                type="number"
+                                value={item.estimated_duration_min ?? ""}
+                                onChange={(e) => updateItem(item.id, "estimated_duration_min", e.target.value ? Number(e.target.value) : null)}
+                                className="h-8 w-20 text-right text-xs border-slate-200 dark:border-zinc-700 dark:bg-zinc-800 font-mono"
+                                min={1}
+                                max={480}
+                                step={1}
+                                aria-label="Định mức phút"
                               />
                             </td>
                             <td className="px-3 py-2">

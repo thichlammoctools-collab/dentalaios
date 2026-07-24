@@ -11,12 +11,24 @@ import type { PatientImage } from "@shared/types";
 import type { PatientImageCreateInput } from "@shared/validation";
 import { createPatientImagesRepository } from "../repositories/patient-images.repo";
 import { filesService } from "./files.service";
-import { NotFoundError } from "../lib/errors";
+import { NotFoundError, ValidationError } from "../lib/errors";
 import { assertAllInTenant } from "../lib/tenant-scope";
 import { newId } from "../lib/ids";
 import { imageAnnotationsService } from "./image-annotations.service";
 
 const MAX_IMAGE_SIZE = 50 * 1024 * 1024; // 50 MB
+
+/** Ensure a visit (when provided) belongs to the same patient; prevents cross-patient/visit linkage. */
+async function assertVisitBelongsToPatient(db: D1Database, tenantId: string, visitId: string | undefined, patientId: string): Promise<void> {
+  if (!visitId) return;
+  const row = await db
+    .prepare("SELECT patient_id FROM visits WHERE tenant_id = ? AND id = ? LIMIT 1")
+    .bind(tenantId, visitId)
+    .first<{ patient_id: string }>();
+  if (!row || row.patient_id !== patientId) {
+    throw new ValidationError("visit và patient không khớp nhau");
+  }
+}
 
 export const patientImagesService = {
   async listByPatient(
@@ -82,6 +94,7 @@ export const patientImagesService = {
       { table: "visits", id: data.visit_id ?? undefined },
       { table: "file_objects", id: data.file_id },
     ]);
+    await assertVisitBelongsToPatient(db, tenantId, data.visit_id, data.patient_id);
     return createPatientImagesRepository(db).create(tenantId, {
       ...data,
       uploaded_by: userId,
@@ -114,6 +127,7 @@ export const patientImagesService = {
       { table: "patients", id: input.patient_id },
       { table: "visits", id: input.visit_id ?? undefined },
     ]);
+    await assertVisitBelongsToPatient(db, tenantId, input.visit_id, input.patient_id);
     const safeFilename = input.filename.replace(/[^a-zA-Z0-9._-]/g, "_") || "image";
     const fileId = newId();
     const r2Key = `tenant-${tenantId}/patient-images/${fileId}-${safeFilename}`;

@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { diagnosisCreateSchema, diagnosisImageEvidenceCreateSchema, diagnosisUpdateSchema, visitCreateSchema, visitUpdateSchema, findingCreateSchema, findingUpdateSchema } from "@shared/validation";
+import { diagnosisCreateSchema, diagnosisImageEvidenceCreateSchema, diagnosisUpdateSchema, findingCreateSchema, findingUpdateSchema, findingsBatchCreateSchema, visitCreateSchema, visitUpdateSchema } from "@shared/validation";
 import { PERMISSIONS } from "@shared/constants";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
@@ -152,6 +152,19 @@ router.get(
     const jwt = getJwt(c);
     const items = await diagnosisService.revisions(c.env.DB, jwt.tenant_id, c.req.param("visitId"), c.req.param("diagnosisId"));
     return c.json({ items, total: items.length });
+  },
+);
+
+// POST /api/visits/:id/findings/batch — validate all findings before any insert.
+router.post(
+  "/:id/findings/batch",
+  requirePermission(PERMISSIONS.WRITE_FINDINGS),
+  auditLog("create_batch", "clinical_finding"),
+  zValidator("json", findingsBatchCreateSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const created = await visitService.addFindings(c.env.DB, jwt.tenant_id, c.req.param("id"), c.req.valid("json"));
+    return c.json({ items: created, total: created.length }, 201);
   },
 );
 

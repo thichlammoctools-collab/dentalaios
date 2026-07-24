@@ -13,11 +13,12 @@ import { createTreatmentPlansRepository } from "../repositories/treatment-plans.
 import { createTreatmentItemsRepository } from "../repositories/treatment-items.repo";
 import { createPatientsRepository } from "../repositories/patients.repo";
 import { createTreatmentServicesRepository } from "../repositories/treatment-service-prices.repo";
-import { NotFoundError } from "../lib/errors";
+import { NotFoundError, ValidationError } from "../lib/errors";
 import { aiModelConfigService } from "./ai-model-config.service";
 import { isValidFdiTooth } from "@shared/constants";
 import { getAnatomicalSiteLabel, getFindingCategory } from "@shared/constants/clinical-findings";
-import type { FindingCategory, FindingLocationDetails, FindingMeasurements, FindingScope } from "@shared/types";
+import { findingCreateSchema } from "@shared/validation";
+import type { AnatomicalSite, FindingCategory, FindingLocationDetails, FindingMeasurements, FindingScope } from "@shared/types";
 
 export interface SummarizeResult {
   summary: string;
@@ -32,6 +33,7 @@ export interface TreatmentPlanItemDraft {
   procedure: string;
   description: string;
   cost: number;
+  estimated_duration_min?: number;
 }
 
 export interface GeneratePlanResult {
@@ -67,6 +69,8 @@ export interface AnalyzeImageResult {
 }
 
 // ─── Utilities ───────────────────────────────────────────────────
+
+const AI_ANALYZABLE_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 function uint8ArrayToBase64(bytes: Uint8Array): string {
   let binary = "";
@@ -308,24 +312,38 @@ QUY TẮC QUAN TRỌNG:
       .first<{ r2_key: string; content_type: string }>();
     if (!file) throw new NotFoundError("Image file not found");
 
-    // Step 2: Fetch the tenant-scoped image from R2.
+    // Confirm this file is attached to a tenant patient-image record before
+    // reading private storage. Arbitrary file_objects are never AI input.
+    const imageRecord = await db
+      .prepare("SELECT id FROM patient_images WHERE tenant_id = ? AND file_id = ? LIMIT 1")
+      .bind(tenantId, fileId)
+      .first<{ id: string }>();
+    if (!imageRecord) throw new NotFoundError("Image file not found in patient records");
+
+    // Step 2: Fetch only a supported raster image from tenant-scoped R2 storage.
     let imageBase64: string | null = null;
-    let mimeType = file.content_type || "image/jpeg";
+    let mimeType = file.content_type.toLowerCase();
+    if (!AI_ANALYZABLE_IMAGE_TYPES.has(mimeType)) {
+      throw new ValidationError("AI chỉ hỗ trợ ảnh JPEG, PNG hoặc WebP. DICOM/CBCT phải được mở bằng PACS hoặc viewer chuyên dụng.");
+    }
     if (FILES) {
       try {
         const r2Obj = await FILES.get(file.r2_key);
         if (r2Obj && "arrayBuffer" in r2Obj) {
+          const contentType = (r2Obj as R2ObjectBody).httpMetadata?.contentType?.toLowerCase();
+          if (contentType && !AI_ANALYZABLE_IMAGE_TYPES.has(contentType)) {
+            throw new ValidationError("AI chỉ hỗ trợ ảnh JPEG, PNG hoặc WebP. DICOM/CBCT phải được mở bằng PACS hoặc viewer chuyên dụng.");
+          }
+          mimeType = contentType ?? mimeType;
           const buf = await (r2Obj as R2ObjectBody).arrayBuffer();
-          // Limit to 5MB to avoid token limits
           const MAX_SIZE = 5 * 1024 * 1024;
-          const truncated = buf.byteLength > MAX_SIZE ? buf.slice(0, MAX_SIZE) : buf;
-          const bytes = new Uint8Array(truncated);
-          imageBase64 = uint8ArrayToBase64(bytes);
-          // Try to detect mime type from content-type header
-          const ct = (r2Obj as R2ObjectBody).httpMetadata?.contentType;
-          if (ct) mimeType = ct;
+          if (buf.byteLength > MAX_SIZE) {
+            throw new ValidationError("Ảnh vượt giới hạn 5 MB cho phân tích AI. Hãy dùng ảnh raster nhỏ hơn hoặc preview được tạo bởi pipeline chuyên dụng.");
+          }
+          imageBase64 = uint8ArrayToBase64(new Uint8Array(buf));
         }
-      } catch {
+      } catch (error) {
+        if (error instanceof ValidationError) throw error;
         throw new NotFoundError("Image file missing in storage");
       }
     }
@@ -409,14 +427,6 @@ function summaryFindingLocation(finding: SummaryData["findings"][number]): strin
   const category = getFindingCategory(finding.category).label;
   if (finding.scope === "full_mouth") return category;
   return `${category} (${getAnatomicalSiteLabel(finding.anatomical_site as never)})`;
-}
-
-function isFindingCategory(value: unknown): value is FindingCategory {
-  return ["tooth_hard_tissue", "periodontal", "oral_soft_tissue", "occlusion_orthodontics", "tmj_function", "preventive_general"].includes(String(value));
-}
-
-function isFindingScope(value: unknown): value is FindingScope {
-  return value === "tooth" || value === "region" || value === "full_mouth";
 }
 
 function buildSummaryData(opts: {
@@ -583,9 +593,11 @@ function parseAiPlanResponse(
           tooth,
           service_code: service?.code,
           service_name: service?.name,
-          procedure: service?.procedure ?? requestedProcedure,
-          description,
-          cost: service?.price ?? requestedCost,
+           procedure: service?.procedure ?? requestedProcedure,
+           description,
+           cost: service?.price ?? requestedCost,
+           estimated_duration_min: service?.estimated_duration_min,
+
         }];
       }),
       notes: String(parsed.notes || ""),
@@ -604,27 +616,34 @@ function parseFdiTooth(value: unknown): number | null | undefined {
   return Number.isInteger(tooth) && isValidFdiTooth(tooth) ? tooth : undefined;
 }
 
-function parseAnalyzeImageResponse(raw: string): { analysis: string; findings: ImageAnalysisFinding[] } | null {
+export function parseAnalyzeImageResponse(raw: string): { analysis: string; findings: ImageAnalysisFinding[] } | null {
   try {
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
     const parsed = JSON.parse(jsonMatch[0]);
-    return {
-      analysis: String(parsed.analysis || ""),
-      findings: Array.isArray(parsed.findings)
-        ? parsed.findings.map((f: Record<string, unknown>) => ({
-            tooth_number: f.tooth_number == null ? null : (Number(f.tooth_number) || 0),
-            category: isFindingCategory(f.category) ? f.category : "tooth_hard_tissue",
-            scope: isFindingScope(f.scope) ? f.scope : "tooth",
-            anatomical_site: f.anatomical_site ? String(f.anatomical_site) : undefined,
-            location_details: typeof f.location_details === "object" && f.location_details !== null ? f.location_details as FindingLocationDetails : undefined,
-            measurements: typeof f.measurements === "object" && f.measurements !== null ? f.measurements as FindingMeasurements : undefined,
-            condition: String(f.condition || "Không xác định"),
-            description: String(f.description || ""),
-            recommendation: String(f.recommendation || ""),
-          }))
-        : [],
-    };
+    const findings = Array.isArray(parsed.findings)
+      ? parsed.findings.flatMap((f: Record<string, unknown>) => {
+          const candidate = {
+            tooth_number: f.tooth_number == null ? null : Number(f.tooth_number),
+            category: f.category,
+            scope: f.scope,
+            anatomical_site: f.anatomical_site,
+            location_details: f.location_details,
+            measurements: f.measurements,
+            condition: typeof f.condition === "string" ? f.condition.trim() : "",
+          };
+          const validated = findingCreateSchema.safeParse(candidate);
+          if (!validated.success) return [];
+          return [{
+            ...validated.data,
+            tooth_number: validated.data.tooth_number,
+            anatomical_site: validated.data.anatomical_site as AnatomicalSite | undefined,
+            description: typeof f.description === "string" ? f.description : "",
+            recommendation: typeof f.recommendation === "string" ? f.recommendation : "",
+          }];
+        })
+      : [];
+    return { analysis: String(parsed.analysis || ""), findings };
   } catch {
     return null;
   }
@@ -676,9 +695,11 @@ function buildFallbackPlan(
       tooth: finding?.tooth_number ?? null,
       service_code: service?.code,
       service_name: service?.name,
-      procedure: service?.procedure ?? procedure,
-      description: `${label} ${loc}${diagnosis.notes ? ` — ${diagnosis.notes}` : ""}`,
-      cost: service?.price ?? found?.cost ?? 200000,
+       procedure: service?.procedure ?? procedure,
+       description: `${label} ${loc}${diagnosis.notes ? ` — ${diagnosis.notes}` : ""}`,
+       cost: service?.price ?? found?.cost ?? 200000,
+       estimated_duration_min: service?.estimated_duration_min,
+
     }];
   });
 

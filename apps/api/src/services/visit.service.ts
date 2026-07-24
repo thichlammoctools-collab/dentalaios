@@ -1,8 +1,8 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import type { Visit, ClinicalFinding } from "@shared/types";
-import type { VisitCreateInput, VisitUpdateInput, FindingCreateInput, FindingUpdateInput } from "@shared/validation";
+import type { VisitCreateInput, VisitUpdateInput, FindingCreateInput, FindingUpdateInput, FindingsBatchCreateInput } from "@shared/validation";
 import { createVisitsRepository } from "../repositories/visits.repo";
-import { createFindingsRepository } from "../repositories/findings.repo";
+import { allocateFindingCode, createFindingsRepository } from "../repositories/findings.repo";
 import { createDiagnosesRepository } from "../repositories/diagnoses.repo";
 import { createClinicalTerminologyRepository } from "../repositories/clinical-terminology.repo";
 import { createAppointmentsRepository } from "../repositories/appointments.repo";
@@ -155,6 +155,50 @@ export const visitService = {
     });
   },
 
+  async addFindings(
+    db: D1Database,
+    tenantId: string,
+    visitId: string,
+    data: FindingsBatchCreateInput,
+  ): Promise<ClinicalFinding[]> {
+    // Validate all foreign references/concepts before the first write.
+    const visit = await createVisitsRepository(db).getById(tenantId, visitId);
+    if (!visit) throw new NotFoundError("Visit not found");
+    const terminology = createClinicalTerminologyRepository(db);
+    const resolved = await Promise.all(data.findings.map(async (finding) => {
+      const concept = finding.concept_id ? await terminology.getConcept(finding.concept_id) : null;
+      if (finding.concept_id && (!concept || !concept.is_active)) {
+        throw new ValidationError("Khái niệm lâm sàng không còn hoạt động");
+      }
+      if (concept && (concept.category !== finding.category || concept.default_scope !== finding.scope)) {
+        throw new ValidationError("Khái niệm không phù hợp với nhóm hoặc phạm vi finding");
+      }
+      if (concept?.kind === "diagnosis") {
+        throw new ValidationError("Chẩn đoán cần được xác nhận qua hồ sơ diagnosis riêng");
+      }
+      return { finding, concept };
+    }));
+
+    const rows = [] as Array<{ id: string; code: string; finding: FindingCreateInput; concept: Awaited<ReturnType<typeof terminology.getConcept>> }>;
+    for (const { finding, concept } of resolved) {
+      rows.push({ id: crypto.randomUUID(), code: await allocateFindingCode(db, tenantId), finding, concept });
+    }
+    await db.batch(rows.map(({ id, code, finding, concept }) => db
+      .prepare(`INSERT INTO clinical_findings
+        (id, code, tenant_id, visit_id, category, scope, tooth_number, tooth_system, anatomical_site, location_details_json, measurements_json, condition, concept_id, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(
+        id, code, tenantId, visitId, finding.category, finding.scope, finding.tooth_number ?? null,
+        finding.scope === "tooth" ? "FDI" : null,
+        finding.category === "periodontal" && finding.scope === "tooth" ? "gum" : finding.anatomical_site ?? null,
+        finding.location_details ? JSON.stringify(finding.location_details) : null,
+        finding.measurements ? JSON.stringify(finding.measurements) : null,
+        concept?.legacy_condition ?? finding.condition, concept?.id ?? null, finding.notes ?? null,
+      ),
+    ));
+    return createFindingsRepository(db).listByVisit(tenantId, visitId);
+  },
+
   async updateFinding(
     db: D1Database,
     tenantId: string,
@@ -164,9 +208,13 @@ export const visitService = {
   ): Promise<ClinicalFinding> {
     const visit = await createVisitsRepository(db).getById(tenantId, visitId);
     if (!visit) throw new NotFoundError("Visit not found");
+    const findings = createFindingsRepository(db);
+    if (!await findings.getByVisitAndId(tenantId, visitId, findingId)) {
+      throw new NotFoundError("Finding not found");
+    }
     const concept = data.concept_id ? await createClinicalTerminologyRepository(db).getConcept(data.concept_id) : null;
     if (data.concept_id && (!concept || !concept.is_active)) throw new ValidationError("Khái niệm lâm sàng không còn hoạt động");
-    return createFindingsRepository(db).update(tenantId, findingId, {
+    return findings.update(tenantId, findingId, {
       condition: concept?.legacy_condition ?? data.condition,
       concept_id: data.concept_id ?? undefined,
       notes: data.notes ?? null,

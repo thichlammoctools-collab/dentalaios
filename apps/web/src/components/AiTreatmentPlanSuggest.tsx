@@ -14,6 +14,7 @@ export interface TreatmentPlanItemDraft {
   procedure: string;
   description: string;
   cost: number;
+  estimated_duration_min?: number;
 }
 
 export interface GeneratePlanResult {
@@ -50,6 +51,15 @@ export function AiTreatmentPlanSuggest({ visitId, onApply }: AiTreatmentPlanSugg
     } finally {
       setGenerating(false);
     }
+  }
+
+  function updateDuration(index: number, value: string) {
+    setResult((current) => current ? {
+      ...current,
+      items: current.items.map((item, itemIndex) => itemIndex === index
+        ? { ...item, estimated_duration_min: value === "" ? undefined : Number(value) }
+        : item),
+    } : current);
   }
 
   function toggleItem(index: number) {
@@ -134,6 +144,7 @@ export function AiTreatmentPlanSuggest({ visitId, onApply }: AiTreatmentPlanSugg
                     <TableHead>Răng</TableHead>
                     <TableHead>Thủ thuật</TableHead>
                     <TableHead>Mô tả</TableHead>
+                    <TableHead className="text-right">Phút</TableHead>
                     <TableHead className="text-right">Chi phí</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -168,6 +179,18 @@ export function AiTreatmentPlanSuggest({ visitId, onApply }: AiTreatmentPlanSugg
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {item.description}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <input
+                          type="number"
+                          value={item.estimated_duration_min ?? ""}
+                          onChange={(event) => updateDuration(idx, event.target.value)}
+                          min={1}
+                          max={480}
+                          step={1}
+                          aria-label="Định mức phút"
+                          className="h-8 w-20 rounded border border-input bg-background px-2 text-right text-sm"
+                        />
                       </TableCell>
                       <TableCell className="text-right font-medium">
                         {formatCurrency(item.cost, "VND")}

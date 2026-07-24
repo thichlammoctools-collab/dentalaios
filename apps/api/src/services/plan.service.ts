@@ -1,7 +1,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import type { TreatmentPlan, TreatmentPlanItem } from "@shared/types";
-import type { PlanCreateInput, PlanItemCreateInput, PlanItemUpdateInput } from "@shared/validation";
-import { createTreatmentPlansRepository } from "../repositories/treatment-plans.repo";
+import type { PlanBatchCreateInput, PlanCreateInput, PlanItemCreateInput, PlanItemUpdateInput } from "@shared/validation";
+import { allocateTreatmentPlanCode, createTreatmentPlansRepository } from "../repositories/treatment-plans.repo";
 import { createTreatmentItemsRepository } from "../repositories/treatment-items.repo";
 import { createTreatmentServicesRepository } from "../repositories/treatment-service-prices.repo";
 import { NotFoundError, ValidationError } from "../lib/errors";
@@ -50,6 +50,77 @@ export const planService = {
     });
   },
 
+  async createWithItems(
+    db: D1Database,
+    tenantId: string,
+    data: PlanBatchCreateInput,
+  ): Promise<{ plan: TreatmentPlan; items: TreatmentPlanItem[] }> {
+    await assertAllInTenant(db, tenantId, [
+      { table: "visits", id: data.plan.visit_id },
+      { table: "patients", id: data.plan.patient_id },
+      ...data.items.flatMap((item) => [
+        { table: "users" as const, id: item.treating_clinician_id ?? undefined },
+        { table: "users" as const, id: item.assistant_id ?? undefined },
+      ]),
+    ]);
+    const visit = await db
+      .prepare("SELECT patient_id FROM visits WHERE tenant_id = ? AND id = ? LIMIT 1")
+      .bind(tenantId, data.plan.visit_id)
+      .first<{ patient_id: string }>();
+    if (!visit || visit.patient_id !== data.plan.patient_id) {
+      throw new ValidationError("patient_id không khớp với visit");
+    }
+
+    const services = createTreatmentServicesRepository(db);
+    const resolvedItems = await Promise.all(data.items.map(async (item) => {
+      const service = item.service_code ? await services.getActiveByCode(tenantId, item.service_code) : null;
+      if (item.service_code && !service) {
+        throw new ValidationError("Mã dịch vụ không hợp lệ hoặc đã ngừng áp dụng");
+      }
+      await assertTreatmentPersonnel(db, tenantId, {
+        treatingClinicianId: item.treating_clinician_id ?? undefined,
+        assistantId: item.assistant_id ?? undefined,
+      });
+      return {
+        id: crypto.randomUUID(),
+        tooth_number: item.tooth_number,
+        service_code: service?.code,
+        service_name: service?.name,
+        procedure: service?.procedure ?? item.procedure,
+        description: item.description,
+        unit_cost: service?.price ?? item.unit_cost,
+        estimated_duration_min: service?.estimated_duration_min ?? item.estimated_duration_min,
+        treating_clinician_id: item.treating_clinician_id ?? null,
+        assistant_id: item.assistant_id ?? null,
+      };
+    }));
+
+    const planId = crypto.randomUUID();
+    const planCode = await allocateTreatmentPlanCode(db, tenantId);
+    const totalCost = resolvedItems.reduce((sum, item) => sum + item.unit_cost, 0);
+    const statements = [
+      db.prepare(`INSERT INTO treatment_plans
+        (id, code, tenant_id, visit_id, patient_id, total_cost, currency, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(planId, planCode, tenantId, data.plan.visit_id, data.plan.patient_id, totalCost, data.plan.currency, data.plan.notes ?? null),
+      ...resolvedItems.flatMap((item) => [
+        db.prepare(`INSERT INTO treatment_plan_items
+          (id, tenant_id, treatment_plan_id, tooth_number, procedure, description, unit_cost, estimated_duration_min, treating_clinician_id, assistant_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          .bind(item.id, tenantId, planId, item.tooth_number, item.procedure, item.description, item.unit_cost, item.estimated_duration_min, item.treating_clinician_id, item.assistant_id),
+        db.prepare(`INSERT INTO treatment_plan_item_price_snapshots
+          (treatment_plan_item_id, tenant_id, service_code, service_name, price_includes_vat)
+          VALUES (?, ?, ?, ?, 1)`)
+          .bind(item.id, tenantId, item.service_code ?? null, item.service_name ?? null),
+      ]),
+    ];
+    await db.batch(statements);
+
+    const plan = await this.get(db, tenantId, planId);
+    const items = await this.listItems(db, tenantId, planId);
+    return { plan, items };
+  },
+
   async addItem(
     db: D1Database,
     tenantId: string,
@@ -91,6 +162,71 @@ export const planService = {
     // Recompute total in same tenant scope
     await plans.recomputeTotal(tenantId, planId);
     return item;
+  },
+
+  async addItems(
+    db: D1Database,
+    tenantId: string,
+    planId: string,
+    items: PlanItemCreateInput[],
+  ): Promise<TreatmentPlanItem[]> {
+    const plans = createTreatmentPlansRepository(db);
+    const plan = await plans.getById(tenantId, planId);
+    if (!plan) throw new NotFoundError("Treatment plan not found");
+    if (plan.status !== "draft") {
+      throw new ValidationError("Chỉ có thể thêm item khi plan đang ở trạng thái draft");
+    }
+
+    const services = createTreatmentServicesRepository(db);
+    const resolvedItems = [] as Array<{
+      id: string;
+      data: PlanItemCreateInput;
+      service: Awaited<ReturnType<typeof services.getActiveByCode>>;
+    }>;
+
+    for (const data of items) {
+      const service = data.service_code ? await services.getActiveByCode(tenantId, data.service_code) : null;
+      if (data.service_code && !service) {
+        throw new ValidationError("Mã dịch vụ không hợp lệ hoặc đã ngừng áp dụng");
+      }
+      await assertAllInTenant(db, tenantId, [
+        { table: "users", id: data.treating_clinician_id ?? undefined },
+        { table: "users", id: data.assistant_id ?? undefined },
+      ]);
+      await assertTreatmentPersonnel(db, tenantId, {
+        treatingClinicianId: data.treating_clinician_id ?? undefined,
+        assistantId: data.assistant_id ?? undefined,
+      });
+      resolvedItems.push({ id: crypto.randomUUID(), data, service });
+    }
+
+    const statements = resolvedItems.flatMap(({ id, data, service }) => [
+      db.prepare(
+        `INSERT INTO treatment_plan_items
+            (id, tenant_id, treatment_plan_id, tooth_number, procedure, description, unit_cost, estimated_duration_min,
+             treating_clinician_id, assistant_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        id, tenantId, planId, data.tooth_number ?? null, service?.procedure ?? data.procedure,
+        data.description, service?.price ?? data.unit_cost, service?.estimated_duration_min ?? data.estimated_duration_min,
+        data.treating_clinician_id ?? null, data.assistant_id ?? null,
+      ),
+      db.prepare(
+        `INSERT INTO treatment_plan_item_price_snapshots
+            (treatment_plan_item_id, tenant_id, service_code, service_name, price_includes_vat)
+          VALUES (?, ?, ?, ?, ?)`,
+      ).bind(id, tenantId, service?.code ?? null, service?.name ?? null, 1),
+    ]);
+    statements.push(
+      db.prepare(
+        `UPDATE treatment_plans
+            SET total_cost = COALESCE((SELECT SUM(unit_cost) FROM treatment_plan_items WHERE tenant_id = ? AND treatment_plan_id = ?), 0),
+                updated_at = datetime('now')
+          WHERE tenant_id = ? AND id = ?`,
+      ).bind(tenantId, planId, tenantId, planId),
+    );
+    await db.batch(statements);
+    return createTreatmentItemsRepository(db).listByPlan(tenantId, planId);
   },
 
   async removeItem(db: D1Database, tenantId: string, planId: string, itemId: string): Promise<boolean> {

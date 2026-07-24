@@ -452,7 +452,7 @@ export function ReferralProgramsPage() {
         )}
       </div>
       <Dialog open={open} onOpenChange={setOpen} size="workspace">
-        <form onSubmit={save}>
+        <form onSubmit={save} className="flex min-h-0 flex-1 flex-col">
           <DialogHeader>
             <DialogTitle>Tạo chương trình giới thiệu</DialogTitle>
             <DialogDescription>

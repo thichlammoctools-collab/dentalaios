@@ -395,6 +395,10 @@ export function PatientImageGallery({
   }
 
   async function handleAnalyze(img: PatientImage) {
+    if (!isAiAnalyzableImage(img)) {
+      toast.error("DICOM/CBCT chỉ được lưu trữ và phải mở bằng PACS hoặc viewer chuyên dụng.");
+      return;
+    }
     setAnalyzing(true);
     setAnalysisResult(null);
     try {
@@ -417,8 +421,8 @@ export function PatientImageGallery({
   async function handleSaveFindings(result: AnalyzeImageResult) {
     if (!visitId || result.findings.length === 0) return;
     try {
-      await Promise.all(result.findings.map((f) =>
-        apiPost(`/api/visits/${visitId}/findings`, {
+      await apiPost(`/api/visits/${visitId}/findings/batch`, {
+        findings: result.findings.map((f) => ({
           tooth_number: f.tooth_number,
           category: f.category,
           scope: f.scope,
@@ -427,13 +431,23 @@ export function PatientImageGallery({
           measurements: f.measurements,
           condition: f.condition,
           notes: `${f.description}\nĐề xuất: ${f.recommendation}`,
-        }),
-      ));
+        })),
+      });
       toast.success(`Đã lưu ${result.findings.length} clinical finding(s)`);
       setAnalysisResult(null);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Lỗi lưu findings");
+      toast.error(err instanceof ApiError ? err.message : "Không thể lưu findings; không có finding nào được tạo.");
     }
+  }
+
+  const DICOM_TYPES = new Set(["dicom", "cbct", "scan_3d"]);
+
+  function isDicomType(img: PatientImage): boolean {
+    return DICOM_TYPES.has(img.image_type);
+  }
+
+  function isAiAnalyzableImage(img: PatientImage): boolean {
+    return !isDicomType(img);
   }
 
   const imageTypes = Object.entries(PATIENT_IMAGE_TYPE_LABELS) as [PatientImageType, string][];
@@ -642,7 +656,7 @@ export function PatientImageGallery({
             )}
           </div>
 
-          {viewUrl && selected && <section className="mb-4 rounded-xl border border-border p-3">
+          {viewUrl && selected && !isDicomType(selected) && <section className="mb-4 rounded-xl border border-border p-3">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold">Ghi chú trên ảnh</p><p className="text-xs text-muted-foreground">Mũi tên: bấm lên vị trí cần chỉ. Vẽ tự do: nhấn giữ và kéo trên ảnh.</p></div><div className="flex gap-1"><Button size="sm" variant={annotationShape === "pin" ? "default" : "outline"} onClick={() => { setAnnotationShape("pin"); setAnnotationGeometry(null); drawingFreehandRef.current = false; freehandPointsRef.current = []; }}>Mũi tên</Button><Button size="sm" variant={annotationShape === "freehand" ? "default" : "outline"} onClick={() => { setAnnotationShape("freehand"); setAnnotationGeometry(null); drawingFreehandRef.current = false; freehandPointsRef.current = []; }}>Vẽ tự do</Button></div></div>
             <textarea value={annotationNote} onChange={(event) => setAnnotationNote(event.target.value)} rows={2} placeholder="Mô tả dấu hiệu quan sát được trên ảnh" className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             <div className="mt-2 flex items-center justify-between gap-2"><p className="text-xs text-muted-foreground">{annotationGeometry ? "Đã tạo nét đánh dấu màu vàng, nhập ghi chú để lưu." : "Chưa tạo nét đánh dấu."}</p><Button size="sm" onClick={() => void saveAnnotation()} disabled={!annotationGeometry || !annotationNote.trim() || savingAnnotation}>{savingAnnotation ? "Đang lưu..." : "Lưu ghi chú"}</Button></div>
@@ -650,46 +664,53 @@ export function PatientImageGallery({
           </section>}
 
           {selected && <section className="mb-4 rounded-xl border border-border p-3">
-            <p className="text-sm font-semibold">Liên kết làm bằng chứng chẩn đoán</p><p className="mt-0.5 text-xs text-muted-foreground">Có thể liên kết ảnh hoặc ghi chú đã chọn với chẩn đoán ở bất kỳ lượt khám nào của bệnh nhân.</p>
-            <div className="mt-3 grid gap-2"><select value={selectedDiagnosisId} onChange={(event) => setSelectedDiagnosisId(event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="">Chọn chẩn đoán</option>{diagnosisOptions.map((diagnosis) => <option key={diagnosis.id} value={diagnosis.id}>{formatDate(diagnosis.visit_date)} · {diagnosis.concept_display_vi_snapshot} · {statusLabel(diagnosis.status)}</option>)}</select>
-              <select value={selectedAnnotationVersionId} onChange={(event) => setSelectedAnnotationVersionId(event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="">Toàn bộ ảnh (không có đánh dấu)</option>{annotations.map((annotation) => <option key={annotation.current_version.id} value={annotation.current_version.id}>Ghi chú V{annotation.current_version.version_no} · {annotation.current_version.note}</option>)}</select>
-              <select value={evidenceRelation} onChange={(event) => setEvidenceRelation(event.target.value as "supports" | "contradicts" | "incidental")} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="supports">Ủng hộ chẩn đoán</option><option value="contradicts">Mâu thuẫn với chẩn đoán</option><option value="incidental">Phát hiện kèm theo</option></select>
-              <textarea value={evidenceNote} onChange={(event) => setEvidenceNote(event.target.value)} rows={2} placeholder={evidenceRelation === "contradicts" ? "Giải thích bằng chứng mâu thuẫn" : "Ghi chú liên kết (tùy chọn)"} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
-              <Button size="sm" onClick={() => void linkEvidence()} disabled={!selectedDiagnosisId || linkingEvidence}>{linkingEvidence ? "Đang liên kết..." : "Liên kết bằng chứng"}</Button>
-            </div>
-            {imageEvidence.length > 0 && <div className="mt-3 border-t pt-3"><p className="text-xs font-medium text-muted-foreground">Đang được dùng làm bằng chứng ({imageEvidence.length})</p>{imageEvidence.map((evidence) => <p key={evidence.id} className="mt-1 text-xs">{evidence.relation === "supports" ? "Ủng hộ" : evidence.relation === "contradicts" ? "Mâu thuẫn" : "Kèm theo"} · {evidence.diagnosis_id}</p>)}</div>}
+            {!isDicomType(selected) ? (
+              <>
+                <p className="text-sm font-semibold">Ghi chú trên ảnh — chỉ áp dụng cho ảnh raster (JPEG/PNG/WebP)</p><p className="mt-0.5 text-xs text-muted-foreground">DICOM/CBCT phải được mở bằng PACS hoặc viewer chuyên dụng.</p>
+                <div className="mt-3 grid gap-2"><select value={selectedDiagnosisId} onChange={(event) => setSelectedDiagnosisId(event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="">Chọn chẩn đoán</option>{diagnosisOptions.map((diagnosis) => <option key={diagnosis.id} value={diagnosis.id}>{formatDate(diagnosis.visit_date)} · {diagnosis.concept_display_vi_snapshot} · {statusLabel(diagnosis.status)}</option>)}</select>
+                  <select value={selectedAnnotationVersionId} onChange={(event) => setSelectedAnnotationVersionId(event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="">Toàn bộ ảnh (không có đánh dấu)</option>{annotations.map((annotation) => <option key={annotation.current_version.id} value={annotation.current_version.id}>Ghi chú V{annotation.current_version.version_no} · {annotation.current_version.note}</option>)}</select>
+                  <select value={evidenceRelation} onChange={(event) => setEvidenceRelation(event.target.value as "supports" | "contradicts" | "incidental")} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="supports">Ủng hộ chẩn đoán</option><option value="contradicts">Mâu thuẫn với chẩn đoán</option><option value="incidental">Phát hiện kèm theo</option></select>
+                  <textarea value={evidenceNote} onChange={(event) => setEvidenceNote(event.target.value)} rows={2} placeholder={evidenceRelation === "contradicts" ? "Giải thích bằng chứng mâu thuẫn" : "Ghi chú liên kết (tùy chọn)"} className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+                  <Button size="sm" onClick={() => void linkEvidence()} disabled={!selectedDiagnosisId || linkingEvidence}>{linkingEvidence ? "Đang liên kết..." : "Liên kết bằng chứng"}</Button>
+                </div>
+                {imageEvidence.length > 0 && <div className="mt-3 border-t pt-3"><p className="text-xs font-medium text-muted-foreground">Đang được dùng làm bằng chứng ({imageEvidence.length})</p>{imageEvidence.map((evidence) => <p key={evidence.id} className="mt-1 text-xs">{evidence.relation === "supports" ? "Ủng hộ" : evidence.relation === "contradicts" ? "Mâu thuẫn" : "Kèm theo"} · {evidence.diagnosis_id}</p>)}</div>}
+              </>
+            ) : (
+              <p className="text-xs text-muted-foreground">Ảnh DICOM không hỗ trợ ghi chú trực tiếp trong DentalAIOS; hãy mở bằng PACS/viewer chuyên dụng.</p>
+            )}
           </section>}
 
-          {/* AI Analysis Result */}
-          {analysisResult && (
-            <div className="rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-50/50 dark:bg-teal-950/30 p-4 mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-teal-700 dark:text-teal-300">
-                  Kết quả phân tích AI
-                </p>
-                <Badge variant="outline" className="text-[10px]">{analysisResult.ai_model}</Badge>
-              </div>
-              <p className="text-sm mb-3">{analysisResult.analysis}</p>
-              {analysisResult.findings.length > 0 ? (
-                <div className="space-y-2 mb-3">
-                  {analysisResult.findings.map((f, i) => (
-                    <div key={i} className="text-sm bg-white/50 dark:bg-black/20 rounded-lg p-2">
-                      {f.tooth_number && <span className="font-bold mr-2">Răng #{f.tooth_number}</span>}
-                      <span className="font-medium">{f.condition}</span>
-                       {f.anatomical_site && <span className="text-muted-foreground ml-1">({f.anatomical_site})</span>}
-                      <p className="text-xs mt-0.5">{f.description}</p>
-                      {f.recommendation && (
-                        <p className="text-xs text-teal-600 dark:text-teal-400 mt-0.5">
-                          → {f.recommendation}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Không phát hiện bất thường</p>
-              )}
-              {visitId && analysisResult.findings.length > 0 && (
+{/* AI Analysis Result */}
+           {analysisResult && (
+             <div className="rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-50/50 dark:bg-teal-950/30 p-4 mb-4">
+               <div className="flex items-center justify-between mb-2">
+                 <p className="text-xs font-semibold text-teal-700 dark:text-teal-300">
+                   Kết quả phân tích AI
+                 </p>
+                 <Badge variant="outline" className="text-[10px]">{analysisResult.ai_model}</Badge>
+               </div>
+               <p className="text-sm mb-3">{analysisResult.analysis}</p>
+               <p className="text-xs text-orange-600 dark:text-orange-400 mb-3 font-medium">AI chỉ hỗ trợ quan sát sơ bộ, cần bác sĩ xác nhận; không thay thế chẩn đoán hình ảnh.</p>
+               {analysisResult.findings.length > 0 ? (
+                 <div className="space-y-2 mb-3">
+                   {analysisResult.findings.map((f, i) => (
+                     <div key={i} className="text-sm bg-white/50 dark:bg-black/20 rounded-lg p-2">
+                       {f.tooth_number && <span className="font-bold mr-2">Răng #{f.tooth_number}</span>}
+                       <span className="font-medium">{f.condition}</span>
+                        {f.anatomical_site && <span className="text-muted-foreground ml-1">({f.anatomical_site})</span>}
+                       <p className="text-xs mt-0.5">{f.description}</p>
+                       {f.recommendation && (
+                         <p className="text-xs text-teal-600 dark:text-teal-400 mt-0.5">
+                           → {f.recommendation}
+                         </p>
+                       )}
+                     </div>
+                   ))}
+                 </div>
+               ) : (
+                 <p className="text-sm text-muted-foreground">Không phát hiện bất thường</p>
+               )}
+               {visitId && analysisResult.findings.length > 0 && (
                 <Button
                   size="sm"
                   onClick={() => handleSaveFindings(analysisResult)}
@@ -714,7 +735,8 @@ export function PatientImageGallery({
           </Button>
           {selected && (
             <>
-              <Button
+              {isDicomType(selected) && <p className="mr-auto text-xs text-muted-foreground">DICOM/CBCT: chỉ lưu trữ; mở bằng PACS/viewer chuyên dụng.</p>}
+              {isAiAnalyzableImage(selected) && <Button
                 variant="outline"
                 onClick={() => handleAnalyze(selected)}
                 disabled={analyzing}
@@ -724,7 +746,7 @@ export function PatientImageGallery({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
                 Phân tích bằng AI
-              </Button>
+              </Button>}
               <Button
                 variant="destructive"
                 size="sm"

@@ -399,6 +399,11 @@ export const findingCreateSchema = z.object({
 
 export type FindingCreateInput = z.infer<typeof findingCreateSchema>;
 
+export const findingsBatchCreateSchema = z.object({
+  findings: z.array(findingCreateSchema).min(1).max(100),
+}).strict();
+export type FindingsBatchCreateInput = z.infer<typeof findingsBatchCreateSchema>;
+
 export const findingUpdateSchema = z.object({
   condition: nonEmpty(100),
   concept_id: z.string().min(1).nullable().optional(),
@@ -519,6 +524,18 @@ export const planItemUpdateSchema = planItemCreateSchema;
 
 export type PlanCreateInput = z.infer<typeof planCreateSchema>;
 export type PlanItemCreateInput = z.infer<typeof planItemCreateSchema>;
+
+export const planItemsBatchCreateSchema = z.object({
+  items: z.array(planItemCreateSchema).min(1).max(100),
+}).strict();
+
+export const planBatchCreateSchema = z.object({
+  plan: planCreateSchema,
+  items: z.array(planItemCreateSchema).min(1).max(100),
+}).strict();
+
+export type PlanItemsBatchCreateInput = z.infer<typeof planItemsBatchCreateSchema>;
+export type PlanBatchCreateInput = z.infer<typeof planBatchCreateSchema>;
 
 const treatmentCaseTypes = ["general", "implant", "orthodontics", "prosthodontics", "full_mouth", "other"] as const;
 

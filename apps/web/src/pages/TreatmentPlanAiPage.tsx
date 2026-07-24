@@ -43,9 +43,12 @@ export function TreatmentPlanAiPage() {
     const invalidItem = items.find((item) =>
       (item.tooth != null && !isValidFdiTooth(item.tooth))
       || !item.procedure.trim()
-      || !item.description.trim()
-      || !Number.isFinite(item.cost)
-      || item.cost < 0,
+       || !item.description.trim()
+       || !Number.isFinite(item.cost)
+       || item.cost < 0
+       || !Number.isInteger(item.estimated_duration_min)
+       || (item.estimated_duration_min ?? 0) < 1
+       || (item.estimated_duration_min ?? 0) > 480,
     );
     if (invalidItem) {
       toast.error("Một gợi ý AI có dữ liệu không hợp lệ. Vui lòng tạo lại gợi ý.");
@@ -53,16 +56,16 @@ export function TreatmentPlanAiPage() {
     }
     setApplying(true);
     try {
-      // Add each item to the plan
-      for (const item of items) {
-        await apiPost(`/api/treatment-plans/${plan.id}/items`, {
+      await apiPost(`/api/treatment-plans/${plan.id}/items/batch`, {
+        items: items.map((item) => ({
           tooth_number: item.tooth,
           service_code: item.service_code,
           procedure: item.procedure,
           description: item.description,
           unit_cost: item.cost,
-        });
-      }
+          estimated_duration_min: item.estimated_duration_min,
+        })),
+      });
       // Redirect back to plan detail
       navigate(`/treatment-plans/${plan.id}`);
     } catch (err) {

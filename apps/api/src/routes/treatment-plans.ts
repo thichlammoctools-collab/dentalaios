@@ -1,8 +1,10 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import {
+  planBatchCreateSchema,
   planCreateSchema,
   planItemCreateSchema,
+  planItemsBatchCreateSchema,
   planItemUpdateSchema,
   treatmentCaseActivateSchema,
   treatmentCaseCancelSchema,
@@ -158,6 +160,19 @@ router.post(
   },
 );
 
+// POST /api/treatment-plans/batch — create a draft and all validated items atomically.
+router.post(
+  "/batch",
+  requirePermission(PERMISSIONS.WRITE_PLANS),
+  auditLog("create_batch", "treatment_plan"),
+  zValidator("json", planBatchCreateSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const created = await planService.createWithItems(c.env.DB, jwt.tenant_id, c.req.valid("json"));
+    return c.json(created, 201);
+  },
+);
+
 // GET /api/treatment-plans/:id
 router.get(
   "/:id",
@@ -199,6 +214,20 @@ router.get(
     const jwt = getJwt(c);
     const items = await treatmentCasesService.listStatusHistory(c.env.DB, jwt.tenant_id, c.req.param("id"));
     return c.json({ items, total: items.length });
+  },
+);
+
+// POST /api/treatment-plans/:id/items/batch
+router.post(
+  "/:id/items/batch",
+  requirePermission(PERMISSIONS.WRITE_PLANS),
+  auditLog("create_batch", "treatment_plan_item"),
+  zValidator("json", planItemsBatchCreateSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const { items } = c.req.valid("json");
+    const created = await planService.addItems(c.env.DB, jwt.tenant_id, c.req.param("id"), items);
+    return c.json({ items: created, total: created.length }, 201);
   },
 );
 

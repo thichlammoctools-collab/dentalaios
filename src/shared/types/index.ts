@@ -1008,6 +1008,7 @@ export interface GeneratePlanItemDraft {
   procedure: string;
   description: string;
   cost: number;
+  estimated_duration_min?: number; // resolved from catalog or editor input
 }
 
 export interface GeneratePlanResult {
