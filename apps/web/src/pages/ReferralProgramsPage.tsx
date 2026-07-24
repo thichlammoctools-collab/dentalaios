@@ -24,6 +24,7 @@ import {
   ReferralEmpty,
   ReferrerTypeLabel,
 } from "@/components/referral/ReferralUi";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { formatDate } from "@/lib/utils";
 
 type RuleDraft = Pick<
@@ -618,19 +619,21 @@ export function ReferralProgramsPage() {
                       <option value="assistant">Phụ tá</option>
                       <option value="partner">Đối tác</option>
                     </select>
-                    <input
-                      type="number"
-                      min={0}
-                      aria-label={`Ngưỡng doanh thu cho bậc ${index + 1}`}
-                      placeholder="Ngưỡng doanh thu"
-                      value={rule.min_net_revenue}
-                      onChange={(event) =>
-                        updateRule(index, {
-                          min_net_revenue: Number(event.target.value),
-                        })
-                      }
-                      className="min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm lg:col-span-4"
-                    />
+                    <div className="min-w-0 lg:col-span-4">
+                      <CurrencyInput
+                        min={0}
+                        aria-label={`Ngưỡng doanh thu cho bậc ${index + 1}`}
+                        placeholder="VD: 1 000 000"
+                        value={rule.min_net_revenue}
+                        onChange={(value) =>
+                          updateRule(index, {
+                            min_net_revenue: value === "" ? 0 : value,
+                          })
+                        }
+                        className="w-full"
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">Doanh thu ròng tối thiểu (VND) để áp dụng bậc này.</p>
+                    </div>
                     <div className="grid min-w-0 gap-3 lg:col-span-6 lg:grid-cols-[minmax(7.5rem,0.9fr)_6rem_minmax(11rem,1.6fr)]">
                       <select
                         value={rule.reward_kind}
