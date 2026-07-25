@@ -28,6 +28,23 @@ interface PatientsResponse {
   total: number;
 }
 
+function StatusBadges({ p }: { p: PatientWithStatus }) {
+  const badges: { label: string; color: string }[] = [];
+  if (p.has_appointment_today) badges.push({ label: "Hôm nay", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" });
+  if (p.has_debt) badges.push({ label: "Công nợ", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" });
+  if (p.has_active_treatment) badges.push({ label: "Điều trị", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" });
+  if (badges.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {badges.map((b) => (
+        <span key={b.label} className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${b.color}`}>
+          {b.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function PatientRowSkeleton() {
   return (
     <TableRow>
@@ -35,7 +52,8 @@ function PatientRowSkeleton() {
       <TableCell className="hidden sm:table-cell"><div className="h-4 w-20 rounded animate-pulse bg-muted" /></TableCell>
       <TableCell className="hidden md:table-cell"><div className="h-4 w-24 rounded animate-pulse bg-muted" /></TableCell>
       <TableCell className="hidden lg:table-cell"><div className="h-4 w-12 rounded animate-pulse bg-muted" /></TableCell>
-      <TableCell className="hidden lg:table-cell"><div className="h-4 w-24 rounded animate-pulse bg-muted" /></TableCell>
+      <TableCell className="hidden xl:table-cell"><div className="h-4 w-24 rounded animate-pulse bg-muted" /></TableCell>
+      <TableCell className="hidden lg:table-cell"><div className="h-5 w-20 rounded animate-pulse bg-muted" /></TableCell>
       <TableCell><div className="h-7 w-14 rounded animate-pulse bg-muted" /></TableCell>
     </TableRow>
   );
@@ -283,6 +301,7 @@ export function PatientsPage() {
                         <p className="truncate font-medium text-primary">{p.name}</p>
                         <p className="mt-0.5 text-sm text-muted-foreground">{p.phone}</p>
                         <p className="mt-1 text-xs text-muted-foreground">Sinh {formatDate(p.date_of_birth)} · {p.gender === "M" ? "Nam" : p.gender === "F" ? "Nữ" : "Khác"}</p>
+                        <div className="mt-1.5"><StatusBadges p={p} /></div>
                       </Link>
                       <div className="flex shrink-0 items-center gap-1">
                         {!showArchived && <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => { setEditPatient(p); setOpenForm(true); }} aria-label={`Sửa ${p.name}`}>
@@ -304,9 +323,10 @@ export function PatientsPage() {
                   <TableRow>
                     <TableHead>Họ tên</TableHead>
                     <TableHead>SĐT</TableHead>
-                    <TableHead>Ngày sinh</TableHead>
-                    <TableHead>Giới tính</TableHead>
-                    <TableHead>Ngày tạo</TableHead>
+                    <TableHead className="hidden md:table-cell">Ngày sinh</TableHead>
+                    <TableHead className="hidden lg:table-cell">Giới tính</TableHead>
+                    <TableHead className="hidden xl:table-cell">Ngày tạo</TableHead>
+                    <TableHead className="hidden lg:table-cell">Trạng thái</TableHead>
                     <TableHead className="w-24"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -330,8 +350,8 @@ export function PatientsPage() {
                           </Link>
                         </TableCell>
                         <TableCell className="font-mono text-sm">{p.phone}</TableCell>
-                        <TableCell>{formatDate(p.date_of_birth)}</TableCell>
-                        <TableCell>
+                        <TableCell className="hidden md:table-cell">{formatDate(p.date_of_birth)}</TableCell>
+                        <TableCell className="hidden lg:table-cell">
                           <div className="flex items-center gap-1.5">
                             {p.gender === "M" ? (
                               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-600">M</span>
@@ -345,8 +365,11 @@ export function PatientsPage() {
                             </span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
+                        <TableCell className="hidden xl:table-cell text-sm text-muted-foreground">
                           {formatDate(p.created_at)}
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          <StatusBadges p={p} />
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
