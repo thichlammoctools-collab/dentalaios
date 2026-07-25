@@ -793,7 +793,7 @@ export function VisitDetailPage() {
               {visit.status}
             </Badge>
             <Badge variant="outline" className="capitalize">
-              {visit.clinical_state === "pre_exam" ? "Pre-exam nháp" : visit.clinical_state === "awaiting_doctor_review" ? "Chờ bác sĩ duyệt" : visit.clinical_state === "signed" ? "Đã ký khóa" : visit.clinical_state === "amended" ? "Đã đính chính" : visit.clinical_state}
+              {visit.clinical_state === "pre_exam" ? "Khám ban đầu - bản nháp" : visit.clinical_state === "awaiting_doctor_review" ? "Chờ bác sĩ duyệt" : visit.clinical_state === "signed" ? "Đã ký và khóa" : visit.clinical_state === "amended" ? "Đã đính chính" : visit.clinical_state === "in_progress" ? "Đang khám" : visit.clinical_state}
             </Badge>
           </div>
         </div>
@@ -891,8 +891,8 @@ export function VisitDetailPage() {
       {canSubmitPreExam && (
         <Card className="border-cyan-300 dark:border-cyan-800">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Pre-exam draft</CardTitle>
-            <p className="text-xs text-muted-foreground">Dữ liệu tại đây chưa là hồ sơ lâm sàng hiệu lực. Bác sĩ phải review trước khi dùng cho chẩn đoán và kế hoạch điều trị.</p>
+            <CardTitle className="text-base">Bản nháp khám ban đầu</CardTitle>
+            <p className="text-xs text-muted-foreground">Dữ liệu tại đây chưa là hồ sơ lâm sàng có hiệu lực. Bác sĩ phải duyệt trước khi dùng cho chẩn đoán và kế hoạch điều trị.</p>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
             <Textarea
@@ -903,7 +903,7 @@ export function VisitDetailPage() {
               placeholder="Lý do đến khám / than phiền chính của bệnh nhân"
             />
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-muted-foreground">{draftFindings.length > 0 ? `${draftFindings.length} finding draft đang chờ review.` : "Có thể nhập pre-exam trước khi bác sĩ khám."}</p>
+              <p className="text-xs text-muted-foreground">{draftFindings.length > 0 ? `${draftFindings.length} ghi nhận nháp đang chờ bác sĩ duyệt.` : "Có thể nhập thông tin khám ban đầu trước khi bác sĩ khám."}</p>
               <Button size="sm" onClick={() => void submitPreExam()} disabled={savingPreExam || !preExamChiefComplaint.trim()}>
                 {savingPreExam ? "Đang gửi..." : "Gửi bác sĩ duyệt"}
               </Button>
@@ -920,7 +920,7 @@ export function VisitDetailPage() {
                 <CardTitle className="text-base">Dữ liệu nháp chờ bác sĩ duyệt ({reviewQueue.length})</CardTitle>
                 <p className="mt-1 text-xs text-muted-foreground">Phụ tá hoặc AI đã tạo bản ghi nháp. Bác sĩ cần xác nhận hoặc bác bỏ để đưa vào hồ sơ chính thức.</p>
               </div>
-              <Badge variant="warning">{reviewQueue.length} mục pending</Badge>
+              <Badge variant="warning">{reviewQueue.length} mục chờ duyệt</Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
@@ -933,10 +933,10 @@ export function VisitDetailPage() {
                   </div>
                   <p className="font-medium text-foreground">
                     {item.event.entity_type === "finding"
-                      ? `Condition: ${(item.entity as ClinicalFinding).condition}${(item.entity as ClinicalFinding).tooth_number ? ` (Răng #${(item.entity as ClinicalFinding).tooth_number})` : ""}`
+                      ? `Tình trạng: ${(item.entity as ClinicalFinding).condition}${(item.entity as ClinicalFinding).tooth_number ? ` (Răng #${(item.entity as ClinicalFinding).tooth_number})` : ""}`
                       : item.event.entity_type === "diagnosis"
-                      ? `Concept: ${String((item.entity as Record<string, unknown>).concept_display_vi_snapshot ?? "")}`
-                      : `Chief complaint: ${String((item.entity as Record<string, unknown>).chief_complaint ?? "Khám tổng quát")}`}
+                      ? `Chẩn đoán: ${String((item.entity as Record<string, unknown>).concept_display_vi_snapshot ?? "")}`
+                      : `Lý do đến khám: ${String((item.entity as Record<string, unknown>).chief_complaint ?? "Khám tổng quát")}`}
                   </p>
                 </div>
                 {canReview ? (
