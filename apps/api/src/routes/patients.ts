@@ -26,6 +26,11 @@ router.get(
     const branchId = url.searchParams.get("branch_id") ?? undefined;
     const search = url.searchParams.get("search") ?? undefined;
     const archived = url.searchParams.get("archived") === "true";
+    const gender = url.searchParams.get("gender") ?? undefined;
+    const marketingSource = url.searchParams.get("marketing_source") ?? undefined;
+    const hasAppointmentToday = url.searchParams.get("has_appointment_today") === "true";
+    const hasDebt = url.searchParams.get("has_debt") === "true";
+    const hasActiveTreatment = url.searchParams.get("has_active_treatment") === "true";
     if (archived && !jwt.permissions.includes(PERMISSIONS.ALL) && !jwt.permissions.includes(PERMISSIONS.MANAGE_PATIENTS)) {
       throw new ForbiddenError(`Missing permission: ${PERMISSIONS.MANAGE_PATIENTS}`);
     }
@@ -35,6 +40,11 @@ router.get(
       branchId,
       search,
       archived,
+      gender,
+      marketingSource,
+      hasAppointmentToday: hasAppointmentToday || undefined,
+      hasDebt: hasDebt || undefined,
+      hasActiveTreatment: hasActiveTreatment || undefined,
     };
     const [items, total] = await Promise.all([
       patientService.list(c.env.DB, jwt.tenant_id, { ...pagination, limit, offset }),

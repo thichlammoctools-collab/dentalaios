@@ -565,13 +565,15 @@ export function SchedulePage() {
                     const dayAppts = (weekByDate.get(dayYmd) ?? []).sort((a, b) =>
                       a.scheduled_at.localeCompare(b.scheduled_at),
                     );
-                    const isToday = dayYmd === ymd(new Date());
+                    const todayYmd = ymd(now);
+                    const isToday = dayYmd === todayYmd;
+                    const isPastDay = dayYmd < todayYmd;
                     const isSelected = dayYmd === ymd(selectedDate);
                     const isExpanded = dayYmd === expandedWeekDay;
                     return (
                       <div
                         key={dayYmd}
-                        className={`flex min-h-[320px] flex-col rounded-lg border p-2 transition-colors hover:bg-accent/30 ${isExpanded ? "border-primary bg-primary/5 ring-1 ring-primary/20" : isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : isToday ? "border-amber-400 bg-amber-50/30" : "border-border"}`}
+                        className={`flex min-h-[320px] flex-col rounded-lg border p-2 transition-colors hover:bg-accent/30 ${isExpanded ? "border-primary bg-primary/5 ring-1 ring-primary/20" : isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/20" : isToday ? "border-amber-400 bg-amber-50/30" : isPastDay ? "border-border bg-muted/10" : "border-border"}`}
                         onClick={() => setSelectedDate(day)}
                         onDragOver={(event) => event.preventDefault()}
                         onDrop={(event) => void handleAppointmentDrop(event, day)}
@@ -618,7 +620,7 @@ export function SchedulePage() {
                                     event.dataTransfer.effectAllowed = "move";
                                     event.dataTransfer.setData("application/x-appointment-id", a.id);
                                   }}
-                                  className={`rounded-md border-l-2 px-2 py-1.5 text-xs transition-colors hover:bg-accent/50 ${statusBorderClass(a.status)} ${canMoveAppointment(a) ? "cursor-grab active:cursor-grabbing" : "cursor-default"}`}
+                                  className={`rounded-md border-l-2 px-2 py-1.5 text-xs transition-colors hover:bg-accent/50 ${statusBorderClass(a.status)} ${isPastDay ? "opacity-60 grayscale-[15%]" : ""} ${canMoveAppointment(a) ? "cursor-grab active:cursor-grabbing" : "cursor-default"}`}
                                 >
                                   <div className="flex items-center justify-between gap-1">
                                     <span className="font-mono font-semibold">{formatTime(a.scheduled_at)}</span>

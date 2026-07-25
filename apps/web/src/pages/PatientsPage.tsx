@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Select } from "@/components/ui/select";
 import { PatientForm } from "@/components/PatientForm";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { DEFAULT_PAGE_SIZE, Pagination } from "@/components/ui/pagination";
@@ -13,11 +14,17 @@ import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
 import { PageContainer } from "@/components/PageContainer";
 import type { Patient } from "@shared/types";
-import { PERMISSIONS } from "@shared/constants";
+import { PERMISSIONS, MARKETING_SOURCE_LABELS, type MarketingSource } from "@shared/constants";
 import { useAuth } from "@/lib/auth-context";
 
+interface PatientWithStatus extends Patient {
+  has_appointment_today: boolean;
+  has_debt: boolean;
+  has_active_treatment: boolean;
+}
+
 interface PatientsResponse {
-  items: Patient[];
+  items: PatientWithStatus[];
   total: number;
 }
 
@@ -36,7 +43,7 @@ function PatientRowSkeleton() {
 
 export function PatientsPage() {
   const { session } = useAuth();
-  const [patients, setPatients] = useState<Patient[]>([]);
+  const [patients, setPatients] = useState<PatientWithStatus[]>([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -44,16 +51,29 @@ export function PatientsPage() {
   const [openForm, setOpenForm] = useState(false);
   const [editPatient, setEditPatient] = useState<Patient | undefined>(undefined);
   const [showArchived, setShowArchived] = useState(false);
+  // Filters
+  const [filterGender, setFilterGender] = useState("");
+  const [filterSource, setFilterSource] = useState("");
+  const [filterTodayAppt, setFilterTodayAppt] = useState(false);
+  const [filterDebt, setFilterDebt] = useState(false);
+  const [filterTreatment, setFilterTreatment] = useState(false);
+
   const canManagePatients = Boolean(
     session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.MANAGE_PATIENTS),
   );
 
-  const load = useCallback(async (q: string, currentPage: number, archived = showArchived) => {
+  const load = useCallback(async (q: string, currentPage: number, opts?: { archived?: boolean; gender?: string; marketingSource?: string; hasAppointmentToday?: boolean; hasDebt?: boolean; hasActiveTreatment?: boolean }) => {
+    const archived = opts?.archived ?? showArchived;
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (q) params.set("search", q);
       if (archived) params.set("archived", "true");
+      if (opts?.gender) params.set("gender", opts.gender);
+      if (opts?.marketingSource) params.set("marketing_source", opts.marketingSource);
+      if (opts?.hasAppointmentToday) params.set("has_appointment_today", "true");
+      if (opts?.hasDebt) params.set("has_debt", "true");
+      if (opts?.hasActiveTreatment) params.set("has_active_treatment", "true");
       params.set("limit", String(DEFAULT_PAGE_SIZE));
       params.set("offset", String((currentPage - 1) * DEFAULT_PAGE_SIZE));
       const res = await apiGet<PatientsResponse>(`/api/patients?${params}`);
@@ -66,23 +86,21 @@ export function PatientsPage() {
     }
   }, [showArchived]);
 
-  useEffect(() => {
-    load("", 1, showArchived);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [load, showArchived]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load("", 1); }, [load, showArchived, filterGender, filterSource, filterTodayAppt, filterDebt, filterTreatment]);
 
   // Debounced search: auto-load after 400ms of no typing
   useEffect(() => {
     const timer = setTimeout(() => {
-      load(search, 1);
+      load(search, 1, { gender: filterGender, marketingSource: filterSource, hasAppointmentToday: filterTodayAppt, hasDebt: filterDebt, hasActiveTreatment: filterTreatment });
       setPage(1);
     }, 400);
     return () => clearTimeout(timer);
-  }, [search, load]);
+  }, [search, filterGender, filterSource, filterTodayAppt, filterDebt, filterTreatment, load]);
 
   useEffect(() => {
-    if (page > 1) void load(search, page);
-  }, [page, search, load]);
+    if (page > 1) void load(search, page, { gender: filterGender, marketingSource: filterSource, hasAppointmentToday: filterTodayAppt, hasDebt: filterDebt, hasActiveTreatment: filterTreatment });
+  }, [page, search, load, filterGender, filterSource, filterTodayAppt, filterDebt, filterTreatment]);
 
   async function onArchive(p: Patient) {
     const reason = prompt(`Lý do lưu trữ hồ sơ bệnh nhân "${p.name}" (tối thiểu 3 ký tự):`);
@@ -94,7 +112,7 @@ export function PatientsPage() {
     try {
       await apiDelete(`/api/patients/${p.id}`, { reason: reason.trim() });
       toast.success("Đã lưu trữ hồ sơ bệnh nhân");
-      load(search, page);
+      load(search, page, { gender: filterGender, marketingSource: filterSource, hasAppointmentToday: filterTodayAppt, hasDebt: filterDebt, hasActiveTreatment: filterTreatment });
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi lưu trữ hồ sơ");
     }
@@ -105,7 +123,7 @@ export function PatientsPage() {
     try {
       await apiPost(`/api/patients/${p.id}/restore`);
       toast.success("Đã khôi phục hồ sơ bệnh nhân");
-      load(search, page);
+      load(search, page, { gender: filterGender, marketingSource: filterSource, hasAppointmentToday: filterTodayAppt, hasDebt: filterDebt, hasActiveTreatment: filterTreatment });
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi khôi phục hồ sơ");
     }
@@ -129,39 +147,106 @@ export function PatientsPage() {
       </div>
 
       <Card>
-        <CardHeader className="grid gap-3 pb-0 lg:grid-cols-[minmax(20rem,1fr)_auto] lg:items-center">
-          <div className="relative min-w-0">
-            <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
-              <svg className="h-4 w-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.35-4.35" />
-              </svg>
-            </div>
-            <Input
-              placeholder="Tìm theo tên hoặc SĐT…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-20"
-            />
-            {loading && (
-              <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+        <CardHeader className="gap-3 pb-0">
+          <div className="grid gap-3 lg:grid-cols-[minmax(20rem,1fr)_auto] lg:items-center">
+            <div className="relative min-w-0">
+              <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+                <svg className="h-4 w-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.35-4.35" />
+                </svg>
               </div>
+              <Input
+                placeholder="Tìm theo tên hoặc SĐT…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 pr-20"
+              />
+              {loading && (
+                <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+                </div>
+              )}
+            </div>
+            {canManagePatients && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="lg:justify-self-end"
+                onClick={() => {
+                  setShowArchived((value) => !value);
+                  setPage(1);
+                }}
+              >
+                {showArchived ? "Xem hồ sơ đang hoạt động" : "Xem hồ sơ đã lưu trữ"}
+              </Button>
             )}
           </div>
-          {canManagePatients && (
+          {/* Filters row */}
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={filterGender} onChange={(e) => { setFilterGender(e.target.value); setPage(1); }} className="h-8 w-auto text-xs">
+              <option value="">Giới tính</option>
+              <option value="M">Nam</option>
+              <option value="F">Nữ</option>
+              <option value="O">Khác</option>
+            </Select>
+            <Select value={filterSource} onChange={(e) => { setFilterSource(e.target.value); setPage(1); }} className="h-8 w-auto text-xs">
+              <option value="">Nguồn</option>
+              {(Object.entries(MARKETING_SOURCE_LABELS) as [MarketingSource, string][]).map(([val, label]) => (
+                <option key={val} value={val}>{label}</option>
+              ))}
+            </Select>
             <Button
-              variant="outline"
               size="sm"
-              className="lg:justify-self-end"
-              onClick={() => {
-                setShowArchived((value) => !value);
-                setPage(1);
-              }}
+              variant={filterTodayAppt ? "default" : "outline"}
+              className="h-8 text-xs gap-1"
+              onClick={() => { setFilterTodayAppt((v) => !v); setPage(1); }}
             >
-              {showArchived ? "Xem hồ sơ đang hoạt động" : "Xem hồ sơ đã lưu trữ"}
+              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />
+              </svg>
+              Lịch hẹn hôm nay
             </Button>
-          )}
+            <Button
+              size="sm"
+              variant={filterDebt ? "default" : "outline"}
+              className="h-8 text-xs gap-1"
+              onClick={() => { setFilterDebt((v) => !v); setPage(1); }}
+            >
+              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+              </svg>
+              Còn công nợ
+            </Button>
+            <Button
+              size="sm"
+              variant={filterTreatment ? "default" : "outline"}
+              className="h-8 text-xs gap-1"
+              onClick={() => { setFilterTreatment((v) => !v); setPage(1); }}
+            >
+              <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 5h6" />
+              </svg>
+              Đang điều trị
+            </Button>
+            {(filterGender || filterSource || filterTodayAppt || filterDebt || filterTreatment) && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 text-xs text-muted-foreground"
+                onClick={() => {
+                  setFilterGender("");
+                  setFilterSource("");
+                  setFilterTodayAppt(false);
+                  setFilterDebt(false);
+                  setFilterTreatment(false);
+                  setPage(1);
+                }}
+              >
+                Xoá bộ lọc
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="pt-4">
           {!loading && patients.length === 0 ? (
@@ -313,7 +398,7 @@ export function PatientsPage() {
         </CardContent>
       </Card>
 
-      <PatientForm open={openForm} onOpenChange={(v) => { if (!v) setEditPatient(undefined); setOpenForm(v); }} patient={editPatient} onSaved={() => load(search, page)} />
+      <PatientForm open={openForm} onOpenChange={(v) => { if (!v) setEditPatient(undefined); setOpenForm(v); }} patient={editPatient} onSaved={() => load(search, page, { gender: filterGender, marketingSource: filterSource, hasAppointmentToday: filterTodayAppt, hasDebt: filterDebt, hasActiveTreatment: filterTreatment })} />
     </PageContainer>
   );
 }

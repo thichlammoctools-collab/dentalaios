@@ -8,9 +8,26 @@ import type { D1Database } from "@cloudflare/workers-types";
 import type { Patient } from "@shared/types";
 import type { D1Row, Pagination } from "./base";
 
+export interface PatientListOpts extends Pagination {
+  branchId?: string;
+  search?: string;
+  archived?: boolean;
+  gender?: string;
+  marketingSource?: string;
+  hasAppointmentToday?: boolean;
+  hasDebt?: boolean;
+  hasActiveTreatment?: boolean;
+}
+
+export interface PatientWithStatus extends Patient {
+  has_appointment_today: boolean;
+  has_debt: boolean;
+  has_active_treatment: boolean;
+}
+
 export interface PatientsRepository {
-  list(tenantId: string, opts?: Pagination & { branchId?: string; search?: string; archived?: boolean }): Promise<Patient[]>;
-  count(tenantId: string, opts?: { branchId?: string; search?: string; archived?: boolean }): Promise<number>;
+  list(tenantId: string, opts?: PatientListOpts): Promise<PatientWithStatus[]>;
+  count(tenantId: string, opts?: Omit<PatientListOpts, "limit" | "offset">): Promise<number>;
   getById(tenantId: string, id: string): Promise<Patient | null>;
   create(tenantId: string, data: Omit<Patient, "id" | "tenant_id" | "created_at">): Promise<Patient>;
   update(tenantId: string, id: string, data: Omit<Partial<Patient>, "avatar_file_id" | "disability_notes"> & { avatar_file_id?: string | null; disability_notes?: string | null }): Promise<Patient | null>;
@@ -35,14 +52,68 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
         const like = `%${opts.search}%`;
         binds.push(like, like, like);
       }
+      if (opts.gender) {
+        conditions.push("p.gender = ?");
+        binds.push(opts.gender);
+      }
+      if (opts.marketingSource) {
+        conditions.push("p.marketing_source = ?");
+        binds.push(opts.marketingSource);
+      }
       if (opts.archived === true) conditions.push("p.archived_at IS NOT NULL");
       else conditions.push("p.archived_at IS NULL");
+
+      // Boolean filters via EXISTS subqueries
+      if (opts.hasAppointmentToday) {
+        conditions.push(`EXISTS (
+          SELECT 1 FROM appointments a
+          WHERE a.tenant_id = p.tenant_id AND a.patient_id = p.id
+            AND date(a.scheduled_at) = date('now')
+            AND a.status NOT IN ('cancelled')
+        )`);
+      }
+      if (opts.hasDebt) {
+        conditions.push(`EXISTS (
+          SELECT 1 FROM treatment_plans tp
+          LEFT JOIN payments pay ON pay.treatment_plan_id = tp.id AND pay.status = 'confirmed'
+          WHERE tp.tenant_id = p.tenant_id AND tp.patient_id = p.id
+            AND tp.status IN ('approved', 'completed')
+          GROUP BY tp.id
+          HAVING tp.total_cost - COALESCE(SUM(pay.amount), 0) > 0.5
+        )`);
+      }
+      if (opts.hasActiveTreatment) {
+        conditions.push(`EXISTS (
+          SELECT 1 FROM treatment_cases tc
+          WHERE tc.tenant_id = p.tenant_id AND tc.patient_id = p.id
+            AND tc.status IN ('active', 'paused')
+        )`);
+      }
 
       binds.push(limit, offset);
        const sql = `SELECT p.*,
                      ref.name AS referral_user_name,
                       COALESCE(direct_referrer.name, case_referrer.name) AS referral_referrer_name,
-                      COALESCE(direct_referrer.code, case_referrer.code) AS referral_referrer_code
+                      COALESCE(direct_referrer.code, case_referrer.code) AS referral_referrer_code,
+                      EXISTS (
+                        SELECT 1 FROM appointments a
+                        WHERE a.tenant_id = p.tenant_id AND a.patient_id = p.id
+                          AND date(a.scheduled_at) = date('now')
+                          AND a.status NOT IN ('cancelled')
+                      ) AS has_appointment_today,
+                      EXISTS (
+                        SELECT 1 FROM treatment_plans tp
+                        LEFT JOIN payments pay ON pay.treatment_plan_id = tp.id AND pay.status = 'confirmed'
+                        WHERE tp.tenant_id = p.tenant_id AND tp.patient_id = p.id
+                          AND tp.status IN ('approved', 'completed')
+                        GROUP BY tp.id
+                        HAVING tp.total_cost - COALESCE(SUM(pay.amount), 0) > 0.5
+                      ) AS has_debt,
+                      EXISTS (
+                        SELECT 1 FROM treatment_cases tc
+                        WHERE tc.tenant_id = p.tenant_id AND tc.patient_id = p.id
+                          AND tc.status IN ('active', 'paused')
+                      ) AS has_active_treatment
                     FROM patients p
                     LEFT JOIN users ref ON ref.id = p.referral_user_id
                     LEFT JOIN referrers direct_referrer ON direct_referrer.tenant_id = p.tenant_id AND direct_referrer.id = p.referrer_id
@@ -52,7 +123,7 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
                    ORDER BY p.created_at DESC
                    LIMIT ? OFFSET ?`;
       const result = await db.prepare(sql).bind(...binds).all();
-      return (result.results as D1Row[]).map(mapPatient);
+      return (result.results as D1Row[]).map(mapPatientWithStatus);
     },
 
     async count(tenantId, opts = {}) {
@@ -67,8 +138,44 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
         const like = `%${opts.search}%`;
         binds.push(like, like, like);
       }
+      if (opts.gender) {
+        conditions.push("gender = ?");
+        binds.push(opts.gender);
+      }
+      if (opts.marketingSource) {
+        conditions.push("marketing_source = ?");
+        binds.push(opts.marketingSource);
+      }
       if (opts.archived === true) conditions.push("archived_at IS NOT NULL");
       else conditions.push("archived_at IS NULL");
+
+      // Boolean filters
+      if (opts.hasAppointmentToday) {
+        conditions.push(`EXISTS (
+          SELECT 1 FROM appointments a
+          WHERE a.tenant_id = patients.tenant_id AND a.patient_id = patients.id
+            AND date(a.scheduled_at) = date('now')
+            AND a.status NOT IN ('cancelled')
+        )`);
+      }
+      if (opts.hasDebt) {
+        conditions.push(`EXISTS (
+          SELECT 1 FROM treatment_plans tp
+          LEFT JOIN payments pay ON pay.treatment_plan_id = tp.id AND pay.status = 'confirmed'
+          WHERE tp.tenant_id = patients.tenant_id AND tp.patient_id = patients.id
+            AND tp.status IN ('approved', 'completed')
+          GROUP BY tp.id
+          HAVING tp.total_cost - COALESCE(SUM(pay.amount), 0) > 0.5
+        )`);
+      }
+      if (opts.hasActiveTreatment) {
+        conditions.push(`EXISTS (
+          SELECT 1 FROM treatment_cases tc
+          WHERE tc.tenant_id = patients.tenant_id AND tc.patient_id = patients.id
+            AND tc.status IN ('active', 'paused')
+        )`);
+      }
+
       const row = await db.prepare(`SELECT COUNT(*) AS total FROM patients WHERE ${conditions.join(" AND ")}`).bind(...binds).first<D1Row>();
       return Number(row?.total ?? 0);
     },
@@ -206,6 +313,16 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
         .run();
       return result.meta.changes > 0;
     },
+  };
+}
+
+function mapPatientWithStatus(row: D1Row): PatientWithStatus {
+  const patient = mapPatient(row);
+  return {
+    ...patient,
+    has_appointment_today: Boolean(row.has_appointment_today),
+    has_debt: Boolean(row.has_debt),
+    has_active_treatment: Boolean(row.has_active_treatment),
   };
 }
 
