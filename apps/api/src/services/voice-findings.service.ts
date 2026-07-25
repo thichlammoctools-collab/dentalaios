@@ -10,6 +10,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import { createVisitsRepository } from "../repositories/visits.repo";
 import { NotFoundError } from "../lib/errors";
+import { getAiResponseText } from "../lib/ai-response";
 import { aiModelConfigService } from "./ai-model-config.service";
 import type { AnatomicalSite, FindingCategory, FindingLocationDetails, FindingMeasurements, FindingScope } from "@shared/types";
 
@@ -69,7 +70,7 @@ export const voiceFindingsService = {
     const model = await aiModelConfigService.resolve(db, "voice_findings_parse");
     if (model.is_enabled && AI && typeof (AI as { run?: unknown }).run === "function") {
       try {
-        const result = await (AI as { run: (model: string, inputs: object) => Promise<{ response?: string }> }).run(
+        const result = await (AI as { run: (model: string, inputs: object) => Promise<unknown> }).run(
           model.model_id,
           {
             messages: [
@@ -116,7 +117,7 @@ Format:
             temperature: 0.1,
           },
         );
-        const raw = (result as { response?: string }).response || "{}";
+        const raw = getAiResponseText(result) || "{}";
         const parsed = parseVoiceResponse(raw);
         if (parsed && parsed.findings.length > 0) {
           return {

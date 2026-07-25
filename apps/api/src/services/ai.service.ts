@@ -13,6 +13,7 @@ import { createTreatmentPlansRepository } from "../repositories/treatment-plans.
 import { createTreatmentItemsRepository } from "../repositories/treatment-items.repo";
 import { createPatientsRepository } from "../repositories/patients.repo";
 import { createTreatmentServicesRepository } from "../repositories/treatment-service-prices.repo";
+import { getAiResponseText } from "../lib/ai-response";
 import { NotFoundError, ValidationError } from "../lib/errors";
 import { aiModelConfigService } from "./ai-model-config.service";
 import { isValidFdiTooth } from "@shared/constants";
@@ -111,7 +112,7 @@ export const aiService = {
     const model = await aiModelConfigService.resolve(db, "visit_summary");
     if (model.is_enabled && AI && typeof (AI as { run?: unknown }).run === "function") {
       try {
-        const result = await (AI as { run: (model: string, inputs: object) => Promise<{ response?: string }> }).run(
+        const result = await (AI as { run: (model: string, inputs: object) => Promise<unknown> }).run(
           model.model_id,
           {
             messages: [
@@ -123,7 +124,7 @@ export const aiService = {
           },
         );
         return {
-          summary: (result as { response?: string }).response || "Không có phản hồi từ AI.",
+          summary: getAiResponseText(result) || "Không có phản hồi từ AI.",
           ai_model: model.model_id,
           generated_at: new Date().toISOString(),
         };
@@ -221,7 +222,7 @@ QUY TẮC QUAN TRỌNG:
     const model = await aiModelConfigService.resolve(db, "treatment_plan_draft");
     if (model.is_enabled && AI && typeof (AI as { run?: unknown }).run === "function") {
       try {
-        const result = await (AI as { run: (model: string, inputs: object) => Promise<{ response?: string }> }).run(
+        const result = await (AI as { run: (model: string, inputs: object) => Promise<unknown> }).run(
           model.model_id,
           {
             messages: [
@@ -232,7 +233,7 @@ QUY TẮC QUAN TRỌNG:
             temperature: 0.2,
           },
         );
-        const raw = (result as { response?: string }).response || "{}";
+        const raw = getAiResponseText(result) || "{}";
         const parsed = parseAiPlanResponse(raw, activeServices);
         if (parsed) {
           return { ...parsed, ai_model: model.model_id, generated_at: new Date().toISOString() };
@@ -387,7 +388,7 @@ QUY TẮC QUAN TRỌNG:
             temperature: 0.2,
           },
         );
-        const raw = (result as { response?: string })?.response || "{}";
+        const raw = getAiResponseText(result) || "{}";
         const parsed = parseAnalyzeImageResponse(raw);
         if (parsed) {
           return { ...parsed, ai_model: model.model_id, generated_at: new Date().toISOString() };

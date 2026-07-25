@@ -237,65 +237,81 @@ export const PLATFORM_PERMISSIONS = {
 
 export const PLATFORM_AI_APPLICATION = "clinic_web" as const;
 
+const PLATFORM_AI_TEXT_MODELS = [
+  { id: "@cf/meta/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B" },
+  { id: "@cf/openai/gpt-oss-20b", name: "GPT-OSS 20B" },
+  { id: "@cf/openai/gpt-oss-120b", name: "GPT-OSS 120B" },
+  { id: "@cf/google/gemma-4-26b-a4b-it", name: "Gemma 4 26B" },
+  { id: "@cf/moonshotai/kimi-k2.6", name: "Kimi K2.6" },
+  { id: "@cf/moonshotai/kimi-k2.7-code", name: "Kimi K2.7 Code" },
+  { id: "@cf/zai-org/glm-4.7-flash", name: "GLM 4.7 Flash" },
+  { id: "@cf/zai-org/glm-5.2", name: "GLM 5.2" },
+  { id: "@cf/nvidia/nemotron-3-120b-a12b", name: "Nemotron 3 120B" },
+  { id: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b", name: "DeepSeek R1 Distill Qwen 32B" },
+  { id: "@cf/aisingapore/gemma-sea-lion-v4-27b-it", name: "SEA-LION v4 27B" },
+  { id: "@cf/ibm/granite-4.0-h-micro", name: "Granite 4.0 H Micro" },
+  { id: "@cf/qwen/qwen3-30b-a3b-fp8", name: "Qwen 3 30B" },
+  { id: "@cf/qwen/qwq-32b", name: "QwQ 32B" },
+  { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", name: "Llama 3.3 70B Fast" },
+  { id: "@cf/meta/llama-3.2-3b-instruct", name: "Llama 3.2 3B" },
+  { id: "@cf/meta/llama-3.2-1b-instruct", name: "Llama 3.2 1B" },
+  { id: "@cf/meta/llama-3.1-8b-instruct-fast", name: "Llama 3.1 8B Fast" },
+  { id: "@cf/meta/llama-3.1-8b-instruct-fp8", name: "Llama 3.1 8B FP8" },
+  { id: "@cf/mistralai/mistral-small-3.1-24b-instruct", name: "Mistral Small 3.1 24B" },
+  { id: "@cf/qwen/qwen2.5-coder-32b-instruct", name: "Qwen 2.5 Coder 32B" },
+] as const;
+
+const PLATFORM_AI_VISION_MODELS = [
+  { id: "@cf/meta/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B" },
+  { id: "@cf/google/gemma-4-26b-a4b-it", name: "Gemma 4 26B" },
+  { id: "@cf/moonshotai/kimi-k2.6", name: "Kimi K2.6" },
+  { id: "@cf/moonshotai/kimi-k2.7-code", name: "Kimi K2.7 Code" },
+  { id: "@cf/meta/llama-3.2-11b-vision-instruct", name: "Llama 3.2 Vision 11B" },
+  { id: "@cf/mistralai/mistral-small-3.1-24b-instruct", name: "Mistral Small 3.1 24B" },
+] as const;
+
 export const PLATFORM_AI_MODEL_CONFIG_CATALOG = [
   {
     use_case: "visit_summary",
     name: "Tóm tắt lượt khám",
     modality: "text",
     default_model_id: "@cf/meta/llama-4-scout-17b-16e-instruct",
-    allowed_models: [
-      { id: "@cf/meta/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B" },
-      { id: "@cf/meta/llama-3.1-8b-instruct", name: "Llama 3.1 8B" },
-    ],
+    allowed_models: PLATFORM_AI_TEXT_MODELS,
   },
   {
     use_case: "treatment_plan_draft",
     name: "Gợi ý kế hoạch điều trị",
     modality: "text",
     default_model_id: "@cf/meta/llama-4-scout-17b-16e-instruct",
-    allowed_models: [
-      { id: "@cf/meta/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B" },
-      { id: "@cf/meta/llama-3.1-8b-instruct", name: "Llama 3.1 8B" },
-    ],
+    allowed_models: PLATFORM_AI_TEXT_MODELS,
   },
   {
     use_case: "clinical_image_analysis",
     name: "Phân tích hình ảnh lâm sàng",
     modality: "vision",
     default_model_id: "@cf/meta/llama-3.2-11b-vision-instruct",
-    allowed_models: [
-      { id: "@cf/meta/llama-3.2-11b-vision-instruct", name: "Llama 3.2 Vision 11B" },
-    ],
+    allowed_models: PLATFORM_AI_VISION_MODELS,
   },
   {
     use_case: "voice_findings_parse",
     name: "Trích xuất phát hiện từ ghi âm",
     modality: "text",
     default_model_id: "@cf/meta/llama-4-scout-17b-16e-instruct",
-    allowed_models: [
-      { id: "@cf/meta/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B" },
-      { id: "@cf/meta/llama-3.1-8b-instruct", name: "Llama 3.1 8B" },
-    ],
+    allowed_models: PLATFORM_AI_TEXT_MODELS,
   },
   {
     use_case: "appointment_chat_parse",
     name: "Phân tích hội thoại đặt lịch",
     modality: "text",
     default_model_id: "@cf/meta/llama-4-scout-17b-16e-instruct",
-    allowed_models: [
-      { id: "@cf/meta/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B" },
-      { id: "@cf/meta/llama-3.1-8b-instruct", name: "Llama 3.1 8B" },
-    ],
+    allowed_models: PLATFORM_AI_TEXT_MODELS,
   },
   {
     use_case: "next_appointment_suggestion",
     name: "Gợi ý lịch hẹn tiếp theo",
     modality: "text",
     default_model_id: "@cf/meta/llama-4-scout-17b-16e-instruct",
-    allowed_models: [
-      { id: "@cf/meta/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B" },
-      { id: "@cf/meta/llama-3.1-8b-instruct", name: "Llama 3.1 8B" },
-    ],
+    allowed_models: PLATFORM_AI_TEXT_MODELS,
   },
 ] as const;
 

@@ -24,6 +24,7 @@ import { NotFoundError } from "../lib/errors";
 import { isDoctorRole } from "@shared/constants";
 import { getAnatomicalSiteLabel, getFindingCategory } from "@shared/constants/clinical-findings";
 import { aiModelConfigService } from "./ai-model-config.service";
+import { getAiResponseText } from "../lib/ai-response";
 
 // ─── Result types ────────────────────────────────────────────
 
@@ -105,7 +106,7 @@ export const aiAppointmentService = {
     const model = await aiModelConfigService.resolve(db, "appointment_chat_parse");
     if (model.is_enabled && AI && typeof (AI as { run?: unknown }).run === "function") {
       try {
-        const result = await (AI as { run: (model: string, inputs: object) => Promise<{ response?: string }> }).run(
+        const result = await (AI as { run: (model: string, inputs: object) => Promise<unknown> }).run(
           model.model_id,
           {
             messages: [
@@ -156,7 +157,7 @@ Trả CHÍNH XÁC JSON, KHÔNG thêm text khác:
             temperature: 0.2,
           },
         );
-        const raw = (result as { response?: string }).response || "{}";
+        const raw = getAiResponseText(result) || "{}";
         const parsed = parseAiResponse(raw);
         if (parsed) {
           return {
@@ -241,7 +242,7 @@ Trả CHÍNH XÁC JSON, KHÔNG thêm text khác:
     const model = await aiModelConfigService.resolve(db, "next_appointment_suggestion");
     if (model.is_enabled && AI && typeof (AI as { run?: unknown }).run === "function") {
       try {
-        const result = await (AI as { run: (model: string, inputs: object) => Promise<{ response?: string }> }).run(
+        const result = await (AI as { run: (model: string, inputs: object) => Promise<unknown> }).run(
           model.model_id,
           {
             messages: [
@@ -291,7 +292,7 @@ Hãy đề xuất lịch hẹn tiếp theo:`,
             temperature: 0.2,
           },
         );
-        const raw = (result as { response?: string }).response || "{}";
+        const raw = getAiResponseText(result) || "{}";
         const parsed = parseSuggestResponse(raw);
         if (parsed) {
           return {

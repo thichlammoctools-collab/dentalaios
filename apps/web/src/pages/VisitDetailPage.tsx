@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { VoiceFindingsDialog } from "@/components/VoiceFindingsDialog";
+import { SafetyAcknowledgementDialog } from "@/components/SafetyAcknowledgementDialog";
+import { RejectReasonDialog } from "@/components/RejectReasonDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -377,6 +379,11 @@ export function VisitDetailPage() {
   const [assistantId, setAssistantId] = useState("");
   const [savingPersonnel, setSavingPersonnel] = useState(false);
 
+  const [safetyDialogOpen, setSafetyDialogOpen] = useState(false);
+  const [safetyWarningType, setSafetyWarningType] = useState<VisitSafetyWarningType>("blood_pressure");
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectItem, setRejectItem] = useState<ReviewQueueItem | null>(null);
+
   const [suggestNextLoading, setSuggestNextLoading] = useState(false);
   const [suggestNextResult, setSuggestNextResult] = useState<{
     suggested_date: string;
@@ -455,12 +462,17 @@ export function VisitDetailPage() {
   }
 
   async function rejectReview(item: ReviewQueueItem) {
-    if (!visit) return;
-    const reason = window.prompt("Lý do bác bỏ ghi nhận nháp này:");
-    if (!reason?.trim()) return;
+    setRejectItem(item);
+    setRejectDialogOpen(true);
+  }
+
+  async function confirmRejectReview(reason: string) {
+    if (!visit || !rejectItem) return;
     try {
-      await apiPost(`/api/visits/${visit.id}/reviews/${item.event.entity_type}/${item.event.entity_id}/reject`, { review_note: reason });
+      await apiPost(`/api/visits/${visit.id}/reviews/${rejectItem.event.entity_type}/${rejectItem.event.entity_id}/reject`, { review_note: reason });
       toast.success("Đã bác bỏ ghi nhận nháp");
+      setRejectDialogOpen(false);
+      setRejectItem(null);
       void load();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Không thể bác bỏ");
@@ -484,20 +496,21 @@ export function VisitDetailPage() {
     }
   }
 
-  async function acknowledgeSafetyWarning(warningType: VisitSafetyWarningType) {
+  function acknowledgeSafetyWarning(warningType: VisitSafetyWarningType) {
+    setSafetyWarningType(warningType);
+    setSafetyDialogOpen(true);
+  }
+
+  async function confirmSafetyAcknowledgement(outcome: VisitSafetyAcknowledgementOutcome, reason?: string) {
     if (!visit) return;
-    const outcome = window.prompt("Chọn outcome: acknowledged | continue_with_reason | defer_treatment | refer_or_escalate", "acknowledged") as VisitSafetyAcknowledgementOutcome | null;
-    if (!outcome || !["acknowledged", "continue_with_reason", "defer_treatment", "refer_or_escalate"].includes(outcome)) return;
-    const requiresReason = outcome !== "acknowledged";
-    const reason = requiresReason ? window.prompt("Lý do hoặc hướng xử trí:") : undefined;
-    if (requiresReason && !reason?.trim()) return;
     try {
       const saved = await apiPost<VisitSafetyAcknowledgement>(`/api/visits/${visit.id}/safety-acknowledgements`, {
-        warning_type: warningType,
+        warning_type: safetyWarningType,
         outcome,
-        reason: reason || undefined,
+        reason,
       });
-      setSafetyAcknowledgements((current) => [...current.filter((item) => item.warning_type !== warningType), saved]);
+      setSafetyAcknowledgements((current) => [...current.filter((item) => item.warning_type !== safetyWarningType), saved]);
+      setSafetyDialogOpen(false);
       toast.success("Đã ghi nhận đánh giá an toàn");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Không thể ghi nhận đánh giá an toàn");
@@ -1497,6 +1510,18 @@ export function VisitDetailPage() {
           </Button>
         </DialogFooter>
       </Dialog>
+
+      <SafetyAcknowledgementDialog
+        open={safetyDialogOpen}
+        onOpenChange={setSafetyDialogOpen}
+        onSubmit={confirmSafetyAcknowledgement}
+      />
+
+      <RejectReasonDialog
+        open={rejectDialogOpen}
+        onOpenChange={setRejectDialogOpen}
+        onSubmit={confirmRejectReview}
+      />
     </PageContainer>
   );
 }

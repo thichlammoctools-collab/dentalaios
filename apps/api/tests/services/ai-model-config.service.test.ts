@@ -23,11 +23,29 @@ describe("aiModelConfigService", () => {
         {
           application_key: "clinic_web",
           use_case: "clinical_image_analysis",
-          model_id: "@cf/meta/llama-4-scout-17b-16e-instruct",
+          model_id: "@cf/openai/gpt-oss-20b",
           is_enabled: true,
         },
         "platform-owner",
       ),
     ).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("offers all supported chat models for text and only vision-capable models for images", async () => {
+    const configs = await aiModelConfigService.list(createMockD1() as never);
+    const text = configs.find((config) => config.use_case === "visit_summary");
+    const vision = configs.find((config) => config.use_case === "clinical_image_analysis");
+
+    expect(text?.allowed_models).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "@cf/openai/gpt-oss-20b" }),
+      expect.objectContaining({ id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast" }),
+    ]));
+    expect(vision?.allowed_models).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "@cf/google/gemma-4-26b-a4b-it" }),
+      expect.objectContaining({ id: "@cf/meta/llama-3.2-11b-vision-instruct" }),
+    ]));
+    expect(vision?.allowed_models).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "@cf/openai/gpt-oss-20b" }),
+    ]));
   });
 });
