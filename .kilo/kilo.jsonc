@@ -1,0 +1,15 @@
+{
+  "mcp": {
+    "vexp": {
+      "type": "local",
+      "command": [
+        "node",
+        "c:\\Users\\PNN\\.vscode\\extensions\\vexp.vexp-vscode-2.3.1-win32-x64\\dist\\mcp-server.cjs"
+      ],
+      "env": {
+        "VEXP_WORKSPACE": "c:\\Users\\PNN\\Documents\\GitHub\\dentalaios"
+      },
+      "enabled": true
+    }
+  }
+}

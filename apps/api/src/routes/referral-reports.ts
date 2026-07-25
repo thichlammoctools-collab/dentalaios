@@ -61,11 +61,24 @@ router.get("/", async (c) => {
 });
 router.get("/export.csv", async (c) => {
   const jwt = getJwt(c);
+  const params = new URL(c.req.url).searchParams;
+  const conditions: string[] = ["c.tenant_id = ?"];
+  const bindValues: unknown[] = [jwt.tenant_id];
+  const from = params.get("from");
+  const to = params.get("to");
+  const referrerType = params.get("referrer_type");
+  const caseStatus = params.get("case_status");
+  const rewardStatus = params.get("reward_status");
+  if (from) { conditions.push("c.registered_at >= ?"); bindValues.push(from); }
+  if (to) { conditions.push("c.registered_at <= ?"); bindValues.push(`${to}T23:59:59`); }
+  if (referrerType) { conditions.push("r.type = ?"); bindValues.push(referrerType); }
+  if (caseStatus) { conditions.push("c.status = ?"); bindValues.push(caseStatus); }
+  if (rewardStatus) { conditions.push("rw.status = ?"); bindValues.push(rewardStatus); }
   const rows = await c.env.DB.prepare(
-    `SELECT r.code, r.name, r.type, c.status AS case_status, rw.status AS reward_status, rw.calculated_amount, rw.currency, rw.created_at
-     FROM referral_cases c JOIN referrers r ON r.id = c.referrer_id LEFT JOIN referral_rewards rw ON rw.referral_case_id = c.id
-     WHERE c.tenant_id = ? ORDER BY c.registered_at DESC`,
-  ).bind(jwt.tenant_id).all<Record<string, unknown>>();
+     `SELECT r.code, r.name, r.type, c.status AS case_status, rw.status AS reward_status, rw.calculated_amount, rw.currency, rw.created_at
+      FROM referral_cases c JOIN referrers r ON r.id = c.referrer_id LEFT JOIN referral_rewards rw ON rw.referral_case_id = c.id
+      WHERE ${conditions.join(" AND ")} ORDER BY c.registered_at DESC`,
+   ).bind(...bindValues).all<Record<string, unknown>>();
   const header = "code,name,type,case_status,reward_status,calculated_amount,currency,created_at";
   const csv = [header, ...rows.results.map((row) => [row.code, row.name, row.type, row.case_status, row.reward_status, row.calculated_amount, row.currency, row.created_at].map((value) => `"${String(value ?? "").replaceAll("\"", "\"\"")}"`).join(","))].join("\n");
   return new Response(csv, { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=referrals.csv" } });
