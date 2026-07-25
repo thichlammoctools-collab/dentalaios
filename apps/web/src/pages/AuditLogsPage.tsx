@@ -35,7 +35,7 @@ export function AuditLogsPage() {
       setLogs(res.items);
       setTotal(res.total);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Lỗi tải audit");
+      toast.error(err instanceof ApiError ? err.message : "Lỗi tải nhật ký kiểm toán");
     } finally {
       setLoading(false);
     }
@@ -52,9 +52,9 @@ export function AuditLogsPage() {
   return (
     <PageContainer size="data" className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Audit logs</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Nhật ký kiểm toán</h1>
         <p className="text-sm text-muted-foreground">
-          Theo dõi mọi clinical action. Cần quyền quản lý user.
+          Theo dõi mọi hoạt động lâm sàng. Cần quyền quản lý người dùng.
         </p>
       </div>
       <Card>
@@ -65,17 +65,17 @@ export function AuditLogsPage() {
           {loading ? (
             <p className="text-sm text-muted-foreground">Đang tải…</p>
           ) : logs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Chưa có log nào.</p>
+            <p className="text-sm text-muted-foreground">Chưa có nhật ký nào.</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Thời gian</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Entity</TableHead>
-                  <TableHead>Entity ID</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead>IP</TableHead>
+                  <TableHead>Hành động</TableHead>
+                  <TableHead>Đối tượng</TableHead>
+                  <TableHead>Mã đối tượng</TableHead>
+                  <TableHead>Người dùng</TableHead>
+                  <TableHead>Địa chỉ IP</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

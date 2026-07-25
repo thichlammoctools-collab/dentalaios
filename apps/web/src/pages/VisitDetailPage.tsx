@@ -487,10 +487,10 @@ export function VisitDetailPage() {
         initial_assessment: { chief_complaint: preExamChiefComplaint },
       });
       setPreExamChiefComplaint("");
-      toast.success("Đã gửi pre-exam draft để bác sĩ duyệt");
+      toast.success("Đã gửi bản nháp khám ban đầu để bác sĩ duyệt");
       void load();
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Không thể gửi pre-exam draft");
+      toast.error(err instanceof ApiError ? err.message : "Không thể gửi bản nháp khám ban đầu");
     } finally {
       setSavingPreExam(false);
     }
@@ -597,7 +597,7 @@ export function VisitDetailPage() {
       toast.success("Đã tạo kế hoạch điều trị");
       navigate(withPatientReturnContext(`/treatment-plans/${created.id}`, visit.patient_id, "plans"));
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Loi tao plan");
+      toast.error(err instanceof ApiError ? err.message : "Lỗi tạo kế hoạch");
     }
   }
 
@@ -654,7 +654,7 @@ export function VisitDetailPage() {
       const result = await apiPost<SummarizeResult>("/api/ai/summarize", { visit_id: visit.id });
       setSummaryResult(result);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Ọi tạo tóm tắt AI");
+      toast.error(err instanceof ApiError ? err.message : "Lỗi tạo tóm tắt AI");
       setSummaryDialogOpen(false);
     } finally {
       setSummarizing(false);
@@ -687,7 +687,7 @@ export function VisitDetailPage() {
       })));
       setPlanNotes(result.notes);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Loi tao kế hoạch AI");
+      toast.error(err instanceof ApiError ? err.message : "Lỗi tạo kế hoạch AI");
       setPlanDialogOpen(false);
     } finally {
       setGeneratingPlan(false);
@@ -725,7 +725,7 @@ export function VisitDetailPage() {
       setPlanDialogOpen(false);
       navigate(withPatientReturnContext(`/treatment-plans/${plan.id}`, visit.patient_id, "plans"));
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Loi luu ke hoach");
+      toast.error(err instanceof ApiError ? err.message : "Lỗi lưu kế hoạch");
     } finally {
       setSavingPlan(false);
     }

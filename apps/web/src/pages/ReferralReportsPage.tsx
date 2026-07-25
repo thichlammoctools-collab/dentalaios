@@ -21,7 +21,7 @@ export function ReferralReportsPage() {
   const canView = Boolean(session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.VIEW_REFERRAL_REPORTS));
   useEffect(() => { if (canView) void load(); }, [canView, range]);
   function query() { const params = new URLSearchParams(); Object.entries(range).forEach(([key, value]) => { if (value) params.set(key, value); }); return params.size ? `?${params}` : ""; }
-  async function load() { setLoading(true); try { setReport(await referralReportsApi.get<Report>(query())); } catch (cause) { toast.error(cause instanceof ApiError ? cause.message : "Không thể tải báo cáo referral"); } finally { setLoading(false); } }
+  async function load() { setLoading(true); try { setReport(await referralReportsApi.get<Report>(query())); } catch (cause) { toast.error(cause instanceof ApiError ? cause.message : "Không thể tải báo cáo giới thiệu"); } finally { setLoading(false); } }
   async function exportCsv() { try { await referralReportsApi.exportCsv(query()); toast.info("Yêu cầu xuất CSV đã được gửi. API có thể trả URL tải xuống hoặc file tùy cấu hình."); } catch (cause) { toast.error(cause instanceof ApiError ? cause.message : "Không thể xuất CSV"); } }
   if (!canView) return <PageContainer size="reading"><div className="rounded-xl border border-border bg-card p-6"><h1 className="font-semibold">Cần quyền xem báo cáo</h1><p className="mt-1 text-sm text-muted-foreground">Báo cáo giới thiệu chỉ dành cho tài khoản được cấp quyền phù hợp.</p></div></PageContainer>;
   const kpis = report?.kpis ?? {};

@@ -16,7 +16,7 @@ type ItemsResponse<T> = { items: T[] };
 type Admin = PlatformUser & { role: { key: string; name: string } };
 
 function PageHeader({ title, description, action }: { title: string; description: string; action?: ReactNode }) {
-  return <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#67e8f9]">Platform Control</p><h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">{title}</h1><p className="mt-1 max-w-3xl text-sm text-muted-foreground">{description}</p></div>{action}</div>;
+  return <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#67e8f9]">Quản trị nền tảng</p><h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">{title}</h1><p className="mt-1 max-w-3xl text-sm text-muted-foreground">{description}</p></div>{action}</div>;
 }
 
 function Page({ children }: { children: ReactNode }) { return <div className="mx-auto w-full max-w-[90rem] space-y-6 p-4 sm:p-7 lg:px-8 lg:py-8 2xl:px-10">{children}</div>; }
@@ -65,11 +65,187 @@ export function PlatformContentPage() {
 }
 
 export function PlatformConfigurationPage() {
-  const [flags, setFlags] = useState<PlatformFeatureFlag[]>([]); const [aiConfigs, setAiConfigs] = useState<PlatformAiModelConfig[]>([]); const [error, setError] = useState<string | null>(null); const [form, setForm] = useState({ key: "", description: "", default_enabled: false }); const { hasPermission } = usePlatformAuth();
-  const load = () => void Promise.all([platformGet<ItemsResponse<PlatformFeatureFlag>>("/api/platform/feature-flags"), platformGet<ItemsResponse<PlatformAiModelConfig>>("/api/platform/ai-model-configs")]).then(([flagsResult, aiResult]) => { setFlags(flagsResult.items); setAiConfigs(aiResult.items); }).catch((cause) => setError(cause instanceof PlatformApiError ? cause.message : "Không thể tải cấu hình")); useEffect(load, []);
-  async function save(event: FormEvent) { event.preventDefault(); try { await platformPut("/api/platform/feature-flags", form); setForm({ key: "", description: "", default_enabled: false }); load(); } catch (cause) { setError(cause instanceof PlatformApiError ? cause.message : "Không thể lưu feature flag"); } }
-  async function saveAiConfig(config: PlatformAiModelConfig, modelId: string, isEnabled: boolean) { try { await platformPut("/api/platform/ai-model-configs", { application_key: config.application_key, use_case: config.use_case, model_id: modelId, is_enabled: isEnabled }); load(); } catch (cause) { setError(cause instanceof PlatformApiError ? cause.message : "Không thể lưu cấu hình AI"); } }
-  return <Page><PageHeader title="Cấu hình nền tảng" description="Feature flag, metadata tích hợp và mô hình AI. API key và secrets chỉ quản lý qua Cloudflare/Wrangler." /><ErrorNotice error={error} /><Card><CardHeader><CardTitle>Mô hình AI theo ứng dụng</CardTitle><CardDescription>Clinic Web dùng cấu hình theo từng tác vụ. Kết quả AI chỉ hỗ trợ nghiệp vụ và luôn cần nhân sự chuyên môn kiểm tra.</CardDescription></CardHeader><CardContent className="space-y-3">{aiConfigs.map((config) => <div className="grid gap-3 rounded-lg border p-4 lg:grid-cols-[minmax(0,1fr)_15rem_auto] lg:items-center" key={config.use_case}><div><p className="font-medium">{config.name}</p><p className="mt-1 text-xs text-muted-foreground">{config.modality === "vision" ? "Mô hình thị giác" : "Mô hình văn bản"} · {config.is_overridden ? "Đang dùng cấu hình tùy chỉnh" : "Đang dùng mô hình mặc định"}</p></div><Select aria-label={`Mô hình cho ${config.name}`} value={config.model_id} disabled={!hasPermission("platform_ai_config.write")} onChange={(event) => void saveAiConfig(config, event.target.value, config.is_enabled)}>{config.allowed_models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}</Select><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={config.is_enabled} disabled={!hasPermission("platform_ai_config.write")} onChange={(event) => void saveAiConfig(config, config.model_id, event.target.checked)} />Bật</label></div>)}{aiConfigs.length === 0 && <p className="text-sm text-muted-foreground">Chưa tải được danh mục mô hình AI.</p>}</CardContent></Card><div className="grid gap-5 lg:grid-cols-3"><Card className="lg:col-span-2"><CardHeader><CardTitle>Feature flags</CardTitle></CardHeader><CardContent className="space-y-2">{flags.length ? flags.map((flag) => <div className="flex justify-between rounded-lg border p-3 text-sm" key={flag.key}><div><p className="font-medium">{flag.key}</p><p className="text-slate-500">{flag.description}</p></div><Status active={flag.default_enabled} /></div>) : <p className="text-sm text-slate-500">Chưa có feature flag.</p>}</CardContent></Card>{hasPermission("platform_config.write") && <Card><CardHeader><CardTitle>Thêm hoặc cập nhật</CardTitle></CardHeader><CardContent><form className="space-y-3" onSubmit={save}><Input placeholder="feature.key" value={form.key} onChange={(event) => setForm({ ...form, key: event.target.value })} required /><Textarea placeholder="Mô tả" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} required /><label className="flex gap-2 text-sm"><input type="checkbox" checked={form.default_enabled} onChange={(event) => setForm({ ...form, default_enabled: event.target.checked })} />Bật mặc định</label><Button type="submit">Lưu flag</Button></form></CardContent></Card>}</div></Page>;
+  const [flags, setFlags] = useState<PlatformFeatureFlag[]>([]);
+  const [aiConfigs, setAiConfigs] = useState<PlatformAiModelConfig[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({ key: "", description: "", default_enabled: false });
+  const { hasPermission } = usePlatformAuth();
+
+  const load = () => {
+    void Promise.all([
+      platformGet<ItemsResponse<PlatformFeatureFlag>>("/api/platform/feature-flags"),
+      platformGet<ItemsResponse<PlatformAiModelConfig>>("/api/platform/ai-model-configs"),
+    ])
+      .then(([flagsResult, aiResult]) => {
+        setFlags(flagsResult.items);
+        setAiConfigs(aiResult.items);
+      })
+      .catch((cause) => setError(cause instanceof PlatformApiError ? cause.message : "Không thể tải cấu hình"));
+  };
+
+  useEffect(load, []);
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+
+    try {
+      await platformPut("/api/platform/feature-flags", form);
+      setForm({ key: "", description: "", default_enabled: false });
+      load();
+    } catch (cause) {
+      setError(cause instanceof PlatformApiError ? cause.message : "Không thể lưu feature flag");
+    }
+  }
+
+  async function saveAiConfig(config: PlatformAiModelConfig, modelId: string, isEnabled: boolean) {
+    try {
+      await platformPut("/api/platform/ai-model-configs", {
+        application_key: config.application_key,
+        use_case: config.use_case,
+        model_id: modelId,
+        is_enabled: isEnabled,
+      });
+      load();
+    } catch (cause) {
+      setError(cause instanceof PlatformApiError ? cause.message : "Không thể lưu cấu hình AI");
+    }
+  }
+
+  function AiGuidanceCard({ configs }: { configs: PlatformAiModelConfig[] }) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Hướng dẫn sử dụng AI</CardTitle>
+          <CardDescription>
+            Tham chiếu vận hành cho từng tác vụ AI. Nhân sự chuyên môn phải thực hiện ghi chú rà soát trước khi sử dụng kết quả.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[940px] text-sm">
+              <thead className="border-b bg-slate-50 text-left text-slate-500">
+                <tr>
+                  <th className="p-3">Tác vụ</th>
+                  <th className="p-3">Mô hình mặc định</th>
+                  <th className="p-3">Mục đích</th>
+                  <th className="p-3">Ghi chú rà soát bắt buộc</th>
+                </tr>
+              </thead>
+              <tbody>
+                {configs.map((config) => {
+                  const defaultModel = config.allowed_models.find((model) => model.id === config.default_model_id);
+
+                  return (
+                    <tr className="border-b align-top last:border-0" key={config.use_case}>
+                      <td className="p-3">
+                        <p className="font-medium">{config.name}</p>
+                        <p className="mt-1 font-mono text-xs text-muted-foreground">{config.use_case}</p>
+                      </td>
+                      <td className="p-3">{defaultModel?.name ?? config.default_model_id}</td>
+                      <td className="p-3">
+                        <p>{config.guidance || "Chưa có hướng dẫn mục đích."}</p>
+                        {config.recommendation && <p className="mt-1 text-xs text-muted-foreground">Khuyến nghị: {config.recommendation}</p>}
+                      </td>
+                      <td className="p-3">
+                        <p className="font-medium text-amber-700">Bắt buộc</p>
+                        <p className="mt-1">{config.review_note || "Cần nhân sự chuyên môn rà soát kết quả AI."}</p>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {configs.length === 0 && (
+                  <tr>
+                    <td className="p-8 text-center text-muted-foreground" colSpan={4}>Chưa tải được hướng dẫn mô hình AI.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Page>
+      <PageHeader
+        title="Cấu hình nền tảng"
+        description="Feature flag, metadata tích hợp và mô hình AI. API key và secrets chỉ quản lý qua Cloudflare/Wrangler."
+      />
+      <ErrorNotice error={error} />
+      <AiGuidanceCard configs={aiConfigs} />
+      <Card>
+        <CardHeader>
+          <CardTitle>Mô hình AI theo ứng dụng</CardTitle>
+          <CardDescription>
+            Clinic Web dùng cấu hình theo từng tác vụ. Kết quả AI chỉ hỗ trợ nghiệp vụ và luôn cần nhân sự chuyên môn kiểm tra.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {aiConfigs.map((config) => (
+            <div className="grid gap-3 rounded-lg border p-4 lg:grid-cols-[minmax(0,1fr)_15rem_auto] lg:items-center" key={config.use_case}>
+              <div>
+                <p className="font-medium">{config.name}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {config.modality === "vision" ? "Mô hình thị giác" : "Mô hình văn bản"} · {config.is_overridden ? "Đang dùng cấu hình tùy chỉnh" : "Đang dùng mô hình mặc định"}
+                </p>
+              </div>
+              <Select
+                aria-label={`Mô hình cho ${config.name}`}
+                value={config.model_id}
+                disabled={!hasPermission("platform_ai_config.write")}
+                onChange={(event) => void saveAiConfig(config, event.target.value, config.is_enabled)}
+              >
+                {config.allowed_models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
+              </Select>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={config.is_enabled}
+                  disabled={!hasPermission("platform_ai_config.write")}
+                  onChange={(event) => void saveAiConfig(config, config.model_id, event.target.checked)}
+                />
+                Bật
+              </label>
+            </div>
+          ))}
+          {aiConfigs.length === 0 && <p className="text-sm text-muted-foreground">Chưa tải được danh mục mô hình AI.</p>}
+        </CardContent>
+      </Card>
+      <div className="grid gap-5 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader><CardTitle>Feature flags</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {flags.length ? flags.map((flag) => (
+              <div className="flex justify-between rounded-lg border p-3 text-sm" key={flag.key}>
+                <div>
+                  <p className="font-medium">{flag.key}</p>
+                  <p className="text-slate-500">{flag.description}</p>
+                </div>
+                <Status active={flag.default_enabled} />
+              </div>
+            )) : <p className="text-sm text-slate-500">Chưa có feature flag.</p>}
+          </CardContent>
+        </Card>
+        {hasPermission("platform_config.write") && (
+          <Card>
+            <CardHeader><CardTitle>Thêm hoặc cập nhật</CardTitle></CardHeader>
+            <CardContent>
+              <form className="space-y-3" onSubmit={save}>
+                <Input placeholder="feature.key" value={form.key} onChange={(event) => setForm({ ...form, key: event.target.value })} required />
+                <Textarea placeholder="Mô tả" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} required />
+                <label className="flex gap-2 text-sm">
+                  <input type="checkbox" checked={form.default_enabled} onChange={(event) => setForm({ ...form, default_enabled: event.target.checked })} />
+                  Bật mặc định
+                </label>
+                <Button type="submit">Lưu flag</Button>
+              </form>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </Page>
+  );
 }
 
 export function PlatformProceduresPage() {

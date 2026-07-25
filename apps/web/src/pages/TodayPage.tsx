@@ -175,7 +175,7 @@ export function TodayPage() {
           <section>
             <div className="mb-3 flex items-baseline justify-between gap-3">
               <div><h3 className="text-lg font-semibold">Luồng khách hôm nay</h3><p className="text-sm text-muted-foreground">Theo dõi lịch, khách đến và tiến độ khám tại chi nhánh.</p></div>
-              <span className="text-xs text-muted-foreground">Scope cố định theo chi nhánh đăng nhập</span>
+              <span className="text-xs text-muted-foreground">Phạm vi cố định theo chi nhánh đăng nhập</span>
             </div>
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-8">
               <MetricCard label="Đã đặt lịch" value={formatNumber(snapshot.today.scheduled)} />
@@ -198,7 +198,7 @@ export function TodayPage() {
                 <MetricCard label="Tỷ lệ hoàn thành" value={formatPercent(snapshot.kpis.completion_rate)} />
                 <MetricCard label="Lịch hẹn" value={formatNumber(snapshot.kpis.appointments)} />
                 <MetricCard label="Bệnh nhân mới" value={formatNumber(snapshot.kpis.new_patients)} />
-                <MetricCard label="Plan bản nháp" value={formatNumber(snapshot.kpis.pending_plans)} risk={snapshot.kpis.pending_plans > 0 ? "warning" : undefined} />
+                <MetricCard label="Kế hoạch bản nháp" value={formatNumber(snapshot.kpis.pending_plans)} risk={snapshot.kpis.pending_plans > 0 ? "warning" : undefined} />
               </CardContent>
             </Card>
             <Card>
@@ -253,7 +253,7 @@ function ActionSummary({ groups, hasActions }: { groups: BranchDashboardActionGr
 }
 
 function ActionCenter({ groups, branchId }: { groups: BranchDashboardActionGroup[]; branchId: string }) {
-  return <section><div className="mb-3"><h3 className="text-lg font-semibold">Action Center</h3><p className="text-sm text-muted-foreground">Mở bản ghi phù hợp để tiếp tục xử lý, không hiển thị dữ liệu lâm sàng trên dashboard.</p></div><div className="grid gap-4 xl:grid-cols-2">{groups.filter((group) => group.count > 0).map((group) => <ActionGroupCard key={group.kind} group={group} branchId={branchId} />)}</div></section>;
+  return <section><div className="mb-3"><h3 className="text-lg font-semibold">Trung tâm xử lý</h3><p className="text-sm text-muted-foreground">Mở bản ghi phù hợp để tiếp tục xử lý, không hiển thị dữ liệu lâm sàng trên bảng điều hành.</p></div><div className="grid gap-4 xl:grid-cols-2">{groups.filter((group) => group.count > 0).map((group) => <ActionGroupCard key={group.kind} group={group} branchId={branchId} />)}</div></section>;
 }
 
 function ActionGroupCard({ group, branchId }: { group: BranchDashboardActionGroup; branchId: string }) {

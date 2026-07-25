@@ -396,7 +396,7 @@ export function PatientImageGallery({
 
   async function handleAnalyze(img: PatientImage) {
     if (!isAiAnalyzableImage(img)) {
-      toast.error("DICOM/CBCT chỉ được lưu trữ và phải mở bằng PACS hoặc viewer chuyên dụng.");
+      toast.error("DICOM/CBCT chỉ được lưu trữ và phải mở bằng PACS hoặc trình xem chuyên dụng.");
       return;
     }
     setAnalyzing(true);
@@ -433,13 +433,13 @@ export function PatientImageGallery({
           notes: `${f.description}\nĐề xuất: ${f.recommendation}`,
         })),
       });
-      toast.success(`Đã lưu ${result.findings.length} clinical finding(s)`);
+      toast.success(`Đã lưu ${result.findings.length} ghi nhận lâm sàng`);
       setAnalysisResult(null);
     } catch (err) {
       const itemIndex = err instanceof ApiError && isItemIndexDetails(err.details)
-        ? ` Finding #${err.details.item_index + 1} cần được chỉnh sửa.`
+        ? ` Ghi nhận #${err.details.item_index + 1} cần được chỉnh sửa.`
         : "";
-      toast.error(`${err instanceof ApiError ? err.message : "Không thể lưu findings; không có finding nào được tạo."}${itemIndex}`);
+      toast.error(`${err instanceof ApiError ? err.message : "Không thể lưu ghi nhận; không có ghi nhận nào được tạo."}${itemIndex}`);
     }
   }
 
@@ -669,7 +669,7 @@ export function PatientImageGallery({
           {selected && <section className="mb-4 rounded-xl border border-border p-3">
             {!isDicomType(selected) ? (
               <>
-                <p className="text-sm font-semibold">Ghi chú trên ảnh — chỉ áp dụng cho ảnh raster (JPEG/PNG/WebP)</p><p className="mt-0.5 text-xs text-muted-foreground">DICOM/CBCT phải được mở bằng PACS hoặc viewer chuyên dụng.</p>
+                <p className="text-sm font-semibold">Ghi chú trên ảnh — chỉ áp dụng cho ảnh raster (JPEG/PNG/WebP)</p><p className="mt-0.5 text-xs text-muted-foreground">DICOM/CBCT phải được mở bằng PACS hoặc trình xem chuyên dụng.</p>
                 <div className="mt-3 grid gap-2"><select value={selectedDiagnosisId} onChange={(event) => setSelectedDiagnosisId(event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="">Chọn chẩn đoán</option>{diagnosisOptions.map((diagnosis) => <option key={diagnosis.id} value={diagnosis.id}>{formatDate(diagnosis.visit_date)} · {diagnosis.concept_display_vi_snapshot} · {statusLabel(diagnosis.status)}</option>)}</select>
                   <select value={selectedAnnotationVersionId} onChange={(event) => setSelectedAnnotationVersionId(event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="">Toàn bộ ảnh (không có đánh dấu)</option>{annotations.map((annotation) => <option key={annotation.current_version.id} value={annotation.current_version.id}>Ghi chú V{annotation.current_version.version_no} · {annotation.current_version.note}</option>)}</select>
                   <select value={evidenceRelation} onChange={(event) => setEvidenceRelation(event.target.value as "supports" | "contradicts" | "incidental")} className="h-9 rounded-md border border-input bg-background px-3 text-sm"><option value="supports">Ủng hộ chẩn đoán</option><option value="contradicts">Mâu thuẫn với chẩn đoán</option><option value="incidental">Phát hiện kèm theo</option></select>
@@ -679,7 +679,7 @@ export function PatientImageGallery({
                 {imageEvidence.length > 0 && <div className="mt-3 border-t pt-3"><p className="text-xs font-medium text-muted-foreground">Đang được dùng làm bằng chứng ({imageEvidence.length})</p>{imageEvidence.map((evidence) => <p key={evidence.id} className="mt-1 text-xs">{evidence.relation === "supports" ? "Ủng hộ" : evidence.relation === "contradicts" ? "Mâu thuẫn" : "Kèm theo"} · {evidence.diagnosis_id}</p>)}</div>}
               </>
             ) : (
-              <p className="text-xs text-muted-foreground">Ảnh DICOM không hỗ trợ ghi chú trực tiếp trong DentalAIOS; hãy mở bằng PACS/viewer chuyên dụng.</p>
+              <p className="text-xs text-muted-foreground">Ảnh DICOM không hỗ trợ ghi chú trực tiếp trong DentalAIOS; hãy mở bằng PACS/trình xem chuyên dụng.</p>
             )}
           </section>}
 
@@ -719,7 +719,7 @@ export function PatientImageGallery({
                   onClick={() => handleSaveFindings(analysisResult)}
                   className="bg-teal-600 hover:bg-teal-700 text-white mt-1"
                 >
-                  Lưu {analysisResult.findings.length} finding(s) vào lượt khám
+                  Lưu {analysisResult.findings.length} ghi nhận vào lượt khám
                 </Button>
               )}
             </div>
@@ -738,7 +738,7 @@ export function PatientImageGallery({
           </Button>
           {selected && (
             <>
-              {isDicomType(selected) && <p className="mr-auto text-xs text-muted-foreground">DICOM/CBCT: chỉ lưu trữ; mở bằng PACS/viewer chuyên dụng.</p>}
+              {isDicomType(selected) && <p className="mr-auto text-xs text-muted-foreground">DICOM/CBCT: chỉ lưu trữ; mở bằng PACS/trình xem chuyên dụng.</p>}
               {isAiAnalyzableImage(selected) && <Button
                 variant="outline"
                 onClick={() => handleAnalyze(selected)}

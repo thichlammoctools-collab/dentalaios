@@ -322,7 +322,7 @@ export function SchedulePage() {
             + Tạo lịch hẹn
           </Button>
           <Button asChild variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20">
-            <Link to={ROUTES.TODAY}>Dashboard hôm nay</Link>
+            <Link to={ROUTES.TODAY}>Bảng điều hành hôm nay</Link>
           </Button>
         </div>
       </div>

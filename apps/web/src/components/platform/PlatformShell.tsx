@@ -9,7 +9,7 @@ const navigation = [
   { label: "Cấu hình", href: "/platform/configuration", icon: "sliders" },
   { label: "Thủ thuật", href: "/platform/procedures", icon: "stethoscope" },
   { label: "Thuật ngữ", href: "/platform/clinical-terminology", icon: "book" },
-  { label: "Super Admin", href: "/platform/admins", icon: "users" },
+  { label: "Quản trị viên nền tảng", href: "/platform/admins", icon: "users" },
   { label: "Nhật ký", href: "/platform/audit-logs", icon: "log" },
 ] as const;
 
@@ -47,7 +47,7 @@ export function PlatformShell() {
       <aside className="relative border-b border-[#263650] bg-[#070d1a] p-4 lg:min-h-svh lg:w-64 lg:shrink-0 lg:border-b-0 lg:border-r">
         <Link to="/platform/dashboard" className="flex items-center gap-3 rounded-lg px-2 py-2 outline-none focus-visible:ring-2 focus-visible:ring-[#22d3ee] focus-visible:ring-offset-2 focus-visible:ring-offset-[#070d1a]">
           <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#16c7e5] font-bold text-[#06202a] shadow-[0_6px_16px_rgb(0_0_0_/_18%)]">D</span>
-          <span><strong className="block text-sm text-[#f1f5f9]">Dental Empire</strong><small className="text-[10px] uppercase tracking-[0.16em] text-[#67e8f9]">Platform Control</small></span>
+          <span><strong className="block text-sm text-[#f1f5f9]">Dental Empire</strong><small className="text-[10px] uppercase tracking-[0.16em] text-[#67e8f9]">Quản trị nền tảng</small></span>
         </Link>
         <nav className="mt-6 grid grid-cols-2 gap-1 lg:block lg:space-y-1">
           {visible.map((item) => {

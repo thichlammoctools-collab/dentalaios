@@ -1498,6 +1498,9 @@ export interface PlatformAiModelConfig {
   modality: "text" | "vision";
   model_id: string;
   default_model_id: string;
+  recommendation: string;
+  guidance: string;
+  review_note: string;
   allowed_models: Array<{ id: string; name: string }>;
   is_enabled: boolean;
   is_overridden: boolean;

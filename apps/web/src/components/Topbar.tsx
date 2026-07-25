@@ -46,7 +46,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
     if (location.pathname === ROUTES.SETTINGS_USERS) return "Người dùng";
     if (location.pathname === ROUTES.SETTINGS_TREATMENT_SERVICES) return "Dịch vụ điều trị";
     if (location.pathname === ROUTES.SETTINGS_ROLES) return "Vai trò";
-    if (location.pathname === ROUTES.SETTINGS_AUDIT_LOGS) return "Audit logs";
+    if (location.pathname === ROUTES.SETTINGS_AUDIT_LOGS) return "Nhật ký kiểm toán";
     return "";
   };
 
@@ -59,7 +59,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
             type="button"
             onClick={onMenuClick}
             className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground lg:hidden"
-            aria-label="Open menu"
+            aria-label="Mở menu"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -82,7 +82,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
           type="button"
           onClick={toggle}
           className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-          aria-label="Toggle theme"
+          aria-label="Chuyển đổi giao diện"
           title={theme === "light" ? "Chuyển sang tối" : "Chuyển sang sáng"}
         >
           {theme === "light" ? (

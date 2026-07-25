@@ -173,7 +173,7 @@ export function ClinicalDiagnosesCard({ visitId, patientId, findings }: Props) {
       <Button size="sm" onClick={openCreate}>Thêm chẩn đoán</Button>
     </CardHeader>
     <CardContent>
-      {loading ? <p className="text-sm text-muted-foreground">Đang tải chẩn đoán...</p> : items.length === 0 ? <p className="text-sm text-muted-foreground">Chưa có chẩn đoán mã hóa. Finding, nguy cơ và quan sát vẫn được lưu riêng.</p> : <div className="space-y-2">
+      {loading ? <p className="text-sm text-muted-foreground">Đang tải chẩn đoán...</p> : items.length === 0 ? <p className="text-sm text-muted-foreground">Chưa có chẩn đoán mã hóa. Ghi nhận, nguy cơ và quan sát vẫn được lưu riêng.</p> : <div className="space-y-2">
         {items.map((diagnosis) => <div key={diagnosis.id} className="flex flex-wrap items-start gap-2 rounded-lg border border-border p-3">
           <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{diagnosis.concept_display_vi_snapshot}</p><Badge variant={statusVariant(diagnosis.status)}>{statusLabel[diagnosis.status]}</Badge></div>
             {diagnosis.icd10_code_snapshot ? <p className="mt-1 text-sm text-muted-foreground"><span className="font-mono">{diagnosis.icd10_code_snapshot}</span> · {diagnosis.icd10_display_vi_snapshot}</p> : <p className="mt-1 text-sm text-muted-foreground">Chưa xác nhận mã ICD-10</p>}

@@ -255,7 +255,7 @@ export function AppointmentForm({
       return;
     }
     if (milestone && selectedMilestoneIds.length === 0) {
-      toast.error("Vui lòng chọn ít nhất một milestone");
+      toast.error("Vui lòng chọn ít nhất một mốc điều trị");
       return;
     }
     setStep(2);
@@ -370,7 +370,7 @@ export function AppointmentForm({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
         <DialogHeader>
-           <DialogTitle>{milestone ? "Đặt lịch từ milestone" : "Tạo lịch hẹn mới"}</DialogTitle>
+           <DialogTitle>{milestone ? "Đặt lịch từ mốc điều trị" : "Tạo lịch hẹn mới"}</DialogTitle>
            <AppointmentSteps step={step} />
         </DialogHeader>
         <DialogBody className="grid gap-3">
@@ -560,7 +560,7 @@ export function AppointmentForm({
                 id="procedure"
                 value={procedure}
                 onChange={(e) => setProcedure(e.target.value)}
-                placeholder="VD: scaling, filling, root_canal…"
+                placeholder="VD: cạo vôi, trám răng, điều trị tủy…"
               />
             </div>
           )}

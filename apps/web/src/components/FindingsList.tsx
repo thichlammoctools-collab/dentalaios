@@ -68,8 +68,8 @@ export function FindingsList({ visitId, findings, onUpdate, onDeleted }: Finding
     setSaving(true);
     try {
       const updated = await apiPatch<ClinicalFinding>(`/api/visits/${visitId}/findings/${editing.id}`, { condition, notes: notes || undefined, location_details: locationDetails, measurements });
-      onUpdate(updated); setEditing(null); toast.success("Đã cập nhật finding");
-    } catch (error) { toast.error(error instanceof ApiError ? error.message : "Không thể cập nhật finding"); }
+      onUpdate(updated); setEditing(null); toast.success("Đã cập nhật ghi nhận");
+    } catch (error) { toast.error(error instanceof ApiError ? error.message : "Không thể cập nhật ghi nhận"); }
     finally { setSaving(false); }
   }
 
@@ -90,7 +90,7 @@ export function FindingsList({ visitId, findings, onUpdate, onDeleted }: Finding
     setPeriodontalSurfaces((current) => current.includes(surface) ? current.filter((item) => item !== surface) : [...current, surface]);
   }
 
-  if (!findings.length) return <p className="text-sm text-muted-foreground">Chưa có finding nào.</p>;
+  if (!findings.length) return <p className="text-sm text-muted-foreground">Chưa có ghi nhận nào.</p>;
 
   const grouped = new Map<string, ClinicalFinding[]>();
   for (const finding of findings) {
@@ -101,7 +101,7 @@ export function FindingsList({ visitId, findings, onUpdate, onDeleted }: Finding
   return <div className="space-y-2">{[...grouped.values()].map((items) => {
     const location = locationLabel(items[0]);
     return <section key={locationKey(items[0])} className="rounded-lg border border-border p-3">
-      <div className="mb-3 flex flex-wrap items-center gap-2"><Badge variant="outline">{location}</Badge><Badge variant="secondary">{items.length} finding</Badge></div>
+      <div className="mb-3 flex flex-wrap items-center gap-2"><Badge variant="outline">{location}</Badge><Badge variant="secondary">{items.length} ghi nhận</Badge></div>
       <div className="space-y-3">{items.map((finding) => {
         const isEditing = editing?.id === finding.id;
         const category = getFindingCategory(finding.category);

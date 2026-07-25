@@ -105,7 +105,7 @@ export function AiTreatmentPlanSuggest({ visitId, onApply }: AiTreatmentPlanSugg
           AI gợi ý kế hoạch điều trị
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          AI phân tích clinical findings và đề xuất các hạng mục điều trị phù hợp.
+          AI phân tích các ghi nhận lâm sàng và đề xuất các hạng mục điều trị phù hợp.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -215,7 +215,7 @@ export function AiTreatmentPlanSuggest({ visitId, onApply }: AiTreatmentPlanSugg
 
             {/* AI Model Info */}
             <div className="text-[10px] text-muted-foreground text-center">
-              AI model: <span className="font-mono">{result.ai_model}</span> · Generated:{" "}
+              Mô hình AI: <span className="font-mono">{result.ai_model}</span> · Tạo lúc:{" "}
               {new Date(result.generated_at).toLocaleString("vi-VN")}
             </div>
 

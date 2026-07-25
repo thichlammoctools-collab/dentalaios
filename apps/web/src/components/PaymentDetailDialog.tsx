@@ -351,7 +351,7 @@ export function PaymentDetailDialog({ paymentId, onClose, onSaved }: PaymentDeta
                 onClick={() => onChangeStatus("fail")}
                 className="text-destructive"
               >
-                {statusAction === "fail" ? "…" : "Đánh fail"}
+                {statusAction === "fail" ? "…" : "Đánh dấu thất bại"}
               </Button>
             </div>
           )}

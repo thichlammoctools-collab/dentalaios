@@ -10,7 +10,7 @@ const OUTCOME_OPTIONS: { value: VisitSafetyAcknowledgementOutcome; label: string
   { value: "acknowledged", label: "Xác nhận" },
   { value: "continue_with_reason", label: "Tiếp tục với lý do" },
   { value: "defer_treatment", label: "Hoãn điều trị" },
-  { value: "refer_or_escalate", label: "Chuyển hoặc escalate" },
+  { value: "refer_or_escalate", label: "Chuyển tuyến hoặc báo cấp trên" },
 ];
 
 interface SafetyAcknowledgementDialogProps {
@@ -45,7 +45,7 @@ export function SafetyAcknowledgementDialog({ open, onOpenChange, onSubmit }: Sa
 
       <DialogBody className="space-y-4">
         <div className="grid gap-1.5">
-          <Label htmlFor="safety-outcome">Outcome</Label>
+          <Label htmlFor="safety-outcome">Kết quả xử trí</Label>
           <Select
             id="safety-outcome"
             value={outcome}

@@ -435,7 +435,7 @@ export function ReferralProgramsPage() {
                           <td className="p-2.5">
                             {rule.reward_kind === "cash"
                               ? "Tiền mặt"
-                              : "Voucher"}{" "}
+                              : "Phiếu ưu đãi"}{" "}
                             ·{" "}
                             {rule.calculation_type === "fixed"
                               ? "Cố định"
@@ -690,7 +690,7 @@ export function ReferralProgramsPage() {
                         className="min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm"
                       >
                         <option value="cash">Tiền mặt</option>
-                        <option value="voucher">Voucher</option>
+                         <option value="voucher">Phiếu ưu đãi</option>
                       </select>
                       <select
                         value={rule.calculation_type}

@@ -84,7 +84,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
           notes: f.notes || undefined,
         })),
       });
-      toast.success(`Đã lưu ${response.items.length} findings`);
+      toast.success(`Đã lưu ${response.items.length} ghi nhận`);
       onSaved(response.items);
       handleClose();
     } catch (err) {
@@ -93,7 +93,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
         : null;
       setSaveErrorIndex(itemIndex);
       if (itemIndex !== null) setEditingIdx(itemIndex);
-      toast.error(err instanceof ApiError ? err.message : "Lỗi lưu findings");
+      toast.error(err instanceof ApiError ? err.message : "Lỗi lưu ghi nhận");
     } finally {
       setSaving(false);
     }
@@ -148,8 +148,8 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
             </svg>
           </div>
           <div>
-            <DialogTitle>Nhập findings bằng giọng nói</DialogTitle>
-            <p className="text-xs text-muted-foreground mt-0.5">AI phân tích &amp; tạo findings, bác sĩ duyệt lại</p>
+            <DialogTitle>Nhập ghi nhận bằng giọng nói</DialogTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">AI phân tích và tạo ghi nhận, bác sĩ duyệt lại</p>
           </div>
         </div>
       </DialogHeader>
@@ -159,7 +159,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="text-sm font-medium">Bước 1 — Ghi âm liên tục hoặc nhập text</p>
+              <p className="text-sm font-medium">Bước 1 — Ghi âm liên tục hoặc nhập văn bản</p>
               <p className="mt-0.5 text-xs text-muted-foreground">Bấm bắt đầu, nói liên tục; transcript sẽ hiển thị ngay để kiểm tra trước khi phân tích.</p>
             </div>
             <VoiceInputButton
@@ -200,12 +200,12 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
                 rows={2}
                 value={manualEntry}
                 onChange={(e) => setManualEntry(e.target.value)}
-                placeholder="Hoặc nhập text thủ công và nhấn Phân tích…"
+                placeholder="Hoặc nhập văn bản thủ công và nhấn Phân tích…"
                 className="text-sm"
               />
               {manualEntry.trim() && (
                 <Button size="sm" onClick={addManualEntry} variant="outline" className="text-xs">
-                  Phân tích text
+                  Phân tích văn bản
                 </Button>
               )}
             </div>
@@ -223,7 +223,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
             </div>
             <div className="text-center">
               <p className="font-medium text-sm text-cyan-800 dark:text-cyan-300">AI đang phân tích…</p>
-              <p className="text-xs text-cyan-600 dark:text-cyan-500 mt-0.5">Chuyển đổi giọng nói thành clinical findings</p>
+              <p className="text-xs text-cyan-600 dark:text-cyan-500 mt-0.5">Chuyển đổi giọng nói thành ghi nhận lâm sàng</p>
             </div>
           </div>
         )}
@@ -233,7 +233,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
           <div className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-center justify-between mb-3">
               <p className="text-sm font-medium">
-                Bước 2 — Findings đã phân tích ({parsedFindings.length})
+                Bước 2 — Ghi nhận đã phân tích ({parsedFindings.length})
               </p>
               <Button
                 size="sm"
@@ -245,7 +245,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
               </Button>
             </div>
             <p className="text-xs text-muted-foreground mb-3">
-              Kiểm tra &amp; chỉnh sửa findings trước khi lưu. Bác sĩ chịu trách nhiệm duyệt.
+              Kiểm tra và chỉnh sửa ghi nhận trước khi lưu. Bác sĩ chịu trách nhiệm duyệt.
             </p>
             <div className="space-y-2 max-h-72 overflow-y-auto">
               {parsedFindings.map((f, idx) => {
@@ -378,7 +378,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
                 ])
               }
             >
-              + Thêm findings thủ công
+              + Thêm ghi nhận thủ công
             </Button>
           </div>
         )}
@@ -389,8 +389,8 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
             <svg className="h-8 w-8 text-zinc-300 dark:text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
             </svg>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Nhấn <strong>Bắt đầu ghi âm</strong> hoặc nhập text để bắt đầu</p>
-            <p className="text-xs text-zinc-400 dark:text-zinc-600">AI sẽ phân tích và tạo clinical findings cho bạn duyệt</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Nhấn <strong>Bắt đầu ghi âm</strong> hoặc nhập văn bản để bắt đầu</p>
+            <p className="text-xs text-zinc-400 dark:text-zinc-600">AI sẽ phân tích và tạo ghi nhận lâm sàng để bạn duyệt</p>
           </div>
         )}
       </DialogBody>
@@ -412,7 +412,7 @@ export function VoiceFindingsDialog({ open, onOpenChange, visitId, onSaved }: Vo
               <svg className="mr-1.5 h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
-              Lưu {parsedFindings.length > 0 ? `(${parsedFindings.length})` : ""} Findings
+              Lưu {parsedFindings.length > 0 ? `(${parsedFindings.length})` : ""} ghi nhận
             </>
           )}
         </Button>

@@ -480,7 +480,7 @@ function EditAppointmentDialog({
 
           <div className="grid gap-1.5">
             <Label>Hạng mục</Label>
-            <Input value={procedure} onChange={(e) => setProcedure(e.target.value)} placeholder="VD: scaling, filling…" />
+            <Input value={procedure} onChange={(e) => setProcedure(e.target.value)} placeholder="VD: cạo vôi, trám răng…" />
           </div>
 
           <div className="grid gap-1.5">

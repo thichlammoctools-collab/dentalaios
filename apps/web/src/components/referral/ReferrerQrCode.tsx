@@ -42,7 +42,7 @@ export function ReferrerQrCode({ referrerId, label }: ReferrerQrCodeProps) {
         <p className="mt-1 text-xs text-muted-foreground">Quét để chọn người giới thiệu khi tạo hồ sơ.</p>
       </div>
       <div className="flex flex-wrap justify-center gap-2">
-        <Button type="button" variant="outline" onClick={() => void copyPayload()}>Copy</Button>
+        <Button type="button" variant="outline" onClick={() => void copyPayload()}>Sao chép</Button>
         {dataUrl && <Button type="button" asChild><a href={dataUrl} download={`referrer-${label}.png`}>Tải PNG</a></Button>}
       </div>
     </div>

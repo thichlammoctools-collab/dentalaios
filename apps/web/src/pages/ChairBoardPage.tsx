@@ -260,7 +260,7 @@ export function ChairBoardPage() {
                   {canViewRevenue && item.revenue && (
                     <div className="grid grid-cols-3 gap-2 rounded-lg bg-emerald-50 p-3 text-xs dark:bg-emerald-950/30">
                       <Metric label="Doanh thu" value={formatCurrency(item.revenue.confirmed_revenue)} />
-                      <Metric label="Payment" value={String(item.revenue.payment_count)} />
+                       <Metric label="Lượt thanh toán" value={String(item.revenue.payment_count)} />
                       <Metric label="DT/giờ" value={item.revenue.revenue_per_completed_hour === null ? "--" : formatCurrency(item.revenue.revenue_per_completed_hour)} />
                     </div>
                   )}

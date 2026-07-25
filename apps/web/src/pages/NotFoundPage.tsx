@@ -8,7 +8,7 @@ export function NotFoundPage() {
       description="Đường dẫn không tồn tại hoặc đã bị thay đổi."
     >
       <Link to="/today" className="text-primary underline">
-        Về Today dashboard
+        Về bảng điều hành hôm nay
       </Link>
     </PlaceholderPage>
   );

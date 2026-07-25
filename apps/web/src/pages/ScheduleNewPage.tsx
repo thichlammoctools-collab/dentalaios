@@ -240,7 +240,7 @@ export function ScheduleNewPage() {
                     <Input
                       value={procedure}
                       onChange={(e) => setProcedure(e.target.value)}
-                      placeholder="VD: scaling, filling…"
+                       placeholder="VD: cạo vôi, trám răng…"
                     />
                   </div>
                 </div>

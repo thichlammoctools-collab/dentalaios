@@ -173,7 +173,7 @@ export function PatientClinicalJourney({ patientId }: { patientId: string }) {
                       {findings.length === 0 ? <span className="text-muted-foreground">Chưa ghi nhận</span> : (
                         <div>
                           <button type="button" className="font-medium hover:text-primary hover:underline" onClick={() => navigate(withPatientReturnContext(`/visits/${row.visit.id}`, patientId, "journey"))}>
-                            {findings[0].code ?? "Finding chưa có mã"}
+                             {findings[0].code ?? "Ghi nhận chưa có mã"}
                           </button>
                           <p className="mt-0.5 text-muted-foreground">BS. {row.visit.treating_clinician_name ?? "—"}</p>
                           <p className="text-muted-foreground">Phụ tá: {row.visit.assistant_name ?? "—"}</p>

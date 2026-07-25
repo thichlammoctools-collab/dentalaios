@@ -16,6 +16,24 @@ describe("aiModelConfigService", () => {
     });
   });
 
+  it("returns the recommended default and guidance for every configured use case", async () => {
+    const configs = await aiModelConfigService.list(createMockD1() as never);
+
+    expect(configs).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        use_case: "treatment_plan_draft",
+        model_id: "@cf/openai/gpt-oss-20b",
+        recommendation: "Ưu tiên suy luận có cấu trúc",
+      }),
+      expect.objectContaining({
+        use_case: "appointment_chat_parse",
+        model_id: "@cf/zai-org/glm-4.7-flash",
+        guidance: expect.any(String),
+        review_note: expect.any(String),
+      }),
+    ]));
+  });
+
   it("rejects a model that is incompatible with the selected use case", async () => {
     await expect(
       aiModelConfigService.update(
