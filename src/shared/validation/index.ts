@@ -1116,6 +1116,30 @@ export const platformAiModelConfigSchema = z.object({
   is_enabled: z.boolean(),
 }).strict();
 
+export const platformAiRolloutSchema = z.object({
+  use_case: z.enum(platformAiUseCases),
+  candidate_model_id: z.enum(platformAiModelIds),
+  traffic_percent: z.number().int().min(0).max(100),
+  status: z.enum(["draft", "pending_approval", "paused"]),
+}).strict();
+
+export const platformAiRolloutApprovalSchema = z.object({
+  status: z.enum(["approved", "active", "paused"]),
+}).strict();
+
+export const platformAiBenchmarkCaseSchema = z.object({
+  use_case: z.enum(platformAiUseCases),
+  label: nonEmpty(120),
+  prompt: z.string().trim().min(10).max(20_000),
+  expected_output: z.string().trim().min(2).max(20_000),
+  is_deidentified: z.literal(true),
+}).strict();
+
+export const platformAiBenchmarkReviewSchema = z.object({
+  reviewer_score: z.number().int().min(0).max(5),
+  reviewer_note: z.string().trim().max(1000).optional(),
+}).strict();
+
 export const procedureCatalogCreateSchema = z.object({
   code: z.string().trim().min(2, "Mã thủ thuật tối thiểu 2 ký tự").max(100).regex(/^[a-z0-9_-]+$/, "Mã thủ thuật chỉ gồm chữ thường, số, gạch ngang hoặc gạch dưới"),
   name: nonEmpty(200),

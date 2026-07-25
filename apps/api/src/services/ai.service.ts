@@ -13,9 +13,8 @@ import { createTreatmentPlansRepository } from "../repositories/treatment-plans.
 import { createTreatmentItemsRepository } from "../repositories/treatment-items.repo";
 import { createPatientsRepository } from "../repositories/patients.repo";
 import { createTreatmentServicesRepository } from "../repositories/treatment-service-prices.repo";
-import { getAiResponseText } from "../lib/ai-response";
+import { runAiWithFallback } from "../lib/ai-runtime";
 import { NotFoundError, ValidationError } from "../lib/errors";
-import { aiModelConfigService } from "./ai-model-config.service";
 import { isValidFdiTooth } from "@shared/constants";
 import { getAnatomicalSiteLabel, getFindingCategory } from "@shared/constants/clinical-findings";
 import { findingCreateSchema } from "@shared/validation";
@@ -108,30 +107,22 @@ export const aiService = {
 
     const data = buildSummaryData({ patient, visit, findings, planItems });
 
-    // Try Cloudflare AI
-    const model = await aiModelConfigService.resolve(db, "visit_summary");
-    if (model.is_enabled && AI && typeof (AI as { run?: unknown }).run === "function") {
-      try {
-        const result = await (AI as { run: (model: string, inputs: object) => Promise<unknown> }).run(
-          model.model_id,
-          {
-            messages: [
-              { role: "system", content: "Bạn là trợ lý nha khoa chuyên nghiệp. Viết tóm tắt bệnh án bằng tiếng Việt, ngắn gọn, dễ hiểu. Dùng ngôn ngữ thân thiện, phù hợp để bác sĩ đọc lại nhanh." },
-              { role: "user", content: buildPrompt(data) },
-            ],
-            max_tokens: 512,
-            temperature: 0.3,
-          },
-        );
-        return {
-          summary: getAiResponseText(result) || "Không có phản hồi từ AI.",
-          ai_model: model.model_id,
-          generated_at: new Date().toISOString(),
-        };
-      } catch {
-        // fall through
-      }
-    }
+    const generated = await runAiWithFallback({
+      db,
+      AI,
+      use_case: "visit_summary",
+      request: {
+        messages: [
+          { role: "system", content: "Bạn là trợ lý nha khoa chuyên nghiệp. Viết tóm tắt bệnh án bằng tiếng Việt, ngắn gọn, dễ hiểu. Dùng ngôn ngữ thân thiện, phù hợp để bác sĩ đọc lại nhanh." },
+          { role: "user", content: buildPrompt(data) },
+        ],
+        max_tokens: 512,
+        temperature: 0.3,
+      },
+      parse: (text) => text.trim() || null,
+      routing_key: visitId,
+    });
+    if (generated) return { summary: generated.value, ai_model: generated.model_id, generated_at: new Date().toISOString() };
 
     // Fallback: structured text
     return {
@@ -218,30 +209,22 @@ QUY TẮC QUAN TRỌNG:
 - Khi danh mục trống: service_code = null và có thể dùng chi phí tham khảo.
 - Không bào chữa, chỉ trả JSON thuần túy`;
 
-    // Try Cloudflare AI
-    const model = await aiModelConfigService.resolve(db, "treatment_plan_draft");
-    if (model.is_enabled && AI && typeof (AI as { run?: unknown }).run === "function") {
-      try {
-        const result = await (AI as { run: (model: string, inputs: object) => Promise<unknown> }).run(
-          model.model_id,
-          {
-            messages: [
-              { role: "system", content: "Bạn là bác sĩ nha khoa chuyên nghiệp. Luôn trả lời đúng format JSON, không thêm text khác." },
-              { role: "user", content: prompt },
-            ],
-            max_tokens: 1024,
-            temperature: 0.2,
-          },
-        );
-        const raw = getAiResponseText(result) || "{}";
-        const parsed = parseAiPlanResponse(raw, activeServices);
-        if (parsed) {
-          return { ...parsed, ai_model: model.model_id, generated_at: new Date().toISOString() };
-        }
-      } catch {
-        // fall through
-      }
-    }
+    const generated = await runAiWithFallback({
+      db,
+      AI,
+      use_case: "treatment_plan_draft",
+      request: {
+        messages: [
+          { role: "system", content: "Bạn là bác sĩ nha khoa chuyên nghiệp. Luôn trả lời đúng format JSON, không thêm text khác." },
+          { role: "user", content: prompt },
+        ],
+        max_tokens: 1024,
+        temperature: 0.2,
+      },
+      parse: (text) => parseAiPlanResponse(text, activeServices),
+      routing_key: visitId,
+    });
+    if (generated) return { ...generated.value, ai_model: generated.model_id, generated_at: new Date().toISOString() };
 
     // Fallback: rule-based plan
     return buildFallbackPlan(findings, diagnoses, visit, patient, activeServices);
@@ -355,48 +338,31 @@ QUY TẮC QUAN TRỌNG:
 
     if (!imageBase64) throw new NotFoundError("Image file missing in storage");
 
-    const model = await aiModelConfigService.resolve(db, "clinical_image_analysis");
-
-    // Step 3: Try vision model with base64 image
-    if (
-      model.is_enabled &&
-      AI &&
-      typeof (AI as { run?: unknown }).run === "function" &&
-      imageBase64
-    ) {
-      try {
-        const result = await (AI as { run: (model: string, inputs: object) => Promise<unknown> }).run(
-          model.model_id,
+    const generated = await runAiWithFallback({
+      db,
+      AI,
+      use_case: "clinical_image_analysis",
+      request: {
+        messages: [
           {
-            messages: [
-              {
-                role: "system",
-                content: "Bạn là bác sĩ nha khoa giàu kinh nghiệm. Khi nhìn hình ảnh y khoa, hãy mô tả chính xác những gì bạn thấy, xác định răng theo hệ FDI, và trả lời đúng format JSON, không thêm text khác ngoài JSON.",
-              },
-              {
-                role: "user",
-                content: [
-                  { type: "text", text: textPrompt },
-                  {
-                    type: "image_url",
-                    image_url: { url: `data:${mimeType};base64,${imageBase64}` },
-                  },
-                ],
-              },
-            ],
-            max_tokens: 1536,
-            temperature: 0.2,
+            role: "system",
+            content: "Bạn là bác sĩ nha khoa giàu kinh nghiệm. Khi nhìn hình ảnh y khoa, hãy mô tả chính xác những gì bạn thấy, xác định răng theo hệ FDI, và trả lời đúng format JSON, không thêm text khác ngoài JSON.",
           },
-        );
-        const raw = getAiResponseText(result) || "{}";
-        const parsed = parseAnalyzeImageResponse(raw);
-        if (parsed) {
-          return { ...parsed, ai_model: model.model_id, generated_at: new Date().toISOString() };
-        }
-      } catch {
-        // fall through to text-only
-      }
-    }
+          {
+            role: "user",
+            content: [
+              { type: "text", text: textPrompt },
+              { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
+            ],
+          },
+        ],
+        max_tokens: 1536,
+        temperature: 0.2,
+      },
+      parse: parseAnalyzeImageResponse,
+      routing_key: fileId,
+    });
+    if (generated) return { ...generated.value, ai_model: generated.model_id, generated_at: new Date().toISOString() };
 
     // Step 4: Final fallback
     return {

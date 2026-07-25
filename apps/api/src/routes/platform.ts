@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
+import { z } from "zod";
 import { PLATFORM_PERMISSIONS } from "@shared/constants";
 import {
   platformAdminCreateSchema,
@@ -10,6 +11,10 @@ import {
   platformFlagOverrideSchema,
   platformFlagSchema,
   platformAiModelConfigSchema,
+  platformAiRolloutSchema,
+  platformAiRolloutApprovalSchema,
+  platformAiBenchmarkCaseSchema,
+  platformAiBenchmarkReviewSchema,
   platformLifecycleSchema,
   platformLimitsSchema,
   procedureCatalogCreateSchema,
@@ -46,6 +51,8 @@ import { createClinicalTerminologyRepository } from "../repositories/clinical-te
 import { platformService } from "../services/platform.service";
 import { platformTenantProvisionService } from "../services/platform-tenant-provision.service";
 import { aiModelConfigService } from "../services/ai-model-config.service";
+import { createAiModelMetricsRepository } from "../repositories/ai-model-metrics.repo";
+import { createAiGovernanceRepository } from "../repositories/ai-governance.repo";
 const router = new Hono<{ Bindings: Env; Variables: PlatformAuthContext }>();
 const actor = (c: any) => ({
   user_id: getPlatformJwt(c).sub,
@@ -326,6 +333,90 @@ router.get(
   "/ai-model-configs",
   requirePlatformPermission(PLATFORM_PERMISSIONS.AI_CONFIG_READ),
   async (c) => c.json({ items: await aiModelConfigService.list(c.env.DB) }),
+);
+router.get(
+  "/ai-model-metrics",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.AI_CONFIG_READ),
+  async (c) => c.json({ items: await createAiModelMetricsRepository(c.env.DB).summary(30) }),
+);
+router.get(
+  "/ai-rollouts",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.AI_CONFIG_READ),
+  async (c) => c.json({ items: await createAiGovernanceRepository(c.env.DB).listRollouts() }),
+);
+router.put(
+  "/ai-rollouts",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.AI_EVALUATE),
+  requireRecentPlatformMfa(),
+  zValidator("json", platformAiRolloutSchema),
+  async (c) => {
+    const data = c.req.valid("json");
+    const config = (await aiModelConfigService.list(c.env.DB)).find((item) => item.use_case === data.use_case);
+    if (!config?.allowed_models.some((model) => model.id === data.candidate_model_id)) throw new ConflictError("Model không tương thích với tác vụ AI này");
+    await createAiGovernanceRepository(c.env.DB).upsertRollout({ ...data, requested_by: getPlatformJwt(c).sub, updated_at: "" });
+    await platformAudit(c.env.DB, { ...actor(c), action: "ai_rollout.requested", entity_type: "ai_rollout", entity_id: data.use_case, details: { candidate_model_id: data.candidate_model_id, traffic_percent: data.traffic_percent, status: data.status } });
+    return c.json({ ok: true });
+  },
+);
+router.post(
+  "/ai-rollouts/:useCase/approve",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.AI_APPROVE),
+  requireRecentPlatformMfa(),
+  zValidator("json", platformAiRolloutApprovalSchema),
+  async (c) => {
+    const data = c.req.valid("json");
+    await createAiGovernanceRepository(c.env.DB).approveRollout(c.req.param("useCase"), data.status, getPlatformJwt(c).sub);
+    await platformAudit(c.env.DB, { ...actor(c), action: "ai_rollout.approved", entity_type: "ai_rollout", entity_id: c.req.param("useCase"), details: { status: data.status } });
+    return c.json({ ok: true });
+  },
+);
+router.get(
+  "/ai-benchmark-cases",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.AI_CONFIG_READ),
+  async (c) => c.json({ items: await createAiGovernanceRepository(c.env.DB).listBenchmarkCases() }),
+);
+router.post(
+  "/ai-benchmark-cases",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.AI_EVALUATE),
+  requireRecentPlatformMfa(),
+  zValidator("json", platformAiBenchmarkCaseSchema),
+  async (c) => {
+    const data = c.req.valid("json");
+    const id = newId();
+    await createAiGovernanceRepository(c.env.DB).createBenchmarkCase({ ...data, id, created_by: getPlatformJwt(c).sub, created_at: "" });
+    await platformAudit(c.env.DB, { ...actor(c), action: "ai_benchmark_case.created", entity_type: "ai_benchmark_case", entity_id: id, details: { use_case: data.use_case, is_deidentified: true } });
+    return c.json({ id }, 201);
+  },
+);
+router.post(
+  "/ai-benchmark-cases/:id/evaluate",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.AI_EVALUATE),
+  requireRecentPlatformMfa(),
+  zValidator("json", z.object({ model_id: z.string().min(1) }).strict()),
+  async (c) => {
+    const benchmarkCase = (await createAiGovernanceRepository(c.env.DB).listBenchmarkCases()).find((item) => item.id === c.req.param("id"));
+    if (!benchmarkCase) throw new NotFoundError("Benchmark case not found");
+    const config = (await aiModelConfigService.list(c.env.DB)).find((item) => item.use_case === benchmarkCase.use_case);
+    const modelId = c.req.valid("json").model_id;
+    if (!config?.allowed_models.some((model) => model.id === modelId)) throw new ConflictError("Model không tương thích với benchmark này");
+    if (!c.env.AI || typeof (c.env.AI as { run?: unknown }).run !== "function") throw new ConflictError("Workers AI chưa sẵn sàng");
+    const result = await (c.env.AI as { run: (model: string, input: object) => Promise<unknown> }).run(modelId, { messages: [{ role: "user", content: benchmarkCase.prompt }], max_tokens: 1024, temperature: 0 });
+    const output = (await import("../lib/ai-response")).getAiResponseText(result) ?? "";
+    const id = newId();
+    await createAiGovernanceRepository(c.env.DB).createEvaluation({ id, case_id: benchmarkCase.id, model_id: modelId, output, json_valid: (() => { try { JSON.parse(output); return true; } catch { return false; } })(), created_at: "" });
+    return c.json({ id, output });
+  },
+);
+router.post(
+  "/ai-benchmark-evaluations/:id/review",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.AI_EVALUATE),
+  requireRecentPlatformMfa(),
+  zValidator("json", platformAiBenchmarkReviewSchema),
+  async (c) => {
+    const data = c.req.valid("json");
+    await createAiGovernanceRepository(c.env.DB).reviewEvaluation(c.req.param("id"), data.reviewer_score, data.reviewer_note, getPlatformJwt(c).sub);
+    return c.json({ ok: true });
+  },
 );
 router.put(
   "/ai-model-configs",

@@ -4,6 +4,7 @@ type AiResponse = {
   choices?: Array<{
     message?: { content?: unknown };
   }>;
+  usage?: { input_tokens?: unknown; prompt_tokens?: unknown; output_tokens?: unknown; completion_tokens?: unknown };
 };
 
 function contentToText(content: unknown): string | undefined {
@@ -17,6 +18,16 @@ function contentToText(content: unknown): string | undefined {
       return "";
     })
     .join("") || undefined;
+}
+
+export function getAiUsage(result: unknown): { input_tokens: number; output_tokens: number } {
+  if (typeof result !== "object" || result === null) return { input_tokens: 0, output_tokens: 0 };
+  const usage = (result as AiResponse).usage;
+  const numberOrZero = (value: unknown) => typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.round(value) : 0;
+  return {
+    input_tokens: numberOrZero(usage?.input_tokens ?? usage?.prompt_tokens),
+    output_tokens: numberOrZero(usage?.output_tokens ?? usage?.completion_tokens),
+  };
 }
 
 /** Supports both the native Workers AI and OpenAI-compatible response shapes. */

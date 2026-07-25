@@ -232,10 +232,25 @@ export const PLATFORM_PERMISSIONS = {
   CLINICAL_TERMINOLOGY_WRITE: "platform_clinical_terminology.write",
   AI_CONFIG_READ: "platform_ai_config.read",
   AI_CONFIG_WRITE: "platform_ai_config.write",
+  AI_EVALUATE: "platform_ai_evaluate.write",
+  AI_APPROVE: "platform_ai_approve.write",
   AUDIT_READ: "platform_audit.read",
 } as const;
 
 export const PLATFORM_AI_APPLICATION = "clinic_web" as const;
+
+export const PLATFORM_AI_MODEL_PRICING = {
+  "@cf/meta/llama-4-scout-17b-16e-instruct": { input_microusd_per_million: 270_000, output_microusd_per_million: 850_000 },
+  "@cf/openai/gpt-oss-20b": { input_microusd_per_million: 200_000, output_microusd_per_million: 300_000 },
+  "@cf/openai/gpt-oss-120b": { input_microusd_per_million: 500_000, output_microusd_per_million: 1_000_000 },
+  "@cf/google/gemma-4-26b-a4b-it": { input_microusd_per_million: 100_000, output_microusd_per_million: 300_000 },
+  "@cf/moonshotai/kimi-k2.6": { input_microusd_per_million: 950_000, output_microusd_per_million: 4_000_000 },
+  "@cf/moonshotai/kimi-k2.7-code": { input_microusd_per_million: 950_000, output_microusd_per_million: 4_000_000 },
+  "@cf/nvidia/nemotron-3-120b-a12b": { input_microusd_per_million: 500_000, output_microusd_per_million: 1_500_000 },
+  "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b": { input_microusd_per_million: 500_000, output_microusd_per_million: 4_880_000 },
+  "@cf/aisingapore/gemma-sea-lion-v4-27b-it": { input_microusd_per_million: 350_000, output_microusd_per_million: 560_000 },
+  "@cf/mistralai/mistral-small-3.1-24b-instruct": { input_microusd_per_million: 350_000, output_microusd_per_million: 560_000 },
+} as const;
 
 const PLATFORM_AI_TEXT_MODELS = [
   { id: "@cf/meta/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B" },
@@ -276,6 +291,7 @@ export const PLATFORM_AI_MODEL_CONFIG_CATALOG = [
     name: "Tóm tắt lượt khám",
     modality: "text",
     default_model_id: "@cf/meta/llama-4-scout-17b-16e-instruct",
+    fallback_model_id: "@cf/openai/gpt-oss-20b",
     recommendation: "Cân bằng chất lượng và chi phí",
     guidance: "Tóm tắt bệnh án tiếng Việt, ưu tiên chất lượng diễn đạt và độ ổn định.",
     review_note: "Bác sĩ kiểm tra trước khi dùng làm nội dung hồ sơ hoặc tư vấn.",
@@ -286,6 +302,7 @@ export const PLATFORM_AI_MODEL_CONFIG_CATALOG = [
     name: "Gợi ý kế hoạch điều trị",
     modality: "text",
     default_model_id: "@cf/openai/gpt-oss-20b",
+    fallback_model_id: "@cf/meta/llama-4-scout-17b-16e-instruct",
     recommendation: "Ưu tiên suy luận có cấu trúc",
     guidance: "Soạn nháp kế hoạch từ findings, chẩn đoán và danh mục dịch vụ có sẵn.",
     review_note: "Bác sĩ xác nhận chỉ định, dịch vụ và chi phí trước khi phê duyệt.",
@@ -296,6 +313,7 @@ export const PLATFORM_AI_MODEL_CONFIG_CATALOG = [
     name: "Phân tích hình ảnh lâm sàng",
     modality: "vision",
     default_model_id: "@cf/meta/llama-4-scout-17b-16e-instruct",
+    fallback_model_id: "@cf/meta/llama-3.2-11b-vision-instruct",
     recommendation: "Đa phương thức, ổn định",
     guidance: "Đọc ảnh JPEG, PNG hoặc WebP và trả về phát hiện có cấu trúc theo hệ FDI.",
     review_note: "Chỉ hỗ trợ sàng lọc, không thay thế đọc X-quang, DICOM/CBCT hoặc chẩn đoán.",
@@ -306,6 +324,7 @@ export const PLATFORM_AI_MODEL_CONFIG_CATALOG = [
     name: "Trích xuất phát hiện từ ghi âm",
     modality: "text",
     default_model_id: "@cf/meta/llama-4-scout-17b-16e-instruct",
+    fallback_model_id: "@cf/openai/gpt-oss-20b",
     recommendation: "Cân bằng chất lượng và chi phí",
     guidance: "Chuẩn hóa bản ghi đã có thành clinical findings có cấu trúc.",
     review_note: "Đối chiếu bản ghi gốc, răng FDI và thuật ngữ trước khi lưu.",
@@ -315,7 +334,8 @@ export const PLATFORM_AI_MODEL_CONFIG_CATALOG = [
     use_case: "appointment_chat_parse",
     name: "Phân tích hội thoại đặt lịch",
     modality: "text",
-    default_model_id: "@cf/zai-org/glm-4.7-flash",
+    default_model_id: "@cf/openai/gpt-oss-20b",
+    fallback_model_id: "@cf/meta/llama-4-scout-17b-16e-instruct",
     recommendation: "Phản hồi nhanh cho tác vụ hành chính",
     guidance: "Trích xuất bệnh nhân, bác sĩ, thời gian và thủ thuật từ hội thoại đặt lịch.",
     review_note: "Lễ tân xác nhận bệnh nhân, bác sĩ, múi giờ và lịch trống trước khi tạo lịch.",
@@ -326,6 +346,7 @@ export const PLATFORM_AI_MODEL_CONFIG_CATALOG = [
     name: "Gợi ý lịch hẹn tiếp theo",
     modality: "text",
     default_model_id: "@cf/openai/gpt-oss-20b",
+    fallback_model_id: "@cf/meta/llama-4-scout-17b-16e-instruct",
     recommendation: "Ưu tiên suy luận có cấu trúc",
     guidance: "Đề xuất thời điểm tái khám dựa trên findings và hạng mục điều trị còn lại.",
     review_note: "Nhân sự lâm sàng hoặc lễ tân xác nhận chỉ định và lịch trống trước khi gửi hẹn.",

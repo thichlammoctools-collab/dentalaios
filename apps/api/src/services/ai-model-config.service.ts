@@ -4,7 +4,7 @@ import type { PlatformAiModelConfig } from "@shared/types";
 import { ValidationError } from "../lib/errors";
 import { createPlatformAiModelConfigRepository } from "../repositories/platform-ai-model-config.repo";
 
-type ResolvedAiModel = { model_id: string; is_enabled: boolean };
+type ResolvedAiModel = { model_id: string; fallback_model_id: string; is_enabled: boolean };
 
 function catalogEntry(useCase: PlatformAiUseCase) {
   const entry = PLATFORM_AI_MODEL_CONFIG_CATALOG.find((item) => item.use_case === useCase);
@@ -25,6 +25,7 @@ export const aiModelConfigService = {
         modality: entry.modality,
         model_id: validOverride?.model_id ?? entry.default_model_id,
         default_model_id: entry.default_model_id,
+        fallback_model_id: entry.fallback_model_id,
         recommendation: entry.recommendation,
         guidance: entry.guidance,
         review_note: entry.review_note,
@@ -38,7 +39,7 @@ export const aiModelConfigService = {
   async resolve(db: D1Database, useCase: PlatformAiUseCase): Promise<ResolvedAiModel> {
     const config = (await this.list(db)).find((item) => item.use_case === useCase);
     if (!config) throw new ValidationError("AI use case không hợp lệ");
-    return { model_id: config.model_id, is_enabled: config.is_enabled };
+    return { model_id: config.model_id, fallback_model_id: config.fallback_model_id, is_enabled: config.is_enabled };
   },
   async update(db: D1Database, data: { application_key: string; use_case: string; model_id: string; is_enabled: boolean }, userId: string): Promise<PlatformAiModelConfig> {
     const entry = catalogEntry(data.use_case as PlatformAiUseCase);

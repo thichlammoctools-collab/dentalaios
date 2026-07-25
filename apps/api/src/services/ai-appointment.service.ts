@@ -23,8 +23,7 @@ import { createUsersRepository } from "../repositories/users.repo";
 import { NotFoundError } from "../lib/errors";
 import { isDoctorRole } from "@shared/constants";
 import { getAnatomicalSiteLabel, getFindingCategory } from "@shared/constants/clinical-findings";
-import { aiModelConfigService } from "./ai-model-config.service";
-import { getAiResponseText } from "../lib/ai-response";
+import { runAiWithFallback } from "../lib/ai-runtime";
 
 // ─── Result types ────────────────────────────────────────────
 
@@ -103,12 +102,11 @@ export const aiAppointmentService = {
       .map((d) => `  - ${d.name}`)
       .join("\n");
 
-    const model = await aiModelConfigService.resolve(db, "appointment_chat_parse");
-    if (model.is_enabled && AI && typeof (AI as { run?: unknown }).run === "function") {
-      try {
-        const result = await (AI as { run: (model: string, inputs: object) => Promise<unknown> }).run(
-          model.model_id,
-          {
+    const generated = await runAiWithFallback({
+      db,
+      AI,
+      use_case: "appointment_chat_parse",
+      request: {
             messages: [
               {
                 role: "system",
@@ -155,21 +153,11 @@ Trả CHÍNH XÁC JSON, KHÔNG thêm text khác:
             ],
             max_tokens: 1024,
             temperature: 0.2,
-          },
-        );
-        const raw = getAiResponseText(result) || "{}";
-        const parsed = parseAiResponse(raw);
-        if (parsed) {
-          return {
-            appointment: parsed,
-            ai_model: model.model_id,
-            generated_at: new Date().toISOString(),
-          };
-        }
-      } catch {
-        // fall through to fallback
-      }
-    }
+      },
+      parse: parseAiResponse,
+      routing_key: tenantId,
+    });
+    if (generated) return { appointment: generated.value, ai_model: generated.model_id, generated_at: new Date().toISOString() };
 
     // Fallback: extract basic info with regex
     return {
@@ -239,12 +227,11 @@ Trả CHÍNH XÁC JSON, KHÔNG thêm text khác:
 
     const today = new Date().toISOString().slice(0, 10);
 
-    const model = await aiModelConfigService.resolve(db, "next_appointment_suggestion");
-    if (model.is_enabled && AI && typeof (AI as { run?: unknown }).run === "function") {
-      try {
-        const result = await (AI as { run: (model: string, inputs: object) => Promise<unknown> }).run(
-          model.model_id,
-          {
+    const generated = await runAiWithFallback({
+      db,
+      AI,
+      use_case: "next_appointment_suggestion",
+      request: {
             messages: [
               {
                 role: "system",
@@ -290,21 +277,11 @@ Hãy đề xuất lịch hẹn tiếp theo:`,
             ],
             max_tokens: 512,
             temperature: 0.2,
-          },
-        );
-        const raw = getAiResponseText(result) || "{}";
-        const parsed = parseSuggestResponse(raw);
-        if (parsed) {
-          return {
-            suggestion: parsed,
-            ai_model: model.model_id,
-            generated_at: new Date().toISOString(),
-          };
-        }
-      } catch {
-        // fall through
-      }
-    }
+      },
+      parse: parseSuggestResponse,
+      routing_key: visitId,
+    });
+    if (generated) return { suggestion: generated.value, ai_model: generated.model_id, generated_at: new Date().toISOString() };
 
     // Fallback: rule-based
     return {

@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import type { PlatformAiModelConfig, PlatformAuditLog, PlatformContent, PlatformDashboardSnapshot, PlatformFeatureFlag, PlatformTenantDetail, PlatformTenantSummary, PlatformUser, ProcedureCatalogItem } from "@shared/types";
+import type { PlatformAiBenchmarkCase, PlatformAiModelConfig, PlatformAiModelMetric, PlatformAiRollout, PlatformAuditLog, PlatformContent, PlatformDashboardSnapshot, PlatformFeatureFlag, PlatformTenantDetail, PlatformTenantSummary, PlatformUser, ProcedureCatalogItem } from "@shared/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -67,18 +67,31 @@ export function PlatformContentPage() {
 export function PlatformConfigurationPage() {
   const [flags, setFlags] = useState<PlatformFeatureFlag[]>([]);
   const [aiConfigs, setAiConfigs] = useState<PlatformAiModelConfig[]>([]);
+  const [aiMetrics, setAiMetrics] = useState<PlatformAiModelMetric[]>([]);
+  const [aiRollouts, setAiRollouts] = useState<PlatformAiRollout[]>([]);
+  const [benchmarkCases, setBenchmarkCases] = useState<PlatformAiBenchmarkCase[]>([]);
+  const [lastBenchmarkResult, setLastBenchmarkResult] = useState<{ id: string; output: string } | null>(null);
+  const [benchmarkReview, setBenchmarkReview] = useState({ score: 5, note: "" });
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ key: "", description: "", default_enabled: false });
+  const [rolloutForm, setRolloutForm] = useState({ use_case: "", candidate_model_id: "", traffic_percent: 0, status: "draft" as "draft" | "pending_approval" });
+  const [benchmarkForm, setBenchmarkForm] = useState({ use_case: "", label: "", prompt: "", expected_output: "", is_deidentified: false });
   const { hasPermission } = usePlatformAuth();
 
   const load = () => {
     void Promise.all([
       platformGet<ItemsResponse<PlatformFeatureFlag>>("/api/platform/feature-flags"),
       platformGet<ItemsResponse<PlatformAiModelConfig>>("/api/platform/ai-model-configs"),
+      platformGet<ItemsResponse<PlatformAiModelMetric>>("/api/platform/ai-model-metrics"),
+      platformGet<ItemsResponse<PlatformAiRollout>>("/api/platform/ai-rollouts"),
+      platformGet<ItemsResponse<PlatformAiBenchmarkCase>>("/api/platform/ai-benchmark-cases"),
     ])
-      .then(([flagsResult, aiResult]) => {
+      .then(([flagsResult, aiResult, metricsResult, rolloutsResult, benchmarksResult]) => {
         setFlags(flagsResult.items);
         setAiConfigs(aiResult.items);
+        setAiMetrics(metricsResult.items);
+        setAiRollouts(rolloutsResult.items);
+        setBenchmarkCases(benchmarksResult.items);
       })
       .catch((cause) => setError(cause instanceof PlatformApiError ? cause.message : "Không thể tải cấu hình"));
   };
@@ -108,6 +121,59 @@ export function PlatformConfigurationPage() {
       load();
     } catch (cause) {
       setError(cause instanceof PlatformApiError ? cause.message : "Không thể lưu cấu hình AI");
+    }
+  }
+
+  const rolloutConfig = aiConfigs.find((config) => config.use_case === rolloutForm.use_case);
+
+  async function saveRollout(event: FormEvent) {
+    event.preventDefault();
+    try {
+      await platformPut("/api/platform/ai-rollouts", rolloutForm);
+      setRolloutForm({ use_case: "", candidate_model_id: "", traffic_percent: 0, status: "draft" });
+      load();
+    } catch (cause) {
+      setError(cause instanceof PlatformApiError ? cause.message : "Không thể lưu A/B rollout");
+    }
+  }
+
+  async function approveRollout(useCase: string, status: "approved" | "active" | "paused") {
+    try {
+      await platformPost(`/api/platform/ai-rollouts/${encodeURIComponent(useCase)}/approve`, { status });
+      load();
+    } catch (cause) {
+      setError(cause instanceof PlatformApiError ? cause.message : "Không thể cập nhật trạng thái rollout");
+    }
+  }
+
+  async function createBenchmarkCase(event: FormEvent) {
+    event.preventDefault();
+    try {
+      await platformPost("/api/platform/ai-benchmark-cases", benchmarkForm);
+      setBenchmarkForm({ use_case: "", label: "", prompt: "", expected_output: "", is_deidentified: false });
+      load();
+    } catch (cause) {
+      setError(cause instanceof PlatformApiError ? cause.message : "Không thể tạo benchmark case");
+    }
+  }
+
+  async function evaluateBenchmarkCase(id: string, modelId: string) {
+    try {
+      const result = await platformPost<{ id: string; output: string }>(`/api/platform/ai-benchmark-cases/${encodeURIComponent(id)}/evaluate`, { model_id: modelId });
+      setLastBenchmarkResult(result);
+    } catch (cause) {
+      setError(cause instanceof PlatformApiError ? cause.message : "Không thể chạy benchmark");
+    }
+  }
+
+  async function reviewBenchmarkResult() {
+    if (!lastBenchmarkResult) return;
+    try {
+      await platformPost(`/api/platform/ai-benchmark-evaluations/${encodeURIComponent(lastBenchmarkResult.id)}/review`, { reviewer_score: benchmarkReview.score, ...(benchmarkReview.note ? { reviewer_note: benchmarkReview.note } : {}) });
+      setLastBenchmarkResult(null);
+      setBenchmarkReview({ score: 5, note: "" });
+    } catch (cause) {
+      setError(cause instanceof PlatformApiError ? cause.message : "Không thể lưu đánh giá benchmark");
     }
   }
 
@@ -174,6 +240,65 @@ export function PlatformConfigurationPage() {
       />
       <ErrorNotice error={error} />
       <AiGuidanceCard configs={aiConfigs} />
+      <Card>
+        <CardHeader>
+          <CardTitle>A/B rollout mô hình AI</CardTitle>
+          <CardDescription>Điều phối thử nghiệm theo tác vụ. Không dùng dữ liệu bệnh nhân trong cấu hình hoặc đánh giá rollout.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {aiRollouts.length ? <div className="space-y-2">{aiRollouts.map((rollout) => {
+            const config = aiConfigs.find((item) => item.use_case === rollout.use_case);
+            const modelName = config?.allowed_models.find((model) => model.id === rollout.candidate_model_id)?.name ?? rollout.candidate_model_id;
+            return <div className="flex flex-col gap-3 rounded-lg border p-3 text-sm sm:flex-row sm:items-center sm:justify-between" key={rollout.use_case}><div><p className="font-medium">{config?.name ?? rollout.use_case}</p><p className="mt-1 text-muted-foreground">Ứng viên: {modelName} · Lưu lượng: {rollout.traffic_percent}% · Trạng thái: {rollout.status}</p></div>{hasPermission("platform_ai_approve.write") ? <Select aria-label={`Trạng thái rollout ${rollout.use_case}`} value={rollout.status} onChange={(event) => void approveRollout(rollout.use_case, event.target.value as "approved" | "active" | "paused")} className="w-44"><option value="approved">Đã duyệt</option><option value="active">Đang hoạt động</option><option value="paused">Tạm dừng</option></Select> : null}</div>;
+          })}</div> : <p className="text-sm text-muted-foreground">Chưa có A/B rollout nào.</p>}
+          {hasPermission("platform_ai_evaluate.write") && <form className="grid gap-3 rounded-lg border border-dashed p-4 md:grid-cols-2" onSubmit={saveRollout}>
+            <div className="space-y-2"><Label>Tác vụ AI</Label><Select value={rolloutForm.use_case} onChange={(event) => setRolloutForm({ ...rolloutForm, use_case: event.target.value, candidate_model_id: "" })} required><option value="">Chọn tác vụ</option>{aiConfigs.map((config) => <option key={config.use_case} value={config.use_case}>{config.name}</option>)}</Select></div>
+            <div className="space-y-2"><Label>Mô hình ứng viên</Label><Select value={rolloutForm.candidate_model_id} disabled={!rolloutConfig} onChange={(event) => setRolloutForm({ ...rolloutForm, candidate_model_id: event.target.value })} required><option value="">Chọn mô hình tương thích</option>{rolloutConfig?.allowed_models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}</Select></div>
+            <div className="space-y-2"><Label>Lưu lượng (%)</Label><Input type="number" min={0} max={100} step={1} value={rolloutForm.traffic_percent} onChange={(event) => setRolloutForm({ ...rolloutForm, traffic_percent: Number(event.target.value) })} required /></div>
+            <div className="space-y-2"><Label>Trạng thái yêu cầu</Label><Select value={rolloutForm.status} onChange={(event) => setRolloutForm({ ...rolloutForm, status: event.target.value as "draft" | "pending_approval" })}><option value="draft">Bản nháp</option><option value="pending_approval">Chờ duyệt</option></Select></div>
+            <div className="md:col-span-2"><Button type="submit">Lưu A/B rollout</Button></div>
+          </form>}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader><CardTitle>Benchmark AI đã khử định danh</CardTitle><CardDescription>Chỉ tạo prompt và kết quả mong đợi đã khử định danh. Không nhập dữ liệu bệnh nhân, PII hoặc hồ sơ lâm sàng có thể nhận diện.</CardDescription></CardHeader>
+        <CardContent className="space-y-4">
+          {benchmarkCases.length ? <div className="space-y-2">{benchmarkCases.map((benchmark) => { const config = aiConfigs.find((item) => item.use_case === benchmark.use_case); return <div className="flex flex-col gap-3 rounded-lg border p-3 text-sm sm:flex-row sm:items-center sm:justify-between" key={benchmark.id}><div><p className="font-medium">{benchmark.label}</p><p className="mt-1 text-xs text-muted-foreground">{config?.name ?? benchmark.use_case} · Khử định danh: {benchmark.is_deidentified ? "Đã xác nhận" : "Không"}</p></div>{hasPermission("platform_ai_evaluate.write") ? <Select aria-label={`Chạy benchmark ${benchmark.label}`} defaultValue="" onChange={(event) => { if (event.target.value) void evaluateBenchmarkCase(benchmark.id, event.target.value); }} className="w-56"><option value="">Chạy với model...</option>{config?.allowed_models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}</Select> : null}</div>; })}</div> : <p className="text-sm text-muted-foreground">Chưa có benchmark case.</p>}
+          {lastBenchmarkResult && <div className="space-y-3 rounded-lg border border-amber-400/50 bg-amber-50/50 p-4"><div><p className="font-medium">Kết quả benchmark chờ reviewer chấm điểm</p><pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded border bg-background p-3 text-xs">{lastBenchmarkResult.output || "(Model không trả nội dung)"}</pre></div>{hasPermission("platform_ai_evaluate.write") && <div className="grid gap-3 md:grid-cols-[10rem_minmax(0,1fr)_auto]"><Input type="number" min={0} max={5} value={benchmarkReview.score} onChange={(event) => setBenchmarkReview({ ...benchmarkReview, score: Number(event.target.value) })} aria-label="Điểm reviewer từ 0 đến 5" /><Input value={benchmarkReview.note} maxLength={1000} placeholder="Nhận xét reviewer (không chứa dữ liệu bệnh nhân)" onChange={(event) => setBenchmarkReview({ ...benchmarkReview, note: event.target.value })} /><Button onClick={() => void reviewBenchmarkResult()}>Lưu đánh giá</Button></div>}</div>}
+          {hasPermission("platform_ai_evaluate.write") && <form className="grid gap-3 rounded-lg border border-dashed p-4" onSubmit={createBenchmarkCase}>
+            <div className="space-y-2"><Label>Tác vụ AI</Label><Select value={benchmarkForm.use_case} onChange={(event) => setBenchmarkForm({ ...benchmarkForm, use_case: event.target.value })} required><option value="">Chọn tác vụ</option>{aiConfigs.map((config) => <option key={config.use_case} value={config.use_case}>{config.name}</option>)}</Select></div>
+            <div className="space-y-2"><Label>Nhãn</Label><Input value={benchmarkForm.label} maxLength={120} onChange={(event) => setBenchmarkForm({ ...benchmarkForm, label: event.target.value })} required /></div>
+            <div className="space-y-2"><Label>Prompt đã khử định danh</Label><Textarea value={benchmarkForm.prompt} minLength={10} onChange={(event) => setBenchmarkForm({ ...benchmarkForm, prompt: event.target.value })} required /></div>
+            <div className="space-y-2"><Label>Kết quả mong đợi</Label><Textarea value={benchmarkForm.expected_output} minLength={2} onChange={(event) => setBenchmarkForm({ ...benchmarkForm, expected_output: event.target.value })} required /></div>
+            <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={benchmarkForm.is_deidentified} onChange={(event) => setBenchmarkForm({ ...benchmarkForm, is_deidentified: event.target.checked })} required /><span>Tôi xác nhận nội dung này đã được khử định danh và không chứa dữ liệu bệnh nhân.</span></label>
+            <div><Button type="submit">Tạo benchmark case</Button></div>
+          </form>}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Theo dõi độ tin cậy AI</CardTitle>
+          <CardDescription>Thống kê 30 ngày gần nhất theo model, chỉ lưu số liệu tổng hợp. Không lưu prompt, kết quả hoặc dữ liệu bệnh nhân.</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="border-b bg-slate-50 text-left text-slate-500">
+                <tr><th className="p-3">Tác vụ</th><th className="p-3">Model</th><th className="p-3 text-right">Lần gọi</th><th className="p-3 text-right">Thành công</th><th className="p-3 text-right">Fallback</th><th className="p-3 text-right">Độ trễ TB</th><th className="p-3 text-right">Token vào/ra</th><th className="p-3 text-right">Chi phí ước tính</th></tr>
+              </thead>
+              <tbody>
+                {aiMetrics.map((metric) => {
+                  const config = aiConfigs.find((item) => item.use_case === metric.use_case);
+                  const modelName = config?.allowed_models.find((model) => model.id === metric.model_id)?.name ?? metric.model_id;
+                  const successRate = metric.attempts ? Math.round((metric.successes / metric.attempts) * 100) : 0;
+                  return <tr className="border-b last:border-0" key={`${metric.use_case}:${metric.model_id}`}><td className="p-3 font-medium">{config?.name ?? metric.use_case}</td><td className="p-3">{modelName}</td><td className="p-3 text-right tabular-nums">{metric.attempts}</td><td className="p-3 text-right tabular-nums">{successRate}%</td><td className="p-3 text-right tabular-nums">{metric.fallback_uses}</td><td className="p-3 text-right tabular-nums">{metric.average_latency_ms} ms</td><td className="p-3 text-right tabular-nums">{metric.input_tokens.toLocaleString("vi-VN")} / {metric.output_tokens.toLocaleString("vi-VN")}</td><td className="p-3 text-right tabular-nums">${(metric.cost_microusd / 1_000_000).toLocaleString("en-US", { maximumFractionDigits: 4 })}</td></tr>;
+                })}
+                {aiMetrics.length === 0 && <tr><td className="p-8 text-center text-muted-foreground" colSpan={8}>Chưa có lượt gọi AI trong 30 ngày gần nhất.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle>Mô hình AI theo ứng dụng</CardTitle>

@@ -10,8 +10,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import { createVisitsRepository } from "../repositories/visits.repo";
 import { NotFoundError } from "../lib/errors";
-import { getAiResponseText } from "../lib/ai-response";
-import { aiModelConfigService } from "./ai-model-config.service";
+import { runAiWithFallback } from "../lib/ai-runtime";
 import type { AnatomicalSite, FindingCategory, FindingLocationDetails, FindingMeasurements, FindingScope } from "@shared/types";
 
 export interface ParsedFinding {
@@ -66,13 +65,11 @@ export const voiceFindingsService = {
       ? `${patient.name}, ${patient.gender === "M" ? "Nam" : patient.gender === "F" ? "Nữ" : "Khác"}, sinh ${patient.date_of_birth}`
       : "không rõ";
 
-    // Try Cloudflare AI
-    const model = await aiModelConfigService.resolve(db, "voice_findings_parse");
-    if (model.is_enabled && AI && typeof (AI as { run?: unknown }).run === "function") {
-      try {
-        const result = await (AI as { run: (model: string, inputs: object) => Promise<unknown> }).run(
-          model.model_id,
-          {
+    const generated = await runAiWithFallback({
+      db,
+      AI,
+      use_case: "voice_findings_parse",
+      request: {
             messages: [
               {
                 role: "system",
@@ -115,21 +112,14 @@ Format:
             ],
             max_tokens: 1024,
             temperature: 0.1,
-          },
-        );
-        const raw = getAiResponseText(result) || "{}";
-        const parsed = parseVoiceResponse(raw);
-        if (parsed && parsed.findings.length > 0) {
-          return {
-            findings: parsed.findings,
-            ai_model: model.model_id,
-            generated_at: new Date().toISOString(),
-          };
-        }
-      } catch {
-        // fall through to fallback
-      }
-    }
+      },
+      parse: (text) => {
+        const parsed = parseVoiceResponse(text);
+        return parsed && parsed.findings.length > 0 ? parsed : null;
+      },
+      routing_key: visitId,
+    });
+    if (generated) return { findings: generated.value.findings, ai_model: generated.model_id, generated_at: new Date().toISOString() };
 
     // Fallback: rule-based extraction
     return {

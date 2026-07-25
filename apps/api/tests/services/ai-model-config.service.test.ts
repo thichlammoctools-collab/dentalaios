@@ -12,6 +12,7 @@ describe("aiModelConfigService", () => {
 
     expect(config).toEqual({
       model_id: "@cf/meta/llama-4-scout-17b-16e-instruct",
+      fallback_model_id: "@cf/openai/gpt-oss-20b",
       is_enabled: true,
     });
   });
@@ -27,7 +28,7 @@ describe("aiModelConfigService", () => {
       }),
       expect.objectContaining({
         use_case: "appointment_chat_parse",
-        model_id: "@cf/zai-org/glm-4.7-flash",
+        model_id: "@cf/openai/gpt-oss-20b",
         guidance: expect.any(String),
         review_note: expect.any(String),
       }),

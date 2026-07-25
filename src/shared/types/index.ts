@@ -1427,6 +1427,8 @@ export type PlatformPermission =
   | "platform_clinical_terminology.write"
   | "platform_ai_config.read"
   | "platform_ai_config.write"
+  | "platform_ai_evaluate.write"
+  | "platform_ai_approve.write"
   | "platform_audit.read";
 
 export interface PlatformRole {
@@ -1498,6 +1500,7 @@ export interface PlatformAiModelConfig {
   modality: "text" | "vision";
   model_id: string;
   default_model_id: string;
+  fallback_model_id: string;
   recommendation: string;
   guidance: string;
   review_note: string;
@@ -1505,6 +1508,51 @@ export interface PlatformAiModelConfig {
   is_enabled: boolean;
   is_overridden: boolean;
   updated_at?: string;
+}
+
+export interface PlatformAiModelMetric {
+  use_case: string;
+  model_id: string;
+  attempts: number;
+  successes: number;
+  failures: number;
+  fallback_uses: number;
+  average_latency_ms: number;
+  input_tokens: number;
+  output_tokens: number;
+  cost_microusd: number;
+}
+
+export interface PlatformAiRollout {
+  use_case: string;
+  candidate_model_id: string;
+  traffic_percent: number;
+  status: "draft" | "pending_approval" | "approved" | "active" | "paused";
+  requested_by?: string;
+  approved_by?: string;
+  updated_at: string;
+}
+
+export interface PlatformAiBenchmarkCase {
+  id: string;
+  use_case: string;
+  label: string;
+  prompt: string;
+  expected_output: string;
+  is_deidentified: boolean;
+  created_at: string;
+}
+
+export interface PlatformAiBenchmarkEvaluation {
+  id: string;
+  case_id: string;
+  model_id: string;
+  output: string;
+  json_valid: boolean;
+  reviewer_score?: number;
+  reviewer_note?: string;
+  reviewed_at?: string;
+  created_at: string;
 }
 
 /** Global clinical procedure maintained by Platform Admins. */
