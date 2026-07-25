@@ -31,6 +31,10 @@ router.get(
     const hasAppointmentToday = url.searchParams.get("has_appointment_today") === "true";
     const hasDebt = url.searchParams.get("has_debt") === "true";
     const hasActiveTreatment = url.searchParams.get("has_active_treatment") === "true";
+    const sortParam = url.searchParams.get("sort") ?? "newest";
+    const sort = (["name", "newest", "oldest", "revenue"] as const).includes(sortParam as "name" | "newest" | "oldest" | "revenue")
+      ? (sortParam as "name" | "newest" | "oldest" | "revenue")
+      : "newest";
     if (archived && !jwt.permissions.includes(PERMISSIONS.ALL) && !jwt.permissions.includes(PERMISSIONS.MANAGE_PATIENTS)) {
       throw new ForbiddenError(`Missing permission: ${PERMISSIONS.MANAGE_PATIENTS}`);
     }
@@ -45,6 +49,7 @@ router.get(
       hasAppointmentToday: hasAppointmentToday || undefined,
       hasDebt: hasDebt || undefined,
       hasActiveTreatment: hasActiveTreatment || undefined,
+      sort,
     };
     const [items, total] = await Promise.all([
       patientService.list(c.env.DB, jwt.tenant_id, { ...pagination, limit, offset }),

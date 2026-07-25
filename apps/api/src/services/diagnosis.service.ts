@@ -23,7 +23,7 @@ export const diagnosisService = {
     const visit = await requireVisit(db, tenantId, visitId);
     if (visit.locked_at) throw new ConflictError("Hồ sơ lượt khám đã được ký và khóa; hãy tạo amendment");
     await assertSourceFinding(db, tenantId, visitId, data.source_finding_id ?? undefined);
-    const resolved = await resolveDiagnosis(db, data.concept_id, data.icd10_code_id ?? undefined, data.status);
+    const resolved = await resolveDiagnosis(db, data.concept_id, data.status);
     const now = new Date().toISOString();
     const entrySource = entry.entrySource ?? "doctor";
     const clinicalEffective = entry.clinicalEffective ?? entrySource === "doctor";
@@ -77,9 +77,9 @@ export const diagnosisService = {
 
     const status = data.status ?? current.status;
     const conceptId = data.concept_id ?? current.concept_id;
-    const shouldResolve = conceptId !== current.concept_id || data.icd10_code_id !== undefined || status === "confirmed";
+    const shouldResolve = conceptId !== current.concept_id || status === "confirmed";
     const resolved = shouldResolve
-      ? await resolveDiagnosis(db, conceptId, data.icd10_code_id === undefined ? current.icd10_code_id : data.icd10_code_id ?? undefined, status)
+      ? await resolveDiagnosis(db, conceptId, status)
       : null;
     const now = new Date().toISOString();
     const next: ClinicalDiagnosis = {
@@ -87,14 +87,14 @@ export const diagnosisService = {
       concept_id: resolved?.concept.id ?? current.concept_id,
       concept_version_id: resolved?.conceptVersionId ?? current.concept_version_id,
       status,
-      icd10_code_id: resolved?.mapping?.code.id ?? (status === "confirmed" ? current.icd10_code_id : current.icd10_code_id),
-      icd10_version_id: resolved?.mapping?.code.terminology_version_id ?? current.icd10_version_id,
-      icd10_code_snapshot: resolved?.mapping?.code.code ?? current.icd10_code_snapshot,
-      icd10_display_vi_snapshot: resolved?.mapping?.code.display_vi ?? current.icd10_display_vi_snapshot,
+      icd10_code_id: resolved ? resolved.mapping?.code.id : current.icd10_code_id,
+      icd10_version_id: resolved ? resolved.mapping?.code.terminology_version_id : current.icd10_version_id,
+      icd10_code_snapshot: resolved ? resolved.mapping?.code.code : current.icd10_code_snapshot,
+      icd10_display_vi_snapshot: resolved ? resolved.mapping?.code.display_vi : current.icd10_display_vi_snapshot,
       concept_code_snapshot: resolved?.concept.code ?? current.concept_code_snapshot,
       concept_display_vi_snapshot: resolved?.concept.display_vi ?? current.concept_display_vi_snapshot,
-      mapping_id: resolved?.mapping?.id ?? current.mapping_id,
-      mapping_role: resolved?.mapping?.mapping_role ?? current.mapping_role,
+      mapping_id: resolved ? resolved.mapping?.id : current.mapping_id,
+      mapping_role: resolved ? resolved.mapping?.mapping_role : current.mapping_role,
       confirmed_by: status === "confirmed" ? (current.confirmed_by ?? actorId) : current.confirmed_by,
       confirmed_at: status === "confirmed" ? (current.confirmed_at ?? now) : current.confirmed_at,
       ruled_out_at: status === "ruled_out" ? now : current.ruled_out_at,
@@ -141,7 +141,6 @@ async function assertSourceFinding(db: D1Database, tenantId: string, visitId: st
 async function resolveDiagnosis(
   db: D1Database,
   conceptId: string,
-  requestedIcd10Id: string | undefined,
   status: ClinicalDiagnosisStatus,
 ) {
   const terminology = createClinicalTerminologyRepository(db);
@@ -150,8 +149,7 @@ async function resolveDiagnosis(
   if (concept.kind !== "diagnosis") throw new ValidationError("Chỉ khái niệm loại chẩn đoán mới tạo được diagnosis");
   const version = await terminology.getConceptVersion(conceptId);
   if (!version) throw new ConflictError("Khái niệm chưa có phiên bản thuật ngữ được duyệt");
-  const mapping = await terminology.getActiveMapping(conceptId, requestedIcd10Id);
+  const mapping = await terminology.getActiveMapping(conceptId);
   if (status === "confirmed" && !mapping) throw new ValidationError("Chẩn đoán xác nhận cần mã ICD-10 Việt Nam được phê duyệt");
-  if (requestedIcd10Id && !mapping) throw new ValidationError("Mã ICD-10 không phải mapping hợp lệ của chẩn đoán");
   return { concept, conceptVersionId: version.id, mapping };
 }

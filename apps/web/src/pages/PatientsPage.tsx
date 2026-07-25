@@ -21,6 +21,7 @@ interface PatientWithStatus extends Patient {
   has_appointment_today: boolean;
   has_debt: boolean;
   has_active_treatment: boolean;
+  total_paid: number;
 }
 
 interface PatientsResponse {
@@ -75,12 +76,13 @@ export function PatientsPage() {
   const [filterTodayAppt, setFilterTodayAppt] = useState(false);
   const [filterDebt, setFilterDebt] = useState(false);
   const [filterTreatment, setFilterTreatment] = useState(false);
+  const [sortBy, setSortBy] = useState<"name" | "newest" | "oldest" | "revenue">("newest");
 
   const canManagePatients = Boolean(
     session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.MANAGE_PATIENTS),
   );
 
-  const load = useCallback(async (q: string, currentPage: number, opts?: { archived?: boolean; gender?: string; marketingSource?: string; hasAppointmentToday?: boolean; hasDebt?: boolean; hasActiveTreatment?: boolean }) => {
+  const load = useCallback(async (q: string, currentPage: number, opts?: { archived?: boolean; gender?: string; marketingSource?: string; hasAppointmentToday?: boolean; hasDebt?: boolean; hasActiveTreatment?: boolean; sort?: string }) => {
     const archived = opts?.archived ?? showArchived;
     setLoading(true);
     try {
@@ -92,6 +94,7 @@ export function PatientsPage() {
       if (opts?.hasAppointmentToday) params.set("has_appointment_today", "true");
       if (opts?.hasDebt) params.set("has_debt", "true");
       if (opts?.hasActiveTreatment) params.set("has_active_treatment", "true");
+      params.set("sort", opts?.sort ?? "newest");
       params.set("limit", String(DEFAULT_PAGE_SIZE));
       params.set("offset", String((currentPage - 1) * DEFAULT_PAGE_SIZE));
       const res = await apiGet<PatientsResponse>(`/api/patients?${params}`);

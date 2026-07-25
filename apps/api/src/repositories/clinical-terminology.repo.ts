@@ -119,8 +119,8 @@ export function createClinicalTerminologyRepository(db: D1Database) {
         JOIN clinical_concept_icd10_mappings m ON m.concept_version_id = cv.id AND m.is_active = 1
         JOIN icd10_codes i ON i.id = m.icd10_code_id AND i.is_active = 1
         JOIN clinical_terminology_versions v ON v.id = i.terminology_version_id AND v.system = 'ICD10_VN' AND v.status = 'approved'
-        WHERE cv.concept_id = ? AND cv.status = 'approved'${extra}
-        ORDER BY CASE m.mapping_role WHEN 'primary' THEN 0 ELSE 1 END LIMIT 1`)
+         WHERE cv.concept_id = ? AND cv.status = 'approved' AND m.mapping_role = 'primary'${extra}
+         LIMIT 1`)
         .bind(conceptId, ...(icd10CodeId ? [icd10CodeId] : [])).first<D1Row>();
       if (!row) return null;
       return {
@@ -134,13 +134,24 @@ export function createClinicalTerminologyRepository(db: D1Database) {
       };
     },
 
-    async createMapping(conceptId: string, icd10CodeId: string, role: "primary" | "alternative"): Promise<ClinicalConceptIcd10Mapping> {
+    async createMapping(conceptId: string, icd10CodeId: string): Promise<ClinicalConceptIcd10Mapping> {
       const version = await this.getConceptVersion(conceptId);
       if (!version) throw new Error("Concept has no approved terminology version");
       const id = crypto.randomUUID();
+      await db.prepare(`UPDATE clinical_concept_icd10_mappings
+        SET is_active = 0
+        WHERE concept_version_id = ? AND mapping_role = 'primary' AND is_active = 1`).bind(version.id).run();
+      const existing = await db.prepare(`SELECT id FROM clinical_concept_icd10_mappings
+        WHERE concept_version_id = ? AND icd10_code_id = ? LIMIT 1`).bind(version.id, icd10CodeId).first<{ id: string }>();
+      if (existing) {
+        await db.prepare(`UPDATE clinical_concept_icd10_mappings
+          SET mapping_role = 'primary', is_active = 1
+          WHERE id = ?`).bind(existing.id).run();
+        return { id: existing.id, concept_version_id: version.id, icd10_code_id: icd10CodeId, mapping_role: "primary", is_active: true, created_at: new Date().toISOString() };
+      }
       await db.prepare(`INSERT INTO clinical_concept_icd10_mappings (id, concept_version_id, icd10_code_id, mapping_role)
-        VALUES (?, ?, ?, ?)`).bind(id, version.id, icd10CodeId, role).run();
-      return { id, concept_version_id: version.id, icd10_code_id: icd10CodeId, mapping_role: role, is_active: true, created_at: new Date().toISOString() };
+        VALUES (?, ?, ?, 'primary')`).bind(id, version.id, icd10CodeId).run();
+      return { id, concept_version_id: version.id, icd10_code_id: icd10CodeId, mapping_role: "primary", is_active: true, created_at: new Date().toISOString() };
     },
   };
 }

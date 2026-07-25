@@ -429,6 +429,21 @@ describe("Clinical diagnosis routes", () => {
     ]), { permissions: ["write_findings"], body: { concept_id: "concept-caries", status: "confirmed" } });
     expect(res.status).toBe(422);
   });
+
+  it("uses the catalog primary ICD mapping without accepting a client-selected code", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const concept = { id: "concept-caries", code: "dental.caries", legacy_condition: "caries", kind: "diagnosis", category: "tooth_hard_tissue", default_scope: "tooth", default_anatomical_site: null, display_vi: "Sâu răng", description_vi: null, is_active: 1, sort_order: 1, created_at: "2026-01-01", updated_at: "2026-01-01" };
+    const primaryMapping = { mapping_id: "mapping-caries", concept_version_id: "concept-version-caries", icd10_code_id: "icd-k02-9", mapping_role: "primary", mapping_is_active: 1, mapping_created_at: "2026-01-01", id: "icd-k02-9", terminology_version_id: "icd-vn-1", code: "K02.9", display_vi: "Sâu răng, không xác định", parent_code: null, is_billable: 1, is_active: 1, sort_order: 1, created_at: "2026-01-01" };
+    const res = await authedRequestWithDB(app, "POST", "/api/visits/visit-1/diagnoses", new Map([
+      ["FROM visits v", [visitRow()]],
+      ["FROM clinical_concepts", [concept]],
+      ["SELECT id, display_vi FROM clinical_concept_versions", [{ id: "concept-version-caries", display_vi: "Sâu răng" }]],
+      ["FROM clinical_concept_versions cv", [primaryMapping]],
+      ["FROM clinical_diagnoses WHERE tenant_id", [{ ...diagnosisRow, entered_by: "test-user", entry_source: "doctor", clinical_effective_at: "2026-01-01T10:00:00Z" }]],
+    ]), { permissions: ["write_findings"], body: { concept_id: "concept-caries", status: "confirmed" } });
+    expect(res.status).toBe(201);
+    await expect(res.json()).resolves.toMatchObject({ icd10_code_snapshot: "K02.9", mapping_role: "primary" });
+  });
 });
 
 describe("PATCH /api/visits/:id", () => {

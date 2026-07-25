@@ -17,12 +17,14 @@ export interface PatientListOpts extends Pagination {
   hasAppointmentToday?: boolean;
   hasDebt?: boolean;
   hasActiveTreatment?: boolean;
+  sort?: "name" | "newest" | "oldest" | "revenue";
 }
 
 export interface PatientWithStatus extends Patient {
   has_appointment_today: boolean;
   has_debt: boolean;
   has_active_treatment: boolean;
+  total_paid: number;
 }
 
 export interface PatientsRepository {
@@ -91,10 +93,20 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
       }
 
       binds.push(limit, offset);
+
+      const orderBy = opts.sort === "name" ? "p.name ASC"
+        : opts.sort === "oldest" ? "p.created_at ASC"
+        : opts.sort === "revenue" ? "total_paid DESC"
+        : "p.created_at DESC";
+
        const sql = `SELECT p.*,
                      ref.name AS referral_user_name,
                       COALESCE(direct_referrer.name, case_referrer.name) AS referral_referrer_name,
                       COALESCE(direct_referrer.code, case_referrer.code) AS referral_referrer_code,
+                      COALESCE((
+                        SELECT SUM(pay.amount) FROM payments pay
+                        WHERE pay.tenant_id = p.tenant_id AND pay.patient_id = p.id AND pay.status = 'confirmed'
+                      ), 0) AS total_paid,
                       EXISTS (
                         SELECT 1 FROM appointments a
                         WHERE a.tenant_id = p.tenant_id AND a.patient_id = p.id
@@ -120,7 +132,7 @@ export function createPatientsRepository(db: D1Database): PatientsRepository {
                     LEFT JOIN referral_cases referral_case ON referral_case.tenant_id = p.tenant_id AND referral_case.patient_id = p.id
                     LEFT JOIN referrers case_referrer ON case_referrer.tenant_id = p.tenant_id AND case_referrer.id = referral_case.referrer_id
                    WHERE ${conditions.join(" AND ")}
-                   ORDER BY p.created_at DESC
+                   ORDER BY ${orderBy}
                    LIMIT ? OFFSET ?`;
       const result = await db.prepare(sql).bind(...binds).all();
       return (result.results as D1Row[]).map(mapPatientWithStatus);
@@ -323,6 +335,7 @@ function mapPatientWithStatus(row: D1Row): PatientWithStatus {
     has_appointment_today: Boolean(row.has_appointment_today),
     has_debt: Boolean(row.has_debt),
     has_active_treatment: Boolean(row.has_active_treatment),
+    total_paid: Number(row.total_paid ?? 0),
   };
 }
 

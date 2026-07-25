@@ -447,7 +447,6 @@ const terminologyStatuses = ["draft", "approved", "retired"] as const;
 export const diagnosisCreateSchema = z.object({
   source_finding_id: z.string().min(1).nullable().optional(),
   concept_id: z.string().min(1),
-  icd10_code_id: z.string().min(1).nullable().optional(),
   status: z.enum(diagnosisStatuses).default("confirmed"),
   source: z.enum(diagnosisSources).default("manual"),
   source_text: optionalText(2000),
@@ -456,7 +455,6 @@ export const diagnosisCreateSchema = z.object({
 
 export const diagnosisUpdateSchema = z.object({
   concept_id: z.string().min(1).optional(),
-  icd10_code_id: z.string().min(1).nullable().optional(),
   status: z.enum(diagnosisStatuses).optional(),
   notes: optionalText(2000),
   change_reason: nonEmpty(1000),
@@ -567,7 +565,6 @@ export const icd10ImportSchema = z.object({
 export const clinicalConceptMappingCreateSchema = z.object({
   concept_id: z.string().min(1),
   icd10_code_id: z.string().min(1),
-  mapping_role: z.enum(["primary", "alternative"]).default("primary"),
 }).strict();
 
 // ──────────────── Treatment plan ────────────────

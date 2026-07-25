@@ -111,7 +111,12 @@ router.patch(
 router.get(
   "/clinical-terminology/concepts",
   requirePlatformPermission(PLATFORM_PERMISSIONS.CLINICAL_TERMINOLOGY_READ),
-  async (c) => c.json({ items: await createClinicalTerminologyRepository(c.env.DB).listConcepts() }),
+  async (c) => {
+    const terminology = createClinicalTerminologyRepository(c.env.DB);
+    const concepts = await terminology.listConcepts();
+    const items = await Promise.all(concepts.map(async (concept) => ({ ...concept, default_icd10: (await terminology.getActiveMapping(concept.id))?.code })));
+    return c.json({ items });
+  },
 );
 router.post(
   "/clinical-terminology/concepts",
@@ -169,8 +174,8 @@ router.post(
     const concept = await terminology.getConcept(data.concept_id);
     const code = await terminology.getIcd10(data.icd10_code_id);
     if (!concept || !code) throw new NotFoundError("Concept or ICD-10 code not found");
-    const mapping = await terminology.createMapping(data.concept_id, data.icd10_code_id, data.mapping_role);
-    await platformAudit(c.env.DB, { ...actor(c), action: "clinical_terminology.mapping_created", entity_type: "clinical_concept_mapping", entity_id: mapping.id, details: { concept_id: concept.id, icd10_code_id: code.id } });
+    const mapping = await terminology.createMapping(data.concept_id, data.icd10_code_id);
+    await platformAudit(c.env.DB, { ...actor(c), action: "clinical_terminology.primary_mapping_set", entity_type: "clinical_concept_mapping", entity_id: mapping.id, details: { concept_id: concept.id, icd10_code_id: code.id } });
     return c.json(mapping, 201);
   },
 );
