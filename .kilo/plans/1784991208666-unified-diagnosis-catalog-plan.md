@@ -36,6 +36,8 @@ V1 không tự tạo diagnosis, không tự tạo treatment plan và không đư
 
 ## Hiện trạng có thể tái sử dụng
 
+- Đã có API route `clinical-pathways.ts`, service `clinical-pathway.service.ts` và content registry `clinical-pathway-content.ts`.
+- Schema và D1 table migrations đã tồn tại (0065_clinical_pathway_assessments.sql).
 - `VisitDetailPage` đã tải patient, alerts, findings, review queue, safety acknowledgements và treatment history.
 - `clinical_findings` đã có location theo răng, `entry_source`, `clinical_effective_at` và review lifecycle.
 - `clinical_diagnoses` đã dùng diagnosis catalog với ICD-10 primary mapping tự động và snapshot lịch sử.
@@ -44,7 +46,33 @@ V1 không tự tạo diagnosis, không tự tạo treatment plan và không đư
 - Feature flag theo tenant đã có qua `platform_feature_flags` và `platform_tenant_feature_overrides`.
 - `visit-safety.service` đã là mẫu cho service tenant-scoped có validation và acknowledgement.
 
-## Phạm vi dữ liệu V1
+## Những việc chưa thực hiện
+
+Mặc dù DB schema, Service, Repo và Route đã được tạo, các hạng mục sau **vẫn còn thiếu và cần được implement**:
+
+### 1. Visit workspace integration (Frontend)
+
+- Cần xây dựng UI components cho Clinical Copilot trong `VisitDetailPage`.
+- Tải data từ `/api/visits/:visitId/clinical-pathways/endodontic-pain`.
+- Giao diện bật/tắt pathway, chọn răng mục tiêu.
+- Hiển thị Checklist, pattern ưu tiên, và trạng thái review.
+- Shortcut đến Diagnosis/Treatment plan hiện có (không tạo mutation).
+
+### 2. Sign-off và amendment (Backend)
+
+- Sửa `visitSignoffService.sign` để chặn ký khi pathway còn active, có item pending hoặc assessment draft pending review.
+- Sửa canonical snapshot để đưa `clinical_pathway_assessments` và `clinical_pathway_assessment_items` vào signed record.
+- Đưa dữ liệu trên vào `afterObj` khi amend.
+
+### 3. Review event
+
+- Sửa `clinical_review_events` (nếu cần ở các validation logic khác) để nhận `pathway_assessment` làm entity_type hợp lệ nếu trước đó chưa làm đủ các chỗ check typescript.
+
+### 4. Tests
+
+- Bổ sung unit/integration tests cho pathway routes và logic chặn sign-off.
+
+## Phạm vi dữ liệu V1 (Đã hoàn tất Migration 0065)
 
 Tạo migration additive cho các bảng sau. Không backfill dữ liệu cũ và không sửa snapshot diagnosis/treatment hiện có.
 
@@ -151,7 +179,7 @@ Nếu dữ liệu mâu thuẫn hoặc chưa đủ, ưu tiên hiển thị `Dữ 
 
 ## API và quyền
 
-Tạo service tenant-scoped riêng, ví dụ `clinical-pathway.service.ts`, không nhúng logic vào `VisitDetailPage`.
+Đã tạo service tenant-scoped `clinical-pathway.service.ts`.
 
 Các endpoint cần có:
 
@@ -246,15 +274,15 @@ Không log PII vào metric hoặc platform aggregate. Log model/provider không 
 
 ## Migration và rollout sequence
 
-1. Thêm migration additive cho assessment, items, revisions và mở rộng review-event enum.
-2. Seed feature flag default off.
-3. Thêm shared validation/types, repository, service, routes và role checks.
-4. Mở rộng sign-off/canonical snapshot/amendment.
-5. Tích hợp VisitDetail UI với feature flag fallback.
-6. Thêm metrics aggregate và audit actions.
-7. Chạy migration local/remote theo quy trình hiện có.
-8. Bật pilot cho tenant được chọn sau khi content clinical được duyệt.
-9. Theo dõi completion rate, skip reasons, sign-off blocks và phản hồi bác sĩ; chỉ sau đó mới quyết định mở rộng.
+1. [Xong] Thêm migration additive cho assessment, items, revisions và mở rộng review-event enum.
+2. [Xong] Seed feature flag default off.
+3. [Xong] Thêm shared validation/types, repository, service, routes và role checks.
+4. [Chưa xong] Mở rộng sign-off/canonical snapshot/amendment.
+5. [Chưa xong] Tích hợp VisitDetail UI với feature flag fallback.
+6. [Chưa xong] Viết test cho API và UI integration.
+7. [Chưa xong] Chạy migration local/remote theo quy trình hiện có.
+8. [Chưa xong] Bật pilot cho tenant được chọn sau khi content clinical được duyệt.
+9. [Chưa xong] Theo dõi completion rate, skip reasons, sign-off blocks và phản hồi bác sĩ; chỉ sau đó mới quyết định mở rộng.
 
 ## Kiểm thử bắt buộc
 

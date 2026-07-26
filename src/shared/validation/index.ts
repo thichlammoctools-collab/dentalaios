@@ -471,7 +471,7 @@ export const preExamSubmitSchema = z.object({
   })).max(100).optional(),
 }).strict().refine((data) => Boolean(data.initial_assessment || data.findings?.length || data.diagnoses_suspected?.length), "Cần có ít nhất một dữ liệu pre-exam");
 
-export const clinicalReviewEntitySchema = z.enum(["finding", "diagnosis", "initial_assessment"]);
+export const clinicalReviewEntitySchema = z.enum(["finding", "diagnosis", "initial_assessment", "pathway_assessment"]);
 export const clinicalReviewRouteParamsSchema = z.object({
   id: z.string().min(1),
   entityType: clinicalReviewEntitySchema,
@@ -1205,3 +1205,59 @@ export type PlatformLifecycleInput = z.infer<typeof platformLifecycleSchema>;
 export type PlatformFlagInput = z.infer<typeof platformFlagSchema>;
 export type PlatformLimitsInput = z.infer<typeof platformLimitsSchema>;
 export type PlatformContentCreateInput = z.infer<typeof platformContentCreateSchema>;
+
+// ──────────────── Clinical Pathway (V1: endodontic pain) ────────────────
+
+const symptomValue = z.enum(["present", "absent", "unknown"]);
+const testResult = z.enum(["positive", "negative", "inconclusive", "not_done"]);
+const imagingSign = z.enum(["present", "absent", "unknown", "not_assessed"]);
+
+const endodonticPainAssessmentSchema = z.object({
+  symptoms: z.object({
+    spontaneous_pain: symptomValue,
+    pain_on_biting: symptomValue,
+    prolonged_pain_after_stimulus: symptomValue,
+    prolonged_pain_duration: optionalText(200),
+  }).strict(),
+  tests: z.object({
+    cold_test: testResult,
+    percussion: testResult,
+    palpation: testResult,
+    bite_test: testResult,
+  }).strict(),
+  context: z.object({
+    large_caries: symptomValue,
+    deep_old_restoration: symptomValue,
+    periapical_signs_on_imaging: imagingSign,
+  }).strict(),
+  notes: optionalText(2000),
+}).strict();
+
+export const pathwayAssessmentCreateSchema = z.object({
+  tooth_number: z.number().int().refine(isValidFdiTooth, "Số răng FDI không hợp lệ"),
+  assessment: endodonticPainAssessmentSchema,
+}).strict();
+
+export const pathwayAssessmentUpdateSchema = z.object({
+  assessment: endodonticPainAssessmentSchema,
+  change_reason: nonEmpty(1000),
+}).strict();
+
+export const pathwayItemUpdateSchema = z.object({
+  status: z.enum(["completed", "skipped"]),
+  value_json: z.string().max(2000).optional(),
+  skip_reason: optionalText(1000),
+}).strict().superRefine((data, ctx) => {
+  if (data.status === "skipped" && !data.skip_reason) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["skip_reason"], message: "Bắt buộc nhập lý do bỏ qua" });
+  }
+});
+
+export const pathwayAssessmentCloseSchema = z.object({
+  close_note: optionalText(1000),
+}).strict();
+
+export type PathwayAssessmentCreateInput = z.infer<typeof pathwayAssessmentCreateSchema>;
+export type PathwayAssessmentUpdateInput = z.infer<typeof pathwayAssessmentUpdateSchema>;
+export type PathwayItemUpdateInput = z.infer<typeof pathwayItemUpdateSchema>;
+export type PathwayAssessmentCloseInput = z.infer<typeof pathwayAssessmentCloseSchema>;

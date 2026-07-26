@@ -51,6 +51,7 @@ import referralsRoutes from "./routes/referrals";
 import referralReportsRoutes from "./routes/referral-reports";
 import referrerAuthRoutes from "./routes/referrer-auth";
 import referrerPortalRoutes from "./routes/referrer-portal";
+import clinicalPathwayRoutes, { clinicalCopilotMetricsRouter } from "./routes/clinical-pathways";
 import { expireReferralWork } from "./services/referral.service";
 
 export type Env = {
@@ -171,6 +172,10 @@ app.route("/api/patients", patientNotesRoutes);
 
 // Visits
 app.route("/api/visits", visitsRoutes);
+app.route("/api/visits", clinicalPathwayRoutes);
+
+// Clinical Copilot metrics
+app.route("/api/clinical-copilot/metrics", clinicalCopilotMetricsRouter);
 
 // Treatment plans (CRUD + /items + /approve via plans router; /pdf + /lark-handover via extras)
 app.route("/api/treatment-plans", treatmentPlansRoutes);

@@ -15,6 +15,7 @@ import { FdiToothChart } from "@/components/FdiToothChart";
 import { FindingsList } from "@/components/FindingsList";
 import { ClinicalDiagnosesCard } from "@/components/ClinicalDiagnosesCard";
 import { PatientImageGallery } from "@/components/PatientImageGallery";
+import { EndodonticPainPathwayCard } from "@/components/EndodonticPainPathwayCard";
 import { Dialog, DialogBody, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
@@ -408,6 +409,14 @@ export function VisitDetailPage() {
   const canSign = Boolean(
     session?.role.permissions.includes(PERMISSIONS.ALL) ||
     session?.role.permissions.includes(PERMISSIONS.SIGN_CLINICAL_RECORDS)
+  );
+  const canWritePathways = Boolean(
+    session?.role.permissions.includes(PERMISSIONS.ALL) ||
+    session?.role.permissions.includes(PERMISSIONS.WRITE_PATHWAYS)
+  );
+  const canReviewPathways = Boolean(
+    session?.role.permissions.includes(PERMISSIONS.ALL) ||
+    session?.role.permissions.includes(PERMISSIONS.REVIEW_PATHWAYS)
   );
 
   async function load() {
@@ -843,7 +852,7 @@ export function VisitDetailPage() {
 
       {/* Vitals */}
       {(visit.blood_pressure_systolic || visit.blood_pressure_diastolic || visit.blood_sugar_mgdl) && (
-        <Card>
+            <Card>
           <CardContent className="pt-4">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
               Chỉ số khám
@@ -1068,7 +1077,8 @@ export function VisitDetailPage() {
                 <FdiToothChart visitId={visit.id} findings={effectiveFindings} onCreated={(f) => setFindings((prev) => [...prev, f])} onCreatedBatch={onFindingsBatchCreated} onUpdated={(updated) => setFindings((prev) => prev.map((finding) => finding.id === updated.id ? updated : finding))} onDeleted={(findingId) => setFindings((prev) => prev.filter((finding) => finding.id !== findingId))} />
               </CardContent>
             </Card>
-           <Card id="findings">
+            <EndodonticPainPathwayCard visitId={visit.id} canWrite={canWritePathways} canReview={canReviewPathways} />
+            <Card id="findings">
              <CardHeader className="pb-3"><CardTitle>Ghi nhận theo răng ({toothFindings.length})</CardTitle></CardHeader>
              <CardContent>
                <FindingsList visitId={visit.id} findings={toothFindings} onUpdate={(updated) => setFindings((prev) => prev.map((f) => (f.id === updated.id ? updated : f)))} onDeleted={(findingId) => setFindings((prev) => prev.filter((finding) => finding.id !== findingId))} />
@@ -1077,7 +1087,7 @@ export function VisitDetailPage() {
          </div>
          <aside className="space-y-6 lg:sticky lg:top-4">
             <ClinicalDiagnosesCard visitId={visit.id} patientId={visit.patient_id} findings={findings} />
-           <Card>
+      <Card>
              <CardContent className="pt-4">
                <PatientImageGallery patientId={visit.patient_id} visitId={visit.id} />
              </CardContent>

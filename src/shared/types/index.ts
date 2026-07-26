@@ -260,7 +260,7 @@ export type VisitStatus = "in_progress" | "completed" | "cancelled";
 export type VisitType = "initial_exam" | "follow_up" | "treatment" | "emergency";
 export type ClinicalState = "pre_exam" | "awaiting_doctor_review" | "in_progress" | "signed" | "amended" | "cancelled";
 export type ClinicalEntrySource = "assistant" | "doctor" | "ai" | "legacy";
-export type ClinicalReviewEntityType = "finding" | "diagnosis" | "initial_assessment";
+export type ClinicalReviewEntityType = "finding" | "diagnosis" | "initial_assessment" | "pathway_assessment";
 export type ClinicalReviewStatus = "pending" | "accepted" | "rejected" | "superseded";
 
 export interface Visit {
@@ -515,6 +515,95 @@ export interface ClinicalReviewEvent {
   reviewed_at?: string;
   review_note?: string;
   created_at: string;
+}
+
+// ───────────────────────── Clinical Pathway (V1) ─────────────────────────
+
+export type PathwayKey = "endodontic_pain";
+export type PathwayAssessmentStatus = "active" | "completed" | "closed_with_exceptions";
+export type PathwayItemStatus = "pending" | "completed" | "skipped";
+
+export interface ClinicalPathwayAssessment {
+  id: string;
+  tenant_id: string;
+  visit_id: string;
+  tooth_number: number;
+  pathway_key: PathwayKey;
+  pathway_version: string;
+  status: PathwayAssessmentStatus;
+  assessment_json: string;
+  entry_source: "assistant" | "doctor";
+  entered_by: string;
+  clinical_effective_at?: string;
+  reviewed_by?: string;
+  reviewed_at?: string;
+  closed_by?: string;
+  closed_at?: string;
+  close_note?: string;
+  current_revision: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClinicalPathwayAssessmentItem {
+  id: string;
+  tenant_id: string;
+  assessment_id: string;
+  item_key: string;
+  item_version: number;
+  status: PathwayItemStatus;
+  value_json?: string;
+  skip_reason?: string;
+  completed_by?: string;
+  completed_at?: string;
+  updated_at: string;
+}
+
+export interface ClinicalPathwayAssessmentRevision {
+  id: string;
+  tenant_id: string;
+  assessment_id: string;
+  revision_no: number;
+  before_json: string;
+  after_json: string;
+  change_reason: string;
+  changed_by: string;
+  changed_at: string;
+}
+
+/** Assessment payload stored in assessment_json — structured, not free text. */
+export interface EndodonticPainAssessmentPayload {
+  symptoms: {
+    spontaneous_pain: "present" | "absent" | "unknown";
+    pain_on_biting: "present" | "absent" | "unknown";
+    prolonged_pain_after_stimulus: "present" | "absent" | "unknown";
+    prolonged_pain_duration?: string;
+  };
+  tests: {
+    cold_test: "positive" | "negative" | "inconclusive" | "not_done";
+    percussion: "positive" | "negative" | "inconclusive" | "not_done";
+    palpation: "positive" | "negative" | "inconclusive" | "not_done";
+    bite_test: "positive" | "negative" | "inconclusive" | "not_done";
+  };
+  context: {
+    large_caries: "present" | "absent" | "unknown";
+    deep_old_restoration: "present" | "absent" | "unknown";
+    periapical_signs_on_imaging: "present" | "absent" | "unknown" | "not_assessed";
+  };
+  notes?: string;
+}
+
+/** Pattern engine output — deterministic, no LLM. */
+export interface PathwayPattern {
+  pattern_key: string;
+  title: string;
+  priority: number;
+  explanation: string;
+  evidence_item_keys: string[];
+  missing_item_keys: string[];
+  source_reference: string;
+  pathway_version: string;
+  review_status: "unreviewed" | "acknowledged" | "dismissed";
 }
 
 export type VisitSafetyWarningType = "blood_pressure" | "blood_sugar" | "bmi";

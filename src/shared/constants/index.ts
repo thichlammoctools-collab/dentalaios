@@ -120,6 +120,8 @@ export const PERMISSIONS = {
   REVIEW_CLINICAL_DRAFTS: "review_clinical_drafts",
   SIGN_CLINICAL_RECORDS: "sign_clinical_records",
   MANAGE_CONSENTS: "manage_consents",
+  WRITE_PATHWAYS: "write_pathways",
+  REVIEW_PATHWAYS: "review_pathways",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
