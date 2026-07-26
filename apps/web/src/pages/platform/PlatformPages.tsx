@@ -25,6 +25,13 @@ function Loading({ label = "Đang tải dữ liệu..." }: { label?: string }) {
 function formatDate(value?: string | null) { return value ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)) : "--"; }
 function Status({ active }: { active: boolean }) { return <span className={active ? "inline-flex items-center gap-1.5 rounded-full bg-[#10382d] px-2 py-1 text-xs font-medium text-[#86efac]" : "inline-flex items-center gap-1.5 rounded-full bg-[#233044] px-2 py-1 text-xs font-medium text-[#c9d5e5]"}><span aria-hidden="true" className={active ? "h-1.5 w-1.5 rounded-full bg-[#4ade80]" : "h-1.5 w-1.5 rounded-full bg-[#94a3b8]"} />{active ? "Hoạt động" : "Tạm ngưng"}</span>; }
 
+function flagLabel(key: string): string {
+  const labels: Record<string, string> = {
+    "clinical_copilot.endodontic_pain_v1": "Clinical Copilot: Đau răng / nội nha",
+  };
+  return labels[key] ?? key;
+}
+
 export function PlatformDashboardPage() {
   const [range, setRange] = useState(30);
   const [data, setData] = useState<PlatformDashboardSnapshot | null>(null);
@@ -73,7 +80,7 @@ export function PlatformConfigurationPage() {
   const [lastBenchmarkResult, setLastBenchmarkResult] = useState<{ id: string; output: string } | null>(null);
   const [benchmarkReview, setBenchmarkReview] = useState({ score: 5, note: "" });
   const [error, setError] = useState<string | null>(null);
-  const [form, setForm] = useState({ key: "", description: "", default_enabled: false });
+  const [selectedFlagKey, setSelectedFlagKey] = useState("");
   const [rolloutForm, setRolloutForm] = useState({ use_case: "", candidate_model_id: "", traffic_percent: 0, status: "draft" as "draft" | "pending_approval" });
   const [benchmarkForm, setBenchmarkForm] = useState({ use_case: "", label: "", prompt: "", expected_output: "", is_deidentified: false });
   const { hasPermission } = usePlatformAuth();
@@ -98,12 +105,9 @@ export function PlatformConfigurationPage() {
 
   useEffect(load, []);
 
-  async function save(event: FormEvent) {
-    event.preventDefault();
-
+  async function updateFlag(flag: PlatformFeatureFlag, enabled: boolean) {
     try {
-      await platformPut("/api/platform/feature-flags", form);
-      setForm({ key: "", description: "", default_enabled: false });
+      await platformPut("/api/platform/feature-flags", { key: flag.key, description: flag.description, default_enabled: enabled });
       load();
     } catch (cause) {
       setError(cause instanceof PlatformApiError ? cause.message : "Không thể lưu feature flag");
@@ -339,32 +343,27 @@ export function PlatformConfigurationPage() {
       </Card>
       <div className="grid gap-5 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardHeader><CardTitle>Feature flags</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Feature flags</CardTitle><CardDescription>Bật hoặc tắt tính năng có sẵn. Nên dùng override theo từng tenant cho các tính năng đang pilot.</CardDescription></CardHeader>
           <CardContent className="space-y-2">
             {flags.length ? flags.map((flag) => (
-              <div className="flex justify-between rounded-lg border p-3 text-sm" key={flag.key}>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm" key={flag.key}>
                 <div>
-                  <p className="font-medium">{flag.key}</p>
+                  <p className="font-medium">{flagLabel(flag.key)}</p>
                   <p className="text-slate-500">{flag.description}</p>
                 </div>
-                <Status active={flag.default_enabled} />
+                <div className="flex items-center gap-3"><Status active={flag.default_enabled} />{hasPermission("platform_config.write") && <Button size="sm" variant={flag.default_enabled ? "outline" : "default"} onClick={() => void updateFlag(flag, !flag.default_enabled)}>{flag.default_enabled ? "Tắt mặc định" : "Bật mặc định"}</Button>}</div>
               </div>
             )) : <p className="text-sm text-slate-500">Chưa có feature flag.</p>}
           </CardContent>
         </Card>
         {hasPermission("platform_config.write") && (
           <Card>
-            <CardHeader><CardTitle>Thêm hoặc cập nhật</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Chọn tính năng</CardTitle><CardDescription>Chọn một tính năng từ danh sách để xem mô tả và thay đổi trạng thái.</CardDescription></CardHeader>
             <CardContent>
-              <form className="space-y-3" onSubmit={save}>
-                <Input placeholder="feature.key" value={form.key} onChange={(event) => setForm({ ...form, key: event.target.value })} required />
-                <Textarea placeholder="Mô tả" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} required />
-                <label className="flex gap-2 text-sm">
-                  <input type="checkbox" checked={form.default_enabled} onChange={(event) => setForm({ ...form, default_enabled: event.target.checked })} />
-                  Bật mặc định
-                </label>
-                <Button type="submit">Lưu flag</Button>
-              </form>
+              <div className="space-y-3">
+                <Select aria-label="Chọn feature flag" value={selectedFlagKey} onChange={(event) => setSelectedFlagKey(event.target.value)}><option value="">Chọn tính năng</option>{flags.map((flag) => <option key={flag.key} value={flag.key}>{flagLabel(flag.key)}</option>)}</Select>
+                {selectedFlagKey && (() => { const flag = flags.find((item) => item.key === selectedFlagKey); return flag ? <div className="rounded-lg border bg-muted/20 p-3 text-sm"><p className="font-medium">{flagLabel(flag.key)}</p><p className="mt-1 text-muted-foreground">{flag.description}</p><Button className="mt-3" size="sm" variant={flag.default_enabled ? "outline" : "default"} onClick={() => void updateFlag(flag, !flag.default_enabled)}>{flag.default_enabled ? "Tắt mặc định" : "Bật mặc định"}</Button></div> : null; })()}
+              </div>
             </CardContent>
           </Card>
         )}
