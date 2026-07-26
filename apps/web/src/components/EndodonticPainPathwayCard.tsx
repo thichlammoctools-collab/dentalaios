@@ -186,4 +186,3 @@ function parsePayload(value: string): EndodonticPainAssessmentPayload {
   try { return JSON.parse(value) as EndodonticPainAssessmentPayload; }
   catch { return blankAssessment(); }
 }
-}
