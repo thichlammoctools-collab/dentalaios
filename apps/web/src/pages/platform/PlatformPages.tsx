@@ -80,6 +80,7 @@ export function PlatformConfigurationPage() {
   const [lastBenchmarkResult, setLastBenchmarkResult] = useState<{ id: string; output: string } | null>(null);
   const [benchmarkReview, setBenchmarkReview] = useState({ score: 5, note: "" });
   const [error, setError] = useState<string | null>(null);
+  const [flagError, setFlagError] = useState<string | null>(null);
   const [selectedFlagKey, setSelectedFlagKey] = useState("");
   const [rolloutForm, setRolloutForm] = useState({ use_case: "", candidate_model_id: "", traffic_percent: 0, status: "draft" as "draft" | "pending_approval" });
   const [benchmarkForm, setBenchmarkForm] = useState({ use_case: "", label: "", prompt: "", expected_output: "", is_deidentified: false });
@@ -106,11 +107,15 @@ export function PlatformConfigurationPage() {
   useEffect(load, []);
 
   async function updateFlag(flag: PlatformFeatureFlag, enabled: boolean) {
+    setFlagError(null);
     try {
       await platformPut("/api/platform/feature-flags", { key: flag.key, description: flag.description, default_enabled: enabled });
       load();
     } catch (cause) {
-      setError(cause instanceof PlatformApiError ? cause.message : "Không thể lưu feature flag");
+      const message = cause instanceof PlatformApiError && cause.status === 403 && cause.message === "Recent MFA verification required"
+        ? "Cần xác thực MFA lại trước khi thay đổi feature flag. Đăng xuất Platform Control rồi đăng nhập lại và nhập mã TOTP."
+        : cause instanceof PlatformApiError ? cause.message : "Không thể cập nhật feature flag";
+      setFlagError(message);
     }
   }
 
@@ -345,6 +350,7 @@ export function PlatformConfigurationPage() {
         <Card className="lg:col-span-2">
           <CardHeader><CardTitle>Feature flags</CardTitle><CardDescription>Bật hoặc tắt tính năng có sẵn. Nên dùng override theo từng tenant cho các tính năng đang pilot.</CardDescription></CardHeader>
           <CardContent className="space-y-2">
+            {flagError && <div role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">{flagError}</div>}
             {flags.length ? flags.map((flag) => (
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm" key={flag.key}>
                 <div>
@@ -361,6 +367,7 @@ export function PlatformConfigurationPage() {
             <CardHeader><CardTitle>Chọn tính năng</CardTitle><CardDescription>Chọn một tính năng từ danh sách để xem mô tả và thay đổi trạng thái.</CardDescription></CardHeader>
             <CardContent>
               <div className="space-y-3">
+                {flagError && <div role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">{flagError}</div>}
                 <Select aria-label="Chọn feature flag" value={selectedFlagKey} onChange={(event) => setSelectedFlagKey(event.target.value)}><option value="">Chọn tính năng</option>{flags.map((flag) => <option key={flag.key} value={flag.key}>{flagLabel(flag.key)}</option>)}</Select>
                 {selectedFlagKey && (() => { const flag = flags.find((item) => item.key === selectedFlagKey); return flag ? <div className="rounded-lg border bg-muted/20 p-3 text-sm"><p className="font-medium">{flagLabel(flag.key)}</p><p className="mt-1 text-muted-foreground">{flag.description}</p><Button className="mt-3" size="sm" variant={flag.default_enabled ? "outline" : "default"} onClick={() => void updateFlag(flag, !flag.default_enabled)}>{flag.default_enabled ? "Tắt mặc định" : "Bật mặc định"}</Button></div> : null; })()}
               </div>
