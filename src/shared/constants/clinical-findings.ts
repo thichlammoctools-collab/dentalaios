@@ -1,4 +1,4 @@
-import type { AnatomicalSite, FindingCategory, FindingScope } from "@shared/types";
+import type { AnatomicalSite, ClinicalFinding, FindingCategory, FindingScope } from "@shared/types";
 
 export interface FindingConditionOption {
   value: string;
@@ -169,4 +169,94 @@ export function getFindingLocationLabel(location?: {
     .map((value) => value ? labels[value] ?? value : "")
     .filter(Boolean)
     .join(", ");
+}
+
+// ─── Tooth-level finding conflict rules ──────────────────────────
+// Nhóm condition dùng để phát hiện mâu thuẫn khi ghi nhận trên cùng một răng.
+// - NEGATION: phủ nhận bệnh lý; không đồng tồn tại với bất kỳ condition khác.
+// - ABSOLUTE: trạng thái tuyệt đối của răng; không đồng tồn tại với condition khác.
+// - Còn lại: condition đồng tồn tại được (concurrent); chỉ chặn khi duplicate.
+
+/** Condition phủ nhận bệnh lý (răng khỏe). */
+export const NEGATION_TOOTH_CONDITIONS: ReadonlySet<string> = new Set(["good"]);
+
+/** Condition tuyệt đối (loại trừ mọi condition khác trên cùng răng). */
+export const ABSOLUTE_TOOTH_CONDITIONS: ReadonlySet<string> = new Set([
+  "missing", "unerupted", "impacted",
+]);
+
+export type FindingConflictKind = "none" | "duplicate" | "conflict_negation" | "conflict_absolute";
+
+/** Chỉ áp dụng cho finding thuộc răng (scope=tooth) — periodontal và tooth_hard_tissue. */
+function isToothLevelFinding(finding: Pick<ClinicalFinding, "scope" | "category">): boolean {
+  return finding.scope === "tooth" && (finding.category === "tooth_hard_tissue" || finding.category === "periodontal");
+}
+
+function surfaceKey(finding: Pick<ClinicalFinding, "category" | "location_details">): string {
+  const details = finding.location_details;
+  const surfaces = finding.category === "periodontal"
+    ? details?.periodontal_surfaces
+    : details?.tooth_surfaces;
+  if (!surfaces || surfaces.length === 0) return "";
+  return [...surfaces].sort().join(",");
+}
+
+/**
+ * Phân loại xung đột giữa incoming finding và các finding hiện có trên cùng răng.
+ * Chỉ xét finding cùng răng (tooth_number) và cùng scope tooth.
+ *
+ * Quy tắc:
+ * - duplicate: cùng category + cùng condition + cùng bộ mặt răng → chặn cứng.
+ * - conflict_negation: một bên là "good", bên kia là bệnh lý → cảnh báo.
+ * - conflict_absolute: một bên là missing/unerupted/impacted và có bản ghi khác cùng răng → cảnh báo.
+ * - none: cho phép cùng tồn tại (khác condition, hoặc khác mặt răng).
+ */
+export function classifyToothFindingConflict(
+  incoming: Pick<ClinicalFinding, "category" | "scope" | "tooth_number" | "condition" | "location_details">,
+  existing: ReadonlyArray<Pick<ClinicalFinding, "id" | "category" | "scope" | "tooth_number" | "condition" | "location_details">>,
+  options: { excludeId?: string } = {},
+): { kind: FindingConflictKind; offenders: Array<Pick<ClinicalFinding, "id" | "category" | "condition">> } {
+  if (!isToothLevelFinding(incoming) || incoming.tooth_number == null) {
+    return { kind: "none", offenders: [] };
+  }
+  const siblings = existing.filter((item) =>
+    item.id !== options.excludeId &&
+    isToothLevelFinding(item) &&
+    item.tooth_number === incoming.tooth_number,
+  );
+  if (siblings.length === 0) return { kind: "none", offenders: [] };
+
+  // 1. DUPLICATE — cùng category + cùng condition + cùng bộ mặt răng.
+  const incomingSurfaceKey = surfaceKey(incoming);
+  const duplicates = siblings.filter((item) =>
+    item.category === incoming.category &&
+    item.condition === incoming.condition &&
+    surfaceKey(item) === incomingSurfaceKey,
+  );
+  if (duplicates.length > 0) {
+    return { kind: "duplicate", offenders: duplicates.map(({ id, category, condition }) => ({ id, category, condition })) };
+  }
+
+  // 2. CONFLICT_ABSOLUTE — có bất kỳ bên nào chứa absolute condition khác với bên còn lại.
+  const incomingAbsolute = ABSOLUTE_TOOTH_CONDITIONS.has(incoming.condition);
+  const absoluteOffenders = siblings.filter((item) => {
+    const itemAbsolute = ABSOLUTE_TOOTH_CONDITIONS.has(item.condition);
+    if (!incomingAbsolute && !itemAbsolute) return false;
+    return item.condition !== incoming.condition;
+  });
+  if (absoluteOffenders.length > 0) {
+    return { kind: "conflict_absolute", offenders: absoluteOffenders.map(({ id, category, condition }) => ({ id, category, condition })) };
+  }
+
+  // 3. CONFLICT_NEGATION — một bên là "good" và bên kia là bệnh lý.
+  const incomingIsGood = NEGATION_TOOTH_CONDITIONS.has(incoming.condition);
+  const negationOffenders = siblings.filter((item) => {
+    const itemIsGood = NEGATION_TOOTH_CONDITIONS.has(item.condition);
+    return (incomingIsGood && !itemIsGood) || (!incomingIsGood && itemIsGood);
+  });
+  if (negationOffenders.length > 0) {
+    return { kind: "conflict_negation", offenders: negationOffenders.map(({ id, category, condition }) => ({ id, category, condition })) };
+  }
+
+  return { kind: "none", offenders: [] };
 }

@@ -63,6 +63,9 @@ function mapPrice(row: D1Row): TreatmentService {
     price: Number(row.price),
     estimated_duration_min: Number(row.estimated_duration_min),
     is_active: Boolean(row.is_active),
+    imported_from_template_code:
+      (row.imported_from_template_code as string | null | undefined) ?? null,
+    imported_at: (row.imported_at as string | null | undefined) ?? null,
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
   };

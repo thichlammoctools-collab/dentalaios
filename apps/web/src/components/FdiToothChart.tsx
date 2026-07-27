@@ -25,6 +25,8 @@ interface FdiToothChartProps {
   onCreatedBatch?: (findings: ClinicalFinding[]) => void;
   onUpdated: (finding: ClinicalFinding) => void;
   onDeleted: (findingId: string) => void;
+  openToothRequest?: number | null;
+  onOpenToothRequestConsumed?: () => void;
 }
 
 const ADULT_UPPER_RIGHT = [18, 17, 16, 15, 14, 13, 12, 11];
@@ -55,7 +57,7 @@ function supportsVerticalAndOrientation(site: string) {
   return site === "buccal" || site === "lip";
 }
 
-export function FdiToothChart({ visitId, findings, readOnly = false, onCreated, onUpdated, onDeleted }: FdiToothChartProps) {
+export function FdiToothChart({ visitId, findings, readOnly = false, onCreated, onUpdated, onDeleted, openToothRequest = null, onOpenToothRequestConsumed }: FdiToothChartProps) {
   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
   const [toothTab, setToothTab] = useState<"tooth_hard_tissue" | "periodontal">("tooth_hard_tissue");
   const [toothCondition, setToothCondition] = useState("good");
@@ -80,6 +82,17 @@ export function FdiToothChart({ visitId, findings, readOnly = false, onCreated, 
       .then((response) => setConcepts(response.items))
       .catch(() => undefined);
   }, []);
+
+  // Allow parents (e.g. ToothFindingsBoard) to programmatically open the tooth dialog
+  // so we keep a single source of truth for the add-finding flow.
+  useEffect(() => {
+    if (openToothRequest == null || readOnly) return;
+    setSavedMessage("");
+    setSelectedTooth(openToothRequest);
+    resetToothForm("tooth_hard_tissue");
+    onOpenToothRequestConsumed?.();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openToothRequest, readOnly]);
 
   const toothDefinition = getFindingCategory(toothTab);
   const otherDefinition = otherCategory ? getFindingCategory(otherCategory) : null;
@@ -276,7 +289,7 @@ export function FdiToothChart({ visitId, findings, readOnly = false, onCreated, 
   const otherCategories = CLINICAL_FINDING_CATEGORIES.filter((item) => NON_TOOTH_CATEGORIES.includes(item.value));
   const primaryFindings = findings.filter((finding) => finding.tooth_number != null && finding.tooth_number >= 50);
 
-  return <div className="space-y-4">
+  return <div id="fdi-chart" className="space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 p-3">
       <div className="flex flex-wrap gap-2">{toothCategories.map((item) => <span key={item.value} className="rounded-full border border-border bg-background px-3 py-1 text-xs font-medium">{item.label}: {findings.filter((finding) => finding.category === item.value).length}</span>)}</div>
       <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground"><span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded border border-border bg-background" />Chưa ghi nhận</span><span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded border border-amber-500 bg-amber-50" />Có ghi nhận</span><span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded border border-red-500 bg-red-50" />Thiếu răng</span></div>

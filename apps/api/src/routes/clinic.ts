@@ -11,7 +11,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { PERMISSIONS } from "@shared/constants";
-import { branchCreateSchema, branchUpdateSchema, paymentPrefixSchema, tenantBusinessInfoSchema, treatmentServiceUpsertSchema } from "@shared/validation";
+import { branchCreateSchema, branchUpdateSchema, paymentPrefixSchema, tenantBusinessInfoSchema, treatmentServiceImportSchema, treatmentServiceUpsertSchema } from "@shared/validation";
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
 import { requirePermission } from "../middleware/rbac";
@@ -24,6 +24,7 @@ import { NotFoundError, ValidationError } from "../lib/errors";
 import { paymentService } from "../services/payment.service";
 import { treatmentServicesService } from "../services/treatment-service-prices.service";
 import { createProcedureCatalogRepository } from "../repositories/procedure-catalog.repo";
+import { treatmentServiceTemplateService } from "../services/treatment-service-template.service";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -189,6 +190,37 @@ router.delete(
   async (c) => {
     const jwt = getJwt(c);
     return c.json(await treatmentServicesService.remove(c.env.DB, jwt.tenant_id, c.req.param("code")));
+  },
+);
+
+// GET /api/clinic/treatment-service-templates — platform-wide treatment service
+// templates with each row flagged if this tenant already has it imported.
+router.get(
+  "/treatment-service-templates",
+  requirePermission(PERMISSIONS.MANAGE_USERS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const url = new URL(c.req.url);
+    const items = await treatmentServiceTemplateService.listForTenant(c.env.DB, jwt.tenant_id, {
+      procedure: url.searchParams.get("procedure") ?? undefined,
+      q: url.searchParams.get("q") ?? undefined,
+      icd10_code_id: url.searchParams.get("icd10_code_id") ?? undefined,
+    });
+    return c.json({ items });
+  },
+);
+
+// POST /api/clinic/treatment-services/import — batch import from platform templates
+router.post(
+  "/treatment-services/import",
+  requirePermission(PERMISSIONS.MANAGE_USERS),
+  auditLog("import", "treatment_service"),
+  zValidator("json", treatmentServiceImportSchema),
+  async (c) => {
+    const jwt = getJwt(c);
+    const data = c.req.valid("json");
+    const result = await treatmentServiceTemplateService.importForTenant(c.env.DB, jwt.tenant_id, data);
+    return c.json(result);
   },
 );
 

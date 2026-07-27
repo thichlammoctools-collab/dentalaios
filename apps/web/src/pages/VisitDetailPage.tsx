@@ -12,10 +12,12 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { FdiToothChart } from "@/components/FdiToothChart";
-import { FindingsList } from "@/components/FindingsList";
 import { ClinicalDiagnosesCard } from "@/components/ClinicalDiagnosesCard";
 import { PatientImageGallery } from "@/components/PatientImageGallery";
-import { EndodonticPainPathwayCard } from "@/components/EndodonticPainPathwayCard";
+import { ClinicalCopilotLauncher } from "@/components/ClinicalCopilotLauncher";
+import { ToothFindingsBoard } from "@/components/ToothFindingsBoard";
+// Side-effect import: registers all Clinical Copilot modules (endodontic pain, ...)
+import "@/features/clinical-copilots";
 import { Dialog, DialogBody, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
@@ -400,6 +402,10 @@ export function VisitDetailPage() {
   const [suggestNextDialogOpen, setSuggestNextDialogOpen] = useState(false);
   const [creatingAppointment, setCreatingAppointment] = useState(false);
   const [workspaceTab, setWorkspaceTab] = useState<ClinicalWorkspaceTab>("exam");
+  // When the ToothFindingsBoard empty-state asks to add a finding, we route the
+  // request back to the FdiToothChart to keep a single source of truth for the
+  // add-finding flow. The chart consumes the value and clears it via onOpenToothRequestConsumed.
+  const [pendingToothOpen, setPendingToothOpen] = useState<number | null>(null);
 
   const permissions = session?.role.permissions ?? [];
   const hasAllPermissions = permissions.includes(PERMISSIONS.ALL);
@@ -930,7 +936,54 @@ export function VisitDetailPage() {
         <section aria-label="Không gian làm việc lâm sàng" className="space-y-4">
           <div className="grid grid-cols-2 gap-2 rounded-xl border border-border bg-muted/20 p-2 md:grid-cols-4">{workspaceTabs.map((tab) => <button type="button" key={tab.id} onClick={() => setWorkspaceTab(tab.id)} className={`rounded-lg px-3 py-2 text-left transition-colors ${workspaceTab === tab.id ? "bg-background shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/60"}`}><span className="flex items-center justify-between gap-2 text-sm font-semibold"><span>{tab.label}</span>{tab.count !== undefined && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">{tab.count}</span>}</span><span className="mt-0.5 block text-xs">{tab.description}</span></button>)}</div>
 
-          {workspaceTab === "exam" && <div className="space-y-4"><Card><CardHeader className="flex-row items-center justify-between gap-4 pb-3"><div><CardTitle>Khám răng hàm mặt</CardTitle><p className="mt-1 text-xs text-muted-foreground">Định vị trên sơ đồ, sau đó xem chi tiết ở danh sách bên dưới.</p></div>{canEditClinical && <Button size="sm" onClick={() => setVoiceDialogOpen(true)}>Ghi âm findings</Button>}</CardHeader><CardContent><FdiToothChart visitId={visit.id} findings={effectiveFindings} readOnly={!canEditClinical} onCreated={(finding) => setFindings((current) => [...current, finding])} onCreatedBatch={onFindingsBatchCreated} onUpdated={(updated) => setFindings((current) => current.map((finding) => finding.id === updated.id ? updated : finding))} onDeleted={(findingId) => setFindings((current) => current.filter((finding) => finding.id !== findingId))} /></CardContent></Card><EndodonticPainPathwayCard visitId={visit.id} canWrite={canWritePathways && !isClinicalReadOnly} canReview={canReviewPathways && !isClinicalReadOnly} /><Card id="findings"><CardHeader className="pb-3"><CardTitle>Ghi nhận theo răng ({toothFindings.length})</CardTitle></CardHeader><CardContent><FindingsList visitId={visit.id} findings={toothFindings} readOnly={!canEditClinical} onUpdate={(updated) => setFindings((current) => current.map((finding) => finding.id === updated.id ? updated : finding))} onDeleted={(findingId) => setFindings((current) => current.filter((finding) => finding.id !== findingId))} /></CardContent></Card></div>}
+          {workspaceTab === "exam" && <div className="space-y-4">
+            <Card>
+              <CardHeader className="flex-row items-center justify-between gap-4 pb-3">
+                <div>
+                  <CardTitle>Khám răng hàm mặt</CardTitle>
+                  <p className="mt-1 text-xs text-muted-foreground">Định vị trên sơ đồ, sau đó xem chi tiết ở danh sách bên dưới.</p>
+                </div>
+                {canEditClinical && <Button size="sm" onClick={() => setVoiceDialogOpen(true)}>Ghi âm findings</Button>}
+              </CardHeader>
+              <CardContent>
+                <FdiToothChart
+                  visitId={visit.id}
+                  findings={effectiveFindings}
+                  readOnly={!canEditClinical}
+                  onCreated={(finding) => setFindings((current) => [...current, finding])}
+                  onCreatedBatch={onFindingsBatchCreated}
+                  onUpdated={(updated) => setFindings((current) => current.map((finding) => finding.id === updated.id ? updated : finding))}
+                  onDeleted={(findingId) => setFindings((current) => current.filter((finding) => finding.id !== findingId))}
+                  openToothRequest={pendingToothOpen}
+                  onOpenToothRequestConsumed={() => setPendingToothOpen(null)}
+                />
+              </CardContent>
+            </Card>
+            <ClinicalCopilotLauncher
+              visitId={visit.id}
+              canWrite={canWritePathways && !isClinicalReadOnly}
+              canReview={canReviewPathways && !isClinicalReadOnly}
+            />
+            <Card id="findings">
+              <CardHeader className="pb-3">
+                <CardTitle>Ghi nhận theo răng ({toothFindings.length})</CardTitle>
+                <p className="mt-1 text-xs text-muted-foreground">Chọn một răng ở sơ đồ FDI bên trái để xem hoặc chỉnh sửa ghi nhận tương ứng.</p>
+              </CardHeader>
+              <CardContent>
+                <ToothFindingsBoard
+                  visitId={visit.id}
+                  findings={toothFindings}
+                  readOnly={!canEditClinical}
+                  onUpdate={(updated) => setFindings((current) => current.map((finding) => finding.id === updated.id ? updated : finding))}
+                  onDeleted={(findingId) => setFindings((current) => current.filter((finding) => finding.id !== findingId))}
+                  onRequestOpenTooth={(tooth) => {
+                    document.getElementById("fdi-chart")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                    setPendingToothOpen(tooth);
+                  }}
+                />
+              </CardContent>
+            </Card>
+          </div>}
           {workspaceTab === "diagnosis" && <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]"><ClinicalDiagnosesCard visitId={visit.id} patientId={visit.patient_id} findings={findings} readOnly={!canEditClinical} /><Card><CardHeader className="pb-3"><CardTitle>Trợ lý chẩn đoán</CardTitle></CardHeader><CardContent className="space-y-3"><p className="text-sm text-muted-foreground">Tóm tắt AI hỗ trợ rà soát ghi nhận hiện có; bác sĩ vẫn là người xác nhận kết luận.</p><Button className="w-full" variant="outline" onClick={onSummarize} disabled={summarizing}>{summarizing ? "Đang tóm tắt..." : "Tạo tóm tắt AI"}</Button><Button className="w-full" variant="outline" onClick={() => setWorkspaceTab("images")}>Mở hình ảnh và bằng chứng</Button></CardContent></Card></div>}
           {workspaceTab === "images" && <Card><CardHeader className="pb-3"><CardTitle>Hình ảnh lâm sàng</CardTitle><p className="mt-1 text-xs text-muted-foreground">Xem ảnh, ghi chú và liên kết bằng chứng mà không làm chật khu vực khám.</p></CardHeader><CardContent><PatientImageGallery patientId={visit.patient_id} visitId={visit.id} canUpload={canWritePatients && !isClinicalReadOnly} canDelete={canWritePatients && !isClinicalReadOnly} canAnnotate={canEditClinical} canLinkEvidence={canEditClinical} canSaveFindings={canEditClinical} onFindingsSaved={onFindingsBatchCreated} /></CardContent></Card>}
           {workspaceTab === "plan" && <div className="grid gap-4 lg:grid-cols-2"><Card><CardHeader className="pb-3"><CardTitle>Kế hoạch điều trị</CardTitle><p className="mt-1 text-xs text-muted-foreground">Tạo kế hoạch sau khi đã rà soát ghi nhận và chẩn đoán.</p></CardHeader><CardContent className="space-y-3">{canWritePlans ? <><Button className="w-full" onClick={onCreatePlan}>Tạo kế hoạch thủ công</Button><Button className="w-full" variant="outline" onClick={onGeneratePlan} disabled={generatingPlan}>{generatingPlan ? "Đang tạo..." : "Tạo nháp bằng AI"}</Button></> : <p className="text-sm text-muted-foreground">Bạn không có quyền tạo kế hoạch điều trị.</p>}</CardContent></Card><Card><CardHeader className="pb-3"><CardTitle>Hẹn tái khám</CardTitle><p className="mt-1 text-xs text-muted-foreground">Chỉ tạo sau khi lịch đề xuất đã được nhân sự xác nhận.</p></CardHeader><CardContent>{canWriteAppointments ? <Button className="w-full" variant="outline" onClick={onSuggestNext} disabled={suggestNextLoading}>{suggestNextLoading ? "Đang gợi ý..." : "Gợi ý lịch tái khám"}</Button> : <p className="text-sm text-muted-foreground">Bạn không có quyền tạo lịch hẹn.</p>}</CardContent></Card></div>}

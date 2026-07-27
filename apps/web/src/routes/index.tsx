@@ -37,6 +37,7 @@ import { PlatformGuard } from "@/components/platform/PlatformGuard";
 import { PlatformShell } from "@/components/platform/PlatformShell";
 import { PlatformLoginPage } from "@/pages/platform/PlatformLoginPage";
 import { PlatformClinicalTerminologyPage } from "@/pages/platform/PlatformClinicalTerminologyPage";
+import { PlatformTreatmentServiceTemplatesPage } from "@/pages/platform/PlatformTreatmentServiceTemplatesPage";
 import {
   PlatformAdminsPage,
   PlatformAuditLogsPage,
@@ -88,6 +89,7 @@ export function AppRoutes() {
         <Route path="/platform/content" element={<PlatformContentPage />} />
         <Route path="/platform/configuration" element={<PlatformConfigurationPage />} />
         <Route path="/platform/procedures" element={<PlatformProceduresPage />} />
+        <Route path="/platform/treatment-service-templates" element={<PlatformTreatmentServiceTemplatesPage />} />
         <Route path="/platform/clinical-terminology" element={<PlatformClinicalTerminologyPage />} />
         <Route path="/platform/admins" element={<PlatformAdminsPage />} />
         <Route path="/platform/audit-logs" element={<PlatformAuditLogsPage />} />

@@ -691,6 +691,8 @@ export interface TreatmentService {
   price: number;
   estimated_duration_min: number;
   is_active: boolean;
+  imported_from_template_code?: string | null;
+  imported_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1652,6 +1654,68 @@ export interface ProcedureCatalogItem {
   sort_order: number;
   created_at: string;
   updated_at: string;
+}
+
+// ───────────────── Platform treatment service templates ─────────────────
+
+export type TreatmentServiceTemplateIcd10Relation = "primary" | "secondary";
+
+export interface PlatformTreatmentServiceTemplateIcd10Link {
+  template_code: string;
+  icd10_code_id: string;
+  icd10_code?: string;
+  icd10_display_vi?: string;
+  relation: TreatmentServiceTemplateIcd10Relation;
+  note?: string | null;
+  created_at: string;
+}
+
+export interface PlatformTreatmentServiceTemplate {
+  code: string;
+  name: string;
+  procedure: string;
+  default_price: number;
+  market_price_low?: number | null;
+  market_price_median?: number | null;
+  market_price_high?: number | null;
+  market_price_currency: string;
+  market_price_reference?: string | null;
+  market_price_updated_at?: string | null;
+  default_duration_min: number;
+  description?: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_by?: string | null;
+  updated_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlatformTreatmentServiceTemplateWithLinks extends PlatformTreatmentServiceTemplate {
+  icd10_links: PlatformTreatmentServiceTemplateIcd10Link[];
+}
+
+/** Tenant-facing template card, includes flag whether tenant already imported. */
+export interface TenantTreatmentServiceTemplate extends PlatformTreatmentServiceTemplateWithLinks {
+  already_imported: boolean;
+}
+
+export type TreatmentServiceImportConflictMode = "skip" | "overwrite_metadata" | "overwrite_all";
+export type TreatmentServiceImportOutcome = "imported" | "updated" | "skipped_conflict" | "error";
+
+export interface TreatmentServiceImportResultItem {
+  template_code: string;
+  code: string;
+  outcome: TreatmentServiceImportOutcome;
+  message?: string;
+}
+
+export interface TreatmentServiceImportResult {
+  imported: number;
+  updated: number;
+  skipped_conflict: number;
+  error: number;
+  items: TreatmentServiceImportResultItem[];
 }
 
 export interface PlatformIntegrationStatus {

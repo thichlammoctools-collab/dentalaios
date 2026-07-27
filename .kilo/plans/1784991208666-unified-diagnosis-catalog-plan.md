@@ -1,328 +1,264 @@
-# Clinical Copilot V1: Đau Răng / Nội Nha
+# Dịch vụ điều trị mẫu toàn hệ thống, có liên kết ICD-10
 
 ## Mục tiêu
 
-Xây vertical slice đầu tiên của Clinical Intelligence Workspace trên nền `VisitDetailPage`, tập trung vào mục tiêu **khám đủ, ít bỏ sót**.
+Cung cấp một danh mục **dịch vụ điều trị mẫu chuẩn hóa toàn hệ thống** để phòng khám nhập nhanh vào danh mục dịch vụ nội bộ (`treatment_services`), thay vì mỗi tenant tự nhập lại từ đầu.
 
-Luồng V1:
+Luồng người dùng:
 
 ```text
-Bác sĩ chủ động bật pathway cho một răng
-→ nhập assessment cấu trúc ngắn
-→ hệ thống hiển thị checklist còn thiếu và pattern cần cân nhắc
-→ hoàn tất hoặc bỏ qua từng mục kèm lý do
-→ bác sĩ quyết định diagnosis/treatment riêng
-→ đóng pathway
-→ ký hồ sơ
+Platform admin quản lý danh mục mẫu (mã, tên, thủ thuật, giá thị trường, ICD-10 liên quan)
+→ Tenant admin mở "Nhập từ danh mục mẫu" trong Treatment Services
+→ Duyệt danh sách mẫu, tìm kiếm/lọc theo thủ thuật hoặc ICD-10
+→ Chọn nhiều mẫu và sửa (giá, tên, định mức thời gian) trước khi import
+→ Hệ thống tạo/cập nhật `treatment_services` với mã chuẩn hệ thống
+→ Mỗi dịch vụ giữ liên kết tới các mã ICD-10 chẩn đoán tương ứng để phục vụ gợi ý sau này
 ```
-
-V1 không tự tạo diagnosis, không tự tạo treatment plan và không đưa ra phần trăm xác suất.
 
 ## Quyết định đã chốt
 
-- Pathway đầu tiên: đau răng / nội nha.
-- KPI chính: tỷ lệ assessment đóng với toàn bộ checklist item ở trạng thái hoàn tất hoặc bỏ qua có lý do.
-- Pathway chỉ kích hoạt khi bác sĩ chủ động bật, không tự bật theo từ khóa.
-- Một lượt khám có thể có nhiều assessment; mỗi assessment gắn đúng một răng mục tiêu.
-- Checklist là bộ cố định trong code, version `endodontic-pain-v1`; chưa xây màn hình quản trị checklist.
-- Nội dung chuyên môn dựa trên AAE và được hội đồng lâm sàng duyệt thành pathway version nội bộ trước pilot.
-- Assessment do bác sĩ nhập có hiệu lực ngay.
-- Assessment do phụ tá nhập là draft, phải qua clinical review trước khi có hiệu lực, được tính KPI hoặc chặn ký.
-- Checklist item được lưu thành bản ghi riêng để audit trạng thái, lý do bỏ qua, người thao tác và thời điểm.
-- Assessment có revision riêng; sau khi visit bị khóa chỉ được sửa qua amendment hiện có.
-- Khi pathway đã được bật, không cho ký visit nếu assessment còn active hoặc có item chưa xử lý.
-- Nếu feature flag bị tắt sau rollout, không làm các visit đang có assessment trở nên không thể ký; lịch sử vẫn đọc được.
-- Voice-to-draft, image AI, differential diagnosis tự động, treatment simulator, prognosis định lượng, knowledge assistant và recall thông minh nằm ngoài V1.
+- **Mã dịch vụ**: mã nội bộ chuẩn hóa toàn hệ thống, không phải ICD-10. Ví dụ `RES-COMP-1S`, `END-RCT-MOL`, `SUR-EXT-SIMPLE`. Mỗi mã là duy nhất trong bảng mẫu toàn hệ thống và giữ nguyên khi import xuống tenant.
+- **Liên kết ICD-10**: mỗi mẫu có 0 hoặc nhiều mã ICD-10 chẩn đoán phù hợp (bảng phụ), lấy từ bảng `icd10_codes` đã có ở migration `0051_clinical_terminology_and_diagnoses`. Không tự phát sinh mã ICD-10 mới.
+- **Phạm vi tenant vs. platform**: danh mục mẫu ở **cấp platform** (không tenant_id); bảng import xuống là bảng `treatment_services` cấp **tenant**. Sau khi import, mỗi tenant có thể sửa/xóa/deactivate độc lập, không ảnh hưởng bản mẫu.
+- **Sửa trước khi import**: cho phép sửa `name`, `price` (mặc định lấy `market_price_median`), `estimated_duration_min` và `procedure` trong bước preview trước khi commit.
+- **Xử lý trùng mã**: nếu tenant đã có dịch vụ cùng `code`, hiển thị conflict; cho phép chọn *bỏ qua*, *ghi đè name/duration nhưng giữ price*, hoặc *ghi đè toàn bộ*. Mặc định là *bỏ qua*.
+- **Giá thị trường**: là dữ liệu tham khảo, không phải giá bắt buộc; gồm `market_price_low`, `market_price_median`, `market_price_high`, `market_price_currency` (mặc định `VND`), `market_price_reference` (nguồn/ghi chú), `market_price_updated_at`.
+- **Quản trị mẫu**: platform admin dùng Platform Control để CRUD danh mục mẫu (thêm/sửa/deactivate). Không cho xóa cứng bản ghi đã được ≥1 tenant import; chỉ được `deactivate` để bảo toàn liên kết lịch sử.
+- **Snapshot khi import**: bản ghi tenant lưu snapshot `imported_from_template_code` và `imported_at`; sau đó độc lập, không auto-sync giá khi mẫu thay đổi.
+- **Không thay đổi** cấu trúc `procedure_catalog` hiện có. Mẫu chỉ tham chiếu tới `procedure_catalog.code` như `treatment_services.procedure` đang làm.
+- **Không thay đổi** bảng `treatment_services` ngoài việc thêm 2 cột optional (`imported_from_template_code`, `imported_at`) để audit nguồn.
 
 ## Hiện trạng có thể tái sử dụng
 
-- Đã có API route `clinical-pathways.ts`, service `clinical-pathway.service.ts` và content registry `clinical-pathway-content.ts`.
-- Schema và D1 table migrations đã tồn tại (0065_clinical_pathway_assessments.sql).
-- `VisitDetailPage` đã tải patient, alerts, findings, review queue, safety acknowledgements và treatment history.
-- `clinical_findings` đã có location theo răng, `entry_source`, `clinical_effective_at` và review lifecycle.
-- `clinical_diagnoses` đã dùng diagnosis catalog với ICD-10 primary mapping tự động và snapshot lịch sử.
-- `clinical_review_events` đã hỗ trợ finding, diagnosis và initial assessment; cần mở rộng cho pathway assessment.
-- `visitSignoffService` đang chặn pending review và tạo canonical signed record; cần thêm pathway assessment vào cả hai phần.
-- Feature flag theo tenant đã có qua `platform_feature_flags` và `platform_tenant_feature_overrides`.
-- `visit-safety.service` đã là mẫu cho service tenant-scoped có validation và acknowledgement.
+- `procedure_catalog` (platform-wide): `code`, `name`, `sort_order`, `is_active`.
+- `treatment_services` (tenant): `id`, `tenant_id`, `code`, `name`, `procedure`, `price`, `estimated_duration_min`, `is_active`.
+- `icd10_codes` và `terminology_versions` từ migration `0051`; đã có mapping cho concept lâm sàng.
+- `PlatformProceduresPage` là mẫu cho một trang platform CRUD danh mục.
+- `TreatmentServicesPage` là trang tenant sẽ được mở rộng thêm nút `Nhập từ danh mục mẫu`.
+- `platformFlagSchema`, MFA middleware, audit log platform đã có sẵn cho endpoint quản trị.
+- `apps/api/src/routes/clinic.ts` đã expose `/treatment-services` PUT/DELETE/GET; sẽ thêm `POST /treatment-services/import`.
 
-## Những việc chưa thực hiện
+## Data model
 
-Mặc dù DB schema, Service, Repo và Route đã được tạo, các hạng mục sau **vẫn còn thiếu và cần được implement**:
+### Bảng mới `platform_treatment_service_templates`
 
-### 1. Visit workspace integration (Frontend)
+- `code` `TEXT PRIMARY KEY` — mã chuẩn hệ thống, tối đa 40 ký tự, regex `^[A-Z][A-Z0-9-]{2,39}$`.
+- `name` `TEXT NOT NULL` — tên dịch vụ mẫu (tiếng Việt).
+- `procedure` `TEXT NOT NULL REFERENCES procedure_catalog(code)` — thủ thuật nhóm.
+- `default_price` `REAL NOT NULL CHECK (default_price >= 0)` — giá gợi ý mặc định (đã gồm VAT).
+- `market_price_low` `REAL NULL CHECK (market_price_low >= 0)`.
+- `market_price_median` `REAL NULL CHECK (market_price_median >= 0)`.
+- `market_price_high` `REAL NULL CHECK (market_price_high >= 0)`.
+- `market_price_currency` `TEXT NOT NULL DEFAULT 'VND'`.
+- `market_price_reference` `TEXT NULL` — nguồn tham khảo (URL, tên khảo sát, ghi chú).
+- `market_price_updated_at` `TEXT NULL` — ngày cập nhật giá tham khảo.
+- `default_duration_min` `INTEGER NOT NULL CHECK (default_duration_min BETWEEN 1 AND 480)`.
+- `description` `TEXT NULL` — mô tả kỹ thuật ngắn.
+- `is_active` `INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1))`.
+- `sort_order` `INTEGER NOT NULL DEFAULT 100`.
+- `created_by`, `updated_by` `TEXT NULL` — platform user id.
+- `created_at`, `updated_at` `TEXT NOT NULL DEFAULT (datetime('now'))`.
+- Index: `(procedure, is_active, sort_order, name)`.
 
-- Cần xây dựng UI components cho Clinical Copilot trong `VisitDetailPage`.
-- Tải data từ `/api/visits/:visitId/clinical-pathways/endodontic-pain`.
-- Giao diện bật/tắt pathway, chọn răng mục tiêu.
-- Hiển thị Checklist, pattern ưu tiên, và trạng thái review.
-- Shortcut đến Diagnosis/Treatment plan hiện có (không tạo mutation).
+### Bảng mới `platform_treatment_service_template_icd10`
 
-### 2. Sign-off và amendment (Backend)
+- `template_code` `TEXT NOT NULL REFERENCES platform_treatment_service_templates(code) ON DELETE CASCADE`.
+- `icd10_code_id` `TEXT NOT NULL REFERENCES icd10_codes(id)`.
+- `relation` `TEXT NOT NULL DEFAULT 'primary' CHECK (relation IN ('primary','secondary'))` — `primary` là chỉ định chính, `secondary` là chỉ định phụ.
+- `note` `TEXT NULL`.
+- `created_at` `TEXT NOT NULL DEFAULT (datetime('now'))`.
+- PRIMARY KEY `(template_code, icd10_code_id)`.
+- Index: `(icd10_code_id, template_code)` để tra ngược từ chẩn đoán.
 
-- Sửa `visitSignoffService.sign` để chặn ký khi pathway còn active, có item pending hoặc assessment draft pending review.
-- Sửa canonical snapshot để đưa `clinical_pathway_assessments` và `clinical_pathway_assessment_items` vào signed record.
-- Đưa dữ liệu trên vào `afterObj` khi amend.
+### ALTER `treatment_services` — additive
 
-### 3. Review event
+- `imported_from_template_code` `TEXT NULL`.
+- `imported_at` `TEXT NULL`.
+- Index: `(tenant_id, imported_from_template_code)`.
+- Không có FK ràng buộc cứng để không kẹt tenant nếu mẫu bị deactivate.
 
-- Sửa `clinical_review_events` (nếu cần ở các validation logic khác) để nhận `pathway_assessment` làm entity_type hợp lệ nếu trước đó chưa làm đủ các chỗ check typescript.
+### Types và validation (`src/shared`)
 
-### 4. Tests
+- `PlatformTreatmentServiceTemplate`, `PlatformTreatmentServiceTemplateIcd10Link`, `PlatformTreatmentServiceTemplateWithLinks`.
+- Zod schema `platformTreatmentServiceTemplateSchema` cho POST/PUT.
+- Zod schema `treatmentServiceImportSchema` cho tenant import (list các item đã override).
 
-- Bổ sung unit/integration tests cho pathway routes và logic chặn sign-off.
+## API endpoint
 
-## Phạm vi dữ liệu V1 (Đã hoàn tất Migration 0065)
+### Platform (mounted trong `apps/api/src/routes/platform.ts`, cần MFA gần đây)
 
-Tạo migration additive cho các bảng sau. Không backfill dữ liệu cũ và không sửa snapshot diagnosis/treatment hiện có.
+- `GET /api/platform/treatment-service-templates` — quyền `platform_config.read`. List có filter `procedure`, `q`, `is_active`, `icd10_code_id`.
+- `GET /api/platform/treatment-service-templates/:code` — trả template + danh sách ICD-10 liên kết.
+- `PUT /api/platform/treatment-service-templates` — quyền `platform_config.write`. Upsert theo `code`; chấp nhận field `icd10_links` để replace mapping trong transaction.
+- `POST /api/platform/treatment-service-templates/:code/deactivate` — set `is_active=0`, giữ dữ liệu.
+- `POST /api/platform/treatment-service-templates/:code/activate` — bật lại.
+- Mọi mutation ghi `platform_audit_log` với action `treatment_service_template.*`.
 
-### `clinical_pathway_assessments`
+### Tenant (mounted trong `apps/api/src/routes/clinic.ts`)
 
-- `id`, `tenant_id`, `visit_id`, `tooth_number`.
-- `pathway_key` cố định `endodontic_pain`.
-- `pathway_version` cố định từ content registry, ví dụ `endodontic-pain-v1`.
-- `status`: `active`, `completed`, `closed_with_exceptions`.
-- `assessment_json`: payload đã validate bằng schema pathway, không phải text tự do.
-- `entry_source`: `doctor` hoặc `assistant`.
-- `entered_by`, `clinical_effective_at`, `reviewed_by`, `reviewed_at`.
-- `closed_by`, `closed_at`, `close_note`.
-- `created_at`, `updated_at`, `current_revision`.
-- Index tenant/visit/pathway/status và tenant/visit/tooth.
-- Chặn nhiều assessment active cùng `tenant_id + visit_id + pathway_key + tooth_number` bằng unique strategy phù hợp SQLite; lịch sử cũ vẫn giữ qua status/revision.
+- `GET /api/clinic/treatment-service-templates` — quyền `MANAGE_USERS` (tương đương admin tenant, giống trang hiện có). Trả:
+  - Toàn bộ template `is_active=1`, kèm ICD-10 tags và `already_imported` boolean (dựa trên `treatment_services.code` của tenant hiện tại).
+  - Cho phép query `?procedure=`, `?q=`, `?icd10_code_id=`.
+- `POST /api/clinic/treatment-services/import` — quyền `MANAGE_USERS`. Body:
+  ```json
+  {
+    "items": [
+      {
+        "template_code": "RES-COMP-1S",
+        "code": "RES-COMP-1S",
+        "name": "Trám composite xoang 1",
+        "procedure": "filling",
+        "price": 500000,
+        "estimated_duration_min": 30,
+        "on_conflict": "skip" | "overwrite_metadata" | "overwrite_all"
+      }
+    ]
+  }
+  ```
+  Trả kết quả từng dòng: `imported`, `updated`, `skipped_conflict`, `error`.
 
-### `clinical_pathway_assessment_items`
+## UI
 
-- `id`, `tenant_id`, `assessment_id`.
-- `item_key`, `item_version`.
-- `status`: `pending`, `completed`, `skipped`.
-- `value_json` cho giá trị cấu trúc của test/item.
-- `skip_reason` bắt buộc khi status là `skipped`.
-- `completed_by`, `completed_at`, `updated_at`.
-- Unique `assessment_id + item_key + item_version`.
-- Không cho xóa item đã tồn tại; khi pathway version thay đổi, item mới phải có version mới.
+### Platform Control — `PlatformTreatmentServiceTemplatesPage` (mới)
 
-### `clinical_pathway_assessment_revisions`
+- Thêm route `/platform/treatment-service-templates` và menu item trong Sidebar platform.
+- Bảng: `code`, `name`, `procedure`, `default_price`, `market_price_low..high`, số ICD-10 liên kết, `is_active`, thao tác.
+- Nút `Thêm mẫu` mở dialog có các trường:
+  - `code` (khóa; disabled khi edit).
+  - `name`, `procedure` (Select từ `procedure_catalog`).
+  - `default_price`, `default_duration_min`, `description`.
+  - Khối `Giá thị trường tham khảo`: `low`, `median`, `high`, `currency` (mặc định VND), `reference`, `updated_at`.
+  - Khối `Liên kết ICD-10`: multi-select có tìm kiếm theo `code` hoặc `display_vi` từ `/api/platform/icd10-codes?q=`; mỗi dòng có `relation` (primary/secondary) và `note` tùy chọn.
+- Thao tác `Deactivate` thay cho xóa; hiển thị số tenant đã import (thống kê aggregate, không PII).
+- Tuân theo `requireRecentPlatformMfa` — báo lỗi rõ như trang Feature Flags nếu MFA hết hạn.
 
-- `id`, `tenant_id`, `assessment_id`, `revision_no`.
-- `before_json`, `after_json`, `change_reason`.
-- `changed_by`, `changed_at`.
-- Unique `assessment_id + revision_no`.
-- Mỗi update assessment hoặc item làm thay đổi dữ liệu lâm sàng phải tạo revision trong cùng transaction.
+### Tenant — mở rộng `TreatmentServicesPage`
 
-### Review event
+- Bên cạnh nút `Thêm dịch vụ` thêm nút `Nhập từ danh mục mẫu`.
+- Dialog `Nhập từ danh mục mẫu`:
+  - Ô tìm kiếm, filter theo `procedure` và ICD-10.
+  - Bảng mẫu: checkbox chọn, `code`, `name`, `procedure`, `market_price_low..high` (hiển thị dạng range), `default_price`, `default_duration_min`, tag ICD-10, badge `Đã có trong danh mục` nếu `already_imported`.
+  - Bước 2 (preview) — chỉ hiện các dòng đã chọn, cho sửa `name`, `price` (mặc định `default_price`), `estimated_duration_min`, `procedure`; nút `Reset về mặc định của mẫu` cho từng dòng.
+  - Nếu code trùng, hiện chip cảnh báo và dropdown `Bỏ qua / Ghi đè metadata / Ghi đè toàn bộ`.
+  - Nút `Nhập N dịch vụ` gọi API import; hiện toast tổng hợp `X đã nhập, Y đã cập nhật, Z bỏ qua`.
+- Trong bảng dịch vụ hiện có, thêm cột `Nguồn` hiển thị `Mẫu hệ thống` nếu `imported_from_template_code` khớp, còn lại là `Tự tạo`.
 
-- Mở rộng constraint/entity handling của `clinical_review_events` để hỗ trợ `pathway_assessment`.
-- Assessment của phụ tá tạo event `pending`.
-- Bác sĩ dùng accept hoặc edit-and-accept; event cũ chuyển `accepted` hoặc `superseded` theo pattern hiện tại.
-- Assessment draft của phụ tá không xuất hiện trong effective clinical facts và không tham gia sign-off blocking cho đến khi được accept.
+## Danh mục mẫu ban đầu (seed migration)
 
-## Assessment payload bắt buộc
+Bộ mẫu tối thiểu để pilot. Mỗi dòng gồm code, tên, procedure, default_price (VND), duration (phút), ICD-10 primary gợi ý. Giá là ước tính thị trường VN 2024-2026, cần review lâm sàng và cập nhật trước khi bật platform-wide.
 
-Tạo schema dùng chung, pathway-specific, với giá trị enum rõ ràng; không suy luận từ notes.
+| Code | Tên | Procedure | default_price | Duration | ICD-10 primary |
+|------|-----|-----------|---------------|----------|----------------|
+| `EXA-INITIAL` | Khám và tư vấn ban đầu | `examination` | 100000 | 20 | `Z01.2` |
+| `EXA-PERIODIC` | Khám định kỳ | `examination` | 50000 | 15 | `Z01.2` |
+| `RES-COMP-1S` | Trám composite xoang 1 | `filling` | 500000 | 30 | `K02.1` |
+| `RES-COMP-2S` | Trám composite xoang 2 | `filling` | 700000 | 40 | `K02.1` |
+| `RES-COMP-3S` | Trám composite xoang 3 | `filling` | 900000 | 50 | `K02.1` |
+| `RES-GIC` | Trám GIC răng sữa/cổ răng | `filling` | 300000 | 25 | `K02.1` |
+| `END-RCT-ANT` | Điều trị tủy răng cửa | `root_canal` | 2000000 | 60 | `K04.0` |
+| `END-RCT-PRE` | Điều trị tủy răng hàm nhỏ | `root_canal` | 2500000 | 75 | `K04.0` |
+| `END-RCT-MOL` | Điều trị tủy răng hàm lớn | `root_canal` | 3500000 | 90 | `K04.0` |
+| `END-RETREAT` | Điều trị tủy lại | `root_canal` | 4500000 | 120 | `K04.5` |
+| `SUR-EXT-SIMPLE` | Nhổ răng đơn giản | `extraction` | 500000 | 30 | `K08.1` |
+| `SUR-EXT-SURGICAL` | Nhổ răng phẫu thuật | `extraction` | 1500000 | 60 | `K08.1` |
+| `SUR-EXT-3M` | Nhổ răng khôn (răng số 8) | `extraction` | 2500000 | 90 | `K01.1` |
+| `PRO-CROWN-PFM` | Bọc mão sứ kim loại | `crown` | 2500000 | 60 | `K02.5` |
+| `PRO-CROWN-ZIRCONIA` | Bọc mão sứ Zirconia | `crown` | 5000000 | 60 | `K02.5` |
+| `PRO-VENEER` | Dán sứ veneer | `veneer` | 6000000 | 60 | `K03.7` |
+| `PRO-BRIDGE-3U` | Cầu răng sứ 3 đơn vị | `bridge` | 7500000 | 90 | `K08.1` |
+| `IMP-STAGE1` | Cấy ghép implant (giai đoạn 1) | `implant` | 20000000 | 90 | `K08.1` |
+| `IMP-CROWN` | Phục hình trên implant | `implant` | 8000000 | 60 | `K08.1` |
+| `PER-SCALING` | Cạo vôi và đánh bóng | `scaling` | 300000 | 30 | `K05.1` |
+| `PER-SRP` | Cạo vôi dưới lợi (SRP) một cung | `scaling` | 800000 | 45 | `K05.3` |
+| `PRV-FLUORIDE` | Bôi fluor phòng ngừa | `fluoride` | 200000 | 20 | `Z29.3` |
+| `PRV-SEALANT` | Trám bít hố rãnh | `fluoride` | 200000 | 20 | `Z29.8` |
+| `OTH-EMERGENCY` | Xử lý cấp cứu nha khoa | `other` | 500000 | 30 | `K04.7` |
 
-- Răng mục tiêu: lấy từ `tooth_number`, validate là số FDI hợp lệ.
-- Triệu chứng:
-  - đau tự phát: `present | absent | unknown`;
-  - đau khi nhai: `present | absent | unknown`;
-  - đau kéo dài sau kích thích: `present | absent | unknown`, kèm thời lượng mô tả chuẩn nếu có.
-- Test cốt lõi:
-  - cold test: `positive | negative | inconclusive | not_done`;
-  - percussion: cùng bộ giá trị;
-  - palpation: cùng bộ giá trị;
-  - bite test: cùng bộ giá trị.
-- Bối cảnh tại răng:
-  - sâu lớn: `present | absent | unknown`;
-  - phục hồi sâu/cũ: `present | absent | unknown`;
-  - dấu hiệu quanh chóp trên hình ảnh: `present | absent | unknown | not_assessed`.
-- `notes` là ghi chú tùy chọn, có giới hạn độ dài; không được dùng để đánh dấu item đã hoàn tất.
-
-## Checklist cố định V1
-
-Định nghĩa content registry trong code, có `key`, `label`, `required`, `source_reference` và `pathway_version`.
-
-- Xác định răng đau/nghi ngờ.
-- Ghi pattern đau tự phát.
-- Ghi đau khi nhai.
-- Ghi đau kéo dài sau kích thích.
-- Ghi cold test.
-- Ghi percussion.
-- Ghi palpation.
-- Ghi bite test.
-- Đánh giá sâu lớn hoặc phục hồi sâu/cũ.
-- Đánh giá dấu hiệu quanh chóp trên hình ảnh.
-- Ghi nhận thiếu dữ liệu hoặc lý do không thực hiện nếu bỏ qua.
-
-Quy tắc đóng:
-
-- `completed`: mọi item ở `completed`.
-- `closed_with_exceptions`: mọi item ở `completed` hoặc `skipped`, và mọi `skipped` có `skip_reason`.
-- Không cho đóng nếu còn `pending`.
-- Mỗi mục guideline có thể bỏ qua có lý do; không ép bác sĩ tick kết quả giả.
-- Item an toàn/pháp lý nếu được thêm về sau phải được đánh dấu `required` và có policy riêng; V1 không tự biến mọi item thành hard block.
-
-## Pattern engine V1
-
-Không gọi LLM và không tạo chẩn đoán tự động. Pattern engine là deterministic, versioned, có test và được hội đồng lâm sàng duyệt.
-
-Output chỉ gồm:
-
-- `pattern_key`, `title`, `priority`.
-- `explanation` dựa trên các field đã nhập.
-- `evidence_item_keys`.
-- `missing_item_keys`.
-- `source_reference` và `pathway_version`.
-- `review_status`: `unreviewed`, `acknowledged`, `dismissed` nếu cần lưu hành vi review.
-
-Output tối đa 1-2 pattern ưu tiên, ví dụ pattern đau phù hợp tình trạng tủy hoặc pattern cần đánh giá quanh chóp. Không dùng các output này để tự điền diagnosis, ICD-10, treatment plan hoặc prognosis.
-
-Nếu dữ liệu mâu thuẫn hoặc chưa đủ, ưu tiên hiển thị `Dữ liệu chưa đủ / cần kiểm tra thêm`, không suy diễn.
-
-## API và quyền
-
-Đã tạo service tenant-scoped `clinical-pathway.service.ts`.
-
-Các endpoint cần có:
-
-- `GET /api/visits/:visitId/clinical-pathways/endodontic-pain`
-  - trả assessment theo răng, checklist items, pattern hiện tại và pathway metadata;
-  - trả 404/disabled khi tenant chưa bật feature flag để UI không hiện entry point.
-- `POST /api/visits/:visitId/clinical-pathways/endodontic-pain/assessments`
-  - bác sĩ tạo assessment hiệu lực ngay;
-  - phụ tá tạo assessment draft và review event pending.
-- `PATCH /api/visits/:visitId/clinical-pathways/endodontic-pain/assessments/:id`
-  - kiểm tra visit tenant/locked state;
-  - tạo revision;
-  - chỉ bác sĩ được sửa assessment đã effective.
-- `POST /api/visits/:visitId/clinical-pathways/endodontic-pain/assessments/:id/close`
-  - validate toàn bộ checklist;
-  - cập nhật status và close metadata trong transaction.
-- `PATCH /api/visits/:visitId/clinical-pathways/endodontic-pain/assessments/:id/items/:itemKey`
-  - cập nhật item, bắt buộc `skip_reason` cho skipped;
-  - tạo revision.
-- `GET /api/clinical-copilot/metrics/endodontic-pain`
-  - chỉ trả aggregate tenant-scoped hoặc platform aggregate không PII;
-  - gồm activated, completed, closed_with_exceptions, completion rate, skip rate theo item và adoption.
-
-Quyền:
-
-- Bác sĩ: tạo, sửa, đóng, review assessment; assessment có hiệu lực ngay.
-- Phụ tá: tạo/sửa draft; không được làm assessment effective, đóng assessment effective hoặc dùng nó để ký hồ sơ.
-- Backend kiểm tra role/permission, không tin `entry_source` từ client.
-- Mọi endpoint đều kiểm tra `tenant_id`, `visit_id`, `patient` gián tiếp qua visit và `locked_at`.
-
-## Visit workspace integration
-
-Trong `VisitDetailPage`:
-
-- Thêm nút rõ ràng `Đánh giá đau răng / nội nha` ở khu vực clinical workflow.
-- Khi bật, cho thêm nhiều răng mục tiêu; mỗi răng hiển thị assessment card riêng.
-- Card hiển thị progress checklist, mục pending, pattern ưu tiên và trạng thái review.
-- Form assessment dùng control cấu trúc, cỡ đủ lớn cho desktop, có notes riêng.
-- Cho phép shortcut đến Diagnosis và Treatment Plan với răng/context hiện tại; không tự tạo hoặc sửa dữ liệu ở hai module đó.
-- Hiển thị rõ `AI/rule suggestion` nếu có pattern nhưng không gọi nó là chẩn đoán.
-- Nếu feature flag tắt, ẩn entry point nhưng vẫn đọc lịch sử assessment trong visit đã có dữ liệu nếu người dùng có quyền đọc.
-
-## Sign-off và amendment
-
-Mở rộng `visitSignoffService.sign`:
-
-- Nếu feature flag đang bật, tìm assessment pathway đã được bác sĩ bật cho visit.
-- Chặn ký nếu assessment còn `active`, còn item `pending`, hoặc còn assessment draft pending review liên quan đến pathway.
-- Cho ký khi assessment là `completed` hoặc `closed_with_exceptions` và mọi item đã terminal.
-- Draft phụ tá pending phải được review trước khi ký.
-- Nếu feature flag bị tắt để rollback, không tạo block mới cho visit; dữ liệu lịch sử vẫn được đưa vào canonical snapshot nếu assessment đã tồn tại.
-
-Mở rộng canonical snapshot/amendment:
-
-- Thêm `clinical_pathway_assessments` và checklist items effective vào `canonicalObj` khi sign.
-- Thêm cùng dữ liệu vào `afterObj` khi amendment.
-- Assessment sau khi visit khóa chỉ sửa qua amendment; revision assessment và record amendment phải cùng truy vết được.
-
-## Feature flag và rollout
-
-- Seed `platform_feature_flags` với key `clinical_copilot.endodontic_pain_v1`, mô tả rõ pathway và default `false`.
-- Dùng `platform_tenant_feature_overrides` hiện có để bật pilot theo tenant; không tạo bảng flag mới.
-- Platform operator/owner bật flag sau khi migration và content pathway đã được kiểm tra.
-- Khi tắt flag:
-  - ẩn entry point và thao tác tạo mới;
-  - không xóa assessment/history;
-  - không làm visit hiện tại không thể ký;
-  - vẫn cho đọc dữ liệu trong signed/amended record.
-- Không backfill assessment cho visit cũ.
-- Trước pilot, hội đồng lâm sàng duyệt checklist, pattern rules, source reference và pathway version.
-
-## KPI và observability
-
-KPI chính:
-
-```text
-closed_assessments_with_all_items_terminal / activated_assessments
-```
-
-Metric phụ:
-
-- số assessment được bật theo tenant, bác sĩ và thời gian;
-- tỷ lệ bác sĩ sử dụng pathway;
-- thời gian từ activate đến close;
-- tỷ lệ `closed_with_exceptions`;
-- tỷ lệ skipped theo item và skip reason;
-- số assessment draft phụ tá chờ review;
-- số visit bị chặn ký do pathway chưa đóng;
-- tỷ lệ edit/revision sau khi tạo.
-
-Không log PII vào metric hoặc platform aggregate. Log model/provider không cần trong V1 vì pattern engine deterministic; lưu pathway/rule version để audit.
+Seed ghi vào migration `0067_treatment_service_templates_seed.sql`. Không seed ICD-10 link nếu bảng `icd10_codes` chưa có mã tương ứng ở tenant/version hiện tại — chỉ seed các link tồn tại, phần còn lại để platform admin bổ sung qua UI.
 
 ## Migration và rollout sequence
 
-1. [Xong] Thêm migration additive cho assessment, items, revisions và mở rộng review-event enum.
-2. [Xong] Seed feature flag default off.
-3. [Xong] Thêm shared validation/types, repository, service, routes và role checks.
-4. [Chưa xong] Mở rộng sign-off/canonical snapshot/amendment.
-5. [Chưa xong] Tích hợp VisitDetail UI với feature flag fallback.
-6. [Chưa xong] Viết test cho API và UI integration.
-7. [Chưa xong] Chạy migration local/remote theo quy trình hiện có.
-8. [Chưa xong] Bật pilot cho tenant được chọn sau khi content clinical được duyệt.
-9. [Chưa xong] Theo dõi completion rate, skip reasons, sign-off blocks và phản hồi bác sĩ; chỉ sau đó mới quyết định mở rộng.
+1. Migration `0067_treatment_service_templates.sql`:
+   - Tạo `platform_treatment_service_templates`.
+   - Tạo `platform_treatment_service_template_icd10`.
+   - `ALTER TABLE treatment_services ADD COLUMN imported_from_template_code TEXT` và `imported_at TEXT`.
+   - Thêm index nói trên.
+2. Migration `0068_treatment_service_templates_seed.sql`:
+   - Seed 24 mẫu ban đầu (`INSERT OR IGNORE`).
+   - Seed ICD-10 link cho các mã ICD-10 đã tồn tại trong `icd10_codes` (`INSERT OR IGNORE` với subquery join theo `code`).
+3. Shared types + Zod schema cho template + import.
+4. Repositories, services, routes:
+   - `apps/api/src/repositories/platform-treatment-service-templates.repo.ts`.
+   - `apps/api/src/services/treatment-service-template.service.ts` (import + conflict handling).
+   - Route platform + tenant như mô tả.
+   - Audit log cho mọi mutation cấp platform và cho action `treatment_services.imported` cấp tenant.
+5. UI:
+   - `PlatformTreatmentServiceTemplatesPage` + route trong `apps/web/src/routes` và Sidebar platform.
+   - Mở rộng `TreatmentServicesPage` với nút và dialog import 2 bước.
+6. Tests (xem mục sau).
+7. `npm run typecheck` cả web/api, `npm run test --workspace apps/api` và `npm run build --workspace apps/web`.
+8. Chạy migration local → remote theo quy trình hiện có.
+9. Platform admin xác nhận bộ mẫu ban đầu, cập nhật ICD-10 còn thiếu, rồi thông báo tenant sử dụng.
 
 ## Kiểm thử bắt buộc
 
-- Schema: enum, FDI tooth, test values, skip reason, payload size.
-- Tenant isolation cho assessment, items, revisions, metrics.
-- Một visit có nhiều răng; dữ liệu và checklist không trộn giữa các assessment.
-- Bác sĩ tạo assessment effective ngay.
-- Phụ tá tạo draft; draft tạo review event và không xuất hiện effective/sign-off.
-- Accept và edit-and-accept draft phụ tá.
-- Không cho close khi còn pending.
-- Cho close completed và closed_with_exceptions đúng điều kiện.
-- Không cho skipped thiếu lý do.
-- Revision được tạo cho từng thay đổi và không mất revision cũ.
-- Visit locked chặn update trực tiếp.
-- Sign bị chặn khi pathway active chưa đóng hoặc review pending.
-- Sign thành công khi tất cả assessment terminal.
-- Tắt flag không chặn visit đang tồn tại và không xóa lịch sử.
-- Canonical signed record/amendment chứa assessment và checklist effective.
-- Deterministic pattern rules: positive, negative, unknown, conflicting và missing data.
-- Web UI: feature flag off/on, nhiều assessment, progress, skip reason, pattern explanation và shortcut không tạo mutation.
-- Chạy API full tests, web/API typecheck và diff check.
-
-## Ngoài phạm vi V1
-
-- Thu âm hoặc lưu audio; ambient scribe và speaker diarization.
-- Dùng LLM để suy luận hoặc tự tạo diagnosis.
-- AI đọc panorama/CBCT/IOS/intraoral và overlay bounding box.
-- Differential diagnosis tự động.
-- Treatment simulator, success probability và prognosis định lượng.
-- Knowledge assistant mở Internet/PubMed tự do.
-- Recall tự động theo guideline.
-- Checklist admin-configurable hoặc tenant-configurable.
-- Cross-tenant case similarity và training trên dữ liệu tenant.
+- Migration: bảng và cột được tạo; unique/CHECK constraint đúng; index tồn tại.
+- Platform routes:
+  - CRUD template; upsert giữ nguyên `code` và cập nhật ICD-10 links atomic.
+  - Không cho tạo `code` sai regex.
+  - Không cho tham chiếu `procedure` không tồn tại trong `procedure_catalog`.
+  - Không cho tham chiếu `icd10_code_id` không tồn tại.
+  - Deactivate → hidden trong list mặc định, vẫn xuất hiện với `is_active=false` khi query rõ ràng.
+  - Yêu cầu MFA gần đây (403 khi hết hạn).
+  - Audit log ghi đầy đủ actor/entity.
+- Tenant routes:
+  - `GET treatment-service-templates` chỉ trả active, kèm `already_imported`.
+  - Import: nhập N mẫu tạo N record trong `treatment_services` với `imported_from_template_code`, `imported_at`.
+  - Conflict `skip`: không đổi record hiện có; response trả `skipped_conflict`.
+  - Conflict `overwrite_metadata`: cập nhật `name`, `procedure`, `estimated_duration_min`, KHÔNG đổi `price`.
+  - Conflict `overwrite_all`: cập nhật toàn bộ, ghi lại `imported_at`.
+  - Tenant isolation: import ở tenant A không ảnh hưởng tenant B.
+  - Quyền: user không có `MANAGE_USERS` bị 403.
+  - Payload rỗng → 400.
+  - `price < 0`, `duration_min` ngoài `[1,480]` → 400.
+- UI:
+  - Dialog hiển thị đúng dữ liệu, filter và tìm kiếm.
+  - Bước preview cho sửa và reset về mặc định.
+  - Toast tổng hợp phản ánh đúng số liệu backend trả về.
+  - Sau import, bảng dịch vụ hiển thị cột `Nguồn` = `Mẫu hệ thống`.
+- Regression:
+  - CRUD `treatment_services` hiện có vẫn hoạt động.
+  - `treatment_plan_items.service_code` vẫn hợp lệ với code đã import.
 
 ## Rủi ro và biện pháp
 
-- **Alert fatigue:** pathway chỉ bật chủ động; pattern tối đa 1-2; item có phân loại và lý do bỏ qua.
-- **Tick đối phó:** cho phép skip có lý do, lưu revision và đo skip rate theo item.
-- **Automation bias:** không hiển thị phần trăm; hiển thị evidence, missing data và pattern, không gọi là diagnosis.
-- **Scope creep:** không đưa voice/image/LLM vào V1; không xây generic suggestion framework trước khi có pathway thực tế.
-- **Content liability:** AAE + hội đồng lâm sàng duyệt và version hóa trước khi bật pilot.
-- **Rollback làm kẹt hồ sơ:** flag off không tạo sign-off block mới; assessment/history vẫn bất biến và đọc được.
-- **Dữ liệu draft bị xem là clinical fact:** phân biệt `entry_source`, review status và `clinical_effective_at` ở backend lẫn UI.
+- **Nhầm mã dịch vụ với ICD-10**: đặt tên field rõ (`code` cho dịch vụ, `icd10_code_id` cho chẩn đoán) và UI luôn hiển thị hai vùng tách biệt.
+- **Giá thị trường không phản ánh thực tế**: coi là dữ liệu tham khảo, tenant vẫn phải xác nhận `price` ở bước preview; hiển thị ngày `market_price_updated_at`.
+- **Tenant kỳ vọng tự đồng bộ giá khi mẫu thay đổi**: rõ ràng trong UI là snapshot một lần; nếu về sau muốn có nút `Cập nhật từ mẫu`, sẽ làm ở phase 2.
+- **Trùng mã giữa mẫu và dịch vụ tenant tự tạo**: mặc định `skip` để không phá dữ liệu; conflict resolution phải là quyết định chủ động của tenant admin.
+- **Xóa cứng bản mẫu làm mất liên kết audit**: chỉ cho `deactivate`, không cho `DELETE`.
+- **Migration seed chạy trên tenant chưa có ICD-10 version**: seed dùng `INSERT OR IGNORE` và join qua subquery; nếu không có `icd10_codes.code` khớp thì bỏ qua link, không fail migration.
+- **MFA hết hạn khi quản trị mẫu**: UI hiển thị lỗi cụ thể như đã làm ở Feature Flags.
+
+## Ngoài phạm vi
+
+- Auto-sync giá từ mẫu xuống tenant sau khi đã import.
+- Nhiều phiên bản giá theo thời gian (price history) trong bảng mẫu.
+- Đa ngôn ngữ tên dịch vụ (chỉ tiếng Việt trong V1).
+- Export danh mục dịch vụ của tenant ngược lên platform để đề xuất mẫu mới.
+- Gợi ý dịch vụ dựa trên chẩn đoán trong `VisitDetailPage` (sẽ dùng bảng ICD-10 link này ở feature khác sau này).
+- Bảng giá theo chi nhánh; hiện `treatment_services` vẫn là cấp tenant.
+- Cross-tenant benchmarking giá.
+
+## Tóm tắt task cho agent thực thi
+
+1. Viết 2 migration `0067_*` và `0068_*` như mục Migration.
+2. Thêm types/validation trong `src/shared/types/index.ts` và `src/shared/validation/index.ts`.
+3. Thêm repo `platform-treatment-service-templates.repo.ts` (list/get/upsert/activate/deactivate + replace icd10 links trong transaction).
+4. Thêm service `treatment-service-template.service.ts` cho luồng import và conflict resolution.
+5. Route platform trong `apps/api/src/routes/platform.ts` (5 endpoint như trên, có MFA + audit).
+6. Route tenant trong `apps/api/src/routes/clinic.ts` (`GET .../treatment-service-templates`, `POST .../treatment-services/import`).
+7. UI Platform: `PlatformTreatmentServiceTemplatesPage` + entry trong sidebar `apps/web/src/pages/platform/PlatformPages.tsx` (hoặc file riêng) + route.
+8. UI Tenant: mở rộng `TreatmentServicesPage` (nút + dialog 2 bước + cột `Nguồn`).
+9. Tests: repository, service (conflict cases), route platform (permission + MFA + audit), route tenant (permission + conflict), tenant isolation trong `tests/repositories/tenant-isolation.test.ts`.
+10. Chạy `npm run typecheck` cả hai workspace, `npm run test --workspace apps/api`, `npm run build --workspace apps/web`, `git diff --check`.

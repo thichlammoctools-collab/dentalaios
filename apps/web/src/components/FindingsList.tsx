@@ -7,7 +7,7 @@ import { toast } from "@/lib/toast";
 import { PERIODONTAL_POCKET_POINTS, PERIODONTAL_SURFACE_OPTIONS, getAnatomicalSiteLabel, getFindingCategory, getFindingConditionLabel, getFindingLocationLabel } from "@shared/constants/clinical-findings";
 import type { ClinicalFinding, FindingLocationDetails, FindingMeasurements, PeriodontalPocketDepths } from "@shared/types";
 
-interface FindingsListProps { visitId: string; findings: ClinicalFinding[]; readOnly?: boolean; onUpdate: (updated: ClinicalFinding) => void; onDeleted: (id: string) => void; }
+interface FindingsListProps { visitId: string; findings: ClinicalFinding[]; readOnly?: boolean; onUpdate: (updated: ClinicalFinding) => void; onDeleted: (id: string) => void; flat?: boolean; }
 
 function displayLocation(finding: ClinicalFinding): string {
   const base = finding.scope === "tooth" ? `Răng #${finding.tooth_number}` : finding.scope === "region" ? getAnatomicalSiteLabel(finding.anatomical_site) : "Toàn miệng";
@@ -37,7 +37,7 @@ function pocketText(measurements?: FindingMeasurements): string {
   }).filter(Boolean).join(" · ");
 }
 
-export function FindingsList({ visitId, findings, readOnly = false, onUpdate, onDeleted }: FindingsListProps) {
+export function FindingsList({ visitId, findings, readOnly = false, onUpdate, onDeleted, flat = false }: FindingsListProps) {
   const [editing, setEditing] = useState<ClinicalFinding | null>(null);
   const [condition, setCondition] = useState("");
   const [notes, setNotes] = useState("");
@@ -92,6 +92,49 @@ export function FindingsList({ visitId, findings, readOnly = false, onUpdate, on
 
   if (!findings.length) return <p className="text-sm text-muted-foreground">Chưa có ghi nhận nào.</p>;
 
+  function renderFinding(finding: ClinicalFinding, sectionLocationLabel?: string) {
+    const isEditing = editing?.id === finding.id;
+    const category = getFindingCategory(finding.category);
+    const pockets = pocketText(finding.measurements);
+    const wrapperClass = flat
+      ? "rounded-lg border border-border p-3"
+      : "border-t border-border pt-3 first:border-t-0 first:pt-0";
+    const showDetailLocation = flat
+      ? true
+      : displayLocation(finding) !== sectionLocationLabel;
+    return <div key={finding.id} className={wrapperClass}>
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="secondary">{category.label}</Badge>
+        {isEditing
+          ? <select value={condition} onChange={(event) => setCondition(event.target.value)} className="h-8 rounded border border-input bg-background px-2 text-xs">{category.conditions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+          : <span className="text-sm font-medium">{getFindingConditionLabel(finding.category, finding.condition)}</span>}
+        {!readOnly && <div className="ml-auto flex items-center">
+          <Button variant="ghost" size="sm" onClick={() => isEditing ? setEditing(null) : startEdit(finding)} disabled={saving}>{isEditing ? "Hủy" : "Sửa"}</Button>
+          <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => remove(finding)} disabled={saving}>Xóa</Button>
+        </div>}
+      </div>
+      {isEditing
+        ? <div className="mt-3 space-y-3">
+            {finding.category === "periodontal" && finding.scope === "tooth" && <>
+              <div className="flex flex-wrap gap-2">{PERIODONTAL_SURFACE_OPTIONS.map((surface) => <label key={surface.value} className="inline-flex items-center gap-1.5 text-xs"><input type="checkbox" checked={periodontalSurfaces.includes(surface.value)} onChange={() => togglePeriodontalSurface(surface.value)} />{surface.label}</label>)}</div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{PERIODONTAL_POCKET_POINTS.map((point) => <label key={point.value} className="grid gap-1 text-xs text-muted-foreground">{point.label}<input inputMode="decimal" value={pocketDepths[point.value] ?? ""} onChange={(event) => setPocketDepths((current) => ({ ...current, [point.value]: event.target.value === "" ? undefined : Number(event.target.value) }))} className="h-8 rounded border border-input bg-background px-2 text-sm text-foreground" placeholder="mm" /></label>)}</div>
+            </>}
+            <Textarea rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Ghi chú" />
+            <Button size="sm" onClick={save} disabled={saving}>{saving ? "Đang lưu..." : "Lưu"}</Button>
+          </div>
+        : <>
+            {showDetailLocation && <p className="mt-2 text-xs text-muted-foreground">{displayLocation(finding)}</p>}
+            {finding.notes && <p className="mt-2 text-sm text-muted-foreground">{finding.notes}</p>}
+            {pockets && <p className="mt-2 text-xs text-muted-foreground">Túi nha chu: {pockets}</p>}
+            {finding.measurements && !pockets && <p className="mt-2 text-xs text-muted-foreground">{Object.entries(finding.measurements).map(([key, value]) => `${key}: ${typeof value === "object" ? JSON.stringify(value) : value}`).join(" · ")}</p>}
+          </>}
+    </div>;
+  }
+
+  if (flat) {
+    return <div className="space-y-2">{findings.map((finding) => renderFinding(finding))}</div>;
+  }
+
   const grouped = new Map<string, ClinicalFinding[]>();
   for (const finding of findings) {
     const key = locationKey(finding);
@@ -102,15 +145,7 @@ export function FindingsList({ visitId, findings, readOnly = false, onUpdate, on
     const location = locationLabel(items[0]);
     return <section key={locationKey(items[0])} className="rounded-lg border border-border p-3">
       <div className="mb-3 flex flex-wrap items-center gap-2"><Badge variant="outline">{location}</Badge><Badge variant="secondary">{items.length} ghi nhận</Badge></div>
-      <div className="space-y-3">{items.map((finding) => {
-        const isEditing = editing?.id === finding.id;
-        const category = getFindingCategory(finding.category);
-        const pockets = pocketText(finding.measurements);
-        return <div key={finding.id} className="border-t border-border pt-3 first:border-t-0 first:pt-0">
-          <div className="flex flex-wrap items-center gap-2"><Badge variant="secondary">{category.label}</Badge>{isEditing ? <select value={condition} onChange={(event) => setCondition(event.target.value)} className="h-8 rounded border border-input bg-background px-2 text-xs">{category.conditions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select> : <span className="text-sm font-medium">{getFindingConditionLabel(finding.category, finding.condition)}</span>}{!readOnly && <div className="ml-auto flex items-center"><Button variant="ghost" size="sm" onClick={() => isEditing ? setEditing(null) : startEdit(finding)} disabled={saving}>{isEditing ? "Hủy" : "Sửa"}</Button><Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => remove(finding)} disabled={saving}>Xóa</Button></div>}</div>
-          {isEditing ? <div className="mt-3 space-y-3">{finding.category === "periodontal" && finding.scope === "tooth" && <><div className="flex flex-wrap gap-2">{PERIODONTAL_SURFACE_OPTIONS.map((surface) => <label key={surface.value} className="inline-flex items-center gap-1.5 text-xs"><input type="checkbox" checked={periodontalSurfaces.includes(surface.value)} onChange={() => togglePeriodontalSurface(surface.value)} />{surface.label}</label>)}</div><div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{PERIODONTAL_POCKET_POINTS.map((point) => <label key={point.value} className="grid gap-1 text-xs text-muted-foreground">{point.label}<input inputMode="decimal" value={pocketDepths[point.value] ?? ""} onChange={(event) => setPocketDepths((current) => ({ ...current, [point.value]: event.target.value === "" ? undefined : Number(event.target.value) }))} className="h-8 rounded border border-input bg-background px-2 text-sm text-foreground" placeholder="mm" /></label>)}</div></>}<Textarea rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Ghi chú" /><Button size="sm" onClick={save} disabled={saving}>{saving ? "Đang lưu..." : "Lưu"}</Button></div> : <>{displayLocation(finding) !== location && <p className="mt-2 text-xs text-muted-foreground">{displayLocation(finding)}</p>}{finding.notes && <p className="mt-2 text-sm text-muted-foreground">{finding.notes}</p>}{pockets && <p className="mt-2 text-xs text-muted-foreground">Túi nha chu: {pockets}</p>}{finding.measurements && !pockets && <p className="mt-2 text-xs text-muted-foreground">{Object.entries(finding.measurements).map(([key, value]) => `${key}: ${typeof value === "object" ? JSON.stringify(value) : value}`).join(" · ")}</p>}</>}
-        </div>;
-      })}</div>
+      <div className="space-y-3">{items.map((finding) => renderFinding(finding, location))}</div>
     </section>;
   })}</div>;
 }

@@ -28,6 +28,7 @@ import {
   platformTenantCreateSchema,
   platformTenantListQuerySchema,
   platformTenantUpdateSchema,
+  platformTreatmentServiceTemplateUpsertSchema,
 } from "@shared/validation";
 import type { Env } from "../index";
 import { newId } from "../lib/ids";
@@ -48,6 +49,7 @@ import { createPlatformTenantsRepository } from "../repositories/platform-tenant
 import { createPlatformUsersRepository } from "../repositories/platform-users.repo";
 import { createProcedureCatalogRepository } from "../repositories/procedure-catalog.repo";
 import { createClinicalTerminologyRepository } from "../repositories/clinical-terminology.repo";
+import { createPlatformTreatmentServiceTemplatesRepository } from "../repositories/platform-treatment-service-templates.repo";
 import { platformService } from "../services/platform.service";
 import { platformTenantProvisionService } from "../services/platform-tenant-provision.service";
 import { aiModelConfigService } from "../services/ai-model-config.service";
@@ -711,4 +713,127 @@ router.get(
     );
   },
 );
+
+// ──────────────── Treatment service templates ────────────────
+router.get(
+  "/treatment-service-templates",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.CONFIG_READ),
+  async (c) => {
+    const url = new URL(c.req.url);
+    const repo = createPlatformTreatmentServiceTemplatesRepository(c.env.DB);
+    const templates = await repo.list({
+      q: url.searchParams.get("q") ?? undefined,
+      procedure: url.searchParams.get("procedure") ?? undefined,
+      active_only: url.searchParams.has("is_active")
+        ? url.searchParams.get("is_active") === "true"
+        : undefined,
+      icd10_code_id: url.searchParams.get("icd10_code_id") ?? undefined,
+    });
+    const codes = templates.map((template) => template.code);
+    const links = await repo.listLinksFor(codes);
+    const linksByCode = new Map<string, typeof links>();
+    for (const link of links) {
+      const existing = linksByCode.get(link.template_code) ?? [];
+      existing.push(link);
+      linksByCode.set(link.template_code, existing);
+    }
+    const items = templates.map((template) => ({
+      ...template,
+      icd10_links: linksByCode.get(template.code) ?? [],
+    }));
+    return c.json({ items });
+  },
+);
+
+router.get(
+  "/treatment-service-templates/:code",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.CONFIG_READ),
+  async (c) => {
+    const item = await createPlatformTreatmentServiceTemplatesRepository(c.env.DB).getWithLinks(
+      c.req.param("code"),
+    );
+    if (!item) throw new NotFoundError("Treatment service template not found");
+    return c.json(item);
+  },
+);
+
+router.put(
+  "/treatment-service-templates",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.CONFIG_WRITE),
+  requireRecentPlatformMfa(),
+  zValidator("json", platformTreatmentServiceTemplateUpsertSchema),
+  async (c) => {
+    const data = c.req.valid("json");
+    const repo = createPlatformTreatmentServiceTemplatesRepository(c.env.DB);
+    const terminology = createClinicalTerminologyRepository(c.env.DB);
+    const catalog = await createProcedureCatalogRepository(c.env.DB).getActive(data.procedure);
+    if (!catalog) throw new ConflictError("Thủ thuật không tồn tại hoặc đã ngừng áp dụng");
+    for (const link of data.icd10_links ?? []) {
+      const code = await terminology.getIcd10(link.icd10_code_id);
+      if (!code) throw new NotFoundError(`ICD-10 code not found: ${link.icd10_code_id}`);
+    }
+    const item = await repo.upsert(
+      {
+        ...data,
+        icd10_links: data.icd10_links.map((link) => ({
+          icd10_code_id: link.icd10_code_id,
+          relation: link.relation,
+          note: link.note ?? null,
+        })),
+      },
+      getPlatformJwt(c).sub,
+    );
+    await platformAudit(c.env.DB, {
+      ...actor(c),
+      action: "treatment_service_template.upserted",
+      entity_type: "treatment_service_template",
+      entity_id: item.code,
+      details: {
+        procedure: item.procedure,
+        default_price: item.default_price,
+        icd10_links_count: item.icd10_links.length,
+      },
+    });
+    return c.json(item);
+  },
+);
+
+router.post(
+  "/treatment-service-templates/:code/activate",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.CONFIG_WRITE),
+  requireRecentPlatformMfa(),
+  async (c) => {
+    const code = c.req.param("code");
+    const repo = createPlatformTreatmentServiceTemplatesRepository(c.env.DB);
+    const ok = await repo.setActive(code, true, getPlatformJwt(c).sub);
+    if (!ok) throw new NotFoundError("Treatment service template not found");
+    await platformAudit(c.env.DB, {
+      ...actor(c),
+      action: "treatment_service_template.activated",
+      entity_type: "treatment_service_template",
+      entity_id: code,
+    });
+    return c.json({ ok: true });
+  },
+);
+
+router.post(
+  "/treatment-service-templates/:code/deactivate",
+  requirePlatformPermission(PLATFORM_PERMISSIONS.CONFIG_WRITE),
+  requireRecentPlatformMfa(),
+  async (c) => {
+    const code = c.req.param("code");
+    const repo = createPlatformTreatmentServiceTemplatesRepository(c.env.DB);
+    const ok = await repo.setActive(code, false, getPlatformJwt(c).sub);
+    if (!ok) throw new NotFoundError("Treatment service template not found");
+    await platformAudit(c.env.DB, {
+      ...actor(c),
+      action: "treatment_service_template.deactivated",
+      entity_type: "treatment_service_template",
+      entity_id: code,
+    });
+    return c.json({ ok: true });
+  },
+);
+
 export default router;

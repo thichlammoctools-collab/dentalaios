@@ -1257,6 +1257,74 @@ export const pathwayAssessmentCloseSchema = z.object({
   close_note: optionalText(1000),
 }).strict();
 
+// ──────────────── Platform treatment service templates ────────────────
+
+const templateCodeSchema = z.string().trim().min(3).max(40).regex(/^[A-Z][A-Z0-9-]{2,39}$/, "Mã chỉ gồm chữ IN HOA, số và dấu gạch nối; bắt đầu bằng chữ cái");
+const tenantServiceCodeSchema = z.string().trim().min(1).max(40).regex(/^[A-Z0-9-]{1,40}$/, "Mã dịch vụ chỉ gồm chữ IN HOA, số và dấu gạch nối");
+const priceSchema = z.number().min(0).max(1_000_000_000);
+const durationSchema = z.number().int().min(1).max(480);
+
+export const platformTreatmentServiceTemplateIcd10LinkSchema = z.object({
+  icd10_code_id: z.string().min(1).max(200),
+  relation: z.enum(["primary", "secondary"]).default("primary"),
+  note: optionalText(500),
+}).strict();
+
+export const platformTreatmentServiceTemplateUpsertSchema = z.object({
+  code: templateCodeSchema,
+  name: nonEmpty(200),
+  procedure: z.string().trim().min(1).max(100),
+  default_price: priceSchema,
+  market_price_low: priceSchema.nullable().optional(),
+  market_price_median: priceSchema.nullable().optional(),
+  market_price_high: priceSchema.nullable().optional(),
+  market_price_currency: z.string().trim().min(1).max(10).default("VND"),
+  market_price_reference: optionalText(500),
+  market_price_updated_at: z.string().trim().max(40).nullable().optional(),
+  default_duration_min: durationSchema,
+  description: optionalText(1000),
+  is_active: z.boolean().default(true),
+  sort_order: z.number().int().min(0).max(100_000).default(100),
+  icd10_links: z.array(platformTreatmentServiceTemplateIcd10LinkSchema).max(50).default([]),
+}).strict().superRefine((data, ctx) => {
+  const { market_price_low: lo, market_price_median: md, market_price_high: hi } = data;
+  if (lo != null && md != null && lo > md) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["market_price_low"], message: "Giá thấp không được lớn hơn giá trung bình" });
+  if (md != null && hi != null && md > hi) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["market_price_high"], message: "Giá cao không được nhỏ hơn giá trung bình" });
+  const codes = new Set<string>();
+  for (const [i, link] of data.icd10_links.entries()) {
+    if (codes.has(link.icd10_code_id)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["icd10_links", i, "icd10_code_id"], message: "Trùng mã ICD-10" });
+    codes.add(link.icd10_code_id);
+  }
+  const primaryCount = data.icd10_links.filter((link) => link.relation === "primary").length;
+  if (primaryCount > 1) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["icd10_links"], message: "Chỉ được có 1 liên kết ICD-10 primary" });
+});
+
+export const platformTreatmentServiceTemplateListQuerySchema = z.object({
+  q: z.string().trim().max(200).optional(),
+  procedure: z.string().trim().max(100).optional(),
+  icd10_code_id: z.string().trim().max(200).optional(),
+  include_inactive: z.enum(["true", "false"]).optional(),
+}).strict();
+
+export const treatmentServiceImportItemSchema = z.object({
+  template_code: templateCodeSchema,
+  code: tenantServiceCodeSchema,
+  name: nonEmpty(200),
+  procedure: z.string().trim().min(1).max(100),
+  price: priceSchema,
+  estimated_duration_min: durationSchema,
+  on_conflict: z.enum(["skip", "overwrite_metadata", "overwrite_all"]).default("skip"),
+}).strict();
+
+export const treatmentServiceImportSchema = z.object({
+  items: z.array(treatmentServiceImportItemSchema).min(1).max(50),
+}).strict();
+
+export type PlatformTreatmentServiceTemplateUpsertInput = z.infer<typeof platformTreatmentServiceTemplateUpsertSchema>;
+export type PlatformTreatmentServiceTemplateIcd10LinkInput = z.infer<typeof platformTreatmentServiceTemplateIcd10LinkSchema>;
+export type TreatmentServiceImportItemInput = z.infer<typeof treatmentServiceImportItemSchema>;
+export type TreatmentServiceImportInput = z.infer<typeof treatmentServiceImportSchema>;
+
 export type PathwayAssessmentCreateInput = z.infer<typeof pathwayAssessmentCreateSchema>;
 export type PathwayAssessmentUpdateInput = z.infer<typeof pathwayAssessmentUpdateSchema>;
 export type PathwayItemUpdateInput = z.infer<typeof pathwayItemUpdateSchema>;
