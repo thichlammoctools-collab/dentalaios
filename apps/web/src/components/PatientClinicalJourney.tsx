@@ -115,7 +115,7 @@ export function PatientClinicalJourney({ patientId }: { patientId: string }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <p className="text-sm text-muted-foreground">Tóm tắt chẩn đoán, kế hoạch và thủ thuật đã hoàn thành theo từng thời điểm.</p>
+        <p className="text-sm text-muted-foreground">Tóm tắt ghi nhận lâm sàng, kế hoạch và thủ thuật đã hoàn thành theo từng thời điểm.</p>
         <Badge variant="outline" className="gap-1.5 px-2.5 py-1">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
           {rows.length} sự kiện lâm sàng
@@ -132,7 +132,7 @@ export function PatientClinicalJourney({ patientId }: { patientId: string }) {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-44">Ngày khám</TableHead>
-                <TableHead className="min-w-48">Chẩn đoán</TableHead>
+                <TableHead className="min-w-48">Ghi nhận lâm sàng</TableHead>
                 <TableHead className="min-w-60">Kế hoạch điều trị</TableHead>
                 <TableHead className="min-w-56">Thủ thuật đã làm</TableHead>
               </TableRow>

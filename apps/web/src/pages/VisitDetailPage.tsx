@@ -59,6 +59,8 @@ interface EditableItem {
   estimated_duration_min?: number;
 }
 
+type ClinicalWorkspaceTab = "exam" | "diagnosis" | "images" | "plan";
+
 const PROCEDURE_OPTIONS = [
   { value: "examination", label: "Khám & chẩn đoán" },
   { value: "filling", label: "Trám răng" },
@@ -94,6 +96,7 @@ function procedureLabel(v: string) {
 type ClinicalWarningSeverity = "high" | "medium";
 
 interface ClinicalWarning {
+  warningType: VisitSafetyWarningType;
   severity: ClinicalWarningSeverity;
   title: string;
   detail: string;
@@ -104,33 +107,33 @@ function getClinicalWarnings({ systolic, diastolic, bloodSugar, bmi }: { systoli
 
   if (systolic != null || diastolic != null) {
     if ((systolic ?? 0) >= 180 || (diastolic ?? 0) >= 120) {
-      warnings.push({ severity: "high", title: "Huyết áp rất cao", detail: "Đo lại sau khi bệnh nhân nghỉ. Hoãn thủ thuật không cấp cứu và đánh giá/chuyển khám khẩn theo tình trạng lâm sàng." });
+      warnings.push({ warningType: "blood_pressure", severity: "high", title: "Huyết áp rất cao", detail: "Đo lại sau khi bệnh nhân nghỉ. Hoãn thủ thuật không cấp cứu và đánh giá/chuyển khám khẩn theo tình trạng lâm sàng." });
     } else if ((systolic ?? 0) >= 160 || (diastolic ?? 0) >= 100) {
-      warnings.push({ severity: "high", title: "Huyết áp cao", detail: "Đo lại đúng kỹ thuật sau khi nghỉ; cân nhắc hoãn điều trị chọn lọc và trao đổi bác sĩ điều trị nếu chỉ số vẫn cao." });
+      warnings.push({ warningType: "blood_pressure", severity: "high", title: "Huyết áp cao", detail: "Đo lại đúng kỹ thuật sau khi nghỉ; cân nhắc hoãn điều trị chọn lọc và trao đổi bác sĩ điều trị nếu chỉ số vẫn cao." });
     } else if ((systolic ?? 0) >= 140 || (diastolic ?? 0) >= 90) {
-      warnings.push({ severity: "medium", title: "Huyết áp tăng", detail: "Nên đo lại trước thủ thuật, ghi nhận chỉ số và hạn chế các yếu tố làm tăng huyết áp khi phù hợp." });
+      warnings.push({ warningType: "blood_pressure", severity: "medium", title: "Huyết áp tăng", detail: "Nên đo lại trước thủ thuật, ghi nhận chỉ số và hạn chế các yếu tố làm tăng huyết áp khi phù hợp." });
     } else if ((systolic ?? Number.POSITIVE_INFINITY) < 90 || (diastolic ?? Number.POSITIVE_INFINITY) < 60) {
-      warnings.push({ severity: "medium", title: "Huyết áp thấp", detail: "Đánh giá triệu chứng như choáng, mệt hoặc ngất; để bệnh nhân nghỉ và đo lại trước khi điều trị." });
+      warnings.push({ warningType: "blood_pressure", severity: "medium", title: "Huyết áp thấp", detail: "Đánh giá triệu chứng như choáng, mệt hoặc ngất; để bệnh nhân nghỉ và đo lại trước khi điều trị." });
     }
   }
 
   if (bloodSugar != null) {
     if (bloodSugar >= 300) {
-      warnings.push({ severity: "high", title: "Đường huyết rất cao", detail: "Đánh giá triệu chứng tăng đường huyết; hoãn thủ thuật không cấp cứu và liên hệ bác sĩ điều trị/đánh giá khẩn khi cần." });
+      warnings.push({ warningType: "blood_sugar", severity: "high", title: "Đường huyết rất cao", detail: "Đánh giá triệu chứng tăng đường huyết; hoãn thủ thuật không cấp cứu và liên hệ bác sĩ điều trị/đánh giá khẩn khi cần." });
     } else if (bloodSugar >= 200) {
-      warnings.push({ severity: "high", title: "Đường huyết cao", detail: "Xác nhận thời điểm đo và bữa ăn gần nhất; cân nhắc trì hoãn thủ thuật chọn lọc, kiểm soát nhiễm trùng và trao đổi bác sĩ điều trị." });
+      warnings.push({ warningType: "blood_sugar", severity: "high", title: "Đường huyết cao", detail: "Xác nhận thời điểm đo và bữa ăn gần nhất; cân nhắc trì hoãn thủ thuật chọn lọc, kiểm soát nhiễm trùng và trao đổi bác sĩ điều trị." });
     } else if (bloodSugar < 70) {
-      warnings.push({ severity: "high", title: "Đường huyết thấp", detail: "Kiểm tra triệu chứng hạ đường huyết, xử trí theo phác đồ cơ sở và chỉ tiếp tục điều trị khi bệnh nhân ổn định." });
+      warnings.push({ warningType: "blood_sugar", severity: "high", title: "Đường huyết thấp", detail: "Kiểm tra triệu chứng hạ đường huyết, xử trí theo phác đồ cơ sở và chỉ tiếp tục điều trị khi bệnh nhân ổn định." });
     }
   }
 
   if (bmi !== null) {
     if (bmi >= 25) {
-      warnings.push({ severity: "medium", title: "BMI béo phì", detail: "Lưu ý nguy cơ bệnh nền và đánh giá tư thế ghế, đường thở, thời lượng điều trị phù hợp." });
+      warnings.push({ warningType: "bmi", severity: "medium", title: "BMI béo phì", detail: "Lưu ý nguy cơ bệnh nền và đánh giá tư thế ghế, đường thở, thời lượng điều trị phù hợp." });
     } else if (bmi >= 23) {
-      warnings.push({ severity: "medium", title: "BMI thừa cân", detail: "Nên khai thác thêm bệnh nền chuyển hóa, huyết áp và thuốc đang sử dụng khi phù hợp." });
+      warnings.push({ warningType: "bmi", severity: "medium", title: "BMI thừa cân", detail: "Nên khai thác thêm bệnh nền chuyển hóa, huyết áp và thuốc đang sử dụng khi phù hợp." });
     } else if (bmi < 18.5) {
-      warnings.push({ severity: "medium", title: "BMI thấp", detail: "Đánh giá tình trạng dinh dưỡng, khả năng ăn uống và nguyên nhân sụt cân nếu có triệu chứng liên quan." });
+      warnings.push({ warningType: "bmi", severity: "medium", title: "BMI thấp", detail: "Đánh giá tình trạng dinh dưỡng, khả năng ăn uống và nguyên nhân sụt cân nếu có triệu chứng liên quan." });
     }
   }
 
@@ -395,20 +398,22 @@ export function VisitDetailPage() {
   } | null>(null);
   const [suggestNextDialogOpen, setSuggestNextDialogOpen] = useState(false);
   const [creatingAppointment, setCreatingAppointment] = useState(false);
+  const [workspaceTab, setWorkspaceTab] = useState<ClinicalWorkspaceTab>("exam");
 
-  const canReview = Boolean(
-    session?.role.permissions.includes(PERMISSIONS.ALL) ||
-    session?.role.permissions.includes(PERMISSIONS.REVIEW_CLINICAL_DRAFTS)
-  );
+  const permissions = session?.role.permissions ?? [];
+  const hasAllPermissions = permissions.includes(PERMISSIONS.ALL);
+  const canReview = hasAllPermissions || permissions.includes(PERMISSIONS.REVIEW_CLINICAL_DRAFTS);
   const canSubmitPreExam = Boolean(
-    session?.role.permissions.includes(PERMISSIONS.ALL) ||
-    session?.role.permissions.includes(PERMISSIONS.WRITE_PRE_EXAM_DRAFTS) ||
-    session?.role.permissions.includes(PERMISSIONS.WRITE_FINDINGS)
+    hasAllPermissions ||
+    permissions.includes(PERMISSIONS.WRITE_PRE_EXAM_DRAFTS) ||
+    permissions.includes(PERMISSIONS.WRITE_FINDINGS)
   );
-  const canSign = Boolean(
-    session?.role.permissions.includes(PERMISSIONS.ALL) ||
-    session?.role.permissions.includes(PERMISSIONS.SIGN_CLINICAL_RECORDS)
-  );
+  const canSign = hasAllPermissions || permissions.includes(PERMISSIONS.SIGN_CLINICAL_RECORDS);
+  const canWriteVisits = hasAllPermissions || permissions.includes(PERMISSIONS.WRITE_VISITS);
+  const canWriteFindings = hasAllPermissions || permissions.includes(PERMISSIONS.WRITE_FINDINGS);
+  const canWritePlans = hasAllPermissions || permissions.includes(PERMISSIONS.WRITE_PLANS);
+  const canWritePatients = hasAllPermissions || permissions.includes(PERMISSIONS.WRITE_PATIENTS);
+  const canWriteAppointments = hasAllPermissions || permissions.includes(PERMISSIONS.WRITE_APPOINTMENTS);
 
   async function load() {
     if (!id) return;
@@ -775,6 +780,16 @@ export function VisitDetailPage() {
   const effectiveFindings = findings.filter((finding) => Boolean(finding.clinical_effective_at) || finding.entry_source === "doctor" || finding.entry_source === "legacy");
   const draftFindings = findings.filter((finding) => !effectiveFindings.some((effective) => effective.id === finding.id));
   const toothFindings = effectiveFindings.filter((finding) => finding.category === "tooth_hard_tissue" || finding.category === "periodontal");
+  const isClinicalReadOnly = Boolean(visit.locked_at);
+  const canEditClinical = canWriteFindings && !isClinicalReadOnly;
+  const statusLabel = visit.status === "in_progress" ? "Đang khám" : visit.status === "completed" ? "Đã hoàn tất" : "Đã hủy";
+  const activeSafetyAcknowledgement = safetyAcknowledgements.find((item) => item.warning_type === safetyWarningType);
+  const workspaceTabs: Array<{ id: ClinicalWorkspaceTab; label: string; description: string; count?: number }> = [
+    { id: "exam", label: "Khám", description: "Ghi nhận theo răng", count: effectiveFindings.length },
+    { id: "diagnosis", label: "Chẩn đoán", description: "Kết luận và bằng chứng" },
+    { id: "images", label: "Hình ảnh", description: "Ảnh và đánh dấu" },
+    { id: "plan", label: "Kế hoạch", description: "Điều trị và tái khám", count: treatmentHistory.length },
+  ];
 
   return (
     <PageContainer size="workspace" className="space-y-5">
@@ -798,24 +813,18 @@ export function VisitDetailPage() {
             </p>
           </div>
           <div className="flex flex-col items-end gap-1">
-            <Badge
-              variant={
-                visit.status === "completed" ? "success" : visit.status === "cancelled" ? "destructive" : "warning"
-              }
-            >
-              {visit.status}
-            </Badge>
+             <Badge variant={visit.status === "completed" ? "success" : visit.status === "cancelled" ? "destructive" : "warning"}>{statusLabel}</Badge>
             <Badge variant="outline" className="capitalize">
               {visit.clinical_state === "pre_exam" ? "Khám ban đầu - bản nháp" : visit.clinical_state === "awaiting_doctor_review" ? "Chờ bác sĩ duyệt" : visit.clinical_state === "signed" ? "Đã ký và khóa" : visit.clinical_state === "amended" ? "Đã đính chính" : visit.clinical_state === "in_progress" ? "Đang khám" : visit.clinical_state}
             </Badge>
           </div>
         </div>
-        {visit.status === "in_progress" && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => void completeVisit()}>Hoàn tất lượt khám</Button>
-            {canSign && !visit.locked_at && <Button size="sm" variant="outline" onClick={() => void signVisit()} disabled={signingVisit}>{signingVisit ? "Đang ký..." : "Ký và khóa hồ sơ"}</Button>}
-          </div>
-        )}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {canWriteVisits && !isClinicalReadOnly && visit.status === "in_progress" && <Button size="sm" onClick={() => void completeVisit()}>Hoàn tất lượt khám</Button>}
+          {canSign && !isClinicalReadOnly && visit.status === "completed" && <Button size="sm" variant="outline" onClick={() => void signVisit()} disabled={signingVisit}>{signingVisit ? "Đang ký..." : "Ký và khóa hồ sơ"}</Button>}
+          {isClinicalReadOnly && <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">Hồ sơ đã ký, dữ liệu lâm sàng ở chế độ chỉ đọc.</span>}
+          {!isClinicalReadOnly && visit.status === "completed" && !canSign && <span className="text-xs text-muted-foreground">Lượt khám đã hoàn tất, chờ người có quyền ký hồ sơ.</span>}
+        </div>
         <div className="mt-2 flex flex-wrap items-center gap-4 text-sm">
             {visit.treating_clinician_name && (
               <div className="flex items-center gap-1.5">
@@ -831,7 +840,7 @@ export function VisitDetailPage() {
                 <span className="font-medium">{visit.assistant_name}</span>
               </div>
             )}
-            <Button variant="outline" size="sm" onClick={openPersonnelDialog}>Cập nhật nhân sự</Button>
+            {canWriteVisits && !isClinicalReadOnly && <Button variant="outline" size="sm" onClick={openPersonnelDialog}>Cập nhật nhân sự</Button>}
           </div>
         {visit.chair_id && (
           <div className="mt-2 flex items-center gap-1.5 text-sm">
@@ -841,64 +850,14 @@ export function VisitDetailPage() {
         )}
       </div>
 
-      {/* Vitals */}
-      {(visit.blood_pressure_systolic || visit.blood_pressure_diastolic || visit.blood_sugar_mgdl) && (
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-              Chỉ số khám
-            </p>
-            <div className="flex flex-wrap gap-6">
-              {(visit.blood_pressure_systolic || visit.blood_pressure_diastolic) && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">💉</span>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Huyết áp</p>
-                    <p className="font-semibold text-sm">
-                      {visit.blood_pressure_systolic}/{visit.blood_pressure_diastolic} mmHg
-                    </p>
-                  </div>
-                </div>
-              )}
-              {visit.blood_sugar_mgdl && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">🩸</span>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Đường huyết</p>
-                    <p className="font-semibold text-sm">
-                      {visit.blood_sugar_mgdl} mg/dL
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {clinicalWarnings.length > 0 && (
-        <Card className="border-amber-300 dark:border-amber-800">
-          <CardContent className="pt-4">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <p className="text-sm font-semibold">Cảnh báo chỉ số khám</p>
-                <p className="mt-1 text-xs text-muted-foreground">Gợi ý hỗ trợ quyết định lâm sàng, không thay thế đánh giá trực tiếp của bác sĩ.</p>
-              </div>
-              <Badge variant="warning">{clinicalWarnings.length} cần chú ý</Badge>
-            </div>
-            <div className="mt-3 space-y-2">
-               {clinicalWarnings.map((warning) => (
-                <div key={warning.title} className={`rounded-lg border px-3 py-2.5 text-sm ${warning.severity === "high" ? "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30" : "border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30"}`}>
-                   <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex flex-wrap items-center gap-2"><Badge variant={warning.severity === "high" ? "destructive" : "warning"}>{warning.severity === "high" ? "Ưu tiên cao" : "Cần theo dõi"}</Badge><span className="font-medium">{warning.title}</span></div>{canReview && <Button size="sm" variant="outline" onClick={() => void acknowledgeSafetyWarning(warning.title.includes("Huyết áp") ? "blood_pressure" : warning.title.includes("Đường huyết") ? "blood_sugar" : "bmi")}>{safetyAcknowledgements.some((item) => item.warning_type === (warning.title.includes("Huyết áp") ? "blood_pressure" : warning.title.includes("Đường huyết") ? "blood_sugar" : "bmi")) ? "Cập nhật đánh giá" : "Bác sĩ xác nhận"}</Button>}</div>
-                   <p className="mt-1.5 text-xs text-muted-foreground">{warning.detail}</p>
-                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Patient safety context */}
+       <Card className={clinicalWarnings.length || alerts.length ? "border-amber-300 dark:border-amber-800" : undefined}>
+         <CardHeader className="pb-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>An toàn trước điều trị</CardTitle><p className="mt-1 text-xs text-muted-foreground">Cảnh báo y khoa, chỉ số đo và đánh giá xử trí tại một nơi.</p></div>{(clinicalWarnings.length || alerts.length) ? <Badge variant="warning">{clinicalWarnings.length + alerts.length} cần lưu ý</Badge> : <Badge variant="success">Không có cảnh báo</Badge>}</div></CardHeader>
+         <CardContent className="space-y-3 pt-0">
+           <div className="grid gap-2 sm:grid-cols-3"><div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5"><p className="text-xs text-muted-foreground">Huyết áp</p><p className="mt-1 font-semibold">{visit.blood_pressure_systolic || visit.blood_pressure_diastolic ? `${visit.blood_pressure_systolic ?? "—"}/${visit.blood_pressure_diastolic ?? "—"} mmHg` : "Chưa ghi nhận"}</p></div><div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5"><p className="text-xs text-muted-foreground">Đường huyết</p><p className="mt-1 font-semibold">{visit.blood_sugar_mgdl ? `${visit.blood_sugar_mgdl} mg/dL` : "Chưa ghi nhận"}</p></div><div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5"><p className="text-xs text-muted-foreground">BMI</p><p className="mt-1 font-semibold">{bmi === null ? "Chưa đủ dữ liệu" : `${bmi} · ${bmiLabel}`}</p></div></div>
+           {(clinicalWarnings.length > 0 || alerts.length > 0) && <div className="space-y-2">{alerts.map((alert) => <div key={alert.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm dark:border-amber-900 dark:bg-amber-950/30"><Badge variant={alert.severity === "high" ? "destructive" : alert.severity === "medium" ? "warning" : "secondary"}>{alert.type === "allergy" ? "Dị ứng" : alert.type === "chronic" ? "Bệnh nền" : alert.type === "medication" ? "Thuốc" : "Lưu ý"}</Badge><span className="font-medium">{alert.description}</span></div>)}{clinicalWarnings.map((warning) => { const acknowledgement = safetyAcknowledgements.find((item) => item.warning_type === warning.warningType); return <div key={warning.title} className={`rounded-lg border px-3 py-2.5 text-sm ${warning.severity === "high" ? "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30" : "border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30"}`}><div className="flex flex-wrap items-center justify-between gap-2"><div className="flex flex-wrap items-center gap-2"><Badge variant={warning.severity === "high" ? "destructive" : "warning"}>{warning.severity === "high" ? "Ưu tiên cao" : "Theo dõi"}</Badge><span className="font-medium">{warning.title}</span></div>{canReview && !isClinicalReadOnly && <Button size="sm" variant="outline" onClick={() => void acknowledgeSafetyWarning(warning.warningType)}>{acknowledgement ? "Cập nhật đánh giá" : "Đánh giá"}</Button>}</div><p className="mt-1.5 text-xs text-muted-foreground">{warning.detail}</p>{acknowledgement && <p className="mt-1 text-xs font-medium text-foreground">Đã xử trí: {acknowledgement.outcome === "acknowledged" ? "Xác nhận" : acknowledgement.outcome === "continue_with_reason" ? "Tiếp tục có lý do" : acknowledgement.outcome === "defer_treatment" ? "Hoãn điều trị" : "Chuyển tuyến/báo cấp trên"}{acknowledgement.reason ? ` · ${acknowledgement.reason}` : ""}</p>}</div>; })}</div>}
+           <div className="flex justify-end"><Button variant="outline" size="sm" onClick={() => navigate(`/patients/${visit.patient_id}/alerts`)}>Mở hồ sơ cảnh báo</Button></div>
+         </CardContent>
+       </Card>
 
       {/* Pre-exam & Doctor Review Queue */}
       {canSubmitPreExam && (
@@ -966,163 +925,16 @@ export function VisitDetailPage() {
         </Card>
       )}
 
-       <Card className={alerts.length > 0 ? "border-amber-300 dark:border-amber-800" : undefined}>
-         <details open={alerts.length > 0}>
-           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-4 [&::-webkit-details-marker]:hidden">
-             <div>
-               <CardTitle>Thông tin cần lưu ý</CardTitle>
-               <p className="mt-1 text-sm text-muted-foreground">{alerts.length > 0 ? `${alerts.length} cảnh báo y khoa cần xem trước khi điều trị` : "Không có cảnh báo y khoa"}</p>
-             </div>
-             <span className="text-xs font-medium text-muted-foreground">Mở rộng</span>
-           </summary>
-         <CardContent className="space-y-4 border-t border-border pt-4">
-          {alerts.length > 0 ? (
-            <div className="space-y-2">
-              {alerts.map((alert) => (
-                <div key={alert.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm dark:border-amber-900 dark:bg-amber-950/30">
-                  <Badge variant={alert.severity === "high" ? "destructive" : alert.severity === "medium" ? "warning" : "secondary"}>
-                    {alert.type === "allergy" ? "Dị ứng" : alert.type === "chronic" ? "Bệnh mãn tính" : alert.type === "medication" ? "Thuốc đang dùng" : "Khác"}
-                  </Badge>
-                  <span className="font-medium">{alert.description}</span>
-                  <span className="text-xs text-muted-foreground">Mức độ: {alert.severity === "high" ? "Cao" : alert.severity === "medium" ? "Trung bình" : "Thấp"}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Chưa ghi nhận cảnh báo y khoa.</p>
-          )}
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
-              <p className="text-xs text-muted-foreground">Chiều cao</p>
-              <p className="mt-1 font-semibold">{patient?.height_cm ? `${patient.height_cm} cm` : "Chưa cập nhật"}</p>
-            </div>
-            <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
-              <p className="text-xs text-muted-foreground">Cân nặng</p>
-              <p className="mt-1 font-semibold">{patient?.weight_kg ? `${patient.weight_kg} kg` : "Chưa cập nhật"}</p>
-            </div>
-            <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
-              <p className="text-xs text-muted-foreground">BMI</p>
-              <p className="mt-1 font-semibold">{bmi === null ? "Chưa đủ dữ liệu" : `${bmi} · ${bmiLabel}`}</p>
-            </div>
-           </div>
-           <Button variant="outline" size="sm" onClick={() => navigate(`/patients/${visit.patient_id}/alerts`)}>
-             Xem hồ sơ bệnh nhân
-           </Button>
-         </CardContent>
-         </details>
-       </Card>
+        <section aria-label="Không gian làm việc lâm sàng" className="space-y-4">
+          <div className="grid grid-cols-2 gap-2 rounded-xl border border-border bg-muted/20 p-2 md:grid-cols-4">{workspaceTabs.map((tab) => <button type="button" key={tab.id} onClick={() => setWorkspaceTab(tab.id)} className={`rounded-lg px-3 py-2 text-left transition-colors ${workspaceTab === tab.id ? "bg-background shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/60"}`}><span className="flex items-center justify-between gap-2 text-sm font-semibold"><span>{tab.label}</span>{tab.count !== undefined && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">{tab.count}</span>}</span><span className="mt-0.5 block text-xs">{tab.description}</span></button>)}</div>
 
-      {/* Previous clinical history */}
-       <Card>
-         <details>
-           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-4 [&::-webkit-details-marker]:hidden">
-             <div><CardTitle>Lịch sử khám và điều trị</CardTitle><p className="mt-1 text-sm text-muted-foreground">{sortedPreviousVisits.length} lượt khám trước · {sortedTreatmentHistory.length} kế hoạch điều trị</p></div>
-             <span className="text-xs font-medium text-muted-foreground">Mở rộng</span>
-           </summary>
-         <CardContent className="grid gap-5 border-t border-border pt-4 lg:grid-cols-2">
-          <div>
-            <p className="mb-2 text-sm font-medium">Lượt khám trước ({sortedPreviousVisits.length})</p>
-            {sortedPreviousVisits.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Chưa có lượt khám trước đó.</p>
-            ) : (
-              <div className="space-y-2">
-                {sortedPreviousVisits.slice(0, 5).map((previousVisit) => (
-                  <button key={previousVisit.id} type="button" onClick={() => navigate(withPatientReturnContext(`/visits/${previousVisit.id}`, visit.patient_id, "visits"))} className="flex w-full items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5 text-left transition-colors hover:bg-muted/50">
-                    <div>
-                      <p className="text-sm font-medium">{formatDateTime(previousVisit.date)}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{previousVisit.treating_clinician_name ?? "Chưa phân công bác sĩ điều trị"}</p>
-                    </div>
-                    <Badge variant={previousVisit.status === "completed" ? "success" : previousVisit.status === "cancelled" ? "destructive" : "warning"}>{previousVisit.status}</Badge>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <div>
-            <p className="mb-2 text-sm font-medium">Kế hoạch điều trị ({sortedTreatmentHistory.length})</p>
-            {sortedTreatmentHistory.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Chưa có kế hoạch điều trị.</p>
-            ) : (
-              <div className="space-y-2">
-                {sortedTreatmentHistory.slice(0, 5).map((plan) => (
-                  <button key={plan.id} type="button" onClick={() => navigate(withPatientReturnContext(`/treatment-plans/${plan.id}`, visit.patient_id, "plans"))} className="flex w-full items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5 text-left transition-colors hover:bg-muted/50">
-                    <div>
-                      <p className="text-sm font-medium">Tạo lúc {formatDateTime(plan.created_at)}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{plan.total_cost.toLocaleString("vi-VN")} {plan.currency}</p>
-                    </div>
-                    <Badge variant={plan.status === "approved" || plan.status === "completed" ? "success" : plan.status === "cancelled" ? "destructive" : "warning"}>{plan.status}</Badge>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-         </CardContent>
-         </details>
-       </Card>
+          {workspaceTab === "exam" && <div className="space-y-4"><Card><CardHeader className="flex-row items-center justify-between gap-4 pb-3"><div><CardTitle>Khám răng hàm mặt</CardTitle><p className="mt-1 text-xs text-muted-foreground">Định vị trên sơ đồ, sau đó xem chi tiết ở danh sách bên dưới.</p></div>{canEditClinical && <Button size="sm" onClick={() => setVoiceDialogOpen(true)}>Ghi âm findings</Button>}</CardHeader><CardContent><FdiToothChart visitId={visit.id} findings={effectiveFindings} readOnly={!canEditClinical} onCreated={(finding) => setFindings((current) => [...current, finding])} onCreatedBatch={onFindingsBatchCreated} onUpdated={(updated) => setFindings((current) => current.map((finding) => finding.id === updated.id ? updated : finding))} onDeleted={(findingId) => setFindings((current) => current.filter((finding) => finding.id !== findingId))} /></CardContent></Card><Card id="findings"><CardHeader className="pb-3"><CardTitle>Ghi nhận theo răng ({toothFindings.length})</CardTitle></CardHeader><CardContent><FindingsList visitId={visit.id} findings={toothFindings} readOnly={!canEditClinical} onUpdate={(updated) => setFindings((current) => current.map((finding) => finding.id === updated.id ? updated : finding))} onDeleted={(findingId) => setFindings((current) => current.filter((finding) => finding.id !== findingId))} /></CardContent></Card></div>}
+          {workspaceTab === "diagnosis" && <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]"><ClinicalDiagnosesCard visitId={visit.id} patientId={visit.patient_id} findings={findings} readOnly={!canEditClinical} /><Card><CardHeader className="pb-3"><CardTitle>Trợ lý chẩn đoán</CardTitle></CardHeader><CardContent className="space-y-3"><p className="text-sm text-muted-foreground">Tóm tắt AI hỗ trợ rà soát ghi nhận hiện có; bác sĩ vẫn là người xác nhận kết luận.</p><Button className="w-full" variant="outline" onClick={onSummarize} disabled={summarizing}>{summarizing ? "Đang tóm tắt..." : "Tạo tóm tắt AI"}</Button><Button className="w-full" variant="outline" onClick={() => setWorkspaceTab("images")}>Mở hình ảnh và bằng chứng</Button></CardContent></Card></div>}
+          {workspaceTab === "images" && <Card><CardHeader className="pb-3"><CardTitle>Hình ảnh lâm sàng</CardTitle><p className="mt-1 text-xs text-muted-foreground">Xem ảnh, ghi chú và liên kết bằng chứng mà không làm chật khu vực khám.</p></CardHeader><CardContent><PatientImageGallery patientId={visit.patient_id} visitId={visit.id} canUpload={canWritePatients && !isClinicalReadOnly} canDelete={canWritePatients && !isClinicalReadOnly} canAnnotate={canEditClinical} canLinkEvidence={canEditClinical} canSaveFindings={canEditClinical} onFindingsSaved={onFindingsBatchCreated} /></CardContent></Card>}
+          {workspaceTab === "plan" && <div className="grid gap-4 lg:grid-cols-2"><Card><CardHeader className="pb-3"><CardTitle>Kế hoạch điều trị</CardTitle><p className="mt-1 text-xs text-muted-foreground">Tạo kế hoạch sau khi đã rà soát ghi nhận và chẩn đoán.</p></CardHeader><CardContent className="space-y-3">{canWritePlans ? <><Button className="w-full" onClick={onCreatePlan}>Tạo kế hoạch thủ công</Button><Button className="w-full" variant="outline" onClick={onGeneratePlan} disabled={generatingPlan}>{generatingPlan ? "Đang tạo..." : "Tạo nháp bằng AI"}</Button></> : <p className="text-sm text-muted-foreground">Bạn không có quyền tạo kế hoạch điều trị.</p>}</CardContent></Card><Card><CardHeader className="pb-3"><CardTitle>Hẹn tái khám</CardTitle><p className="mt-1 text-xs text-muted-foreground">Chỉ tạo sau khi lịch đề xuất đã được nhân sự xác nhận.</p></CardHeader><CardContent>{canWriteAppointments ? <Button className="w-full" variant="outline" onClick={onSuggestNext} disabled={suggestNextLoading}>{suggestNextLoading ? "Đang gợi ý..." : "Gợi ý lịch tái khám"}</Button> : <p className="text-sm text-muted-foreground">Bạn không có quyền tạo lịch hẹn.</p>}</CardContent></Card></div>}
+        </section>
 
-       <div className="grid items-start gap-6 lg:grid-cols-3">
-         <div className="space-y-6 lg:col-span-2">
-            <Card>
-              <CardHeader className="pb-3"><CardTitle>Hồ sơ lâm sàng hiệu lực: Khám răng hàm mặt</CardTitle></CardHeader>
-              <CardContent>
-                <FdiToothChart visitId={visit.id} findings={effectiveFindings} onCreated={(f) => setFindings((prev) => [...prev, f])} onCreatedBatch={onFindingsBatchCreated} onUpdated={(updated) => setFindings((prev) => prev.map((finding) => finding.id === updated.id ? updated : finding))} onDeleted={(findingId) => setFindings((prev) => prev.filter((finding) => finding.id !== findingId))} />
-              </CardContent>
-            </Card>
-           <Card id="findings">
-             <CardHeader className="pb-3"><CardTitle>Ghi nhận theo răng ({toothFindings.length})</CardTitle></CardHeader>
-             <CardContent>
-               <FindingsList visitId={visit.id} findings={toothFindings} onUpdate={(updated) => setFindings((prev) => prev.map((f) => (f.id === updated.id ? updated : f)))} onDeleted={(findingId) => setFindings((prev) => prev.filter((finding) => finding.id !== findingId))} />
-             </CardContent>
-           </Card>
-         </div>
-         <aside className="space-y-6 lg:sticky lg:top-4">
-            <ClinicalDiagnosesCard visitId={visit.id} patientId={visit.patient_id} findings={findings} />
-           <Card>
-             <CardContent className="pt-4">
-               <PatientImageGallery patientId={visit.patient_id} visitId={visit.id} />
-             </CardContent>
-           </Card>
-         </aside>
-       </div>
-
-       {/* Action bar */}
-       <div className="sticky bottom-3 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card/95 p-3 shadow-lg backdrop-blur">
-        <Button size="sm" onClick={() => setVoiceDialogOpen(true)} className="gap-1.5">
-          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-          </svg>
-           Ghi âm findings
-        </Button>
-        <Button size="sm" variant="outline" onClick={onSummarize} disabled={summarizing} className="gap-1.5">
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-          </svg>
-          {summarizing ? "Đang tóm tắt…" : "Tóm tắt AI"}
-        </Button>
-        <Button size="sm" variant="outline" onClick={onGeneratePlan} disabled={generatingPlan} className="gap-1.5">
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-          </svg>
-          {generatingPlan ? "Đang tạo…" : "Tạo kế hoạch AI"}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onSuggestNext}
-          disabled={suggestNextLoading}
-          className="gap-1.5"
-        >
-           {suggestNextLoading ? "Đang gợi ý…" : "Tạo lịch tái khám"}
-        </Button>
-        <div className="ml-auto">
-          <Button size="sm" onClick={onCreatePlan} className="gap-1.5">
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Tạo kế hoạch
-          </Button>
-        </div>
-      </div>
+        <Card><details><summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-4 [&::-webkit-details-marker]:hidden"><div><CardTitle>Lịch sử khám và điều trị</CardTitle><p className="mt-1 text-sm text-muted-foreground">{sortedPreviousVisits.length} lượt khám trước · {sortedTreatmentHistory.length} kế hoạch điều trị</p></div><span className="text-xs font-medium text-muted-foreground">Mở rộng</span></summary><CardContent className="grid gap-5 border-t border-border pt-4 lg:grid-cols-2"><div><p className="mb-2 text-sm font-medium">Lượt khám trước</p>{sortedPreviousVisits.length === 0 ? <p className="text-sm text-muted-foreground">Chưa có lượt khám trước đó.</p> : <div className="space-y-2">{sortedPreviousVisits.slice(0, 5).map((previousVisit) => <button key={previousVisit.id} type="button" onClick={() => navigate(withPatientReturnContext(`/visits/${previousVisit.id}`, visit.patient_id, "visits"))} className="flex w-full items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5 text-left transition-colors hover:bg-muted/50"><div><p className="text-sm font-medium">{formatDateTime(previousVisit.date)}</p><p className="mt-0.5 text-xs text-muted-foreground">{previousVisit.treating_clinician_name ?? "Chưa phân công bác sĩ điều trị"}</p></div><Badge variant={previousVisit.status === "completed" ? "success" : previousVisit.status === "cancelled" ? "destructive" : "warning"}>{previousVisit.status === "completed" ? "Hoàn tất" : previousVisit.status === "cancelled" ? "Đã hủy" : "Đang khám"}</Badge></button>)}</div>}</div><div><p className="mb-2 text-sm font-medium">Kế hoạch điều trị</p>{sortedTreatmentHistory.length === 0 ? <p className="text-sm text-muted-foreground">Chưa có kế hoạch điều trị.</p> : <div className="space-y-2">{sortedTreatmentHistory.slice(0, 5).map((plan) => <button key={plan.id} type="button" onClick={() => navigate(withPatientReturnContext(`/treatment-plans/${plan.id}`, visit.patient_id, "plans"))} className="flex w-full items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5 text-left transition-colors hover:bg-muted/50"><div><p className="text-sm font-medium">Tạo lúc {formatDateTime(plan.created_at)}</p><p className="mt-0.5 text-xs text-muted-foreground">{plan.total_cost.toLocaleString("vi-VN")} {plan.currency}</p></div><Badge variant={plan.status === "approved" || plan.status === "completed" ? "success" : plan.status === "cancelled" ? "destructive" : "warning"}>{plan.status}</Badge></button>)}</div>}</div></CardContent></details></Card>
 
       {/* ─── AI Summary Dialog ─────────────────────────────── */}
       <Dialog open={summaryDialogOpen} onOpenChange={setSummaryDialogOpen}>

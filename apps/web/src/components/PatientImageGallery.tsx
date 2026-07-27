@@ -18,14 +18,20 @@ import {
 } from "@/components/ui/dialog";
 import { apiBlob, apiDelete, apiGet, apiPost, apiUpload, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
-import type { ClinicalDiagnosis, ClinicalDiagnosisImageEvidence, ImageAnnotation, ImageAnnotationGeometry, ImageAnnotationShapeType, PatientImage, PatientImagePurpose, PatientImageType, AnalyzeImageResult, Visit } from "@shared/types";
+import type { ClinicalDiagnosis, ClinicalDiagnosisImageEvidence, ClinicalFinding, ImageAnnotation, ImageAnnotationGeometry, ImageAnnotationShapeType, PatientImage, PatientImagePurpose, PatientImageType, AnalyzeImageResult, Visit } from "@shared/types";
 import { PATIENT_IMAGE_PURPOSE_LABELS, PATIENT_IMAGE_TYPE_LABELS } from "@shared/types";
 
 interface PatientImageGalleryProps {
   patientId: string;
   visitId?: string;
   compact?: boolean;
+  canUpload?: boolean;
+  canDelete?: boolean;
+  canAnnotate?: boolean;
+  canLinkEvidence?: boolean;
+  canSaveFindings?: boolean;
   onImagesChanged?: () => void;
+  onFindingsSaved?: (findings: ClinicalFinding[]) => void;
 }
 
 interface ImageResponse {
@@ -37,7 +43,13 @@ export function PatientImageGallery({
   patientId,
   visitId,
   compact,
+  canUpload = true,
+  canDelete = true,
+  canAnnotate = true,
+  canLinkEvidence = true,
+  canSaveFindings = true,
   onImagesChanged,
+  onFindingsSaved,
 }: PatientImageGalleryProps) {
   const [images, setImages] = useState<PatientImage[]>([]);
   const [imageTotal, setImageTotal] = useState(0);
@@ -257,7 +269,7 @@ export function PatientImageGallery({
 
   useEffect(() => {
     function handlePaste(event: ClipboardEvent) {
-      if (uploading) return;
+      if (!canUpload || uploading) return;
       const image = Array.from(event.clipboardData?.items ?? []).find((item) =>
         item.kind === "file" && item.type.startsWith("image/"),
       );
@@ -272,7 +284,7 @@ export function PatientImageGallery({
 
     window.addEventListener("paste", handlePaste);
     return () => window.removeEventListener("paste", handlePaste);
-  }, [uploading, patientId, visitId]);
+  }, [canUpload, uploading, patientId, visitId]);
 
   async function handleDelete(img: PatientImage) {
     if (!confirm("Xóa hình ảnh này?")) return;
@@ -298,7 +310,7 @@ export function PatientImageGallery({
   }
 
   function handleAnnotationPointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    if (!viewUrl) return;
+    if (!canAnnotate || !viewUrl) return;
     if (event.button !== 0) return;
     event.preventDefault();
     const point = coordinateFromPointer(event);
@@ -419,9 +431,9 @@ export function PatientImageGallery({
   }
 
   async function handleSaveFindings(result: AnalyzeImageResult) {
-    if (!visitId || result.findings.length === 0) return;
+    if (!canSaveFindings || !visitId || result.findings.length === 0) return;
     try {
-      await apiPost(`/api/visits/${visitId}/findings/batch`, {
+      const saved = await apiPost<{ items: ClinicalFinding[] }>(`/api/visits/${visitId}/findings/batch`, {
         findings: result.findings.map((f) => ({
           tooth_number: f.tooth_number,
           category: f.category,
@@ -433,7 +445,8 @@ export function PatientImageGallery({
           notes: `${f.description}\nĐề xuất: ${f.recommendation}`,
         })),
       });
-      toast.success(`Đã lưu ${result.findings.length} ghi nhận lâm sàng`);
+      onFindingsSaved?.(saved.items);
+      toast.success(`Đã lưu ${saved.items.length} ghi nhận lâm sàng`);
       setAnalysisResult(null);
     } catch (err) {
       const itemIndex = err instanceof ApiError && isItemIndexDetails(err.details)
@@ -468,7 +481,7 @@ export function PatientImageGallery({
         </div>
         {visitId && <p className="mt-2 text-xs text-muted-foreground">Ảnh tải tại đây sẽ tự động gắn với lượt khám hiện tại.</p>}
       </section>
-      {!compact && (
+       {!compact && canUpload && (
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Hình ảnh ({imageTotal})</h2>
           <label className="cursor-pointer">
@@ -559,7 +572,7 @@ export function PatientImageGallery({
           <p className="text-xs text-muted-foreground/60 mt-1">
             Hoặc sao chép ảnh và nhấn Ctrl+V để tải lên
           </p>
-          {!compact && (
+          {!compact && canUpload && (
             <label className="mt-3 cursor-pointer">
               <input
                 type="file"
@@ -589,7 +602,7 @@ export function PatientImageGallery({
       )}
 
       {/* Upload FAB for compact mode */}
-      {compact && (
+      {compact && canUpload && (
         <label className="mt-3 inline-block cursor-pointer">
           <input
             type="file"
@@ -636,7 +649,7 @@ export function PatientImageGallery({
                     {annotations.map((annotation) => <AnnotationOverlay key={annotation.id} shape={annotation.current_version.shape_type} geometry={annotation.current_version.geometry} active={selectedAnnotationVersionId === annotation.current_version.id} />)}
                     {annotationGeometry && <AnnotationOverlay shape={annotationShape} geometry={annotationGeometry} draft />}
                   </svg>
-                  <div
+                  {canAnnotate && <div
                     ref={annotationSurfaceRef}
                     className={`absolute inset-0 z-10 touch-none ${annotationShape === "freehand" ? "cursor-crosshair" : "cursor-pointer"}`}
                     aria-label="Vùng đánh dấu ảnh"
@@ -645,7 +658,7 @@ export function PatientImageGallery({
                     onPointerUp={handleAnnotationPointerUp}
                     onPointerCancel={handleAnnotationPointerCancel}
                     onLostPointerCapture={handleAnnotationPointerCancel}
-                  />
+                  />}
                 </div>
               </div>
             ) : viewError ? (
@@ -659,14 +672,14 @@ export function PatientImageGallery({
             )}
           </div>
 
-          {viewUrl && selected && !isDicomType(selected) && <section className="mb-4 rounded-xl border border-border p-3">
+          {canAnnotate && viewUrl && selected && !isDicomType(selected) && <section className="mb-4 rounded-xl border border-border p-3">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold">Ghi chú trên ảnh</p><p className="text-xs text-muted-foreground">Mũi tên: bấm lên vị trí cần chỉ. Vẽ tự do: nhấn giữ và kéo trên ảnh.</p></div><div className="flex gap-1"><Button size="sm" variant={annotationShape === "pin" ? "default" : "outline"} onClick={() => { setAnnotationShape("pin"); setAnnotationGeometry(null); drawingFreehandRef.current = false; freehandPointsRef.current = []; }}>Mũi tên</Button><Button size="sm" variant={annotationShape === "freehand" ? "default" : "outline"} onClick={() => { setAnnotationShape("freehand"); setAnnotationGeometry(null); drawingFreehandRef.current = false; freehandPointsRef.current = []; }}>Vẽ tự do</Button></div></div>
             <textarea value={annotationNote} onChange={(event) => setAnnotationNote(event.target.value)} rows={2} placeholder="Mô tả dấu hiệu quan sát được trên ảnh" className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             <div className="mt-2 flex items-center justify-between gap-2"><p className="text-xs text-muted-foreground">{annotationGeometry ? "Đã tạo nét đánh dấu màu vàng, nhập ghi chú để lưu." : "Chưa tạo nét đánh dấu."}</p><Button size="sm" onClick={() => void saveAnnotation()} disabled={!annotationGeometry || !annotationNote.trim() || savingAnnotation}>{savingAnnotation ? "Đang lưu..." : "Lưu ghi chú"}</Button></div>
             {annotations.length > 0 && <div className="mt-3 space-y-1 border-t pt-3">{annotations.map((annotation) => <button type="button" key={annotation.id} onClick={() => setSelectedAnnotationVersionId(annotation.current_version.id)} className={`block w-full rounded-md px-2 py-1.5 text-left text-xs ${selectedAnnotationVersionId === annotation.current_version.id ? "bg-primary/10 text-primary" : "hover:bg-muted"}`}><span className="font-medium">V{annotation.current_version.version_no}</span> · {annotation.current_version.note}</button>)}</div>}
           </section>}
 
-          {selected && <section className="mb-4 rounded-xl border border-border p-3">
+          {canLinkEvidence && selected && <section className="mb-4 rounded-xl border border-border p-3">
             {!isDicomType(selected) ? (
               <>
                 <p className="text-sm font-semibold">Ghi chú trên ảnh — chỉ áp dụng cho ảnh raster (JPEG/PNG/WebP)</p><p className="mt-0.5 text-xs text-muted-foreground">DICOM/CBCT phải được mở bằng PACS hoặc trình xem chuyên dụng.</p>
@@ -713,7 +726,7 @@ export function PatientImageGallery({
                ) : (
                  <p className="text-sm text-muted-foreground">Không phát hiện bất thường</p>
                )}
-               {visitId && analysisResult.findings.length > 0 && (
+               {canSaveFindings && visitId && analysisResult.findings.length > 0 && (
                 <Button
                   size="sm"
                   onClick={() => handleSaveFindings(analysisResult)}
@@ -750,13 +763,13 @@ export function PatientImageGallery({
                 </svg>
                 Phân tích bằng AI
               </Button>}
-              <Button
-                variant="destructive"
+               {canDelete && <Button
+                 variant="destructive"
                 size="sm"
                 onClick={() => handleDelete(selected)}
               >
-                Xóa
-              </Button>
+                 Xóa
+               </Button>}
             </>
           )}
         </DialogFooter>

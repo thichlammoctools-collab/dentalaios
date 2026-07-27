@@ -28,9 +28,10 @@ interface Props {
   visitId: string;
   patientId: string;
   findings: ClinicalFinding[];
+  readOnly?: boolean;
 }
 
-export function ClinicalDiagnosesCard({ visitId, patientId, findings }: Props) {
+export function ClinicalDiagnosesCard({ visitId, patientId, findings, readOnly = false }: Props) {
   const [items, setItems] = useState<ClinicalDiagnosis[]>([]);
   const [concepts, setConcepts] = useState<ClinicalConcept[]>([]);
   const [loading, setLoading] = useState(true);
@@ -164,7 +165,7 @@ export function ClinicalDiagnosesCard({ visitId, patientId, findings }: Props) {
   return <Card id="diagnoses">
     <CardHeader className="flex-row items-center justify-between gap-4">
       <CardTitle>Chẩn đoán ({items.length})</CardTitle>
-      <Button size="sm" onClick={openCreate}>Thêm chẩn đoán</Button>
+      {!readOnly && <Button size="sm" onClick={openCreate}>Thêm chẩn đoán</Button>}
     </CardHeader>
     <CardContent>
       {loading ? <p className="text-sm text-muted-foreground">Đang tải chẩn đoán...</p> : items.length === 0 ? <p className="text-sm text-muted-foreground">Chưa có chẩn đoán mã hóa. Ghi nhận, nguy cơ và quan sát vẫn được lưu riêng.</p> : <div className="space-y-2">
@@ -174,7 +175,7 @@ export function ClinicalDiagnosesCard({ visitId, patientId, findings }: Props) {
             {diagnosis.source_finding_id && <p className="mt-1 text-xs text-muted-foreground">Từ ghi nhận lâm sàng #{findings.findIndex((finding) => finding.id === diagnosis.source_finding_id) + 1 || ""}</p>}
             <p className="mt-1 text-xs text-muted-foreground">Bằng chứng hình ảnh: {evidenceCounts[diagnosis.id] ?? 0}. Thêm hoặc quản lý từ phần Hình ảnh của lượt khám.</p>
             {diagnosis.notes && <p className="mt-1 whitespace-pre-wrap text-sm">{diagnosis.notes}</p>}</div>
-          <Button variant="outline" size="sm" onClick={() => openEdit(diagnosis)}>Cập nhật</Button>
+          {!readOnly && <Button variant="outline" size="sm" onClick={() => openEdit(diagnosis)}>Cập nhật</Button>}
         </div>)}
       </div>}
     </CardContent>

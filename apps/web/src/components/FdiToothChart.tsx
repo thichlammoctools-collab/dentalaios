@@ -20,6 +20,7 @@ import type { AnatomicalSite, ClinicalConcept, ClinicalFinding, FindingCategory,
 interface FdiToothChartProps {
   visitId: string;
   findings: ClinicalFinding[];
+  readOnly?: boolean;
   onCreated: (finding: ClinicalFinding) => void;
   onCreatedBatch?: (findings: ClinicalFinding[]) => void;
   onUpdated: (finding: ClinicalFinding) => void;
@@ -54,7 +55,7 @@ function supportsVerticalAndOrientation(site: string) {
   return site === "buccal" || site === "lip";
 }
 
-export function FdiToothChart({ visitId, findings, onCreated, onUpdated, onDeleted }: FdiToothChartProps) {
+export function FdiToothChart({ visitId, findings, readOnly = false, onCreated, onUpdated, onDeleted }: FdiToothChartProps) {
   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
   const [toothTab, setToothTab] = useState<"tooth_hard_tissue" | "periodontal">("tooth_hard_tissue");
   const [toothCondition, setToothCondition] = useState("good");
@@ -97,12 +98,14 @@ export function FdiToothChart({ visitId, findings, onCreated, onUpdated, onDelet
   }
 
   function openTooth(tooth: number) {
+    if (readOnly) return;
     setSavedMessage("");
     setSelectedTooth(tooth);
     resetToothForm("tooth_hard_tissue");
   }
 
   function openOther(category: FindingCategory) {
+    if (readOnly) return;
     setSavedMessage("");
     setEditingOther(null);
     const definition = getFindingCategory(category);
@@ -116,6 +119,7 @@ export function FdiToothChart({ visitId, findings, onCreated, onUpdated, onDelet
   }
 
   function editOther(finding: ClinicalFinding) {
+    if (readOnly) return;
     setSavedMessage("");
     setEditingOther(finding);
     setOtherCategory(finding.category);
@@ -157,7 +161,7 @@ export function FdiToothChart({ visitId, findings, onCreated, onUpdated, onDelet
   }
 
   function renderTooth(tooth: number) {
-    return <button key={tooth} type="button" onClick={() => openTooth(tooth)} className={cn("flex h-9 w-9 items-center justify-center rounded border font-mono text-xs font-semibold transition-colors sm:h-10 sm:w-10", selectedTooth === tooth && "ring-2 ring-primary ring-offset-2 ring-offset-card", toothStatus(tooth))}>{tooth}</button>;
+    return <button key={tooth} type="button" onClick={() => openTooth(tooth)} disabled={readOnly} aria-label={`${readOnly ? "Xem" : "Ghi nhận"} răng ${tooth}`} className={cn("flex h-9 w-9 items-center justify-center rounded border font-mono text-xs font-semibold transition-colors sm:h-10 sm:w-10", selectedTooth === tooth && "ring-2 ring-primary ring-offset-2 ring-offset-card", readOnly && "cursor-default", toothStatus(tooth))}>{tooth}</button>;
   }
 
   function renderJaw(right: number[], left: number[]) {
@@ -268,25 +272,33 @@ export function FdiToothChart({ visitId, findings, onCreated, onUpdated, onDelet
     }
   }
 
+  const toothCategories = CLINICAL_FINDING_CATEGORIES.filter((item) => item.value === "tooth_hard_tissue" || item.value === "periodontal");
+  const otherCategories = CLINICAL_FINDING_CATEGORIES.filter((item) => NON_TOOTH_CATEGORIES.includes(item.value));
+  const primaryFindings = findings.filter((finding) => finding.tooth_number != null && finding.tooth_number >= 50);
+
   return <div className="space-y-4">
-    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-      {CLINICAL_FINDING_CATEGORIES.map((item) => {
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 p-3">
+      <div className="flex flex-wrap gap-2">{toothCategories.map((item) => <span key={item.value} className="rounded-full border border-border bg-background px-3 py-1 text-xs font-medium">{item.label}: {findings.filter((finding) => finding.category === item.value).length}</span>)}</div>
+      <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground"><span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded border border-border bg-background" />Chưa ghi nhận</span><span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded border border-amber-500 bg-amber-50" />Có ghi nhận</span><span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded border border-red-500 bg-red-50" />Thiếu răng</span></div>
+    </div>
+
+    <details className="rounded-lg border border-border">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden"><div><p className="text-sm font-semibold">Khám ngoài răng</p><p className="mt-0.5 text-xs text-muted-foreground">Niêm mạc, khớp thái dương hàm, khớp cắn và dự phòng</p></div><span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">{findings.filter((finding) => NON_TOOTH_CATEGORIES.includes(finding.category)).length}</span></summary>
+      <div className="grid gap-2 border-t border-border p-3 sm:grid-cols-2">
+      {otherCategories.map((item) => {
         const categoryFindings = findings.filter((finding) => finding.category === item.value);
         const count = categoryFindings.length;
-        const isToothCategory = item.value === "tooth_hard_tissue" || item.value === "periodontal";
-        return <div key={item.value} className="rounded-lg border border-border p-3"><div className="flex items-center justify-between gap-2"><span className="text-sm font-semibold">{item.label}</span><span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">{count}</span></div><p className="mt-1 min-h-8 text-xs text-muted-foreground">{item.description}</p>{isToothCategory ? <p className="mt-2 text-xs font-medium text-primary">Chọn răng trên sơ đồ</p> : <><div className="mt-2 space-y-1.5">{categoryFindings.map((finding) => <div key={finding.id} className="rounded-md bg-muted/50 px-2 py-1.5 text-xs"><div className="flex items-start gap-1"><div className="min-w-0 flex-1"><p className="font-medium text-foreground">{getFindingConditionLabel(finding.category, finding.condition)}</p><p className="mt-0.5 text-muted-foreground">{findingLocation(finding)}</p>{finding.notes && <p className="mt-1 text-muted-foreground">{finding.notes}</p>}</div><div className="flex shrink-0"><Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => editOther(finding)} disabled={saving}>Sửa</Button><Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-destructive hover:text-destructive" onClick={() => void removeOther(finding)} disabled={saving}>Xóa</Button></div></div></div>)}</div><Button size="sm" variant="outline" className="mt-2 h-8 text-xs" onClick={() => openOther(item.value)}>Thêm ghi nhận</Button></>}</div>;
+        return <div key={item.value} className="rounded-lg border border-border p-3"><div className="flex items-center justify-between gap-2"><span className="text-sm font-semibold">{item.label}</span><span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">{count}</span></div><div className="mt-2 space-y-1.5">{categoryFindings.map((finding) => <div key={finding.id} className="rounded-md bg-muted/50 px-2 py-1.5 text-xs"><div className="flex items-start gap-1"><div className="min-w-0 flex-1"><p className="font-medium text-foreground">{getFindingConditionLabel(finding.category, finding.condition)}</p><p className="mt-0.5 text-muted-foreground">{findingLocation(finding)}</p>{finding.notes && <p className="mt-1 text-muted-foreground">{finding.notes}</p>}</div>{!readOnly && <div className="flex shrink-0"><Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => editOther(finding)} disabled={saving}>Sửa</Button><Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-destructive hover:text-destructive" onClick={() => void removeOther(finding)} disabled={saving}>Xóa</Button></div>}</div></div>)}</div>{!readOnly && <Button size="sm" variant="outline" className="mt-2 h-8 text-xs" onClick={() => openOther(item.value)}>Thêm ghi nhận</Button>}</div>;
       })}
-    </div>
+      </div>
+    </details>
 
     <div className="rounded-lg border border-border bg-card p-4">
       <p className="mb-2 text-center text-xs font-medium text-muted-foreground">Răng vĩnh viễn</p>
       <p className="mb-1 text-center text-[11px] text-muted-foreground">Hàm trên</p><div className="overflow-x-auto pb-1">{renderJaw(ADULT_UPPER_RIGHT, ADULT_UPPER_LEFT)}</div>
       <p className="mb-1 mt-3 text-center text-[11px] text-muted-foreground">Hàm dưới</p><div className="overflow-x-auto pb-1">{renderJaw(ADULT_LOWER_RIGHT, ADULT_LOWER_LEFT)}</div>
-      <div className="my-4 border-t border-border" />
-      <p className="mb-2 text-center text-xs font-medium text-muted-foreground">Răng sữa</p>
-      <p className="mb-1 text-center text-[11px] text-muted-foreground">Hàm trên</p><div className="overflow-x-auto pb-1">{renderJaw(PRIMARY_UPPER_RIGHT, PRIMARY_UPPER_LEFT)}</div>
-      <p className="mb-1 mt-3 text-center text-[11px] text-muted-foreground">Hàm dưới</p><div className="overflow-x-auto pb-1">{renderJaw(PRIMARY_LOWER_RIGHT, PRIMARY_LOWER_LEFT)}</div>
-      <p className="mt-3 text-center text-xs text-muted-foreground">Nhấn một răng để ghi nhận mô cứng hoặc nha chu theo FDI/ISO 3950.</p>
+      <details className="mt-4 border-t border-border pt-3" open={primaryFindings.length > 0}><summary className="cursor-pointer text-center text-xs font-medium text-muted-foreground">Răng sữa{primaryFindings.length ? ` · ${primaryFindings.length} ghi nhận` : ""}</summary><div className="mt-3"><p className="mb-1 text-center text-[11px] text-muted-foreground">Hàm trên</p><div className="overflow-x-auto pb-1">{renderJaw(PRIMARY_UPPER_RIGHT, PRIMARY_UPPER_LEFT)}</div><p className="mb-1 mt-3 text-center text-[11px] text-muted-foreground">Hàm dưới</p><div className="overflow-x-auto pb-1">{renderJaw(PRIMARY_LOWER_RIGHT, PRIMARY_LOWER_LEFT)}</div></div></details>
+      <p className="mt-3 text-center text-xs text-muted-foreground">{readOnly ? "Hồ sơ đang ở chế độ chỉ đọc." : "Nhấn một răng để ghi nhận mô cứng hoặc nha chu theo FDI/ISO 3950."}</p>
     </div>
 
     <Dialog open={selectedTooth !== null} onOpenChange={(open) => !open && setSelectedTooth(null)}>

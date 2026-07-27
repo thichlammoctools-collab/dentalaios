@@ -17,9 +17,10 @@ interface SafetyAcknowledgementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (outcome: VisitSafetyAcknowledgementOutcome, reason?: string) => void;
+  warningLabel?: string;
 }
 
-export function SafetyAcknowledgementDialog({ open, onOpenChange, onSubmit }: SafetyAcknowledgementDialogProps) {
+export function SafetyAcknowledgementDialog({ open, onOpenChange, onSubmit, warningLabel }: SafetyAcknowledgementDialogProps) {
   const [outcome, setOutcome] = useState<VisitSafetyAcknowledgementOutcome>("acknowledged");
   const [reason, setReason] = useState("");
 
@@ -41,6 +42,7 @@ export function SafetyAcknowledgementDialog({ open, onOpenChange, onSubmit }: Sa
     <Dialog open={open} onOpenChange={onOpenChange} size="sm">
       <DialogHeader>
         <DialogTitle>Đánh giá cảnh báo an toàn</DialogTitle>
+        {warningLabel && <p className="mt-1 text-sm text-muted-foreground">{warningLabel}</p>}
       </DialogHeader>
 
       <DialogBody className="space-y-4">
