@@ -367,6 +367,8 @@ export const findingCreateSchema = z.object({
   measurements: findingMeasurementsSchema,
   condition: nonEmpty(100),
   notes: optionalText(2000),
+  /** Bác sĩ xác nhận đồng ý ghi mặc dù mâu thuẫn với bản ghi hiện có trên cùng răng. */
+  acknowledge_conflict: z.boolean().optional(),
 }).superRefine((data, ctx) => {
   if (data.scope === "tooth" && (data.tooth_number == null || !isValidFdiTooth(data.tooth_number))) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Số răng FDI không hợp lệ" });
