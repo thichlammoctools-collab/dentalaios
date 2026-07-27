@@ -402,10 +402,6 @@ export function VisitDetailPage() {
   const [suggestNextDialogOpen, setSuggestNextDialogOpen] = useState(false);
   const [creatingAppointment, setCreatingAppointment] = useState(false);
   const [workspaceTab, setWorkspaceTab] = useState<ClinicalWorkspaceTab>("exam");
-  // When the ToothFindingsBoard empty-state asks to add a finding, we route the
-  // request back to the FdiToothChart to keep a single source of truth for the
-  // add-finding flow. The chart consumes the value and clears it via onOpenToothRequestConsumed.
-  const [pendingToothOpen, setPendingToothOpen] = useState<number | null>(null);
 
   const permissions = session?.role.permissions ?? [];
   const hasAllPermissions = permissions.includes(PERMISSIONS.ALL);
@@ -954,8 +950,6 @@ export function VisitDetailPage() {
                   onCreatedBatch={onFindingsBatchCreated}
                   onUpdated={(updated) => setFindings((current) => current.map((finding) => finding.id === updated.id ? updated : finding))}
                   onDeleted={(findingId) => setFindings((current) => current.filter((finding) => finding.id !== findingId))}
-                  openToothRequest={pendingToothOpen}
-                  onOpenToothRequestConsumed={() => setPendingToothOpen(null)}
                 />
               </CardContent>
             </Card>
@@ -967,7 +961,7 @@ export function VisitDetailPage() {
             <Card id="findings">
               <CardHeader className="pb-3">
                 <CardTitle>Ghi nhận theo răng ({toothFindings.length})</CardTitle>
-                <p className="mt-1 text-xs text-muted-foreground">Chọn một răng ở sơ đồ FDI bên trái để xem hoặc chỉnh sửa ghi nhận tương ứng.</p>
+                <p className="mt-1 text-xs text-muted-foreground">Rà soát nhanh theo hàm, sau đó chọn một hàng để xem hoặc chỉnh sửa ghi nhận tương ứng.</p>
               </CardHeader>
               <CardContent>
                 <ToothFindingsBoard
@@ -976,10 +970,6 @@ export function VisitDetailPage() {
                   readOnly={!canEditClinical}
                   onUpdate={(updated) => setFindings((current) => current.map((finding) => finding.id === updated.id ? updated : finding))}
                   onDeleted={(findingId) => setFindings((current) => current.filter((finding) => finding.id !== findingId))}
-                  onRequestOpenTooth={(tooth) => {
-                    document.getElementById("fdi-chart")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    setPendingToothOpen(tooth);
-                  }}
                 />
               </CardContent>
             </Card>

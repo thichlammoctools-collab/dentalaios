@@ -3,23 +3,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { FindingsList } from "@/components/FindingsList";
-import { getFindingCategory } from "@shared/constants/clinical-findings";
+import { getFindingCategory, getFindingConditionLabel } from "@shared/constants/clinical-findings";
 import type { ClinicalFinding, FindingCategory } from "@shared/types";
 
-/**
- * FDI tooth number layout. Kept in-file to avoid coupling ToothFindingsBoard to
- * FdiToothChart internals; the two components render independent visuals.
- */
-const ADULT_UPPER_RIGHT = [18, 17, 16, 15, 14, 13, 12, 11];
-const ADULT_UPPER_LEFT = [21, 22, 23, 24, 25, 26, 27, 28];
-const ADULT_LOWER_RIGHT = [48, 47, 46, 45, 44, 43, 42, 41];
-const ADULT_LOWER_LEFT = [31, 32, 33, 34, 35, 36, 37, 38];
-const PRIMARY_UPPER_RIGHT = [55, 54, 53, 52, 51];
-const PRIMARY_UPPER_LEFT = [61, 62, 63, 64, 65];
-const PRIMARY_LOWER_RIGHT = [85, 84, 83, 82, 81];
-const PRIMARY_LOWER_LEFT = [71, 72, 73, 74, 75];
-
 type CategoryFilter = "all" | "tooth_hard_tissue" | "periodontal";
+type ToothGroup = "upper" | "lower" | "primary";
 
 interface ToothFindingsBoardProps {
   visitId: string;
@@ -27,167 +15,170 @@ interface ToothFindingsBoardProps {
   readOnly?: boolean;
   onUpdate: (finding: ClinicalFinding) => void;
   onDeleted: (id: string) => void;
-  onRequestOpenTooth: (tooth: number) => void;
 }
 
-export function ToothFindingsBoard({ visitId, findings, readOnly = false, onUpdate, onDeleted, onRequestOpenTooth }: ToothFindingsBoardProps) {
+interface ToothSummary {
+  tooth: number;
+  findings: ClinicalFinding[];
+  latest: ClinicalFinding;
+  categories: FindingCategory[];
+}
+
+const TOOTH_GROUPS: Array<{ id: ToothGroup; label: string }> = [
+  { id: "upper", label: "Hàm trên" },
+  { id: "lower", label: "Hàm dưới" },
+  { id: "primary", label: "Răng sữa" },
+];
+
+export function ToothFindingsBoard({ visitId, findings, readOnly = false, onUpdate, onDeleted }: ToothFindingsBoardProps) {
   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
   const [filter, setFilter] = useState<CategoryFilter>("all");
 
-  // Findings scoped to a specific tooth (tooth_hard_tissue + periodontal recorded per tooth).
   const toothFindings = useMemo(
     () => findings.filter((finding) => finding.scope === "tooth" && typeof finding.tooth_number === "number"),
     [findings],
   );
 
   const filteredFindings = useMemo(
-    () => (filter === "all" ? toothFindings : toothFindings.filter((finding) => finding.category === filter)),
+    () => filter === "all" ? toothFindings : toothFindings.filter((finding) => finding.category === filter),
     [toothFindings, filter],
   );
 
-  const findingsByTooth = useMemo(() => {
-    const map = new Map<number, ClinicalFinding[]>();
+  const summaries = useMemo(() => {
+    const byTooth = new Map<number, ClinicalFinding[]>();
     for (const finding of filteredFindings) {
       const tooth = finding.tooth_number as number;
-      const bucket = map.get(tooth) ?? [];
-      bucket.push(finding);
-      map.set(tooth, bucket);
+      byTooth.set(tooth, [...(byTooth.get(tooth) ?? []), finding]);
     }
-    return map;
+
+    return [...byTooth.entries()]
+      .map(([tooth, items]) => {
+        const sorted = [...items].sort((a, b) => findingTimestamp(b) - findingTimestamp(a));
+        return {
+          tooth,
+          findings: sorted,
+          latest: sorted[0],
+          categories: [...new Set(sorted.map((finding) => finding.category))],
+        };
+      })
+      .sort((a, b) => a.tooth - b.tooth);
   }, [filteredFindings]);
 
-  const recordedTeeth = useMemo(
-    () => [...findingsByTooth.keys()].sort((a, b) => a - b),
-    [findingsByTooth],
-  );
+  const summariesByGroup = useMemo(() => {
+    const groups = new Map<ToothGroup, ToothSummary[]>();
+    for (const group of TOOTH_GROUPS) groups.set(group.id, []);
+    for (const summary of summaries) groups.get(toothGroup(summary.tooth))?.push(summary);
+    return groups;
+  }, [summaries]);
 
-  const primaryHasData = useMemo(
-    () => recordedTeeth.some((tooth) => tooth >= 51),
-    [recordedTeeth],
-  );
-
-  const activeFindings = selectedTooth != null ? findingsByTooth.get(selectedTooth) ?? [] : [];
-  const dominantCategory = selectedTooth != null ? dominantCategoryFor(findingsByTooth.get(selectedTooth) ?? []) : null;
+  const selectedSummary = summaries.find((summary) => summary.tooth === selectedTooth) ?? null;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
-      <div className="space-y-3">
-        <FilterToolbar filter={filter} onChange={setFilter} totalTeeth={recordedTeeth.length} totalFindings={filteredFindings.length} />
-        <div className="rounded-lg border border-border bg-card p-3">
-          <p className="text-center text-xs font-medium text-muted-foreground">Sơ đồ FDI</p>
-          <ToothRail heading="Hàm trên" leftGroup={ADULT_UPPER_RIGHT} rightGroup={ADULT_UPPER_LEFT} findingsByTooth={findingsByTooth} selectedTooth={selectedTooth} onSelect={setSelectedTooth} />
-          <ToothRail heading="Hàm dưới" leftGroup={ADULT_LOWER_RIGHT} rightGroup={ADULT_LOWER_LEFT} findingsByTooth={findingsByTooth} selectedTooth={selectedTooth} onSelect={setSelectedTooth} />
-          <details className="mt-3 border-t border-border pt-3" open={primaryHasData}>
-            <summary className="cursor-pointer text-center text-[11px] font-medium text-muted-foreground">Răng sữa{primaryHasData ? " (có ghi nhận)" : ""}</summary>
-            <ToothRail heading="Hàm trên" leftGroup={PRIMARY_UPPER_RIGHT} rightGroup={PRIMARY_UPPER_LEFT} findingsByTooth={findingsByTooth} selectedTooth={selectedTooth} onSelect={setSelectedTooth} />
-            <ToothRail heading="Hàm dưới" leftGroup={PRIMARY_LOWER_RIGHT} rightGroup={PRIMARY_LOWER_LEFT} findingsByTooth={findingsByTooth} selectedTooth={selectedTooth} onSelect={setSelectedTooth} />
-          </details>
-        </div>
-        <QuickJumpRow teeth={recordedTeeth} findingsByTooth={findingsByTooth} selectedTooth={selectedTooth} onSelect={setSelectedTooth} />
-      </div>
+    <div className="space-y-4">
+      <FilterToolbar filter={filter} onChange={setFilter} totalTeeth={summaries.length} totalFindings={filteredFindings.length} />
 
-      <div className="rounded-lg border border-border bg-card">
-        {selectedTooth == null ? (
-          <EmptyPaneHint totalTeeth={recordedTeeth.length} />
-        ) : (
-          <div className="flex h-full flex-col gap-3 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Badge variant="outline">Răng #{selectedTooth}</Badge>
-                {activeFindings.length > 0 && <Badge variant="secondary">{activeFindings.length} ghi nhận</Badge>}
-                {dominantCategory && <Badge variant="secondary">{getFindingCategory(dominantCategory).label}</Badge>}
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedTooth(null)}>Bỏ chọn</Button>
-            </div>
-            {activeFindings.length > 0 ? (
-              <FindingsList
-                visitId={visitId}
-                findings={activeFindings}
-                readOnly={readOnly}
-                onUpdate={onUpdate}
-                onDeleted={onDeleted}
-                flat
+      {summaries.length === 0 ? (
+        <EmptyState hasFindings={toothFindings.length > 0} />
+      ) : (
+        <div className="overflow-hidden rounded-lg border border-border">
+          {TOOTH_GROUPS.map((group) => {
+            const items = summariesByGroup.get(group.id) ?? [];
+            if (!items.length) return null;
+            return (
+              <ToothSummaryGroup
+                key={group.id}
+                label={group.label}
+                items={items}
+                selectedTooth={selectedTooth}
+                onSelect={setSelectedTooth}
               />
-            ) : (
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-md border border-dashed border-border p-6 text-center">
-                <p className="text-sm font-medium">Chưa có ghi nhận cho răng #{selectedTooth}.</p>
-                <p className="text-xs text-muted-foreground">Ghi nhận mới sẽ được tạo qua sơ đồ FDI ở trên để đảm bảo dữ liệu nhất quán.</p>
-                {!readOnly && (
-                  <Button size="sm" onClick={() => onRequestOpenTooth(selectedTooth)}>
-                    Thêm ghi nhận cho răng #{selectedTooth}
-                  </Button>
-                )}
-              </div>
-            )}
+            );
+          })}
+        </div>
+      )}
+
+      {selectedSummary && (
+        <section aria-label={`Chi tiết ghi nhận răng ${selectedSummary.tooth}`} className="rounded-lg border border-border bg-card p-4">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">Răng #{selectedSummary.tooth}</Badge>
+              <Badge variant="secondary">{selectedSummary.findings.length} ghi nhận</Badge>
+              {selectedSummary.categories.map((category) => <Badge key={category} variant="secondary">{getFindingCategory(category).label}</Badge>)}
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setSelectedTooth(null)}>Đóng chi tiết</Button>
           </div>
-        )}
-      </div>
+          <FindingsList
+            visitId={visitId}
+            findings={selectedSummary.findings}
+            readOnly={readOnly}
+            onUpdate={onUpdate}
+            onDeleted={onDeleted}
+            flat
+          />
+        </section>
+      )}
     </div>
   );
 }
 
-interface ToothRailProps {
-  heading: string;
-  leftGroup: number[];
-  rightGroup: number[];
-  findingsByTooth: Map<number, ClinicalFinding[]>;
+interface ToothSummaryGroupProps {
+  label: string;
+  items: ToothSummary[];
   selectedTooth: number | null;
   onSelect: (tooth: number) => void;
 }
 
-function ToothRail({ heading, leftGroup, rightGroup, findingsByTooth, selectedTooth, onSelect }: ToothRailProps) {
+function ToothSummaryGroup({ label, items, selectedTooth, onSelect }: ToothSummaryGroupProps) {
   return (
-    <div className="mt-2">
-      <p className="mb-1 text-center text-[11px] text-muted-foreground">{heading}</p>
-      <div className="flex min-w-max justify-center gap-0.5">
-        {leftGroup.map((tooth) => (
-          <ToothButton key={tooth} tooth={tooth} findings={findingsByTooth.get(tooth) ?? []} selected={selectedTooth === tooth} onSelect={onSelect} />
-        ))}
-        <div aria-hidden="true" className="mx-1 w-px self-stretch bg-border" />
-        {rightGroup.map((tooth) => (
-          <ToothButton key={tooth} tooth={tooth} findings={findingsByTooth.get(tooth) ?? []} selected={selectedTooth === tooth} onSelect={onSelect} />
-        ))}
+    <section className="border-b border-border last:border-b-0">
+      <div className="flex items-center justify-between bg-muted/30 px-3 py-2">
+        <h3 className="text-sm font-semibold">{label}</h3>
+        <span className="text-xs text-muted-foreground">{items.length} răng</span>
       </div>
-    </div>
-  );
-}
-
-interface ToothButtonProps {
-  tooth: number;
-  findings: ClinicalFinding[];
-  selected: boolean;
-  onSelect: (tooth: number) => void;
-}
-
-function ToothButton({ tooth, findings, selected, onSelect }: ToothButtonProps) {
-  const count = findings.length;
-  const isMissing = findings.some((finding) => finding.condition === "missing");
-  const label = count > 0
-    ? `Răng ${tooth}, ${count} ghi nhận${isMissing ? " (đã mất)" : ""}`
-    : `Răng ${tooth}, chưa có ghi nhận`;
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(tooth)}
-      aria-label={label}
-      aria-pressed={selected}
-      className={cn(
-        "relative flex h-9 w-9 items-center justify-center rounded border font-mono text-xs font-semibold transition-colors sm:h-10 sm:w-10",
-        selected && "ring-2 ring-primary ring-offset-2 ring-offset-card",
-        isMissing
-          ? "border-red-500 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/60 dark:text-red-300"
-          : count > 0
-            ? "border-primary/60 bg-primary/10 text-foreground"
-            : "border-dashed border-border bg-background text-muted-foreground hover:border-primary hover:text-foreground",
-      )}
-    >
-      {tooth}
-      {count > 1 && (
-        <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
-          {count}
-        </span>
-      )}
-    </button>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[38rem] text-left text-sm">
+          <thead className="border-b border-border text-xs text-muted-foreground">
+            <tr>
+              <th scope="col" className="w-24 px-3 py-2 font-medium">Răng</th>
+              <th scope="col" className="px-3 py-2 font-medium">Loại ghi nhận</th>
+              <th scope="col" className="px-3 py-2 font-medium">Ghi nhận mới nhất</th>
+              <th scope="col" className="w-24 px-3 py-2 text-right font-medium">Số lượng</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((summary) => {
+              const isSelected = selectedTooth === summary.tooth;
+              return (
+                <tr
+                  key={summary.tooth}
+                  tabIndex={0}
+                  aria-selected={isSelected}
+                  onClick={() => onSelect(summary.tooth)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onSelect(summary.tooth);
+                    }
+                  }}
+                  className={cn(
+                    "cursor-pointer border-b border-border/70 outline-none transition-colors last:border-b-0 hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
+                    isSelected && "bg-primary/10 hover:bg-primary/10",
+                  )}
+                >
+                  <td className="px-3 py-3"><span className="font-mono font-semibold">#{summary.tooth}</span></td>
+                  <td className="px-3 py-3"><div className="flex flex-wrap gap-1">{summary.categories.map((category) => <Badge key={category} variant="secondary">{getFindingCategory(category).label}</Badge>)}</div></td>
+                  <td className="px-3 py-3">
+                    <p className="font-medium">{getFindingConditionLabel(summary.latest.category, summary.latest.condition)}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{formatFindingDate(summary.latest)}</p>
+                  </td>
+                  <td className="px-3 py-3 text-right"><Badge variant={isSelected ? "default" : "outline"}>{summary.findings.length}</Badge></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -199,7 +190,7 @@ interface FilterToolbarProps {
 }
 
 function FilterToolbar({ filter, onChange, totalTeeth, totalFindings }: FilterToolbarProps) {
-  const options: { value: CategoryFilter; label: string }[] = [
+  const options: Array<{ value: CategoryFilter; label: string }> = [
     { value: "all", label: "Tất cả" },
     { value: "tooth_hard_tissue", label: "Răng & mô cứng" },
     { value: "periodontal", label: "Nha chu" },
@@ -215,9 +206,7 @@ function FilterToolbar({ filter, onChange, totalTeeth, totalFindings }: FilterTo
             aria-pressed={filter === option.value}
             className={cn(
               "rounded-md px-2 py-1 text-[11px] font-medium transition-colors",
-              filter === option.value
-                ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                : "text-muted-foreground hover:bg-background/60",
+              filter === option.value ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/60",
             )}
           >
             {option.label}
@@ -229,70 +218,27 @@ function FilterToolbar({ filter, onChange, totalTeeth, totalFindings }: FilterTo
   );
 }
 
-interface QuickJumpRowProps {
-  teeth: number[];
-  findingsByTooth: Map<number, ClinicalFinding[]>;
-  selectedTooth: number | null;
-  onSelect: (tooth: number) => void;
-}
-
-function QuickJumpRow({ teeth, findingsByTooth, selectedTooth, onSelect }: QuickJumpRowProps) {
-  if (teeth.length === 0) return null;
+function EmptyState({ hasFindings }: { hasFindings: boolean }) {
   return (
-    <div className="rounded-lg border border-border bg-muted/20 p-2">
-      <p className="mb-1 text-[11px] font-medium text-muted-foreground">Nhảy nhanh tới răng đã ghi nhận</p>
-      <div className="flex flex-wrap gap-1">
-        {teeth.map((tooth) => {
-          const count = findingsByTooth.get(tooth)?.length ?? 0;
-          return (
-            <button
-              key={tooth}
-              type="button"
-              onClick={() => onSelect(tooth)}
-              aria-pressed={selectedTooth === tooth}
-              className={cn(
-                "rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors",
-                selectedTooth === tooth
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background text-foreground hover:border-primary",
-              )}
-            >
-              #{tooth}
-              {count > 1 && <span className="ml-1 text-[10px] text-muted-foreground">×{count}</span>}
-            </button>
-          );
-        })}
-      </div>
+    <div className="rounded-lg border border-dashed border-border px-6 py-10 text-center">
+      <p className="text-sm font-medium">{hasFindings ? "Không có ghi nhận phù hợp với bộ lọc." : "Chưa có ghi nhận theo răng."}</p>
+      <p className="mt-1 text-xs text-muted-foreground">Sử dụng sơ đồ FDI phía trên để tạo ghi nhận mới, sau đó xem tóm tắt và chi tiết tại đây.</p>
     </div>
   );
 }
 
-function EmptyPaneHint({ totalTeeth }: { totalTeeth: number }) {
-  return (
-    <div className="flex h-full min-h-40 flex-col items-center justify-center gap-2 p-6 text-center">
-      <p className="text-sm font-medium">Chọn một răng để xem chi tiết.</p>
-      <p className="text-xs text-muted-foreground">
-        {totalTeeth > 0
-          ? `Đang có ghi nhận trên ${totalTeeth} răng. Bấm răng bất kỳ trên sơ đồ hoặc trong danh sách "Nhảy nhanh".`
-          : "Chưa có răng nào được ghi nhận. Sử dụng sơ đồ FDI phía trên để thêm ghi nhận mới."}
-      </p>
-    </div>
-  );
+function toothGroup(tooth: number): ToothGroup {
+  if (tooth >= 51) return "primary";
+  return tooth >= 31 ? "lower" : "upper";
 }
 
-function dominantCategoryFor(findings: ClinicalFinding[]): FindingCategory | null {
-  if (findings.length === 0) return null;
-  const counts = new Map<FindingCategory, number>();
-  for (const finding of findings) {
-    counts.set(finding.category, (counts.get(finding.category) ?? 0) + 1);
-  }
-  let best: FindingCategory | null = null;
-  let bestCount = 0;
-  for (const [category, count] of counts) {
-    if (count > bestCount) {
-      best = category;
-      bestCount = count;
-    }
-  }
-  return best;
+function findingTimestamp(finding: ClinicalFinding): number {
+  return new Date(finding.clinical_effective_at ?? finding.created_at).getTime();
+}
+
+function formatFindingDate(finding: ClinicalFinding): string {
+  const value = finding.clinical_effective_at ?? finding.created_at;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Chưa rõ thời điểm";
+  return new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
 }

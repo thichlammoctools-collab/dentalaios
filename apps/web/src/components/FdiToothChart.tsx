@@ -26,8 +26,6 @@ interface FdiToothChartProps {
   onCreatedBatch?: (findings: ClinicalFinding[]) => void;
   onUpdated: (finding: ClinicalFinding) => void;
   onDeleted: (findingId: string) => void;
-  openToothRequest?: number | null;
-  onOpenToothRequestConsumed?: () => void;
 }
 
 const ADULT_UPPER_RIGHT = [18, 17, 16, 15, 14, 13, 12, 11];
@@ -58,7 +56,7 @@ function supportsVerticalAndOrientation(site: string) {
   return site === "buccal" || site === "lip";
 }
 
-export function FdiToothChart({ visitId, findings, readOnly = false, onCreated, onUpdated, onDeleted, openToothRequest = null, onOpenToothRequestConsumed }: FdiToothChartProps) {
+export function FdiToothChart({ visitId, findings, readOnly = false, onCreated, onUpdated, onDeleted }: FdiToothChartProps) {
   const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
   const [toothTab, setToothTab] = useState<"tooth_hard_tissue" | "periodontal">("tooth_hard_tissue");
   const [toothCondition, setToothCondition] = useState("good");
@@ -84,17 +82,6 @@ export function FdiToothChart({ visitId, findings, readOnly = false, onCreated, 
       .then((response) => setConcepts(response.items))
       .catch(() => undefined);
   }, []);
-
-  // Allow parents (e.g. ToothFindingsBoard) to programmatically open the tooth dialog
-  // so we keep a single source of truth for the add-finding flow.
-  useEffect(() => {
-    if (openToothRequest == null || readOnly) return;
-    setSavedMessage("");
-    setSelectedTooth(openToothRequest);
-    resetToothForm("tooth_hard_tissue");
-    onOpenToothRequestConsumed?.();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openToothRequest, readOnly]);
 
   const toothDefinition = getFindingCategory(toothTab);
   const otherDefinition = otherCategory ? getFindingCategory(otherCategory) : null;
