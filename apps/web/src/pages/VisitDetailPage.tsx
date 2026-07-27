@@ -107,12 +107,12 @@ function getClinicalWarnings({ systolic, diastolic, bloodSugar, bmi }: { systoli
   const warnings: ClinicalWarning[] = [];
 
   if (systolic != null || diastolic != null) {
-    if ((systolic ?? 0) >= 180 || (diastolic ?? 0) >= 120) {
-      warnings.push({ warningType: "blood_pressure", severity: "high", title: "Huyết áp rất cao", detail: "Đo lại sau khi bệnh nhân nghỉ. Hoãn thủ thuật không cấp cứu và đánh giá/chuyển khám khẩn theo tình trạng lâm sàng." });
-    } else if ((systolic ?? 0) >= 160 || (diastolic ?? 0) >= 100) {
-      warnings.push({ warningType: "blood_pressure", severity: "high", title: "Huyết áp cao", detail: "Đo lại đúng kỹ thuật sau khi nghỉ; cân nhắc hoãn điều trị chọn lọc và trao đổi bác sĩ điều trị nếu chỉ số vẫn cao." });
+    if ((systolic ?? 0) > 180 || (diastolic ?? 0) > 120) {
+      warnings.push({ warningType: "blood_pressure", severity: "high", title: "Tăng huyết áp khủng hoảng", detail: "Đo lại sau khi bệnh nhân nghỉ. Hoãn thủ thuật không cấp cứu và đánh giá/chuyển khám khẩn theo tình trạng lâm sàng." });
     } else if ((systolic ?? 0) >= 140 || (diastolic ?? 0) >= 90) {
-      warnings.push({ warningType: "blood_pressure", severity: "medium", title: "Huyết áp tăng", detail: "Nên đo lại trước thủ thuật, ghi nhận chỉ số và hạn chế các yếu tố làm tăng huyết áp khi phù hợp." });
+      warnings.push({ warningType: "blood_pressure", severity: "high", title: "Tăng huyết áp giai đoạn 2", detail: "Đo lại đúng kỹ thuật sau khi nghỉ; cân nhắc hoãn điều trị chọn lọc và trao đổi bác sĩ điều trị nếu chỉ số vẫn cao." });
+    } else if ((systolic ?? 0) >= 130 || (diastolic ?? 0) >= 80) {
+      warnings.push({ warningType: "blood_pressure", severity: "medium", title: "Tăng huyết áp giai đoạn 1", detail: "Nên đo lại trước thủ thuật, ghi nhận chỉ số và hạn chế các yếu tố làm tăng huyết áp khi phù hợp." });
     } else if ((systolic ?? Number.POSITIVE_INFINITY) < 90 || (diastolic ?? Number.POSITIVE_INFINITY) < 60) {
       warnings.push({ warningType: "blood_pressure", severity: "medium", title: "Huyết áp thấp", detail: "Đánh giá triệu chứng như choáng, mệt hoặc ngất; để bệnh nhân nghỉ và đo lại trước khi điều trị." });
     }

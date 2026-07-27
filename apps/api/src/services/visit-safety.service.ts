@@ -45,7 +45,13 @@ async function hasWarning(
   if (warning === "blood_pressure") {
     const systolic = visit.blood_pressure_systolic ?? 0;
     const diastolic = visit.blood_pressure_diastolic ?? 0;
-    return systolic >= 140 || diastolic >= 90 || (systolic > 0 && systolic < 90) || (diastolic > 0 && diastolic < 60);
+    return (
+      systolic > 180 || diastolic > 120 ||
+      systolic >= 140 || diastolic >= 90 ||
+      systolic >= 130 || diastolic >= 80 ||
+      (systolic > 0 && systolic < 90) ||
+      (diastolic > 0 && diastolic < 60)
+    );
   }
   if (warning === "blood_sugar") {
     const glucose = visit.blood_sugar_mgdl;
