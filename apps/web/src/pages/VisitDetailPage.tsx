@@ -15,6 +15,7 @@ import { FdiToothChart } from "@/components/FdiToothChart";
 import { FindingsList } from "@/components/FindingsList";
 import { ClinicalDiagnosesCard } from "@/components/ClinicalDiagnosesCard";
 import { PatientImageGallery } from "@/components/PatientImageGallery";
+import { EndodonticPainPathwayCard } from "@/components/EndodonticPainPathwayCard";
 import { Dialog, DialogBody, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
@@ -414,6 +415,8 @@ export function VisitDetailPage() {
   const canWritePlans = hasAllPermissions || permissions.includes(PERMISSIONS.WRITE_PLANS);
   const canWritePatients = hasAllPermissions || permissions.includes(PERMISSIONS.WRITE_PATIENTS);
   const canWriteAppointments = hasAllPermissions || permissions.includes(PERMISSIONS.WRITE_APPOINTMENTS);
+  const canWritePathways = hasAllPermissions || permissions.includes(PERMISSIONS.WRITE_PATHWAYS);
+  const canReviewPathways = hasAllPermissions || permissions.includes(PERMISSIONS.REVIEW_PATHWAYS);
 
   async function load() {
     if (!id) return;
@@ -928,7 +931,7 @@ export function VisitDetailPage() {
         <section aria-label="Không gian làm việc lâm sàng" className="space-y-4">
           <div className="grid grid-cols-2 gap-2 rounded-xl border border-border bg-muted/20 p-2 md:grid-cols-4">{workspaceTabs.map((tab) => <button type="button" key={tab.id} onClick={() => setWorkspaceTab(tab.id)} className={`rounded-lg px-3 py-2 text-left transition-colors ${workspaceTab === tab.id ? "bg-background shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/60"}`}><span className="flex items-center justify-between gap-2 text-sm font-semibold"><span>{tab.label}</span>{tab.count !== undefined && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">{tab.count}</span>}</span><span className="mt-0.5 block text-xs">{tab.description}</span></button>)}</div>
 
-          {workspaceTab === "exam" && <div className="space-y-4"><Card><CardHeader className="flex-row items-center justify-between gap-4 pb-3"><div><CardTitle>Khám răng hàm mặt</CardTitle><p className="mt-1 text-xs text-muted-foreground">Định vị trên sơ đồ, sau đó xem chi tiết ở danh sách bên dưới.</p></div>{canEditClinical && <Button size="sm" onClick={() => setVoiceDialogOpen(true)}>Ghi âm findings</Button>}</CardHeader><CardContent><FdiToothChart visitId={visit.id} findings={effectiveFindings} readOnly={!canEditClinical} onCreated={(finding) => setFindings((current) => [...current, finding])} onCreatedBatch={onFindingsBatchCreated} onUpdated={(updated) => setFindings((current) => current.map((finding) => finding.id === updated.id ? updated : finding))} onDeleted={(findingId) => setFindings((current) => current.filter((finding) => finding.id !== findingId))} /></CardContent></Card><Card id="findings"><CardHeader className="pb-3"><CardTitle>Ghi nhận theo răng ({toothFindings.length})</CardTitle></CardHeader><CardContent><FindingsList visitId={visit.id} findings={toothFindings} readOnly={!canEditClinical} onUpdate={(updated) => setFindings((current) => current.map((finding) => finding.id === updated.id ? updated : finding))} onDeleted={(findingId) => setFindings((current) => current.filter((finding) => finding.id !== findingId))} /></CardContent></Card></div>}
+          {workspaceTab === "exam" && <div className="space-y-4"><Card><CardHeader className="flex-row items-center justify-between gap-4 pb-3"><div><CardTitle>Khám răng hàm mặt</CardTitle><p className="mt-1 text-xs text-muted-foreground">Định vị trên sơ đồ, sau đó xem chi tiết ở danh sách bên dưới.</p></div>{canEditClinical && <Button size="sm" onClick={() => setVoiceDialogOpen(true)}>Ghi âm findings</Button>}</CardHeader><CardContent><FdiToothChart visitId={visit.id} findings={effectiveFindings} readOnly={!canEditClinical} onCreated={(finding) => setFindings((current) => [...current, finding])} onCreatedBatch={onFindingsBatchCreated} onUpdated={(updated) => setFindings((current) => current.map((finding) => finding.id === updated.id ? updated : finding))} onDeleted={(findingId) => setFindings((current) => current.filter((finding) => finding.id !== findingId))} /></CardContent></Card><EndodonticPainPathwayCard visitId={visit.id} canWrite={canWritePathways && !isClinicalReadOnly} canReview={canReviewPathways && !isClinicalReadOnly} /><Card id="findings"><CardHeader className="pb-3"><CardTitle>Ghi nhận theo răng ({toothFindings.length})</CardTitle></CardHeader><CardContent><FindingsList visitId={visit.id} findings={toothFindings} readOnly={!canEditClinical} onUpdate={(updated) => setFindings((current) => current.map((finding) => finding.id === updated.id ? updated : finding))} onDeleted={(findingId) => setFindings((current) => current.filter((finding) => finding.id !== findingId))} /></CardContent></Card></div>}
           {workspaceTab === "diagnosis" && <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]"><ClinicalDiagnosesCard visitId={visit.id} patientId={visit.patient_id} findings={findings} readOnly={!canEditClinical} /><Card><CardHeader className="pb-3"><CardTitle>Trợ lý chẩn đoán</CardTitle></CardHeader><CardContent className="space-y-3"><p className="text-sm text-muted-foreground">Tóm tắt AI hỗ trợ rà soát ghi nhận hiện có; bác sĩ vẫn là người xác nhận kết luận.</p><Button className="w-full" variant="outline" onClick={onSummarize} disabled={summarizing}>{summarizing ? "Đang tóm tắt..." : "Tạo tóm tắt AI"}</Button><Button className="w-full" variant="outline" onClick={() => setWorkspaceTab("images")}>Mở hình ảnh và bằng chứng</Button></CardContent></Card></div>}
           {workspaceTab === "images" && <Card><CardHeader className="pb-3"><CardTitle>Hình ảnh lâm sàng</CardTitle><p className="mt-1 text-xs text-muted-foreground">Xem ảnh, ghi chú và liên kết bằng chứng mà không làm chật khu vực khám.</p></CardHeader><CardContent><PatientImageGallery patientId={visit.patient_id} visitId={visit.id} canUpload={canWritePatients && !isClinicalReadOnly} canDelete={canWritePatients && !isClinicalReadOnly} canAnnotate={canEditClinical} canLinkEvidence={canEditClinical} canSaveFindings={canEditClinical} onFindingsSaved={onFindingsBatchCreated} /></CardContent></Card>}
           {workspaceTab === "plan" && <div className="grid gap-4 lg:grid-cols-2"><Card><CardHeader className="pb-3"><CardTitle>Kế hoạch điều trị</CardTitle><p className="mt-1 text-xs text-muted-foreground">Tạo kế hoạch sau khi đã rà soát ghi nhận và chẩn đoán.</p></CardHeader><CardContent className="space-y-3">{canWritePlans ? <><Button className="w-full" onClick={onCreatePlan}>Tạo kế hoạch thủ công</Button><Button className="w-full" variant="outline" onClick={onGeneratePlan} disabled={generatingPlan}>{generatingPlan ? "Đang tạo..." : "Tạo nháp bằng AI"}</Button></> : <p className="text-sm text-muted-foreground">Bạn không có quyền tạo kế hoạch điều trị.</p>}</CardContent></Card><Card><CardHeader className="pb-3"><CardTitle>Hẹn tái khám</CardTitle><p className="mt-1 text-xs text-muted-foreground">Chỉ tạo sau khi lịch đề xuất đã được nhân sự xác nhận.</p></CardHeader><CardContent>{canWriteAppointments ? <Button className="w-full" variant="outline" onClick={onSuggestNext} disabled={suggestNextLoading}>{suggestNextLoading ? "Đang gợi ý..." : "Gợi ý lịch tái khám"}</Button> : <p className="text-sm text-muted-foreground">Bạn không có quyền tạo lịch hẹn.</p>}</CardContent></Card></div>}
@@ -975,7 +978,7 @@ export function VisitDetailPage() {
                     <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                     </svg>
-                    {summaryResult.ai_model === "llama-3.1-8b-instruct" ? "AI Cloudflare" : "Tóm tắt cau truc"}
+                    {summaryResult.ai_model === "llama-3.1-8b-instruct" ? "AI Cloudflare" : "Tóm tắt có cấu trúc"}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1046,7 +1049,7 @@ export function VisitDetailPage() {
               </div>
               <div className="text-center">
                 <p className="font-medium text-foreground">AI đang phân tích…</p>
-                <p className="text-sm text-muted-foreground mt-1">Đang xử lý clinical findings & kế hoạch kế hoạch</p>
+                <p className="text-sm text-muted-foreground mt-1">Đang xử lý clinical findings và kế hoạch</p>
               </div>
             </div>
           ) : planResult ? (
@@ -1072,7 +1075,7 @@ export function VisitDetailPage() {
                   <table className="w-full min-w-[500px] text-sm">
                     <thead>
                       <tr className="bg-gradient-to-r from-slate-700 to-slate-600">
-                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-white/80 w-14">Rang</th>
+                        <th className="px-3 py-2.5 text-left text-xs font-semibold text-white/80 w-14">Răng</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-white/80 w-36">Thủ thuật</th>
                         <th className="px-3 py-2.5 text-left text-xs font-semibold text-white/80">Mô tả</th>
                         <th className="px-3 py-2.5 text-right text-xs font-semibold text-white/80 w-24">Phút</th>
@@ -1173,7 +1176,7 @@ export function VisitDetailPage() {
               <div className="flex items-center justify-between rounded-xl border-2 border-teal-300 dark:border-teal-700 bg-gradient-to-r from-teal-50 to-emerald-50 dark:from-teal-950/40 dark:to-emerald-950/40 px-5 py-4 shadow-sm">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-teal-600 dark:text-teal-400">Tổng chi phí ước tính</p>
-                  <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">{editableItems.length} hạng mục | {new Set(editableItems.map((i) => i.procedure)).size} thu thuat</p>
+                  <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-0.5">{editableItems.length} hạng mục | {new Set(editableItems.map((i) => i.procedure)).size} thủ thuật</p>
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-bold text-teal-700 dark:text-teal-300">{totalCost.toLocaleString("vi-VN")}</p>
@@ -1209,7 +1212,7 @@ export function VisitDetailPage() {
                 <svg className="mr-1.5 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
-                Luu kế hoạch điều trị
+                Lưu kế hoạch điều trị
               </>
             )}
           </Button>

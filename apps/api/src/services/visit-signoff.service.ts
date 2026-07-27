@@ -3,10 +3,12 @@ import type { VisitAmendmentCreateInput } from "@shared/validation";
 import { ConflictError, NotFoundError, ValidationError } from "../lib/errors";
 import { createClinicalRecordVersionsRepository, type ClinicalRecordVersion } from "../repositories/clinical-record-versions.repo";
 import { createClinicalReviewEventsRepository } from "../repositories/clinical-review-events.repo";
+import { createClinicalPathwayAssessmentsRepository } from "../repositories/clinical-pathway-assessments.repo";
 import { createDiagnosesRepository } from "../repositories/diagnoses.repo";
 import { createFindingsRepository } from "../repositories/findings.repo";
 import { createVisitInitialAssessmentsRepository } from "../repositories/visit-initial-assessments.repo";
 import { createVisitsRepository } from "../repositories/visits.repo";
+import { clinicalPathwayService } from "./clinical-pathway.service";
 export const visitSignoffService = {
   async sign(db: D1Database, tenantId: string, visitId: string, doctorId: string): Promise<ClinicalRecordVersion> {
     const visits = createVisitsRepository(db);
@@ -14,7 +16,9 @@ export const visitSignoffService = {
     if (!visit) throw new NotFoundError("Visit not found");
     if (visit.locked_at || visit.clinical_state === "signed") throw new ConflictError("Hồ sơ lượt khám này đã được ký và khóa");
 
-    const pendingReviews = await createClinicalReviewEventsRepository(db).listPendingByVisit(tenantId, visitId);
+    const pathwayFeatureEnabled = await clinicalPathwayService.isFeatureEnabled(db, tenantId);
+    const pendingReviews = (await createClinicalReviewEventsRepository(db).listPendingByVisit(tenantId, visitId))
+      .filter((event) => pathwayFeatureEnabled || event.entity_type !== "pathway_assessment");
     if (pendingReviews.length > 0) throw new ValidationError("Còn dữ liệu pre-exam/draft chưa được bác sĩ review", { pending_count: pendingReviews.length });
 
     const initialAssessment = await createVisitInitialAssessmentsRepository(db).getByVisit(tenantId, visitId);
@@ -24,8 +28,9 @@ export const visitSignoffService = {
 
     const findings = await createFindingsRepository(db).listEffectiveByVisit(tenantId, visitId);
     const diagnoses = await createDiagnosesRepository(db).listConfirmedByVisit(tenantId, visitId);
+    const { assessments: pathwayAssessments, items: pathwayItems } = await signedPathwayData(db, tenantId, visitId);
     const now = new Date().toISOString();
-    const canonicalObj = { visit, initial_assessment: initialAssessment, findings, diagnoses, signed_at: now, signed_by: doctorId };
+    const canonicalObj = { visit, initial_assessment: initialAssessment, findings, diagnoses, pathway_assessments: pathwayAssessments, pathway_assessment_items: pathwayItems, signed_at: now, signed_by: doctorId };
     const canonicalJson = JSON.stringify(canonicalObj);
     const sha256 = await computeSha256Hex(canonicalJson);
     const createdVersion: ClinicalRecordVersion = {
@@ -79,11 +84,14 @@ export const visitSignoffService = {
     const findings = await createFindingsRepository(db).listEffectiveByVisit(tenantId, visitId);
     const diagnoses = await createDiagnosesRepository(db).listConfirmedByVisit(tenantId, visitId);
     const assessment = await createVisitInitialAssessmentsRepository(db).getByVisit(tenantId, visitId);
+    const { assessments: pathwayAssessments, items: pathwayItems } = await signedPathwayData(db, tenantId, visitId);
     const afterObj = {
       visit,
       initial_assessment: assessment,
       findings,
       diagnoses,
+      pathway_assessments: pathwayAssessments,
+      pathway_assessment_items: pathwayItems,
       amendment: { reason: data.reason, correction_summary: data.correction_summary, created_by: doctorId, created_at: now },
     };
     const afterJson = JSON.stringify(afterObj);
@@ -110,6 +118,20 @@ export const visitSignoffService = {
     return version;
   },
 };
+
+async function signedPathwayData(db: D1Database, tenantId: string, visitId: string) {
+  const pathways = createClinicalPathwayAssessmentsRepository(db);
+  const allAssessments = await pathways.listByVisit(tenantId, visitId);
+  const activeAssessments = allAssessments.filter((assessment) => assessment.status === "active");
+  if (await clinicalPathwayService.isFeatureEnabled(db, tenantId) && activeAssessments.length > 0) {
+    throw new ValidationError("Còn pathway assessment đang đánh giá chưa đóng", { active_count: activeAssessments.length });
+  }
+
+  const assessments = allAssessments.filter((assessment) => ["completed", "closed_with_exceptions"].includes(assessment.status));
+  const items = (await Promise.all(assessments.map((assessment) => pathways.listItemsByAssessment(tenantId, assessment.id)))).flat();
+  return { assessments, items };
+}
+
 async function computeSha256Hex(data: string): Promise<string> {
   const bytes = new TextEncoder().encode(data);
   const hash = await crypto.subtle.digest("SHA-256", bytes);

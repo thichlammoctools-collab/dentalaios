@@ -1,11 +1,12 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import type { ClinicalDiagnosis, ClinicalFinding, ClinicalReviewEntityType, ClinicalReviewEvent, VisitInitialAssessment } from "@shared/types";
+import type { ClinicalDiagnosis, ClinicalFinding, ClinicalPathwayAssessment, ClinicalReviewEntityType, ClinicalReviewEvent, VisitInitialAssessment } from "@shared/types";
 import type { ClinicalReviewEditAndAcceptInput, ClinicalReviewRejectInput, PreExamSubmitInput } from "@shared/validation";
 import { ConflictError, NotFoundError, ValidationError } from "../lib/errors";
 import { createClinicalReviewEventsRepository } from "../repositories/clinical-review-events.repo";
 import { createDiagnosesRepository } from "../repositories/diagnoses.repo";
 import { createFindingsRepository } from "../repositories/findings.repo";
 import { createVisitInitialAssessmentsRepository } from "../repositories/visit-initial-assessments.repo";
+import { createClinicalPathwayAssessmentsRepository } from "../repositories/clinical-pathway-assessments.repo";
 import { createVisitsRepository } from "../repositories/visits.repo";
 import { diagnosisService } from "./diagnosis.service";
 import { visitService } from "./visit.service";
@@ -13,7 +14,7 @@ import { visitService } from "./visit.service";
 type DraftEntrySource = "assistant" | "doctor" | "ai";
 type QueueItem = {
   event: ClinicalReviewEvent;
-  entity: ClinicalFinding | ClinicalDiagnosis | VisitInitialAssessment;
+  entity: ClinicalFinding | ClinicalDiagnosis | VisitInitialAssessment | ClinicalPathwayAssessment;
 };
 
 export const clinicalReviewService = {
@@ -141,9 +142,11 @@ export const clinicalReviewService = {
     } else if (entityType === "diagnosis") {
       if (!data.diagnosis) throw new ValidationError("Cần gửi nội dung chẩn đoán đã chỉnh sửa");
       await diagnosisService.update(db, tenantId, visitId, entityId, reviewerId, data.diagnosis);
-    } else {
+    } else if (entityType === "initial_assessment") {
       if (!data.initial_assessment) throw new ValidationError("Cần gửi nội dung pre-exam đã chỉnh sửa");
       await createVisitInitialAssessmentsRepository(db).upsert(tenantId, visitId, reviewerId, "doctor", data.initial_assessment);
+    } else {
+      throw new ValidationError("Assessment pathway chỉ được chỉnh sửa qua Clinical Copilot");
     }
 
     if (!await createClinicalReviewEventsRepository(db).updateStatus(tenantId, current.id, "superseded", reviewerId, now, data.review_note)) {
@@ -189,11 +192,15 @@ async function requirePendingEvent(
 
 async function getEntity(
   db: D1Database, tenantId: string, visitId: string, entityType: ClinicalReviewEntityType, entityId: string,
-): Promise<ClinicalFinding | ClinicalDiagnosis | VisitInitialAssessment | null> {
+): Promise<ClinicalFinding | ClinicalDiagnosis | VisitInitialAssessment | ClinicalPathwayAssessment | null> {
   if (entityType === "finding") return createFindingsRepository(db).getByVisitAndId(tenantId, visitId, entityId);
   if (entityType === "diagnosis") {
     const diagnosis = await createDiagnosesRepository(db).get(tenantId, entityId);
     return diagnosis?.visit_id === visitId ? diagnosis : null;
+  }
+  if (entityType === "pathway_assessment") {
+    const pathwayAssessment = await createClinicalPathwayAssessmentsRepository(db).getById(tenantId, entityId);
+    return pathwayAssessment?.visit_id === visitId ? pathwayAssessment : null;
   }
   const assessment = await createVisitInitialAssessmentsRepository(db).getByVisit(tenantId, visitId);
   return assessment?.id === entityId ? assessment : null;
@@ -211,6 +218,12 @@ async function markEntityEffective(
   if (entityType === "diagnosis") {
     await db.prepare("UPDATE clinical_diagnoses SET clinical_effective_at = ? WHERE tenant_id = ? AND visit_id = ? AND id = ?")
       .bind(effectiveAt, tenantId, visitId, entityId).run();
+    return;
+  }
+  if (entityType === "pathway_assessment") {
+    if (!await createClinicalPathwayAssessmentsRepository(db).markEffective(tenantId, entityId, reviewerId, effectiveAt)) {
+      throw new NotFoundError("Pathway assessment not found");
+    }
     return;
   }
   if (!await createVisitInitialAssessmentsRepository(db).accept(tenantId, entityId, reviewerId, effectiveAt)) {
