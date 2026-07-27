@@ -854,23 +854,33 @@ export function VisitDetailPage() {
         )}
       </div>
 
-       <Card className={clinicalWarnings.length || alerts.length ? "border-amber-300 dark:border-amber-800" : undefined}>
-         <CardHeader className="pb-3"><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle>An toàn trước điều trị</CardTitle><p className="mt-1 text-xs text-muted-foreground">Cảnh báo y khoa, chỉ số đo và đánh giá xử trí tại một nơi.</p></div>{(clinicalWarnings.length || alerts.length) ? <Badge variant="warning">{clinicalWarnings.length + alerts.length} cần lưu ý</Badge> : <Badge variant="success">Không có cảnh báo</Badge>}</div></CardHeader>
-         <CardContent className="space-y-3 pt-0">
+        <div className="grid items-start gap-4 xl:grid-cols-2">
+        <Card className={clinicalWarnings.length || alerts.length ? "border-amber-300 dark:border-amber-800" : undefined}>
+          <details open>
+            <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-6 py-4 [&::-webkit-details-marker]:hidden">
+              <div><CardTitle>An toàn trước điều trị</CardTitle><p className="mt-1 text-xs text-muted-foreground">Cảnh báo y khoa, chỉ số đo và đánh giá xử trí tại một nơi.</p></div>
+              <div className="flex shrink-0 items-center gap-2">{(clinicalWarnings.length || alerts.length) ? <Badge variant="warning">{clinicalWarnings.length + alerts.length} cần lưu ý</Badge> : <Badge variant="success">Không có cảnh báo</Badge>}<span className="text-xs font-medium text-muted-foreground">Ẩn/hiện</span></div>
+            </summary>
+          <div className="space-y-3 border-t border-border px-6 pb-6 pt-4">
            <div className="grid gap-2 sm:grid-cols-3"><div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5"><p className="text-xs text-muted-foreground">Huyết áp</p><p className="mt-1 font-semibold">{visit.blood_pressure_systolic || visit.blood_pressure_diastolic ? `${visit.blood_pressure_systolic ?? "—"}/${visit.blood_pressure_diastolic ?? "—"} mmHg` : "Chưa ghi nhận"}</p></div><div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5"><p className="text-xs text-muted-foreground">Đường huyết</p><p className="mt-1 font-semibold">{visit.blood_sugar_mgdl ? `${visit.blood_sugar_mgdl} mg/dL` : "Chưa ghi nhận"}</p></div><div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5"><p className="text-xs text-muted-foreground">BMI</p><p className="mt-1 font-semibold">{bmi === null ? "Chưa đủ dữ liệu" : `${bmi} · ${bmiLabel}`}</p></div></div>
            {(clinicalWarnings.length > 0 || alerts.length > 0) && <div className="space-y-2">{alerts.map((alert) => <div key={alert.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm dark:border-amber-900 dark:bg-amber-950/30"><Badge variant={alert.severity === "high" ? "destructive" : alert.severity === "medium" ? "warning" : "secondary"}>{alert.type === "allergy" ? "Dị ứng" : alert.type === "chronic" ? "Bệnh nền" : alert.type === "medication" ? "Thuốc" : "Lưu ý"}</Badge><span className="font-medium">{alert.description}</span></div>)}{clinicalWarnings.map((warning) => { const acknowledgement = safetyAcknowledgements.find((item) => item.warning_type === warning.warningType); return <div key={warning.title} className={`rounded-lg border px-3 py-2.5 text-sm ${warning.severity === "high" ? "border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30" : "border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30"}`}><div className="flex flex-wrap items-center justify-between gap-2"><div className="flex flex-wrap items-center gap-2"><Badge variant={warning.severity === "high" ? "destructive" : "warning"}>{warning.severity === "high" ? "Ưu tiên cao" : "Theo dõi"}</Badge><span className="font-medium">{warning.title}</span></div>{canReview && !isClinicalReadOnly && <Button size="sm" variant="outline" onClick={() => void acknowledgeSafetyWarning(warning.warningType)}>{acknowledgement ? "Cập nhật đánh giá" : "Đánh giá"}</Button>}</div><p className="mt-1.5 text-xs text-muted-foreground">{warning.detail}</p>{acknowledgement && <p className="mt-1 text-xs font-medium text-foreground">Đã xử trí: {acknowledgement.outcome === "acknowledged" ? "Xác nhận" : acknowledgement.outcome === "continue_with_reason" ? "Tiếp tục có lý do" : acknowledgement.outcome === "defer_treatment" ? "Hoãn điều trị" : "Chuyển tuyến/báo cấp trên"}{acknowledgement.reason ? ` · ${acknowledgement.reason}` : ""}</p>}</div>; })}</div>}
            <div className="flex justify-end"><Button variant="outline" size="sm" onClick={() => navigate(`/patients/${visit.patient_id}/alerts`)}>Mở hồ sơ cảnh báo</Button></div>
-         </CardContent>
-       </Card>
+          </div>
+          </details>
+        </Card>
 
       {/* Pre-exam & Doctor Review Queue */}
       {canSubmitPreExam && (
         <Card className="border-cyan-300 dark:border-cyan-800">
-          <CardHeader className="pb-3">
+          <details open>
+            <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-6 py-4 [&::-webkit-details-marker]:hidden">
+              <div>
             <CardTitle className="text-base">Bản nháp khám ban đầu</CardTitle>
             <p className="text-xs text-muted-foreground">Dữ liệu tại đây chưa là hồ sơ lâm sàng có hiệu lực. Bác sĩ phải duyệt trước khi dùng cho chẩn đoán và kế hoạch điều trị.</p>
-          </CardHeader>
-          <CardContent className="space-y-3 pt-0">
+              </div>
+              <span className="shrink-0 text-xs font-medium text-muted-foreground">Ẩn/hiện</span>
+            </summary>
+          <div className="space-y-3 border-t border-border px-6 pb-6 pt-4">
             <Textarea
               value={preExamChiefComplaint}
               onChange={(event) => setPreExamChiefComplaint(event.target.value)}
@@ -884,9 +894,11 @@ export function VisitDetailPage() {
                 {savingPreExam ? "Đang gửi..." : "Gửi bác sĩ duyệt"}
               </Button>
             </div>
-          </CardContent>
+          </div>
+          </details>
         </Card>
       )}
+        </div>
 
       {reviewQueue.length > 0 && (
         <Card className="border-violet-300 dark:border-violet-800">
@@ -925,9 +937,11 @@ export function VisitDetailPage() {
                 )}
               </div>
             ))}
-          </CardContent>
+          </div>
+          </details>
         </Card>
       )}
+        </div>
 
         <section aria-label="Không gian làm việc lâm sàng" className="space-y-4">
           <div className="grid grid-cols-2 gap-2 rounded-xl border border-border bg-muted/20 p-2 md:grid-cols-4">{workspaceTabs.map((tab) => <button type="button" key={tab.id} onClick={() => setWorkspaceTab(tab.id)} className={`rounded-lg px-3 py-2 text-left transition-colors ${workspaceTab === tab.id ? "bg-background shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/60"}`}><span className="flex items-center justify-between gap-2 text-sm font-semibold"><span>{tab.label}</span>{tab.count !== undefined && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">{tab.count}</span>}</span><span className="mt-0.5 block text-xs">{tab.description}</span></button>)}</div>
