@@ -1140,8 +1140,10 @@ export function VisitDetailPage() {
                             </td>
                             <td className="px-3 py-2 text-center">
                               <button
+                                type="button"
+                                aria-label="Xóa hạng mục"
                                 onClick={() => removeItem(item.id)}
-                                className="opacity-0 group-hover:opacity-100 text-gray-400 dark:text-zinc-500 hover:text-red-500 dark:hover:text-red-400 transition-all"
+                                className="text-gray-400 opacity-60 dark:text-zinc-500 hover:text-red-500 dark:hover:text-red-400 hover:opacity-100 transition-all"
                               >
                                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -1330,6 +1332,7 @@ export function VisitDetailPage() {
         open={safetyDialogOpen}
         onOpenChange={setSafetyDialogOpen}
         onSubmit={confirmSafetyAcknowledgement}
+        warningLabel={safetyWarningType === "blood_pressure" ? "Đánh giá cảnh báo huyết áp" : safetyWarningType === "blood_sugar" ? "Đánh giá cảnh báo đường huyết" : "Đánh giá cảnh báo BMI"}
       />
 
       <RejectReasonDialog

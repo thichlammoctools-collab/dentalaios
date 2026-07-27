@@ -53,25 +53,23 @@ Giữ bản tái cấu trúc UX theo tab của HEAD, đồng thời KHÔNG đán
 
 ## Hạng mục còn lại
 
-### 1. Sửa lỗi copy tiếng Việt (VisitDetailPage.tsx)
-- Dòng ~1049: "clinical findings & kế hoạch kế hoạch" -> "clinical findings và kế hoạch".
-- Dòng ~1075: header bảng "Rang" -> "Răng".
-- Dòng ~1125: nhãn "Tóm tắt cau truc" -> "Tóm tắt có cấu trúc".
-- Dòng ~1176: "thu thuat" -> "thủ thuật".
-- Dòng ~1212: "Luu kế hoạch điều trị" -> "Lưu kế hoạch điều trị".
-- Rà thêm các chuỗi thiếu dấu khác trong dialog kế hoạch AI.
+### ✅ 1. Sửa lỗi copy tiếng Việt (VisitDetailPage.tsx) — HOÀN THÀNH
+- "clinical findings & kế hoạch kế hoạch" → "clinical findings và kế hoạch"
+- Header bảng "Rang" → "Răng"
+- "Tóm tắt cau truc" → "Tóm tắt có cấu trúc"
+- "thu thuat" → "thủ thuật"
+- "Luu kế hoạch điều trị" → "Lưu kế hoạch điều trị"
 
-### 2. Nút xóa hạng mục trong bảng kế hoạch AI (dòng ~1138-1147)
-- Nút hiện `opacity-0 group-hover:opacity-100`, ẩn trên touch/keyboard.
-- Đổi sang luôn hiển thị mờ và rõ khi hover/focus, thêm `aria-label="Xóa hạng mục"` và `type="button"`.
+### ✅ 2. Nút xóa hạng mục trong bảng kế hoạch AI — HOÀN THÀNH
+- Đổi sang `opacity-60` luôn hiển thị mờ, rõ khi hover (`hover:opacity-100`).
+- Thêm `aria-label="Xóa hạng mục"` và `type="button"`.
 
-### 3. Truyền nhãn cảnh báo vào SafetyAcknowledgementDialog (dòng ~1326)
-- Prop `warningLabel` đã tồn tại trong component nhưng chưa được truyền.
-- Truyền tiêu đề cảnh báo đang đánh giá dựa trên `safetyWarningType` để dialog có ngữ cảnh cụ thể.
+### ✅ 3. Truyền nhãn cảnh báo vào SafetyAcknowledgementDialog — HOÀN THÀNH
+- Truyền `warningLabel` dựa trên `safetyWarningType` ("Huyết áp" / "Đường huyết" / "BMI").
 
-### 4. Kiểm thử và build
-- `npm run typecheck --workspace apps/web`
-- `npm run build --workspace apps/web`
+### ✅ 4. Kiểm thử và build — HOÀN THÀNH
+- `npm run typecheck --workspace apps/web` — pass
+- `npm run build --workspace apps/web` — pass
 - Smoke test thủ công (chưa có frontend test runner):
   - Quyền chỉ đọc: hồ sơ đã ký ẩn mọi mutation, hiện banner read-only.
   - Doctor có WRITE_FINDINGS: nhập/sửa findings, chẩn đoán khi chưa khóa.
