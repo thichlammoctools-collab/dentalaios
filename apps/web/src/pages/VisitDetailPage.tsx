@@ -786,7 +786,6 @@ export function VisitDetailPage() {
   const isClinicalReadOnly = Boolean(visit.locked_at);
   const canEditClinical = canWriteFindings && !isClinicalReadOnly;
   const statusLabel = visit.status === "in_progress" ? "Đang khám" : visit.status === "completed" ? "Đã hoàn tất" : "Đã hủy";
-  const activeSafetyAcknowledgement = safetyAcknowledgements.find((item) => item.warning_type === safetyWarningType);
   const workspaceTabs: Array<{ id: ClinicalWorkspaceTab; label: string; description: string; count?: number }> = [
     { id: "exam", label: "Khám", description: "Ghi nhận theo răng", count: effectiveFindings.length },
     { id: "diagnosis", label: "Chẩn đoán", description: "Kết luận và bằng chứng" },
