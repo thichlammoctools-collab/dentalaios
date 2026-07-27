@@ -32,6 +32,21 @@ const symptomOptions = [{ value: "unknown", label: "Chưa ghi nhận" }, { value
 const testOptions = [{ value: "not_done", label: "Chưa thực hiện" }, { value: "positive", label: "Dương tính" }, { value: "negative", label: "Âm tính" }, { value: "inconclusive", label: "Không rõ" }];
 const imagingOptions = [{ value: "not_assessed", label: "Chưa đánh giá" }, { value: "present", label: "Có" }, { value: "absent", label: "Không" }, { value: "unknown", label: "Không rõ" }];
 
+/** Map item_key → Vietnamese label (matches ENDODONTIC_PAIN_CHECKLIST in backend) */
+const CHECKLIST_LABELS: Record<string, string> = {
+  tooth_identified: "Xác định răng đau/nghi ngờ",
+  spontaneous_pain: "Ghi pattern đau tự phát",
+  pain_on_biting: "Ghi đau khi nhai",
+  prolonged_pain_after_stimulus: "Ghi đau kéo dài sau kích thích",
+  cold_test: "Ghi cold test",
+  percussion: "Ghi percussion",
+  palpation: "Ghi palpation",
+  bite_test: "Ghi bite test",
+  large_caries_or_restoration: "Đánh giá sâu lớn hoặc phục hồi sâu/cũ",
+  periapical_signs: "Đánh giá dấu hiệu quanh chóp trên hình ảnh",
+  missing_data_documented: "Ghi nhận thiếu dữ liệu hoặc lý do bỏ qua",
+};
+
 const blankAssessment = (): EndodonticPainAssessmentPayload => ({
   symptoms: { spontaneous_pain: "unknown", pain_on_biting: "unknown", prolonged_pain_after_stimulus: "unknown" },
   tests: { cold_test: "not_done", percussion: "not_done", palpation: "not_done", bite_test: "not_done" },
@@ -72,9 +87,9 @@ export function EndodonticPainPathwayCard({ visitId, canWrite, canReview }: Endo
       });
       setToothNumber("");
       await load();
-      toast.success("Đã mở assessment nội nha");
+      toast.success("Đã mở đánh giá nội nha");
     } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : "Không thể mở assessment");
+      toast.error(error instanceof ApiError ? error.message : "Không thể mở đánh giá");
     } finally {
       setCreating(false);
     }
@@ -179,17 +194,17 @@ function AssessmentCard({ entry, draft, canWrite, canReview, saving, onDraftChan
       {field("Đau tự phát", draft.symptoms.spontaneous_pain, symptomOptions, (value) => onDraftChange({ ...draft, symptoms: { ...draft.symptoms, spontaneous_pain: value as EndodonticPainAssessmentPayload["symptoms"]["spontaneous_pain"] } }))}
       {field("Đau khi nhai", draft.symptoms.pain_on_biting, symptomOptions, (value) => onDraftChange({ ...draft, symptoms: { ...draft.symptoms, pain_on_biting: value as EndodonticPainAssessmentPayload["symptoms"]["pain_on_biting"] } }))}
       {field("Đau kéo dài sau kích thích", draft.symptoms.prolonged_pain_after_stimulus, symptomOptions, (value) => onDraftChange({ ...draft, symptoms: { ...draft.symptoms, prolonged_pain_after_stimulus: value as EndodonticPainAssessmentPayload["symptoms"]["prolonged_pain_after_stimulus"] } }))}
-      {field("Cold test", draft.tests.cold_test, testOptions, (value) => onDraftChange({ ...draft, tests: { ...draft.tests, cold_test: value as EndodonticPainAssessmentPayload["tests"]["cold_test"] } }))}
-      {field("Percussion", draft.tests.percussion, testOptions, (value) => onDraftChange({ ...draft, tests: { ...draft.tests, percussion: value as EndodonticPainAssessmentPayload["tests"]["percussion"] } }))}
-      {field("Palpation", draft.tests.palpation, testOptions, (value) => onDraftChange({ ...draft, tests: { ...draft.tests, palpation: value as EndodonticPainAssessmentPayload["tests"]["palpation"] } }))}
-      {field("Bite test", draft.tests.bite_test, testOptions, (value) => onDraftChange({ ...draft, tests: { ...draft.tests, bite_test: value as EndodonticPainAssessmentPayload["tests"]["bite_test"] } }))}
+      {field("Thử nghiệm lạnh (Cold test)", draft.tests.cold_test, testOptions, (value) => onDraftChange({ ...draft, tests: { ...draft.tests, cold_test: value as EndodonticPainAssessmentPayload["tests"]["cold_test"] } }))}
+      {field("Gõ (Percussion)", draft.tests.percussion, testOptions, (value) => onDraftChange({ ...draft, tests: { ...draft.tests, percussion: value as EndodonticPainAssessmentPayload["tests"]["percussion"] } }))}
+      {field("Sờ nắn (Palpation)", draft.tests.palpation, testOptions, (value) => onDraftChange({ ...draft, tests: { ...draft.tests, palpation: value as EndodonticPainAssessmentPayload["tests"]["palpation"] } }))}
+      {field("Thử nhai (Bite test)", draft.tests.bite_test, testOptions, (value) => onDraftChange({ ...draft, tests: { ...draft.tests, bite_test: value as EndodonticPainAssessmentPayload["tests"]["bite_test"] } }))}
       {field("Sâu lớn", draft.context.large_caries, symptomOptions, (value) => onDraftChange({ ...draft, context: { ...draft.context, large_caries: value as EndodonticPainAssessmentPayload["context"]["large_caries"] } }))}
       {field("Phục hồi sâu/cũ", draft.context.deep_old_restoration, symptomOptions, (value) => onDraftChange({ ...draft, context: { ...draft.context, deep_old_restoration: value as EndodonticPainAssessmentPayload["context"]["deep_old_restoration"] } }))}
       {field("Dấu hiệu quanh chóp trên ảnh", draft.context.periapical_signs_on_imaging, imagingOptions, (value) => onDraftChange({ ...draft, context: { ...draft.context, periapical_signs_on_imaging: value as EndodonticPainAssessmentPayload["context"]["periapical_signs_on_imaging"] } }))}
       <div className="sm:col-span-2 lg:col-span-3"><Label htmlFor={`pathway-notes-${assessment.id}`}>Ghi chú</Label><Textarea id={`pathway-notes-${assessment.id}`} className="mt-1 min-h-20" value={draft.notes ?? ""} onChange={(event) => onDraftChange({ ...draft, notes: event.target.value })} disabled={!canWrite || isClosed} placeholder="Ghi chú lâm sàng bổ sung (tùy chọn)" /></div>
     </div>}
-    <div className="mt-4 grid gap-4 lg:grid-cols-2"><div><p className="mb-2 text-sm font-medium">Checklist</p><div className="space-y-2">{items.map((item) => <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm" key={item.id}><div><p>{item.item_key.replaceAll("_", " ")}</p>{item.skip_reason && <p className="mt-0.5 text-xs text-muted-foreground">Bỏ qua: {item.skip_reason}</p>}</div><div className="flex shrink-0 items-center gap-2"><Badge variant={item.status === "completed" ? "success" : item.status === "skipped" ? "warning" : "secondary"}>{item.status === "completed" ? "Đã xong" : item.status === "skipped" ? "Bỏ qua" : "Cần xử lý"}</Badge>{canWrite && !isClosed && item.status === "pending" && <><Button size="sm" variant="ghost" onClick={() => onUpdateItem(item, "completed")}>Đánh dấu xong</Button><Button size="sm" variant="ghost" onClick={() => onUpdateItem(item, "skipped")}>Bỏ qua</Button></>}</div></div>)}</div></div>
-      <div><p className="mb-2 text-sm font-medium">Pattern cần cân nhắc</p>{patterns.length ? <div className="space-y-2">{patterns.map((pattern) => <div key={pattern.pattern_key} className={cn("rounded-lg border p-3 text-sm", pattern.priority === 0 ? "border-amber-500/40 bg-amber-500/5" : "border-cyan-500/30 bg-cyan-500/[0.03]")}><p className="font-medium">{pattern.title}</p><p className="mt-1 text-muted-foreground">{pattern.explanation}</p>{pattern.missing_item_keys.length > 0 && <p className="mt-2 text-xs text-muted-foreground">Còn thiếu: {pattern.missing_item_keys.join(", ")}</p>}<p className="mt-2 text-[11px] text-muted-foreground">{pattern.source_reference}</p></div>)}</div> : <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">Chưa có pattern cần ưu tiên. Cập nhật assessment để hệ thống kiểm tra dữ liệu thiếu hoặc mâu thuẫn.</p>}</div>
+    <div className="mt-4 grid gap-4 lg:grid-cols-2"><div><p className="mb-2 text-sm font-medium">Danh sách kiểm tra</p><div className="space-y-2">{items.map((item) => <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm" key={item.id}><div><p>{CHECKLIST_LABELS[item.item_key] ?? item.item_key.replaceAll("_", " ")}</p>{item.skip_reason && <p className="mt-0.5 text-xs text-muted-foreground">Bỏ qua: {item.skip_reason}</p>}</div><div className="flex shrink-0 items-center gap-2"><Badge variant={item.status === "completed" ? "success" : item.status === "skipped" ? "warning" : "secondary"}>{item.status === "completed" ? "Đã xong" : item.status === "skipped" ? "Bỏ qua" : "Cần xử lý"}</Badge>{canWrite && !isClosed && item.status === "pending" && <><Button size="sm" variant="ghost" onClick={() => onUpdateItem(item, "completed")}>Đánh dấu xong</Button><Button size="sm" variant="ghost" onClick={() => onUpdateItem(item, "skipped")}>Bỏ qua</Button></>}</div></div>)}</div></div>
+      <div><p className="mb-2 text-sm font-medium">Pattern cần cân nhắc</p>{patterns.length ? <div className="space-y-2">{patterns.map((pattern) => <div key={pattern.pattern_key} className={cn("rounded-lg border p-3 text-sm", pattern.priority === 0 ? "border-amber-500/40 bg-amber-500/5" : "border-cyan-500/30 bg-cyan-500/[0.03]")}><p className="font-medium">{pattern.title}</p><p className="mt-1 text-muted-foreground">{pattern.explanation}</p>{pattern.missing_item_keys.length > 0 && <p className="mt-2 text-xs text-muted-foreground">Còn thiếu: {pattern.missing_item_keys.map((key) => CHECKLIST_LABELS[key] ?? key).join(", ")}</p>}<p className="mt-2 text-[11px] text-muted-foreground">{pattern.source_reference}</p></div>)}</div> : <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">Chưa có pattern cần ưu tiên. Cập nhật assessment để hệ thống kiểm tra dữ liệu thiếu hoặc mâu thuẫn.</p>}</div>
     </div>
   </div>;
 }
