@@ -937,11 +937,9 @@ export function VisitDetailPage() {
                 )}
               </div>
             ))}
-          </div>
-          </details>
+            </CardContent>
         </Card>
       )}
-        </div>
 
         <section aria-label="Không gian làm việc lâm sàng" className="space-y-4">
           <div className="grid grid-cols-2 gap-2 rounded-xl border border-border bg-muted/20 p-2 md:grid-cols-4">{workspaceTabs.map((tab) => <button type="button" key={tab.id} onClick={() => setWorkspaceTab(tab.id)} className={`rounded-lg px-3 py-2 text-left transition-colors ${workspaceTab === tab.id ? "bg-background shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/60"}`}><span className="flex items-center justify-between gap-2 text-sm font-semibold"><span>{tab.label}</span>{tab.count !== undefined && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">{tab.count}</span>}</span><span className="mt-0.5 block text-xs">{tab.description}</span></button>)}</div>
