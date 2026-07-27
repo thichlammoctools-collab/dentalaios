@@ -11,6 +11,7 @@ import {
   CLINICAL_FINDING_CATEGORIES,
   PERIODONTAL_POCKET_POINTS,
   PERIODONTAL_SURFACE_OPTIONS,
+  classifyToothFindingConflict,
   getAnatomicalSiteLabel,
   getFindingCategory,
   getFindingConditionLabel,
@@ -65,6 +66,7 @@ export function FdiToothChart({ visitId, findings, readOnly = false, onCreated, 
   const [periodontalSurfaces, setPeriodontalSurfaces] = useState<string[]>([]);
   const [pocketDepths, setPocketDepths] = useState<PeriodontalPocketDepths>({});
   const [toothNotes, setToothNotes] = useState("");
+  const [conflictAcknowledged, setConflictAcknowledged] = useState(false);
   const [otherCategory, setOtherCategory] = useState<FindingCategory | null>(null);
   const [otherCondition, setOtherCondition] = useState("");
   const [anatomicalSite, setAnatomicalSite] = useState<AnatomicalSite | "">("");
@@ -104,6 +106,7 @@ export function FdiToothChart({ visitId, findings, readOnly = false, onCreated, 
     setPeriodontalSurfaces([]);
     setPocketDepths({});
     setToothNotes("");
+    setConflictAcknowledged(false);
   }
 
   function conceptFor(category: FindingCategory, scope: string, condition: string) {
@@ -157,6 +160,20 @@ export function FdiToothChart({ visitId, findings, readOnly = false, onCreated, 
     return [];
   }
 
+  const toothConflict = selectedTooth == null
+    ? { kind: "none" as const, offenders: [] }
+    : classifyToothFindingConflict({
+      category: toothTab,
+      scope: "tooth",
+      tooth_number: selectedTooth,
+      condition: toothCondition,
+      location_details: toothTab === "tooth_hard_tissue"
+        ? toothSurfaces.length ? { tooth_surfaces: toothSurfaces as FindingLocationDetails["tooth_surfaces"] } : undefined
+        : periodontalSurfaces.length ? { periodontal_surfaces: periodontalSurfaces as FindingLocationDetails["periodontal_surfaces"] } : undefined,
+    }, findings);
+
+  const toothConflictRequiresAcknowledgement = toothConflict.kind === "conflict_negation" || toothConflict.kind === "conflict_absolute";
+
   function findingLocation(finding: ClinicalFinding) {
     if (finding.scope !== "region") return "Toàn miệng";
     const details = [
@@ -187,6 +204,14 @@ export function FdiToothChart({ visitId, findings, readOnly = false, onCreated, 
 
   async function saveToothFinding() {
     if (!selectedTooth) return;
+    if (toothConflict.kind === "duplicate") {
+      toast.error("Đã có ghi nhận giống hệt trên răng này. Hãy chỉnh sửa bản ghi cũ thay vì lưu thêm.");
+      return;
+    }
+    if (toothConflictRequiresAcknowledgement && !conflictAcknowledged) {
+      toast.error("Xác nhận mâu thuẫn trước khi lưu đồng thời hai trạng thái.");
+      return;
+    }
     if (toothTab === "periodontal" && ["calculus", "gingivitis"].includes(toothCondition) && periodontalSurfaces.length === 0) {
       toast.error("Chọn ít nhất một mặt răng có tổn thương");
       return;
@@ -214,6 +239,7 @@ export function FdiToothChart({ visitId, findings, readOnly = false, onCreated, 
         condition: toothCondition,
         concept_id: (() => { const concept = conceptFor(toothTab, "tooth", toothCondition); return concept?.kind === "diagnosis" ? undefined : concept?.id; })(),
         notes: toothNotes || undefined,
+        acknowledge_conflict: toothConflictRequiresAcknowledgement ? true : undefined,
       });
       onCreated(created);
       const message = `Đã lưu ghi nhận răng #${selectedTooth}`;
@@ -317,16 +343,18 @@ export function FdiToothChart({ visitId, findings, readOnly = false, onCreated, 
     <Dialog open={selectedTooth !== null} onOpenChange={(open) => !open && setSelectedTooth(null)}>
       <DialogHeader><DialogTitle>Ghi nhận răng #{selectedTooth}</DialogTitle><p className="mt-1 text-xs text-muted-foreground">Lưu xong có thể tiếp tục ghi nhận trên cùng răng.</p></DialogHeader>
       <DialogBody className="space-y-4">
-        {savedMessage && <div role="status" className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">{savedMessage}</div>}
-        {selectedTooth != null && <ExistingFindingsNotice items={existingFindings({ tooth: selectedTooth })} location={`răng #${selectedTooth}`} />}
-        <div className="flex gap-2 border-b border-border"><button type="button" onClick={() => resetToothForm("tooth_hard_tissue")} className={cn("border-b-2 px-3 py-2 text-sm font-medium", toothTab === "tooth_hard_tissue" ? "border-primary text-primary" : "border-transparent text-muted-foreground")}>Răng &amp; mô cứng</button><button type="button" onClick={() => resetToothForm("periodontal")} className={cn("border-b-2 px-3 py-2 text-sm font-medium", toothTab === "periodontal" ? "border-primary text-primary" : "border-transparent text-muted-foreground")}>Nha chu</button></div>
-        <div className="grid gap-4 md:grid-cols-2"><div className="grid gap-1.5"><Label htmlFor="tooth-condition">Tình trạng</Label><select id="tooth-condition" value={toothCondition} onChange={(event) => setToothCondition(event.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-sm">{toothDefinition.conditions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>
-          {toothTab === "tooth_hard_tissue" ? <SurfacePicker label="Mặt răng" options={TOOTH_SURFACES} values={toothSurfaces} onToggle={(value) => toggleValue(setToothSurfaces, toothSurfaces, value)} /> : <SurfacePicker label="Mặt nha chu" options={PERIODONTAL_SURFACE_OPTIONS} values={periodontalSurfaces} onToggle={(value) => toggleValue(setPeriodontalSurfaces, periodontalSurfaces, value)} />}
+         {savedMessage && <div role="status" className="rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">{savedMessage}</div>}
+         {selectedTooth != null && <ExistingFindingsNotice items={existingFindings({ tooth: selectedTooth })} location={`răng #${selectedTooth}`} />}
+         {toothConflict.kind === "duplicate" && <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"><p className="font-medium">Bản ghi trùng lặp</p><p className="mt-1 text-xs">Tình trạng và các mặt răng đã chọn trùng hoàn toàn với một bản ghi hiện có. Hệ thống không cho lưu thêm.</p></div>}
+         {toothConflictRequiresAcknowledgement && <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100"><p className="font-medium">Cảnh báo mâu thuẫn trạng thái</p><p className="mt-1 text-xs">Trạng thái này mâu thuẫn với ghi nhận “răng khỏe” hoặc trạng thái tuyệt đối (mất răng, chưa mọc, mọc ngầm) đang có. Chỉ lưu đồng thời khi bác sĩ đã xác minh lâm sàng.</p><label className="mt-2 inline-flex cursor-pointer items-center gap-2 text-xs font-medium"><input type="checkbox" checked={conflictAcknowledged} onChange={(event) => setConflictAcknowledged(event.target.checked)} />Tôi xác nhận lưu đồng thời các trạng thái mâu thuẫn</label></div>}
+         <div className="flex gap-2 border-b border-border"><button type="button" onClick={() => resetToothForm("tooth_hard_tissue")} className={cn("border-b-2 px-3 py-2 text-sm font-medium", toothTab === "tooth_hard_tissue" ? "border-primary text-primary" : "border-transparent text-muted-foreground")}>Răng &amp; mô cứng</button><button type="button" onClick={() => resetToothForm("periodontal")} className={cn("border-b-2 px-3 py-2 text-sm font-medium", toothTab === "periodontal" ? "border-primary text-primary" : "border-transparent text-muted-foreground")}>Nha chu</button></div>
+         <div className="grid gap-4 md:grid-cols-2"><div className="grid gap-1.5"><Label htmlFor="tooth-condition">Tình trạng</Label><select id="tooth-condition" value={toothCondition} onChange={(event) => { setConflictAcknowledged(false); setToothCondition(event.target.value); }} className="h-9 rounded-md border border-input bg-background px-3 text-sm">{toothDefinition.conditions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></div>
+           {toothTab === "tooth_hard_tissue" ? <SurfacePicker label="Mặt răng" options={TOOTH_SURFACES} values={toothSurfaces} onToggle={(value) => { setConflictAcknowledged(false); toggleValue(setToothSurfaces, toothSurfaces, value); }} /> : <SurfacePicker label="Mặt nha chu" options={PERIODONTAL_SURFACE_OPTIONS} values={periodontalSurfaces} onToggle={(value) => { setConflictAcknowledged(false); toggleValue(setPeriodontalSurfaces, periodontalSurfaces, value); }} />}
         </div>
         {toothTab === "periodontal" && <div className="rounded-lg border border-border bg-muted/20 p-3"><div className="mb-3 flex flex-wrap items-baseline justify-between gap-2"><div><p className="text-sm font-medium">Độ sâu túi nha chu</p><p className="text-xs text-muted-foreground">Nhập mm tại các điểm đã đo; Viêm nha chu cần tối thiểu một điểm.</p></div>{toothCondition === "periodontitis" && <span className="text-xs font-medium text-destructive">Bắt buộc</span>}</div><div className="grid grid-cols-2 gap-2 sm:grid-cols-3">{PERIODONTAL_POCKET_POINTS.map((point) => <div key={point.value} className="grid gap-1"><Label htmlFor={`pocket-${point.value}`} className="text-xs">{point.label}</Label><input id={`pocket-${point.value}`} inputMode="decimal" value={pocketDepths[point.value as keyof PeriodontalPocketDepths] ?? ""} onChange={(event) => { const value = event.target.value; setPocketDepths((current) => ({ ...current, [point.value]: value === "" ? undefined : Number(value) })); }} className="h-9 rounded-md border border-input bg-background px-2 text-sm" placeholder="mm" /></div>)}</div></div>}
         <div className="grid gap-1.5"><Label htmlFor="tooth-notes">Ghi chú</Label><Textarea id="tooth-notes" rows={3} value={toothNotes} onChange={(event) => setToothNotes(event.target.value)} placeholder="Mức độ, chỉ định theo dõi hoặc mô tả thêm…" /></div>
       </DialogBody>
-      <DialogFooter><Button variant="outline" onClick={() => setSelectedTooth(null)}>Đóng</Button><Button onClick={saveToothFinding} disabled={saving}>{saving ? "Đang lưu…" : `Lưu ${getFindingConditionLabel(toothTab, toothCondition)}`}</Button></DialogFooter>
+       <DialogFooter><Button variant="outline" onClick={() => setSelectedTooth(null)}>Đóng</Button><Button onClick={saveToothFinding} disabled={saving || toothConflict.kind === "duplicate"}>{saving ? "Đang lưu…" : `Lưu ${getFindingConditionLabel(toothTab, toothCondition)}`}</Button></DialogFooter>
     </Dialog>
 
     <Dialog open={otherCategory !== null} onOpenChange={(open) => !open && setOtherCategory(null)}>

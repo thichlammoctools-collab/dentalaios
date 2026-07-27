@@ -1,6 +1,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import type { Visit, ClinicalFinding } from "@shared/types";
 import type { VisitCreateInput, VisitUpdateInput, FindingCreateInput, FindingUpdateInput, FindingsBatchCreateInput } from "@shared/validation";
+import { classifyToothFindingConflict } from "@shared/constants/clinical-findings";
 import { createVisitsRepository } from "../repositories/visits.repo";
 import { allocateFindingCode, createFindingsRepository } from "../repositories/findings.repo";
 import { createDiagnosesRepository } from "../repositories/diagnoses.repo";
@@ -146,6 +147,14 @@ export const visitService = {
     if (data.concept_id && (!concept || !concept.is_active)) throw new ValidationError("Khái niệm lâm sàng không còn hoạt động");
     if (concept && (concept.category !== data.category || concept.default_scope !== data.scope)) throw new ValidationError("Khái niệm không phù hợp với nhóm hoặc phạm vi finding");
     if (concept?.kind === "diagnosis") throw new ValidationError("Chẩn đoán cần được xác nhận qua hồ sơ diagnosis riêng");
+    const resolvedCondition = concept?.legacy_condition ?? data.condition;
+    await assertNoToothFindingConflict(db, tenantId, visitId, {
+      category: data.category,
+      scope: data.scope,
+      tooth_number: data.tooth_number ?? undefined,
+      condition: resolvedCondition,
+      location_details: data.location_details,
+    }, { acknowledgeConflict: data.acknowledge_conflict });
     const source = actor.entrySource ?? "doctor";
     const effectiveAt = source === "doctor" ? new Date().toISOString() : undefined;
     return createFindingsRepository(db).create(tenantId, visitId, {
@@ -157,7 +166,7 @@ export const visitService = {
       anatomical_site: data.category === "periodontal" && data.scope === "tooth" ? "gum" : data.anatomical_site,
       location_details: data.location_details,
       measurements: data.measurements,
-      condition: concept?.legacy_condition ?? data.condition,
+      condition: resolvedCondition,
       notes: data.notes,
       entered_by: actor.userId || undefined,
       entry_source: source,
@@ -195,6 +204,38 @@ export const visitService = {
       resolved.push({ finding, concept });
     }
 
+    // Kiểm tra xung đột trên toàn lô: gồm finding đã lưu trong DB + các finding trong batch đứng trước.
+    const existingFindings = await createFindingsRepository(db).listByVisit(tenantId, visitId);
+    const batchAccumulator: Array<Pick<ClinicalFinding, "id" | "category" | "scope" | "tooth_number" | "condition" | "location_details">> = [...existingFindings];
+    for (const [itemIndex, { finding, concept }] of resolved.entries()) {
+      const resolvedCondition = concept?.legacy_condition ?? finding.condition;
+      const conflict = classifyToothFindingConflict({
+        category: finding.category,
+        scope: finding.scope,
+        tooth_number: finding.tooth_number ?? undefined,
+        condition: resolvedCondition,
+        location_details: finding.location_details,
+      }, batchAccumulator);
+      if (conflict.kind === "duplicate") {
+        throw new ConflictError(
+          `Đã có ghi nhận giống hệt trên răng #${finding.tooth_number} (mục ${itemIndex + 1}); không thể tạo bản ghi trùng lặp.`,
+        );
+      }
+      if ((conflict.kind === "conflict_negation" || conflict.kind === "conflict_absolute") && !finding.acknowledge_conflict) {
+        throw new ConflictError(
+          `Ghi nhận mới cho răng #${finding.tooth_number} (mục ${itemIndex + 1}) mâu thuẫn với ghi nhận trước; hãy xác nhận để lưu song song hoặc chỉnh sửa bản ghi cũ.`,
+        );
+      }
+      batchAccumulator.push({
+        id: `pending-${itemIndex}`,
+        category: finding.category,
+        scope: finding.scope,
+        tooth_number: finding.tooth_number ?? undefined,
+        condition: resolvedCondition,
+        location_details: finding.location_details,
+      });
+    }
+
     const rows = [] as Array<{ id: string; code: string; finding: FindingCreateInput; concept: Awaited<ReturnType<typeof terminology.getConcept>> }>;
     for (const { finding, concept } of resolved) {
       rows.push({ id: crypto.randomUUID(), code: await allocateFindingCode(db, tenantId), finding, concept });
@@ -230,13 +271,22 @@ export const visitService = {
     if (!visit) throw new NotFoundError("Visit not found");
     if (visit.locked_at) throw new ConflictError("Hồ sơ lượt khám đã được ký và khóa; hãy tạo amendment");
     const findings = createFindingsRepository(db);
-    if (!await findings.getByVisitAndId(tenantId, visitId, findingId)) {
+    const current = await findings.getByVisitAndId(tenantId, visitId, findingId);
+    if (!current) {
       throw new NotFoundError("Finding not found");
     }
     const concept = data.concept_id ? await createClinicalTerminologyRepository(db).getConcept(data.concept_id) : null;
     if (data.concept_id && (!concept || !concept.is_active)) throw new ValidationError("Khái niệm lâm sàng không còn hoạt động");
+    const resolvedCondition = concept?.legacy_condition ?? data.condition;
+    await assertNoToothFindingConflict(db, tenantId, visitId, {
+      category: current.category,
+      scope: current.scope,
+      tooth_number: current.tooth_number,
+      condition: resolvedCondition,
+      location_details: data.location_details ?? current.location_details,
+    }, { acknowledgeConflict: data.acknowledge_conflict, excludeId: findingId });
     return findings.update(tenantId, findingId, {
-      condition: concept?.legacy_condition ?? data.condition,
+      condition: resolvedCondition,
       concept_id: data.concept_id ?? undefined,
       notes: data.notes ?? null,
       anatomical_site: data.anatomical_site,
@@ -300,4 +350,41 @@ async function hasConfirmedPayment(db: D1Database, tenantId: string, visitId: st
     .bind(tenantId, visitId)
     .first();
   return Boolean(row);
+}
+
+/**
+ * Kiểm tra xung đột trạng thái răng trước khi ghi:
+ * - `duplicate` → chặn cứng (409), không nhận acknowledge_conflict.
+ * - `conflict_negation` / `conflict_absolute` → cảnh báo (409). Người dùng có thể xác nhận bằng
+ *   `acknowledge_conflict=true` để lưu song song với ghi chú lâm sàng.
+ */
+async function assertNoToothFindingConflict(
+  db: D1Database,
+  tenantId: string,
+  visitId: string,
+  incoming: {
+    category: ClinicalFinding["category"];
+    scope: ClinicalFinding["scope"];
+    tooth_number?: number;
+    condition: string;
+    location_details?: ClinicalFinding["location_details"];
+  },
+  options: { acknowledgeConflict?: boolean; excludeId?: string } = {},
+): Promise<void> {
+  if (incoming.scope !== "tooth" || incoming.tooth_number == null) return;
+  const existing = await createFindingsRepository(db).listByVisit(tenantId, visitId);
+  const conflict = classifyToothFindingConflict(incoming, existing, { excludeId: options.excludeId });
+  if (conflict.kind === "none") return;
+  if (conflict.kind === "duplicate") {
+    throw new ConflictError(
+      `Đã có ghi nhận giống hệt trên răng #${incoming.tooth_number}; không thể tạo bản ghi trùng lặp.`,
+    );
+  }
+  if (options.acknowledgeConflict) return;
+  const reason = conflict.kind === "conflict_negation"
+    ? `mâu thuẫn với ghi nhận "răng khỏe"`
+    : `mâu thuẫn với trạng thái tuyệt đối của răng (mất/mọc ngầm/chưa mọc)`;
+  throw new ConflictError(
+    `Ghi nhận mới cho răng #${incoming.tooth_number} ${reason}; hãy xác nhận để lưu song song hoặc chỉnh sửa bản ghi cũ.`,
+  );
 }

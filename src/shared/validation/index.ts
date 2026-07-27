@@ -414,6 +414,8 @@ export const findingUpdateSchema = z.object({
   anatomical_site: z.enum(ANATOMICAL_SITES).optional(),
   location_details: findingLocationDetailsSchema,
   measurements: findingMeasurementsSchema,
+  /** Bác sĩ xác nhận đồng ý lưu bản ghi mâu thuẫn trên cùng răng. */
+  acknowledge_conflict: z.boolean().optional(),
 });
 
 export type FindingUpdateInput = z.infer<typeof findingUpdateSchema>;

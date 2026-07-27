@@ -307,12 +307,39 @@ describe("POST /api/visits/:id/findings", () => {
 
   it("accepts periodontitis with six-point pocket measurements", async () => {
     const app = mountRoute("/api/visits", visitsRoutes);
-    const findingRow = { id: "periodontal-2", tenant_id: "test-tenant", visit_id: "visit-1", category: "periodontal", scope: "tooth", tooth_number: 36, tooth_system: "FDI", anatomical_site: "gum", condition: "periodontitis", notes: null, created_at: "2026-01-01" };
+    const findingRow = { id: "periodontal-2", tenant_id: "test-tenant", visit_id: "visit-1", category: "periodontal", scope: "tooth", tooth_number: 36, tooth_system: "FDI", anatomical_site: "gum", condition: "gingivitis", notes: null, created_at: "2026-01-01" };
     const res = await authedRequestWithDB(app, "POST", "/api/visits/visit-1/findings", new Map([["FROM visits", [visitRow()]], ["FROM clinical_findings", [findingRow]]]), {
       permissions: ["write_findings"],
       body: { tooth_number: 36, category: "periodontal", scope: "tooth", anatomical_site: "gum", condition: "periodontitis", measurements: { periodontal_pocket_depth_mm: { mesiobuccal: 4, mesiolingual: 5 } } },
     });
     expect(res.status).toBe(201);
+  });
+
+  it("rejects an identical tooth finding as a duplicate", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const findingRow = { id: "caries-1", tenant_id: "test-tenant", visit_id: "visit-1", category: "tooth_hard_tissue", scope: "tooth", tooth_number: 17, tooth_system: "FDI", anatomical_site: null, condition: "caries", notes: null, created_at: "2026-01-01" };
+    const res = await authedRequestWithDB(app, "POST", "/api/visits/visit-1/findings", new Map([["FROM visits", [visitRow()]], ["FROM clinical_findings", [findingRow]]]), {
+      permissions: ["write_findings"],
+      body: { tooth_number: 17, category: "tooth_hard_tissue", scope: "tooth", condition: "caries" },
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it("requires acknowledgement before saving a condition that conflicts with a healthy tooth", async () => {
+    const app = mountRoute("/api/visits", visitsRoutes);
+    const findingRow = { id: "good-1", tenant_id: "test-tenant", visit_id: "visit-1", category: "tooth_hard_tissue", scope: "tooth", tooth_number: 17, tooth_system: "FDI", anatomical_site: null, condition: "good", notes: null, created_at: "2026-01-01" };
+    const dbRows = new Map([["FROM visits", [visitRow()]], ["FROM clinical_findings", [findingRow]]]);
+    const denied = await authedRequestWithDB(app, "POST", "/api/visits/visit-1/findings", dbRows, {
+      permissions: ["write_findings"],
+      body: { tooth_number: 17, category: "tooth_hard_tissue", scope: "tooth", condition: "caries" },
+    });
+    expect(denied.status).toBe(409);
+
+    const acknowledged = await authedRequestWithDB(app, "POST", "/api/visits/visit-1/findings", dbRows, {
+      permissions: ["write_findings"],
+      body: { tooth_number: 17, category: "tooth_hard_tissue", scope: "tooth", condition: "caries", acknowledge_conflict: true },
+    });
+    expect(acknowledged.status).toBe(201);
   });
 
   it("rejects periodontitis without pocket depth", async () => {
@@ -555,7 +582,7 @@ describe("POST /api/visits/:id/findings/batch", () => {
       {
         permissions: ["write_findings"],
         body: {
-          findings: [{ tooth_number: 11, category: "tooth_hard_tissue", scope: "tooth", condition: "caries" }],
+          findings: [{ tooth_number: 11, category: "tooth_hard_tissue", scope: "tooth", condition: "fracture" }],
         },
       },
     );
