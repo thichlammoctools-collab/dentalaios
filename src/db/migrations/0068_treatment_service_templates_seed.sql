@@ -48,35 +48,39 @@ WHERE market_price_median IS NULL;
 -- Seed ICD-10 primary link cho các mã ICD-10 đang có trong `icd10_codes`.
 -- Chỉ chèn link khi mã ICD-10 khớp code tồn tại trong bảng chuẩn để tránh
 -- vi phạm FK trong tenant chưa có terminology version.
+-- Dùng CTE với VALUES(...) thay cho UNION ALL để tránh giới hạn
+-- SQLITE_MAX_COMPOUND_SELECT thấp trên Cloudflare D1.
+WITH template_icd10_map(code, icd) AS (
+  VALUES
+    ('EXA-INITIAL',       'Z01.2'),
+    ('EXA-PERIODIC',      'Z01.2'),
+    ('RES-COMP-1S',       'K02.1'),
+    ('RES-COMP-2S',       'K02.1'),
+    ('RES-COMP-3S',       'K02.1'),
+    ('RES-GIC',           'K02.1'),
+    ('END-RCT-ANT',       'K04.0'),
+    ('END-RCT-PRE',       'K04.0'),
+    ('END-RCT-MOL',       'K04.0'),
+    ('END-RETREAT',       'K04.5'),
+    ('SUR-EXT-SIMPLE',    'K08.1'),
+    ('SUR-EXT-SURGICAL',  'K08.1'),
+    ('SUR-EXT-3M',        'K01.1'),
+    ('PRO-CROWN-PFM',     'K02.5'),
+    ('PRO-CROWN-ZIRCONIA','K02.5'),
+    ('PRO-VENEER',        'K03.7'),
+    ('PRO-BRIDGE-3U',     'K08.1'),
+    ('IMP-STAGE1',        'K08.1'),
+    ('IMP-CROWN',         'K08.1'),
+    ('PER-SCALING',       'K05.1'),
+    ('PER-SRP',           'K05.3'),
+    ('PRV-FLUORIDE',      'Z29.3'),
+    ('PRV-SEALANT',       'Z29.8'),
+    ('OTH-EMERGENCY',     'K04.7')
+)
 INSERT OR IGNORE INTO platform_treatment_service_template_icd10
   (template_code, icd10_code_id, relation)
 SELECT t.code, i.id, 'primary'
-FROM (
-  SELECT 'EXA-INITIAL'       AS code, 'Z01.2' AS icd UNION ALL
-  SELECT 'EXA-PERIODIC',      'Z01.2' UNION ALL
-  SELECT 'RES-COMP-1S',       'K02.1' UNION ALL
-  SELECT 'RES-COMP-2S',       'K02.1' UNION ALL
-  SELECT 'RES-COMP-3S',       'K02.1' UNION ALL
-  SELECT 'RES-GIC',           'K02.1' UNION ALL
-  SELECT 'END-RCT-ANT',       'K04.0' UNION ALL
-  SELECT 'END-RCT-PRE',       'K04.0' UNION ALL
-  SELECT 'END-RCT-MOL',       'K04.0' UNION ALL
-  SELECT 'END-RETREAT',       'K04.5' UNION ALL
-  SELECT 'SUR-EXT-SIMPLE',    'K08.1' UNION ALL
-  SELECT 'SUR-EXT-SURGICAL',  'K08.1' UNION ALL
-  SELECT 'SUR-EXT-3M',        'K01.1' UNION ALL
-  SELECT 'PRO-CROWN-PFM',     'K02.5' UNION ALL
-  SELECT 'PRO-CROWN-ZIRCONIA','K02.5' UNION ALL
-  SELECT 'PRO-VENEER',        'K03.7' UNION ALL
-  SELECT 'PRO-BRIDGE-3U',     'K08.1' UNION ALL
-  SELECT 'IMP-STAGE1',        'K08.1' UNION ALL
-  SELECT 'IMP-CROWN',         'K08.1' UNION ALL
-  SELECT 'PER-SCALING',       'K05.1' UNION ALL
-  SELECT 'PER-SRP',           'K05.3' UNION ALL
-  SELECT 'PRV-FLUORIDE',      'Z29.3' UNION ALL
-  SELECT 'PRV-SEALANT',       'Z29.8' UNION ALL
-  SELECT 'OTH-EMERGENCY',     'K04.7'
-) t
+FROM template_icd10_map t
 JOIN icd10_codes i ON i.code = t.icd
 WHERE EXISTS (
   SELECT 1 FROM platform_treatment_service_templates ptst WHERE ptst.code = t.code
