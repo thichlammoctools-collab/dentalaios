@@ -23,7 +23,7 @@ INSERT OR IGNORE INTO roles (id, tenant_id, name, permissions) VALUES
   ('role-assistant',    'tenant-demo', 'assistant',    '["read_patients","write_visits"]'),
   ('role-receptionist', 'tenant-demo', 'receptionist', '["read_patients","write_patients","write_payments","write_appointments"]'),
   ('role-quan-ly',      'tenant-demo', 'Quản lý',     '["all"]'),
-  ('role-ke-toan',      'tenant-demo', 'Kế toán',     '["read_patients","write_payments"]'),
+  ('role-ke-toan',      'tenant-demo', 'Kế toán',     '["read_patients","write_payments","view_finance","manage_finance"]'),
   ('role-nhan-su',      'tenant-demo', 'Nhân sự',     '["manage_users","read_patients"]'),
   ('role-marketing',    'tenant-demo', 'Marketing',   '["read_patients"]'),
   ('role-bao-ve',       'tenant-demo', 'Bảo vệ',      '[]');

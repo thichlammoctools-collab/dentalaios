@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Armchair,
   BarChart3,
+  Banknote,
   Building2,
   CalendarCheck,
   CalendarClock,
@@ -134,6 +135,9 @@ export function Sidebar({ collapsed, onCollapsedChange, onNavigate }: SidebarPro
   const canViewDashboard = Boolean(
     session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.VIEW_MANAGEMENT_DASHBOARD),
   );
+  const canViewFinance = Boolean(
+    session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.VIEW_FINANCE),
+  );
 
   const activeGroupId = useMemo(
     () => NAV_GROUPS.find((group) => group.items.some((item) => item.match(pathname)))?.id,
@@ -177,6 +181,13 @@ export function Sidebar({ collapsed, onCollapsedChange, onNavigate }: SidebarPro
             onNavigate={onNavigate}
           />
         )}
+        {canViewFinance && (
+          <NavLink
+            item={{ label: "Tài chính phòng khám", href: ROUTES.FINANCE, match: (path) => path === ROUTES.FINANCE, icon: Banknote }}
+            collapsed={collapsed}
+            onNavigate={onNavigate}
+          />
+        )}
 
         {NAV_GROUPS.map((group, groupIndex) => {
           const isOpen = openGroups[group.id];
@@ -186,7 +197,7 @@ export function Sidebar({ collapsed, onCollapsedChange, onNavigate }: SidebarPro
           return (
             <section
               key={group.id}
-              className={cn("pt-4", (groupIndex > 0 || canViewDashboard) && "mt-3 border-t border-border", collapsed && "lg:pt-3")}
+              className={cn("pt-4", (groupIndex > 0 || canViewDashboard || canViewFinance) && "mt-3 border-t border-border", collapsed && "lg:pt-3")}
               aria-label={group.label}
             >
               <button

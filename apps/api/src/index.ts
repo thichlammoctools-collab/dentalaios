@@ -22,6 +22,7 @@ import { AppError } from "./lib/errors";
 import authRoutes from "./routes/auth";
 import registerRoutes from "./routes/register";
 import dashboardRoutes from "./routes/dashboard";
+import financeRoutes from "./routes/finance";
 import aiRoutes from "./routes/ai";
 import patientsRoutes from "./routes/patients";
 import visitsRoutes from "./routes/visits";
@@ -161,6 +162,7 @@ app.route("/api/clinical-reports", clinicalReportsRoutes);
 
 // Dashboard
 app.route("/api/dashboard", dashboardRoutes);
+app.route("/api/finance", financeRoutes);
 
 // AI
 app.route("/api/ai", aiRoutes);

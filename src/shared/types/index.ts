@@ -927,6 +927,110 @@ export interface PaymentAttachment {
   file: FileObject;
 }
 
+// ───────────────────────── Finance ─────────────────────────
+
+export type ExpenseCategory =
+  | "rent"
+  | "utilities"
+  | "supplies"
+  | "lab_fee"
+  | "staff_cost"
+  | "marketing"
+  | "maintenance"
+  | "equipment"
+  | "administration"
+  | "other";
+
+export type ExpenseStatus = "posted" | "void";
+
+export interface Expense {
+  id: string;
+  tenant_id: string;
+  branch_id?: string;
+  occurred_at: string;
+  category: ExpenseCategory;
+  amount: number;
+  currency: string;
+  method: PaymentMethod;
+  vendor_name?: string;
+  reference?: string;
+  notes?: string;
+  status: ExpenseStatus;
+  void_reason?: string;
+  voided_at?: string;
+  created_by: string;
+  created_at: string;
+}
+
+export type FinanceRange = 7 | 30 | 90;
+
+export interface FinanceFilter {
+  range: FinanceRange;
+  branch_id?: string;
+}
+
+export interface FinanceBranch {
+  id: string;
+  name: string;
+}
+
+export interface FinanceKpis {
+  confirmed_receipts: number;
+  operating_expenses: number;
+  referral_payouts: number;
+  net_cash: number;
+  outstanding_receivables: number;
+}
+
+export interface FinanceDailyPoint {
+  date: string;
+  receipts: number;
+  operating_expenses: number;
+  referral_payouts: number;
+}
+
+export interface FinanceExpenseCategoryBreakdown {
+  category: ExpenseCategory;
+  amount: number;
+}
+
+export interface FinanceBranchBreakdown {
+  branch_id?: string;
+  branch_name: string;
+  confirmed_receipts: number;
+  operating_expenses: number;
+  referral_payouts: number;
+  net_cash: number;
+}
+
+export interface FinanceLedgerEntry {
+  id: string;
+  kind: "receipt" | "expense" | "referral_payout";
+  occurred_at: string;
+  amount: number;
+  method?: PaymentMethod;
+  reference?: string;
+  label: string;
+  branch_id?: string;
+  branch_name?: string;
+  status?: ExpenseStatus;
+}
+
+export interface FinanceSnapshot {
+  generated_at: string;
+  timezone: "Asia/Ho_Chi_Minh";
+  range: FinanceRange;
+  range_start: string;
+  range_end: string;
+  branch_id?: string;
+  branches: FinanceBranch[];
+  kpis: FinanceKpis;
+  daily: FinanceDailyPoint[];
+  expense_categories: FinanceExpenseCategoryBreakdown[];
+  branch_breakdown: FinanceBranchBreakdown[];
+  ledger: FinanceLedgerEntry[];
+}
+
 // ───────────────────────── Files & Audit ─────────────────────────
 
 export interface FileObject {

@@ -752,6 +752,37 @@ export const paymentPrefixSchema = z.object({
 
 export type PaymentPrefixInput = z.infer<typeof paymentPrefixSchema>;
 
+// ──────────────── Finance ────────────────
+
+const expenseCategories = ["rent", "utilities", "supplies", "lab_fee", "staff_cost", "marketing", "maintenance", "equipment", "administration", "other"] as const;
+
+export const financeQuerySchema = z.object({
+  range: z.coerce.number().int().refine((value): value is 7 | 30 | 90 => [7, 30, 90].includes(value), {
+    message: "Khoảng thời gian phải là 7, 30 hoặc 90 ngày",
+  }).default(30),
+  branch_id: z.string().trim().min(1).optional(),
+});
+
+export const expenseCreateSchema = z.object({
+  branch_id: z.string().min(1).nullable().optional(),
+  occurred_at: dateString,
+  category: z.enum(expenseCategories),
+  amount: z.number().positive("Số tiền phải lớn hơn 0").max(1_000_000_000),
+  currency: z.literal("VND").default("VND"),
+  method: z.enum(["cash", "transfer", "card", "other"]),
+  vendor_name: optionalText(200),
+  reference: optionalText(200),
+  notes: optionalText(1000),
+}).strict();
+
+export const expenseVoidSchema = z.object({
+  reason: nonEmpty(500),
+}).strict();
+
+export type FinanceQuery = z.infer<typeof financeQuerySchema>;
+export type ExpenseCreateInput = z.infer<typeof expenseCreateSchema>;
+export type ExpenseVoidInput = z.infer<typeof expenseVoidSchema>;
+
 // ──────────────── Medical alerts ────────────────
 
 export const medicalAlertCreateSchema = z.object({

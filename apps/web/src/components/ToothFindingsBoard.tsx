@@ -116,13 +116,13 @@ interface ToothSummaryGroupProps {
 function ToothSummaryGroup({ label, items, selectedTooth, onSelect, visitId, readOnly, onUpdate, onDeleted }: ToothSummaryGroupProps) {
   return (
     <section className="border-b border-border last:border-b-0">
-      <div className="flex items-center justify-between bg-muted/30 px-3 py-2">
-        <h3 className="text-sm font-semibold">{label}</h3>
-        <span className="text-xs text-muted-foreground">{items.length} răng</span>
+      <div className="flex items-center justify-between border-y border-border bg-muted/40 px-4 py-2.5 first:border-t-0">
+        <div className="flex items-center gap-2.5"><span className="h-5 w-1 rounded-full bg-primary/80" aria-hidden="true" /><h3 className="text-sm font-semibold tracking-tight">{label}</h3></div>
+        <span className="rounded-full border border-border bg-background/70 px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">{items.length} răng</span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[38rem] text-left text-sm" style={{ tableLayout: "fixed" }}>
-          <thead className="border-b border-border text-xs text-muted-foreground">
+          <thead className="border-b border-border bg-muted/10 text-xs text-muted-foreground">
             <tr>
               <th scope="col" className="w-20 px-3 py-2 font-medium">Răng</th>
               <th scope="col" className="w-[10rem] px-3 py-2 font-medium">Loại ghi nhận</th>
@@ -179,27 +179,27 @@ function ToothSummaryRow({ summary, isSelected, onToggle, onClose, visitId, read
           }
         }}
         className={cn(
-          "cursor-pointer border-b border-border/70 outline-none transition-colors last:border-b-0 hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
-          isSelected && "bg-primary/10 hover:bg-primary/10",
+          "cursor-pointer border-b border-border/70 outline-none transition-colors last:border-b-0 hover:bg-muted/35 focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
+          isSelected && "bg-primary/10 shadow-[inset_3px_0_0_hsl(var(--primary))] hover:bg-primary/10",
         )}
       >
-        <td className="px-3 py-3"><span className="font-mono font-semibold">#{summary.tooth}</span></td>
-        <td className="px-3 py-3"><div className="flex flex-wrap gap-1">{summary.categories.map((category) => <Badge key={category} variant="secondary">{getFindingCategory(category).label}</Badge>)}</div></td>
+        <td className="px-3 py-3"><span className={cn("inline-flex min-w-11 items-center justify-center rounded-md border px-2 py-1 font-mono text-sm font-semibold tabular-nums", isSelected ? "border-primary/40 bg-primary/10 text-primary" : "border-border bg-muted/30")}>#{summary.tooth}</span></td>
+        <td className="px-3 py-3"><div className="flex flex-wrap gap-1.5">{summary.categories.map((category) => <CategoryBadge key={category} category={category} />)}</div></td>
         <td className="px-3 py-3">
-          <p className="font-medium">{getFindingConditionLabel(summary.latest.category, summary.latest.condition)}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{formatFindingDate(summary.latest)}</p>
+          <p className="font-medium leading-tight">{getFindingConditionLabel(summary.latest.category, summary.latest.condition)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Cập nhật {formatFindingDate(summary.latest)}</p>
         </td>
-        <td className="px-3 py-3 text-right"><Badge variant={isSelected ? "default" : "outline"}>{summary.findings.length}</Badge></td>
+        <td className="px-3 py-3 text-right"><span className={cn("inline-flex min-w-6 justify-center rounded-md border px-1.5 py-0.5 text-xs font-semibold tabular-nums", isSelected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-muted/20 text-muted-foreground")}>{summary.findings.length}</span></td>
       </tr>
       {isSelected && (
         <tr>
-          <td colSpan={4} className="bg-muted/20 p-0">
-            <div className="border-t border-border px-4 py-3">
+          <td colSpan={4} className="bg-primary/[0.035] p-0">
+            <div className="border-t border-primary/20 px-4 py-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline">Răng #{summary.tooth}</Badge>
                   <Badge variant="secondary">{summary.findings.length} ghi nhận</Badge>
-                  {summary.categories.map((category) => <Badge key={category} variant="secondary">{getFindingCategory(category).label}</Badge>)}
+                  {summary.categories.map((category) => <CategoryBadge key={category} category={category} />)}
                 </div>
                 <Button variant="ghost" size="sm" onClick={onClose}>Đóng chi tiết</Button>
               </div>
@@ -219,6 +219,14 @@ function ToothSummaryRow({ summary, isSelected, onToggle, onClose, visitId, read
   );
 }
 
+function CategoryBadge({ category }: { category: FindingCategory }) {
+  const tones: Partial<Record<FindingCategory, string>> = {
+    tooth_hard_tissue: "border-sky-500/25 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+    periodontal: "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+  };
+  return <span className={cn("inline-flex rounded-md border px-1.5 py-0.5 text-[11px] font-medium", tones[category] ?? "border-border bg-muted text-muted-foreground")}>{getFindingCategory(category).label}</span>;
+}
+
 interface FilterToolbarProps {
   filter: CategoryFilter;
   onChange: (filter: CategoryFilter) => void;
@@ -233,7 +241,7 @@ function FilterToolbar({ filter, onChange, totalTeeth, totalFindings }: FilterTo
     { value: "periodontal", label: "Nha chu" },
   ];
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/20 p-2 text-xs">
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/20 px-3 py-2.5 text-xs">
       <div className="flex flex-wrap gap-1">
         {options.map((option) => (
           <button
@@ -242,15 +250,15 @@ function FilterToolbar({ filter, onChange, totalTeeth, totalFindings }: FilterTo
             onClick={() => onChange(option.value)}
             aria-pressed={filter === option.value}
             className={cn(
-              "rounded-md px-2 py-1 text-[11px] font-medium transition-colors",
-              filter === option.value ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:bg-background/60",
+              "rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors",
+              filter === option.value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
             )}
           >
             {option.label}
           </button>
         ))}
       </div>
-      <span className="text-[11px] text-muted-foreground">{totalTeeth} răng · {totalFindings} ghi nhận</span>
+      <span className="rounded-full bg-background/70 px-2 py-1 text-[11px] font-medium tabular-nums text-muted-foreground">{totalTeeth} răng · {totalFindings} ghi nhận</span>
     </div>
   );
 }

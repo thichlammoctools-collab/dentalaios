@@ -21,6 +21,7 @@ import { NotFoundPage } from "@/pages/NotFoundPage";
 import { SchedulePage } from "@/pages/SchedulePage";
 import { ScheduleNewPage } from "@/pages/ScheduleNewPage";
 import { ManagementDashboardPage } from "@/pages/ManagementDashboardPage";
+import { FinancePage } from "@/pages/FinancePage";
 import { ChairBoardPage } from "@/pages/ChairBoardPage";
 import { ChairSettingsPage } from "@/pages/ChairSettingsPage";
 import { ChairRevenueReportPage } from "@/pages/ChairRevenueReportPage";
@@ -104,6 +105,7 @@ export function AppRoutes() {
           </Protected>
         }
       />
+      <Route path={ROUTES.FINANCE} element={<Protected><FinancePage /></Protected>} />
       <Route
         path={ROUTES.TODAY}
         element={
