@@ -136,13 +136,13 @@ function ToothSummaryGroup({ label, items, selectedTooth, onSelect }: ToothSumma
         <span className="text-xs text-muted-foreground">{items.length} răng</span>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[38rem] text-left text-sm">
+        <table className="w-full min-w-[38rem] text-left text-sm" style={{ tableLayout: "fixed" }}>
           <thead className="border-b border-border text-xs text-muted-foreground">
             <tr>
-              <th scope="col" className="w-24 px-3 py-2 font-medium">Răng</th>
-              <th scope="col" className="px-3 py-2 font-medium">Loại ghi nhận</th>
+              <th scope="col" className="w-20 px-3 py-2 font-medium">Răng</th>
+              <th scope="col" className="w-[10rem] px-3 py-2 font-medium">Loại ghi nhận</th>
               <th scope="col" className="px-3 py-2 font-medium">Ghi nhận mới nhất</th>
-              <th scope="col" className="w-24 px-3 py-2 text-right font-medium">Số lượng</th>
+              <th scope="col" className="w-16 px-3 py-2 text-right font-medium">Số lượng</th>
             </tr>
           </thead>
           <tbody>

@@ -159,7 +159,8 @@ export function FdiToothChart({ visitId, findings, readOnly = false, onCreated, 
         : periodontalSurfaces.length ? { periodontal_surfaces: periodontalSurfaces as FindingLocationDetails["periodontal_surfaces"] } : undefined,
     }, findings);
 
-  const toothConflictRequiresAcknowledgement = toothConflict.kind === "conflict_negation" || toothConflict.kind === "conflict_absolute";
+  const hasExistingToothFindings = selectedTooth != null && existingFindings({ tooth: selectedTooth }).length > 0;
+  const toothConflictRequiresAcknowledgement = hasExistingToothFindings && (toothConflict.kind === "conflict_negation" || toothConflict.kind === "conflict_absolute");
 
   function findingLocation(finding: ClinicalFinding) {
     if (finding.scope !== "region") return "Toàn miệng";
