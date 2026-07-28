@@ -106,7 +106,7 @@ interface ToothSummaryGroupProps {
   label: string;
   items: ToothSummary[];
   selectedTooth: number | null;
-  onSelect: (tooth: number) => void;
+  onSelect: (tooth: number | null) => void;
   visitId: string;
   readOnly: boolean;
   onUpdate: (finding: ClinicalFinding) => void;
@@ -138,7 +138,8 @@ function ToothSummaryGroup({ label, items, selectedTooth, onSelect, visitId, rea
                   key={summary.tooth}
                   summary={summary}
                   isSelected={isSelected}
-                  onSelect={onSelect}
+                  onToggle={() => onSelect(isSelected ? null : summary.tooth)}
+                  onClose={() => onSelect(null)}
                   visitId={visitId}
                   readOnly={readOnly}
                   onUpdate={onUpdate}
@@ -156,24 +157,25 @@ function ToothSummaryGroup({ label, items, selectedTooth, onSelect, visitId, rea
 interface ToothSummaryRowProps {
   summary: ToothSummary;
   isSelected: boolean;
-  onSelect: (tooth: number) => void;
+  onToggle: () => void;
+  onClose: () => void;
   visitId: string;
   readOnly: boolean;
   onUpdate: (finding: ClinicalFinding) => void;
   onDeleted: (id: string) => void;
 }
 
-function ToothSummaryRow({ summary, isSelected, onSelect, visitId, readOnly, onUpdate, onDeleted }: ToothSummaryRowProps) {
+function ToothSummaryRow({ summary, isSelected, onToggle, onClose, visitId, readOnly, onUpdate, onDeleted }: ToothSummaryRowProps) {
   return (
     <>
       <tr
         tabIndex={0}
         aria-selected={isSelected}
-        onClick={() => onSelect(summary.tooth)}
+        onClick={onToggle}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            onSelect(summary.tooth);
+            onToggle();
           }
         }}
         className={cn(
@@ -199,7 +201,7 @@ function ToothSummaryRow({ summary, isSelected, onSelect, visitId, readOnly, onU
                   <Badge variant="secondary">{summary.findings.length} ghi nhận</Badge>
                   {summary.categories.map((category) => <Badge key={category} variant="secondary">{getFindingCategory(category).label}</Badge>)}
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => onSelect(summary.tooth)}>Đóng chi tiết</Button>
+                <Button variant="ghost" size="sm" onClick={onClose}>Đóng chi tiết</Button>
               </div>
               <FindingsList
                 visitId={visitId}
