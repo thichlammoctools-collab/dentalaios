@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,6 +61,7 @@ export function EndodonticPainPathwayCard({ visitId, canWrite, canReview }: Endo
   const [creating, setCreating] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, EndodonticPainAssessmentPayload>>({});
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
 
   async function load() {
     setLoading(true);
@@ -76,6 +77,15 @@ export function EndodonticPainPathwayCard({ visitId, canWrite, canReview }: Endo
   }
 
   useEffect(() => { void load(); }, [visitId]);
+
+  const toggleCollapsed = useCallback((id: string) => {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   async function createAssessment() {
     if (!toothNumber) { toast.error("Chọn răng cần đánh giá"); return; }
@@ -178,18 +188,33 @@ export function EndodonticPainPathwayCard({ visitId, canWrite, canReview }: Endo
     </CardHeader>
     <CardContent className="space-y-4">
       {!data.assessments.length && <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Bác sĩ chủ động chọn một răng để bắt đầu đánh giá. Mỗi assessment được theo dõi độc lập.</p>}
-      {data.assessments.map((entry) => <AssessmentCard key={entry.assessment.id} entry={entry} draft={drafts[entry.assessment.id] ?? blankAssessment()} canWrite={canWrite} canReview={canReview} saving={savingId === entry.assessment.id} onDraftChange={(draft) => setDrafts((current) => ({ ...current, [entry.assessment.id]: draft }))} onSave={() => void saveAssessment(entry.assessment)} onUpdateItem={(item, status) => void updateItem(entry.assessment.id, item, status)} onClose={() => void closeAssessment(entry.assessment.id)} onAccept={() => void acceptAssessment(entry.assessment.id)} />)}
+      {data.assessments.map((entry) => <AssessmentCard key={entry.assessment.id} entry={entry} draft={drafts[entry.assessment.id] ?? blankAssessment()} canWrite={canWrite} canReview={canReview} saving={savingId === entry.assessment.id} collapsed={collapsedIds.has(entry.assessment.id)} onToggleCollapse={() => toggleCollapsed(entry.assessment.id)} onDraftChange={(draft) => setDrafts((current) => ({ ...current, [entry.assessment.id]: draft }))} onSave={() => void saveAssessment(entry.assessment)} onUpdateItem={(item, status) => void updateItem(entry.assessment.id, item, status)} onClose={() => void closeAssessment(entry.assessment.id)} onAccept={() => void acceptAssessment(entry.assessment.id)} />)}
     </CardContent>
   </Card>;
 }
 
-function AssessmentCard({ entry, draft, canWrite, canReview, saving, onDraftChange, onSave, onUpdateItem, onClose, onAccept }: { entry: PathwayAssessmentResponse; draft: EndodonticPainAssessmentPayload; canWrite: boolean; canReview: boolean; saving: boolean; onDraftChange: (draft: EndodonticPainAssessmentPayload) => void; onSave: () => void; onUpdateItem: (item: ClinicalPathwayAssessmentItem, status: "completed" | "skipped") => void; onClose: () => void; onAccept: () => void }) {
+function AssessmentCard({ entry, draft, canWrite, canReview, saving, collapsed, onToggleCollapse, onDraftChange, onSave, onUpdateItem, onClose, onAccept }: { entry: PathwayAssessmentResponse; draft: EndodonticPainAssessmentPayload; canWrite: boolean; canReview: boolean; saving: boolean; collapsed: boolean; onToggleCollapse: () => void; onDraftChange: (draft: EndodonticPainAssessmentPayload) => void; onSave: () => void; onUpdateItem: (item: ClinicalPathwayAssessmentItem, status: "completed" | "skipped") => void; onClose: () => void; onAccept: () => void }) {
   const { assessment, items, patterns } = entry;
   const pending = items.filter((item) => item.status === "pending");
   const isClosed = assessment.status !== "active";
+  const completedCount = items.length - pending.length;
+  const allDone = pending.length === 0;
   const field = (label: string, value: string, options: { value: string; label: string }[], change: (value: string) => void) => <label className="grid gap-1 text-xs font-medium"><span>{label}</span><Select className="h-9 text-sm" value={value} onChange={(event) => change(event.target.value)} disabled={!canWrite || isClosed}>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</Select></label>;
-  return <div className="rounded-xl border border-border bg-card p-4">
-    <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex items-center gap-2"><p className="font-semibold">Răng {assessment.tooth_number}</p><Badge variant={assessment.status === "completed" ? "success" : assessment.status === "closed_with_exceptions" ? "warning" : "secondary"}>{assessment.status === "active" ? "Đang đánh giá" : assessment.status === "completed" ? "Hoàn tất" : "Hoàn tất có ngoại lệ"}</Badge>{!assessment.clinical_effective_at && <Badge variant="warning">Chờ bác sĩ duyệt</Badge>}</div><p className="mt-1 text-xs text-muted-foreground">{items.length - pending.length}/{items.length} mục đã xử lý · phiên bản {assessment.pathway_version}</p></div>{assessment.status === "active" && <div className="flex gap-2">{!assessment.clinical_effective_at && canReview && <Button size="sm" onClick={onAccept} disabled={saving}>{saving ? "Đang duyệt..." : "Bác sĩ duyệt"}</Button>}{canWrite && <Button size="sm" variant="outline" onClick={onSave} disabled={saving}>{saving ? "Đang lưu..." : "Lưu assessment"}</Button>}{canWrite && <Button size="sm" onClick={onClose} disabled={saving || !assessment.clinical_effective_at}>Hoàn tất</Button>}</div>}</div>
+  return <div className="rounded-xl border border-border bg-card">
+    <button type="button" onClick={onToggleCollapse} className="flex w-full items-center justify-between gap-3 p-4 text-left transition-colors hover:bg-muted/30">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="font-semibold">Răng {assessment.tooth_number}</p>
+          <Badge variant={assessment.status === "completed" ? "success" : assessment.status === "closed_with_exceptions" ? "warning" : "secondary"}>{assessment.status === "active" ? "Đang đánh giá" : assessment.status === "completed" ? "Hoàn tất" : "Hoàn tất có ngoại lệ"}</Badge>
+          {!assessment.clinical_effective_at && <Badge variant="warning">Chờ bác sĩ duyệt</Badge>}
+          {allDone && assessment.status === "active" && <Badge variant="success">Hoàn tất</Badge>}
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">{completedCount}/{items.length} mục đã xử lý · phiên bản {assessment.pathway_version}</p>
+      </div>
+      <svg className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200", !collapsed && "rotate-180")} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+    </button>
+    {!collapsed && <div className="border-t border-border p-4">
+    <div className="flex flex-wrap gap-2 sm:justify-end">{assessment.status === "active" && <>{!assessment.clinical_effective_at && canReview && <Button size="sm" onClick={onAccept} disabled={saving}>{saving ? "Đang duyệt..." : "Bác sĩ duyệt"}</Button>}{canWrite && <Button size="sm" variant="outline" onClick={onSave} disabled={saving}>{saving ? "Đang lưu..." : "Lưu assessment"}</Button>}{canWrite && <Button size="sm" onClick={onClose} disabled={saving || !assessment.clinical_effective_at}>Hoàn tất</Button>}</>}</div>
     {!isClosed && <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {field("Đau tự phát", draft.symptoms.spontaneous_pain, symptomOptions, (value) => onDraftChange({ ...draft, symptoms: { ...draft.symptoms, spontaneous_pain: value as EndodonticPainAssessmentPayload["symptoms"]["spontaneous_pain"] } }))}
       {field("Đau khi nhai", draft.symptoms.pain_on_biting, symptomOptions, (value) => onDraftChange({ ...draft, symptoms: { ...draft.symptoms, pain_on_biting: value as EndodonticPainAssessmentPayload["symptoms"]["pain_on_biting"] } }))}
@@ -206,6 +231,7 @@ function AssessmentCard({ entry, draft, canWrite, canReview, saving, onDraftChan
     <div className="mt-4 grid gap-4 lg:grid-cols-2"><div><p className="mb-2 text-sm font-medium">Danh sách kiểm tra</p><div className="space-y-2">{items.map((item) => <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm" key={item.id}><div><p>{CHECKLIST_LABELS[item.item_key] ?? item.item_key.replaceAll("_", " ")}</p>{item.skip_reason && <p className="mt-0.5 text-xs text-muted-foreground">Bỏ qua: {item.skip_reason}</p>}</div><div className="flex shrink-0 items-center gap-2"><Badge variant={item.status === "completed" ? "success" : item.status === "skipped" ? "warning" : "secondary"}>{item.status === "completed" ? "Đã xong" : item.status === "skipped" ? "Bỏ qua" : "Cần xử lý"}</Badge>{canWrite && !isClosed && item.status === "pending" && <><Button size="sm" variant="ghost" onClick={() => onUpdateItem(item, "completed")}>Đánh dấu xong</Button><Button size="sm" variant="ghost" onClick={() => onUpdateItem(item, "skipped")}>Bỏ qua</Button></>}</div></div>)}</div></div>
       <div><p className="mb-2 text-sm font-medium">Pattern cần cân nhắc</p>{patterns.length ? <div className="space-y-2">{patterns.map((pattern) => <div key={pattern.pattern_key} className={cn("rounded-lg border p-3 text-sm", pattern.priority === 0 ? "border-amber-500/40 bg-amber-500/5" : "border-cyan-500/30 bg-cyan-500/[0.03]")}><p className="font-medium">{pattern.title}</p><p className="mt-1 text-muted-foreground">{pattern.explanation}</p>{pattern.missing_item_keys.length > 0 && <p className="mt-2 text-xs text-muted-foreground">Còn thiếu: {pattern.missing_item_keys.map((key) => CHECKLIST_LABELS[key] ?? key).join(", ")}</p>}<p className="mt-2 text-[11px] text-muted-foreground">{pattern.source_reference}</p></div>)}</div> : <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">Chưa có pattern cần ưu tiên. Cập nhật assessment để hệ thống kiểm tra dữ liệu thiếu hoặc mâu thuẫn.</p>}</div>
     </div>
+    </div>}
   </div>;
 }
 

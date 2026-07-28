@@ -71,8 +71,6 @@ export function ToothFindingsBoard({ visitId, findings, readOnly = false, onUpda
     return groups;
   }, [summaries]);
 
-  const selectedSummary = summaries.find((summary) => summary.tooth === selectedTooth) ?? null;
-
   return (
     <div className="space-y-4">
       <FilterToolbar filter={filter} onChange={setFilter} totalTeeth={summaries.length} totalFindings={filteredFindings.length} />
@@ -91,31 +89,14 @@ export function ToothFindingsBoard({ visitId, findings, readOnly = false, onUpda
                 items={items}
                 selectedTooth={selectedTooth}
                 onSelect={setSelectedTooth}
+                visitId={visitId}
+                readOnly={readOnly}
+                onUpdate={onUpdate}
+                onDeleted={onDeleted}
               />
             );
           })}
         </div>
-      )}
-
-      {selectedSummary && (
-        <section aria-label={`Chi tiết ghi nhận răng ${selectedSummary.tooth}`} className="rounded-lg border border-border bg-card p-4">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">Răng #{selectedSummary.tooth}</Badge>
-              <Badge variant="secondary">{selectedSummary.findings.length} ghi nhận</Badge>
-              {selectedSummary.categories.map((category) => <Badge key={category} variant="secondary">{getFindingCategory(category).label}</Badge>)}
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => setSelectedTooth(null)}>Đóng chi tiết</Button>
-          </div>
-          <FindingsList
-            visitId={visitId}
-            findings={selectedSummary.findings}
-            readOnly={readOnly}
-            onUpdate={onUpdate}
-            onDeleted={onDeleted}
-            flat
-          />
-        </section>
       )}
     </div>
   );
@@ -126,9 +107,13 @@ interface ToothSummaryGroupProps {
   items: ToothSummary[];
   selectedTooth: number | null;
   onSelect: (tooth: number) => void;
+  visitId: string;
+  readOnly: boolean;
+  onUpdate: (finding: ClinicalFinding) => void;
+  onDeleted: (id: string) => void;
 }
 
-function ToothSummaryGroup({ label, items, selectedTooth, onSelect }: ToothSummaryGroupProps) {
+function ToothSummaryGroup({ label, items, selectedTooth, onSelect, visitId, readOnly, onUpdate, onDeleted }: ToothSummaryGroupProps) {
   return (
     <section className="border-b border-border last:border-b-0">
       <div className="flex items-center justify-between bg-muted/30 px-3 py-2">
@@ -149,36 +134,86 @@ function ToothSummaryGroup({ label, items, selectedTooth, onSelect }: ToothSumma
             {items.map((summary) => {
               const isSelected = selectedTooth === summary.tooth;
               return (
-                <tr
+                <ToothSummaryRow
                   key={summary.tooth}
-                  tabIndex={0}
-                  aria-selected={isSelected}
-                  onClick={() => onSelect(summary.tooth)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      onSelect(summary.tooth);
-                    }
-                  }}
-                  className={cn(
-                    "cursor-pointer border-b border-border/70 outline-none transition-colors last:border-b-0 hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
-                    isSelected && "bg-primary/10 hover:bg-primary/10",
-                  )}
-                >
-                  <td className="px-3 py-3"><span className="font-mono font-semibold">#{summary.tooth}</span></td>
-                  <td className="px-3 py-3"><div className="flex flex-wrap gap-1">{summary.categories.map((category) => <Badge key={category} variant="secondary">{getFindingCategory(category).label}</Badge>)}</div></td>
-                  <td className="px-3 py-3">
-                    <p className="font-medium">{getFindingConditionLabel(summary.latest.category, summary.latest.condition)}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{formatFindingDate(summary.latest)}</p>
-                  </td>
-                  <td className="px-3 py-3 text-right"><Badge variant={isSelected ? "default" : "outline"}>{summary.findings.length}</Badge></td>
-                </tr>
+                  summary={summary}
+                  isSelected={isSelected}
+                  onSelect={onSelect}
+                  visitId={visitId}
+                  readOnly={readOnly}
+                  onUpdate={onUpdate}
+                  onDeleted={onDeleted}
+                />
               );
             })}
           </tbody>
         </table>
       </div>
     </section>
+  );
+}
+
+interface ToothSummaryRowProps {
+  summary: ToothSummary;
+  isSelected: boolean;
+  onSelect: (tooth: number) => void;
+  visitId: string;
+  readOnly: boolean;
+  onUpdate: (finding: ClinicalFinding) => void;
+  onDeleted: (id: string) => void;
+}
+
+function ToothSummaryRow({ summary, isSelected, onSelect, visitId, readOnly, onUpdate, onDeleted }: ToothSummaryRowProps) {
+  return (
+    <>
+      <tr
+        tabIndex={0}
+        aria-selected={isSelected}
+        onClick={() => onSelect(summary.tooth)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onSelect(summary.tooth);
+          }
+        }}
+        className={cn(
+          "cursor-pointer border-b border-border/70 outline-none transition-colors last:border-b-0 hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
+          isSelected && "bg-primary/10 hover:bg-primary/10",
+        )}
+      >
+        <td className="px-3 py-3"><span className="font-mono font-semibold">#{summary.tooth}</span></td>
+        <td className="px-3 py-3"><div className="flex flex-wrap gap-1">{summary.categories.map((category) => <Badge key={category} variant="secondary">{getFindingCategory(category).label}</Badge>)}</div></td>
+        <td className="px-3 py-3">
+          <p className="font-medium">{getFindingConditionLabel(summary.latest.category, summary.latest.condition)}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{formatFindingDate(summary.latest)}</p>
+        </td>
+        <td className="px-3 py-3 text-right"><Badge variant={isSelected ? "default" : "outline"}>{summary.findings.length}</Badge></td>
+      </tr>
+      {isSelected && (
+        <tr>
+          <td colSpan={4} className="bg-muted/20 p-0">
+            <div className="border-t border-border px-4 py-3">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">Răng #{summary.tooth}</Badge>
+                  <Badge variant="secondary">{summary.findings.length} ghi nhận</Badge>
+                  {summary.categories.map((category) => <Badge key={category} variant="secondary">{getFindingCategory(category).label}</Badge>)}
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => onSelect(summary.tooth)}>Đóng chi tiết</Button>
+              </div>
+              <FindingsList
+                visitId={visitId}
+                findings={summary.findings}
+                readOnly={readOnly}
+                onUpdate={onUpdate}
+                onDeleted={onDeleted}
+                flat
+              />
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 

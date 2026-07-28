@@ -256,9 +256,9 @@ export function PatientDetailPage() {
           </div>
         </div>
 
-        <div className="sticky top-0 z-10 -mx-4 border-y border-border bg-background px-4 py-3 shadow-sm sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 2xl:-mx-10 2xl:px-10">
-          <div className="mx-auto max-w-[90rem]">
-            <TabsList className="grid h-auto w-full grid-cols-3 items-stretch gap-1 rounded-lg bg-muted/60 p-1 sm:grid-cols-5 xl:grid-cols-9">
+        <div className="sticky top-0 z-10 -mx-4 bg-background px-4 py-3 shadow-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 2xl:-mx-10 2xl:px-10">
+          <div className="mx-auto max-w-[90rem] rounded-xl border border-border bg-muted/60 p-1 shadow-lg sm:shadow-xl">
+            <TabsList className="grid h-auto w-full grid-cols-3 items-stretch gap-1 bg-transparent p-0 sm:grid-cols-5 xl:grid-cols-9">
               <TabsTrigger value="overview" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">Tổng quan</TabsTrigger>
               <TabsTrigger value="alerts" className="h-full min-w-0 whitespace-normal px-2 py-2 text-center text-xs leading-4 sm:text-sm">
                 <span className="flex flex-wrap items-center justify-center gap-1">Cảnh báo <Count value={alerts.length} urgent /></span>
