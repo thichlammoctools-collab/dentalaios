@@ -387,8 +387,13 @@ export function PatientImageGallery({
   async function linkAnnotationEvidence(annotationVersionId: string) {
     if (!selected) return;
     const diagnosis = diagnosisOptions.find((item) => item.id === annotationDiagnosisIds[annotationVersionId]);
+    const annotation = annotations.find((item) => item.current_version.id === annotationVersionId);
     if (!diagnosis) {
       toast.error("Chọn chẩn đoán để liên kết");
+      return;
+    }
+    if (!annotation) {
+      toast.error("Không tìm thấy ghi chú trên ảnh");
       return;
     }
     const relation = annotationEvidenceRelations[annotationVersionId] ?? "supports";
@@ -398,6 +403,8 @@ export function PatientImageGallery({
         patient_image_id: selected.id,
         annotation_version_id: annotationVersionId,
         relation,
+        // Contradictory evidence requires an explanation; the annotation is that explanation.
+        note: relation === "contradicts" ? annotation.current_version.note : undefined,
       });
       setImageEvidence((current) => [evidence, ...current]);
       setSelectedAnnotationVersionId(annotationVersionId);
