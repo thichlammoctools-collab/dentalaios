@@ -1364,3 +1364,41 @@ export type PathwayAssessmentCreateInput = z.infer<typeof pathwayAssessmentCreat
 export type PathwayAssessmentUpdateInput = z.infer<typeof pathwayAssessmentUpdateSchema>;
 export type PathwayItemUpdateInput = z.infer<typeof pathwayItemUpdateSchema>;
 export type PathwayAssessmentCloseInput = z.infer<typeof pathwayAssessmentCloseSchema>;
+
+// ───────────────────────── Paraclinical Orders ─────────────────────────
+
+const paraclinicalOrderTypes = [
+  "panoramic_xray", "periapical_xray", "bitewing_xray",
+  "cbct", "cephalometric_xray",
+  "blood_test", "coagulation_test", "blood_glucose",
+  "hba1c", "allergy_test",
+  "biopsy", "culture_sensitivity", "other",
+] as const;
+
+export const paraclinicalOrderCreateSchema = z.object({
+  diagnosis_id: z.string().min(1).nullable().optional(),
+  order_type: z.enum(paraclinicalOrderTypes),
+  custom_type_name: optionalText(200),
+  body_site: optionalText(200),
+  clinical_reason: nonEmpty(1000),
+  notes: optionalText(2000),
+}).strict().refine(
+  (data) => data.order_type !== "other" || (data.custom_type_name && data.custom_type_name.length > 0),
+  { message: "Loại chỉ định khác cần nhập tên cụ thể", path: ["custom_type_name"] },
+);
+
+export const paraclinicalOrderUpdateSchema = z.object({
+  status: z.enum(["in_progress", "completed", "cancelled"]).optional(),
+  result_summary: optionalText(5000),
+  result_file_id: z.string().min(1).nullable().optional(),
+  abnormal_flag: z.enum(["normal", "abnormal", "critical"]).optional(),
+  cancel_reason: optionalText(500),
+  notes: optionalText(2000),
+  change_reason: optionalText(1000),
+}).strict().refine(
+  (data) => Object.keys(data).some((key) => key !== "change_reason"),
+  "Cần ít nhất một thay đổi",
+);
+
+export type ParaclinicalOrderCreateInput = z.infer<typeof paraclinicalOrderCreateSchema>;
+export type ParaclinicalOrderUpdateInput = z.infer<typeof paraclinicalOrderUpdateSchema>;

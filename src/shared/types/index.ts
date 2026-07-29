@@ -479,6 +479,43 @@ export interface ClinicalDiagnosis {
   current_revision: number;
 }
 
+// ───────────────────────── Paraclinical Orders ─────────────────────────
+
+export type ParaclinicalOrderType =
+  | "panoramic_xray" | "periapical_xray" | "bitewing_xray"
+  | "cbct" | "cephalometric_xray"
+  | "blood_test" | "coagulation_test" | "blood_glucose"
+  | "hba1c" | "allergy_test"
+  | "biopsy" | "culture_sensitivity" | "other";
+
+export type ParaclinicalOrderStatus = "pending" | "in_progress" | "completed" | "cancelled";
+
+export type ParaclinicalAbnormalFlag = "normal" | "abnormal" | "critical";
+
+export interface ParaclinicalOrder {
+  id: string;
+  tenant_id: string;
+  visit_id: string;
+  patient_id: string;
+  diagnosis_id?: string;
+  order_type: ParaclinicalOrderType;
+  custom_type_name?: string;
+  body_site?: string;
+  status: ParaclinicalOrderStatus;
+  clinical_reason: string;
+  result_summary?: string;
+  result_file_id?: string;
+  abnormal_flag?: ParaclinicalAbnormalFlag;
+  ordered_by: string;
+  ordered_at: string;
+  completed_at?: string;
+  cancelled_at?: string;
+  cancel_reason?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface VisitInitialAssessment {
   id: string;
   tenant_id: string;

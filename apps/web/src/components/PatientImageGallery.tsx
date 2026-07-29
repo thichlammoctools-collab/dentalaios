@@ -208,6 +208,18 @@ export function PatientImageGallery({
       return { key, label: key === "unlinked" ? "Chưa gắn lượt khám" : visit ? `Lượt khám ${new Date(visit.date).toLocaleDateString("vi-VN")}` : "Lượt khám", items };
     });
 
+  function annotationTypeLabel(shape: ImageAnnotationShapeType) {
+    return shape === "pin" ? "Mũi tên" : shape === "freehand" ? "Vẽ tự do" : "Hình chữ nhật";
+  }
+
+  function annotationDiagnosisLabel(annotationVersionId: string) {
+    const diagnosisNames = imageEvidence
+      .filter((evidence) => evidence.annotation_version_id === annotationVersionId)
+      .map((evidence) => diagnosisOptions.find((diagnosis) => diagnosis.id === evidence.diagnosis_id)?.concept_display_vi_snapshot)
+      .filter((name): name is string => Boolean(name));
+    return diagnosisNames.length ? diagnosisNames.join(", ") : "Chưa liên kết";
+  }
+
   function openUpload(files: File[]) {
     if (!files.length || uploading) return;
     setPendingFiles(files);
@@ -673,10 +685,9 @@ export function PatientImageGallery({
           </div>
 
           {canAnnotate && viewUrl && selected && !isDicomType(selected) && <section className="mb-4 rounded-xl border border-border p-3">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold">Ghi chú trên ảnh</p><p className="text-xs text-muted-foreground">Mũi tên: bấm lên vị trí cần chỉ. Vẽ tự do: nhấn giữ và kéo trên ảnh.</p></div><div className="flex gap-1"><Button size="sm" variant={annotationShape === "pin" ? "default" : "outline"} onClick={() => { setAnnotationShape("pin"); setAnnotationGeometry(null); drawingFreehandRef.current = false; freehandPointsRef.current = []; }}>Mũi tên</Button><Button size="sm" variant={annotationShape === "freehand" ? "default" : "outline"} onClick={() => { setAnnotationShape("freehand"); setAnnotationGeometry(null); drawingFreehandRef.current = false; freehandPointsRef.current = []; }}>Vẽ tự do</Button></div></div>
-            <textarea value={annotationNote} onChange={(event) => setAnnotationNote(event.target.value)} rows={2} placeholder="Mô tả dấu hiệu quan sát được trên ảnh" className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
-            <div className="mt-2 flex items-center justify-between gap-2"><p className="text-xs text-muted-foreground">{annotationGeometry ? "Đã tạo nét đánh dấu màu vàng, nhập ghi chú để lưu." : "Chưa tạo nét đánh dấu."}</p><Button size="sm" onClick={() => void saveAnnotation()} disabled={!annotationGeometry || !annotationNote.trim() || savingAnnotation}>{savingAnnotation ? "Đang lưu..." : "Lưu ghi chú"}</Button></div>
-            {annotations.length > 0 && <div className="mt-3 space-y-1 border-t pt-3">{annotations.map((annotation) => <button type="button" key={annotation.id} onClick={() => setSelectedAnnotationVersionId(annotation.current_version.id)} className={`block w-full rounded-md px-2 py-1.5 text-left text-xs ${selectedAnnotationVersionId === annotation.current_version.id ? "bg-primary/10 text-primary" : "hover:bg-muted"}`}><span className="font-medium">V{annotation.current_version.version_no}</span> · {annotation.current_version.note}</button>)}</div>}
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold">Ghi chú trên ảnh</p><p className="text-xs text-muted-foreground">Mũi tên: bấm lên vị trí cần chỉ. Vẽ tự do: nhấn giữ và kéo trên ảnh.</p></div><div className="flex gap-1"><Button size="sm" variant={annotationShape === "pin" ? "default" : "outline"} onClick={() => { setAnnotationShape("pin"); setAnnotationGeometry(null); setAnnotationNote(""); drawingFreehandRef.current = false; freehandPointsRef.current = []; }}>Mũi tên</Button><Button size="sm" variant={annotationShape === "freehand" ? "default" : "outline"} onClick={() => { setAnnotationShape("freehand"); setAnnotationGeometry(null); setAnnotationNote(""); drawingFreehandRef.current = false; freehandPointsRef.current = []; }}>Vẽ tự do</Button></div></div>
+            {annotationGeometry ? <div className="flex items-start gap-2"><textarea autoFocus value={annotationNote} onChange={(event) => setAnnotationNote(event.target.value)} rows={2} placeholder="Nhập tên hoặc nội dung ghi chú" className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" /><Button size="sm" onClick={() => void saveAnnotation()} disabled={!annotationNote.trim() || savingAnnotation}>{savingAnnotation ? "Đang lưu..." : "Lưu ghi chú"}</Button></div> : <p className="text-xs text-muted-foreground">Chọn một vị trí hoặc vẽ trên ảnh để nhập ghi chú.</p>}
+            {annotations.length > 0 && <div className="mt-3 overflow-x-auto border-t pt-3"><table className="w-full min-w-[540px] text-left text-xs"><thead className="text-muted-foreground"><tr className="border-b"><th className="px-2 py-2 font-medium">Tên ghi chú</th><th className="px-2 py-2 font-medium">Loại</th><th className="px-2 py-2 font-medium">Chẩn đoán</th></tr></thead><tbody>{annotations.map((annotation) => <tr key={annotation.id} onClick={() => setSelectedAnnotationVersionId(annotation.current_version.id)} className={`cursor-pointer border-b last:border-0 ${selectedAnnotationVersionId === annotation.current_version.id ? "bg-primary/10 text-primary" : "hover:bg-muted/60"}`}><td className="px-2 py-2 font-medium">{annotation.current_version.note}</td><td className="px-2 py-2">{annotationTypeLabel(annotation.current_version.shape_type)}</td><td className="px-2 py-2">{annotationDiagnosisLabel(annotation.current_version.id)}</td></tr>)}</tbody></table></div>}
           </section>}
 
           {canLinkEvidence && selected && <section className="mb-4 rounded-xl border border-border p-3">
