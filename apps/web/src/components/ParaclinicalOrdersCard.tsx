@@ -106,12 +106,13 @@ export function ParaclinicalOrdersCard({ visitId, patientId, readOnly = false }:
     if (!createForm.order_type) { toast.error("Chọn loại chỉ định"); return; }
     if (!createForm.clinical_reason.trim()) { toast.error("Nhập lý do chỉ định"); return; }
     if (createForm.order_type === "other" && !createForm.custom_type_name.trim()) { toast.error("Nhập tên loại chỉ định"); return; }
+    const needsBodySite = PARACLINICAL_ORDER_TYPES[createForm.order_type]?.group === "imaging";
     setSaving(true);
     try {
       await apiPost(`/api/visits/${visitId}/orders`, {
         order_type: createForm.order_type,
         custom_type_name: createForm.custom_type_name || undefined,
-        body_site: createForm.body_site || undefined,
+        body_site: needsBodySite ? createForm.body_site || undefined : undefined,
         diagnosis_id: createForm.diagnosis_id || undefined,
         clinical_reason: createForm.clinical_reason,
         notes: createForm.notes || undefined,
@@ -212,7 +213,11 @@ export function ParaclinicalOrdersCard({ visitId, patientId, readOnly = false }:
         <DialogBody className="grid gap-4">
           <div className="grid gap-2">
             <Label>Loại chỉ định <span className="text-destructive">*</span></Label>
-            <Select value={createForm.order_type} onChange={(e) => setCreateForm({ ...createForm, order_type: e.target.value as ParaclinicalOrderType })}>
+            <Select value={createForm.order_type} onChange={(e) => {
+              const orderType = e.target.value as ParaclinicalOrderType;
+              const needsBodySite = PARACLINICAL_ORDER_TYPES[orderType]?.group === "imaging";
+              setCreateForm({ ...createForm, order_type: orderType, body_site: needsBodySite ? createForm.body_site : "" });
+            }}>
               <option value="">Chọn loại</option>
               {ORDER_GROUPS.map((group) => (
                 <optgroup key={group} label={ORDER_GROUP_LABELS[group]}>
@@ -229,10 +234,12 @@ export function ParaclinicalOrdersCard({ visitId, patientId, readOnly = false }:
               <Textarea rows={1} value={createForm.custom_type_name} onChange={(e) => setCreateForm({ ...createForm, custom_type_name: e.target.value })} placeholder="Ví dụ: Chụp MRI sọ não" />
             </div>
           )}
-          <div className="grid gap-2">
-            <Label>Vị trí / Răng</Label>
-            <Textarea rows={1} value={createForm.body_site} onChange={(e) => setCreateForm({ ...createForm, body_site: e.target.value })} placeholder="Ví dụ: Răng #36, Hàm trên, Toàn thân..." />
-          </div>
+          {PARACLINICAL_ORDER_TYPES[createForm.order_type as ParaclinicalOrderType]?.group === "imaging" && (
+            <div className="grid gap-2">
+              <Label>Vị trí / Răng</Label>
+              <Textarea rows={1} value={createForm.body_site} onChange={(e) => setCreateForm({ ...createForm, body_site: e.target.value })} placeholder="Ví dụ: Răng #36, Hàm trên, Toàn thân..." />
+            </div>
+          )}
           <div className="grid gap-2">
             <Label>Liên kết chẩn đoán</Label>
             <Select value={createForm.diagnosis_id} onChange={(e) => setCreateForm({ ...createForm, diagnosis_id: e.target.value })}>

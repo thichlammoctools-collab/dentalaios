@@ -1,5 +1,5 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import type { ParaclinicalOrder } from "@shared/types";
+import type { ParaclinicalOrder, ParaclinicalOrderStatusHistory } from "@shared/types";
 import type { ParaclinicalOrderCreateInput, ParaclinicalOrderUpdateInput } from "@shared/validation";
 import { ConflictError, NotFoundError, ValidationError } from "../lib/errors";
 import { createParaclinicalOrdersRepository } from "../repositories/paraclinical-orders.repo";
@@ -13,6 +13,12 @@ export const paraclinicalOrderService = {
 
   async listByPatient(db: D1Database, tenantId: string, patientId: string): Promise<ParaclinicalOrder[]> {
     return createParaclinicalOrdersRepository(db).listByPatient(tenantId, patientId);
+  },
+
+  async listStatusHistory(db: D1Database, tenantId: string, visitId: string, orderId: string): Promise<ParaclinicalOrderStatusHistory[]> {
+    const order = await createParaclinicalOrdersRepository(db).get(tenantId, orderId);
+    if (!order || order.visit_id !== visitId) throw new NotFoundError("Chỉ định không tồn tại");
+    return createParaclinicalOrdersRepository(db).listStatusHistory(tenantId, orderId);
   },
 
   async create(
@@ -66,6 +72,7 @@ export const paraclinicalOrderService = {
     const now = new Date().toISOString();
     const next: ParaclinicalOrder = { ...current, updated_at: now };
 
+    let previousStatus: ParaclinicalOrder["status"] | undefined;
     if (data.status !== undefined) {
       const allowed: Record<string, string[]> = {
         pending: ["in_progress", "cancelled"],
@@ -75,6 +82,7 @@ export const paraclinicalOrderService = {
       if (!transitions.includes(data.status)) {
         throw new ValidationError(`Không thể chuyển trạng thái từ "${current.status}" sang "${data.status}"`);
       }
+      previousStatus = current.status;
       next.status = data.status;
       if (data.status === "completed") next.completed_at = now;
       if (data.status === "cancelled") {
@@ -91,6 +99,7 @@ export const paraclinicalOrderService = {
 
     const updated = await repo.update(tenantId, orderId, next);
     if (!updated) throw new NotFoundError("Chỉ định không tồn tại");
+    if (previousStatus) await repo.addStatusHistory(tenantId, orderId, previousStatus, updated.status, _actorId, now);
     return updated;
   },
 };

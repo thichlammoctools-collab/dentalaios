@@ -52,6 +52,19 @@ router.patch(
   },
 );
 
+// Immutable status timeline for a single order.
+router.get(
+  "/:visitId/orders/:orderId/history",
+  requirePermission(PERMISSIONS.READ_PATIENTS),
+  async (c) => {
+    const jwt = getJwt(c);
+    const items = await paraclinicalOrderService.listStatusHistory(
+      c.env.DB, jwt.tenant_id, c.req.param("visitId"), c.req.param("orderId"),
+    );
+    return c.json({ items, total: items.length });
+  },
+);
+
 // List orders by patient (across visits)
 router.get(
   "/patient/:patientId/orders",

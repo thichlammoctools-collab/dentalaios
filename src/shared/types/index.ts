@@ -516,6 +516,16 @@ export interface ParaclinicalOrder {
   updated_at: string;
 }
 
+export interface ParaclinicalOrderStatusHistory {
+  id: string;
+  tenant_id: string;
+  order_id: string;
+  from_status?: ParaclinicalOrderStatus;
+  to_status: ParaclinicalOrderStatus;
+  changed_by: string;
+  changed_at: string;
+}
+
 export interface VisitInitialAssessment {
   id: string;
   tenant_id: string;

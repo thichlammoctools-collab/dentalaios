@@ -1,5 +1,5 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import type { ParaclinicalOrder } from "@shared/types";
+import type { ParaclinicalOrder, ParaclinicalOrderStatus, ParaclinicalOrderStatusHistory } from "@shared/types";
 import type { D1Row } from "./base";
 
 const columns = [
@@ -38,6 +38,18 @@ function mapOrder(row: D1Row): ParaclinicalOrder {
   };
 }
 
+function mapStatusHistory(row: D1Row): ParaclinicalOrderStatusHistory {
+  return {
+    id: row.id as string,
+    tenant_id: row.tenant_id as string,
+    order_id: row.order_id as string,
+    from_status: (row.from_status as ParaclinicalOrderStatus) ?? undefined,
+    to_status: row.to_status as ParaclinicalOrderStatus,
+    changed_by: row.changed_by as string,
+    changed_at: row.changed_at as string,
+  };
+}
+
 export function createParaclinicalOrdersRepository(db: D1Database) {
   return {
     async listByVisit(tenantId: string, visitId: string): Promise<ParaclinicalOrder[]> {
@@ -63,6 +75,11 @@ export function createParaclinicalOrdersRepository(db: D1Database) {
         .bind(...columns.map((key) => (data as unknown as Record<string, unknown>)[key] ?? null)).run();
       const created = await this.get(data.tenant_id, data.id);
       if (!created) throw new Error("Paraclinical order insert failed");
+      await db.prepare(
+        `INSERT INTO paraclinical_order_status_history
+           (id, tenant_id, order_id, from_status, to_status, changed_by, changed_at)
+         VALUES (?, ?, ?, NULL, 'pending', ?, ?)`,
+      ).bind(crypto.randomUUID(), data.tenant_id, data.id, data.ordered_by, data.ordered_at).run();
       return created;
     },
 
@@ -71,6 +88,31 @@ export function createParaclinicalOrdersRepository(db: D1Database) {
       await db.prepare(`UPDATE paraclinical_orders SET ${updateColumns.map((key) => `${key} = ?`).join(", ")} WHERE tenant_id = ? AND id = ?`)
         .bind(...updateColumns.map((key) => (data as unknown as Record<string, unknown>)[key] ?? null), tenantId, orderId).run();
       return this.get(tenantId, orderId);
+    },
+
+    async addStatusHistory(
+      tenantId: string,
+      orderId: string,
+      fromStatus: ParaclinicalOrderStatus,
+      toStatus: ParaclinicalOrderStatus,
+      changedBy: string,
+      changedAt: string,
+    ): Promise<void> {
+      await db.prepare(
+        `INSERT INTO paraclinical_order_status_history
+           (id, tenant_id, order_id, from_status, to_status, changed_by, changed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(crypto.randomUUID(), tenantId, orderId, fromStatus, toStatus, changedBy, changedAt).run();
+    },
+
+    async listStatusHistory(tenantId: string, orderId: string): Promise<ParaclinicalOrderStatusHistory[]> {
+      const result = await db.prepare(
+        `SELECT id, tenant_id, order_id, from_status, to_status, changed_by, changed_at
+         FROM paraclinical_order_status_history
+         WHERE tenant_id = ? AND order_id = ?
+         ORDER BY changed_at DESC`,
+      ).bind(tenantId, orderId).all<D1Row>();
+      return result.results.map(mapStatusHistory);
     },
   };
 }
