@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageContainer } from "@/components/PageContainer";
 import { ExpenseForm } from "@/components/ExpenseForm";
 import { formatCurrency } from "@/lib/utils";
@@ -19,6 +20,10 @@ const categoryLabels: Record<ExpenseCategory, string> = {
   staff_cost: "Nhân sự", marketing: "Marketing", maintenance: "Bảo trì", equipment: "Thiết bị",
   administration: "Hành chính", other: "Khác",
 };
+
+type FinanceTab = "overview" | "expenses" | "branches" | "ledger";
+
+const financeTabs: FinanceTab[] = ["overview", "expenses", "branches", "ledger"];
 
 function hcmDate(value: string) {
   return new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(value.length === 10 ? `${value}T00:00:00+07:00` : value));
@@ -35,6 +40,8 @@ export function FinancePage() {
   const requestedRange = Number(searchParams.get("range"));
   const range: FinanceRange = requestedRange === 7 || requestedRange === 90 ? requestedRange : 30;
   const branchId = searchParams.get("branch_id") ?? "";
+  const requestedTab = searchParams.get("tab");
+  const activeTab: FinanceTab = financeTabs.includes(requestedTab as FinanceTab) ? requestedTab as FinanceTab : "overview";
   const [snapshot, setSnapshot] = useState<FinanceSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -48,9 +55,15 @@ export function FinancePage() {
   const canManage = Boolean(session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.MANAGE_FINANCE));
 
   function setFilters(nextRange: FinanceRange, nextBranch: string) {
-    const next = new URLSearchParams();
-    if (nextRange !== 30) next.set("range", String(nextRange));
-    if (nextBranch) next.set("branch_id", nextBranch);
+    const next = new URLSearchParams(searchParams);
+    if (nextRange !== 30) next.set("range", String(nextRange)); else next.delete("range");
+    if (nextBranch) next.set("branch_id", nextBranch); else next.delete("branch_id");
+    setSearchParams(next);
+  }
+
+  function setActiveTab(nextTab: string) {
+    const next = new URLSearchParams(searchParams);
+    if (nextTab === "overview") next.delete("tab"); else next.set("tab", nextTab);
     setSearchParams(next);
   }
 
@@ -102,12 +115,34 @@ export function FinancePage() {
           <Button variant="outline" onClick={() => void loadSnapshot(true)} disabled={refreshing} className="self-end border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white">{refreshing ? "Đang tải..." : "Làm mới"}</Button>
           {canManage && <Button onClick={() => setExpenseOpen(true)} className="self-end bg-white text-emerald-950 hover:bg-emerald-50">+ Ghi nhận chi phí</Button>}</div></div>
     </section>
-    {error ? <Card><CardHeader><CardTitle>Không thể tải tài chính</CardTitle><CardDescription>{error}</CardDescription></CardHeader><CardContent><Button onClick={() => void loadSnapshot(true)}>Thử lại</Button></CardContent></Card> : loading ? <FinanceSkeleton /> : empty ? <EmptyFinance onCreate={canManage ? () => setExpenseOpen(true) : undefined} /> : <>
-      <section><div className="mb-3 flex items-baseline justify-between"><div><h2 className="text-lg font-semibold">Tổng hợp dòng tiền</h2><p className="text-sm text-muted-foreground">Thu tính theo ngày xác nhận; chi thưởng giới thiệu được tách riêng để tránh ghi nhận trùng.</p></div><span className="text-xs text-muted-foreground">Theo giờ Hồ Chí Minh</span></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><MetricCard label="Thu đã xác nhận" value={formatCurrency(snapshot?.kpis.confirmed_receipts ?? 0)} tone="income" /><MetricCard label="Chi vận hành" value={formatCurrency(snapshot?.kpis.operating_expenses ?? 0)} tone="expense" /><MetricCard label="Chi thưởng giới thiệu" value={formatCurrency(snapshot?.kpis.referral_payouts ?? 0)} tone="expense" /><MetricCard label="Chênh lệch thu-chi" value={formatCurrency(snapshot?.kpis.net_cash ?? 0)} tone={(snapshot?.kpis.net_cash ?? 0) >= 0 ? "income" : "expense"} /><MetricCard label="Còn phải thu điều trị" value={formatCurrency(snapshot?.kpis.outstanding_receivables ?? 0)} /></div></section>
-      <section className="grid gap-5 xl:grid-cols-3"><Card className="xl:col-span-2"><CardHeader><CardTitle>Thu và chi theo ngày</CardTitle><CardDescription>Dòng tiền trong {range} ngày đã hoàn tất.</CardDescription></CardHeader><CardContent><CashFlowChart data={snapshot?.daily ?? []} /></CardContent></Card><ExpenseCategories data={snapshot?.expense_categories ?? []} /></section>
-      <BranchBreakdown rows={snapshot?.branch_breakdown ?? []} />
-      <Ledger rows={snapshot?.ledger ?? []} canManage={canManage} onVoid={setVoiding} />
-    </>}
+    {error ? <Card><CardHeader><CardTitle>Không thể tải tài chính</CardTitle><CardDescription>{error}</CardDescription></CardHeader><CardContent><Button onClick={() => void loadSnapshot(true)}>Thử lại</Button></CardContent></Card> : loading ? <FinanceSkeleton /> : empty ? <EmptyFinance onCreate={canManage ? () => setExpenseOpen(true) : undefined} /> : <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl p-1 sm:grid-cols-4">
+        <TabsTrigger value="overview" className="min-h-11 whitespace-normal px-2 py-2">Tổng quan</TabsTrigger>
+        <TabsTrigger value="expenses" className="min-h-11 whitespace-normal px-2 py-2">Chi phí vận hành</TabsTrigger>
+        <TabsTrigger value="branches" className="min-h-11 whitespace-normal px-2 py-2">Theo chi nhánh</TabsTrigger>
+        <TabsTrigger value="ledger" className="min-h-11 whitespace-normal px-2 py-2">Sổ giao dịch</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="overview" className="space-y-5 sm:space-y-6">
+        <section><div className="mb-3 flex flex-col justify-between gap-1 sm:flex-row sm:items-baseline"><div><h2 className="text-lg font-semibold">Tổng hợp dòng tiền</h2><p className="text-sm text-muted-foreground">Thu tính theo ngày xác nhận; chi thưởng giới thiệu được tách riêng để tránh ghi nhận trùng.</p></div><span className="shrink-0 text-xs text-muted-foreground">Theo giờ Hồ Chí Minh</span></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><MetricCard label="Thu đã xác nhận" value={formatCurrency(snapshot?.kpis.confirmed_receipts ?? 0)} tone="income" /><MetricCard label="Chi vận hành" value={formatCurrency(snapshot?.kpis.operating_expenses ?? 0)} tone="expense" /><MetricCard label="Chi thưởng giới thiệu" value={formatCurrency(snapshot?.kpis.referral_payouts ?? 0)} tone="expense" /><MetricCard label="Chênh lệch thu-chi" value={formatCurrency(snapshot?.kpis.net_cash ?? 0)} tone={(snapshot?.kpis.net_cash ?? 0) >= 0 ? "income" : "expense"} /><MetricCard label="Còn phải thu điều trị" value={formatCurrency(snapshot?.kpis.outstanding_receivables ?? 0)} /></div></section>
+        <Card><CardHeader><CardTitle>Thu và chi theo ngày</CardTitle><CardDescription>Dòng tiền trong {range} ngày đã hoàn tất.</CardDescription></CardHeader><CardContent><CashFlowChart data={snapshot?.daily ?? []} /></CardContent></Card>
+      </TabsContent>
+
+      <TabsContent value="expenses" className="space-y-5 sm:space-y-6">
+        <section><div className="mb-3 flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><h2 className="text-lg font-semibold">Quản lý chi phí vận hành</h2><p className="text-sm text-muted-foreground">Theo dõi chi phí còn hiệu lực theo nhóm nghiệp vụ trong kỳ.</p></div>{canManage && <Button onClick={() => setExpenseOpen(true)}>+ Ghi nhận chi phí</Button>}</div><div className="grid gap-3 sm:grid-cols-2"><MetricCard label="Tổng chi vận hành" value={formatCurrency(snapshot?.kpis.operating_expenses ?? 0)} tone="expense" /><MetricCard label="Số nhóm phát sinh" value={String(snapshot?.expense_categories.length ?? 0)} /></div></section>
+        <ExpenseCategories data={snapshot?.expense_categories ?? []} />
+      </TabsContent>
+
+      <TabsContent value="branches" className="space-y-5 sm:space-y-6">
+        <div><h2 className="text-lg font-semibold">Hiệu quả theo chi nhánh</h2><p className="text-sm text-muted-foreground">So sánh thu, chi và dòng tiền thuần giữa các đơn vị trong cùng kỳ báo cáo.</p></div>
+        <BranchBreakdown rows={snapshot?.branch_breakdown ?? []} />
+      </TabsContent>
+
+      <TabsContent value="ledger" className="space-y-5 sm:space-y-6">
+        <div><h2 className="text-lg font-semibold">Lịch sử thu chi</h2><p className="text-sm text-muted-foreground">Kiểm tra từng khoản thu, chi vận hành và chi thưởng đã ghi nhận.</p></div>
+        <Ledger rows={snapshot?.ledger ?? []} canManage={canManage} onVoid={setVoiding} />
+      </TabsContent>
+    </Tabs>}
     <ExpenseForm open={expenseOpen} onOpenChange={setExpenseOpen} branches={snapshot?.branches ?? []} onCreated={() => void loadSnapshot(true)} />
     <Dialog open={Boolean(voiding)} onOpenChange={(open) => { if (!open && !savingVoid) { setVoiding(null); setVoidReason(""); } }}><DialogHeader><DialogTitle>Hủy chi phí đã ghi nhận</DialogTitle></DialogHeader><DialogBody className="grid gap-3"><p className="text-sm text-muted-foreground">Bản ghi sẽ được giữ lại trong lịch sử và không còn được tính vào tổng chi.</p><Input value={voidReason} onChange={(event) => setVoidReason(event.target.value)} maxLength={500} placeholder="Lý do hủy bắt buộc" autoFocus /></DialogBody><DialogFooter><Button variant="outline" onClick={() => setVoiding(null)} disabled={savingVoid}>Quay lại</Button><Button variant="destructive" onClick={() => void voidExpense()} disabled={savingVoid}>{savingVoid ? "Đang hủy..." : "Xác nhận hủy"}</Button></DialogFooter></Dialog>
   </PageContainer>;
