@@ -8,13 +8,14 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { apiGet, apiPatch, apiPost, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
+import { formatDateTime } from "@/lib/utils";
 import {
   PARACLINICAL_ORDER_TYPES,
   ORDER_STATUS_LABELS,
   ORDER_GROUP_LABELS,
   getOrderTypeLabel,
 } from "@shared/constants/paraclinical-orders";
-import type { ParaclinicalOrder, ParaclinicalOrderStatus, ParaclinicalOrderType, ParaclinicalAbnormalFlag, ClinicalDiagnosis } from "@shared/types";
+import type { ParaclinicalOrder, ParaclinicalOrderStatus, ParaclinicalOrderStatusHistory, ParaclinicalOrderType, ParaclinicalAbnormalFlag, ClinicalDiagnosis, Patient } from "@shared/types";
 
 const EMPTY_DIAGNOSES: ClinicalDiagnosis[] = [];
 
@@ -42,15 +43,19 @@ const ORDER_GROUPS = ["imaging", "lab", "procedure", "other"] as const;
 interface Props {
   visitId: string;
   patientId: string;
+  patient?: Patient;
   readOnly?: boolean;
 }
 
-export function ParaclinicalOrdersCard({ visitId, patientId, readOnly = false }: Props) {
+export function ParaclinicalOrdersCard({ visitId, patientId, patient, readOnly = false }: Props) {
   const [items, setItems] = useState<ParaclinicalOrder[]>([]);
   const [diagnoses, setDiagnoses] = useState<ClinicalDiagnosis[]>(EMPTY_DIAGNOSES);
   const [loading, setLoading] = useState(true);
   const [openCreate, setOpenCreate] = useState(false);
   const [openUpdate, setOpenUpdate] = useState<ParaclinicalOrder | null>(null);
+  const [historyOrder, setHistoryOrder] = useState<ParaclinicalOrder | null>(null);
+  const [statusHistory, setStatusHistory] = useState<ParaclinicalOrderStatusHistory[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [saving, setSaving] = useState(false);
   const [createForm, setCreateForm] = useState({
     order_type: "" as ParaclinicalOrderType | "",
@@ -149,6 +154,42 @@ export function ParaclinicalOrdersCard({ visitId, patientId, readOnly = false }:
     }
   }
 
+  async function openHistoryDialog(order: ParaclinicalOrder) {
+    setHistoryOrder(order);
+    setStatusHistory([]);
+    setLoadingHistory(true);
+    try {
+      const response = await apiGet<{ items: ParaclinicalOrderStatusHistory[] }>(`/api/visits/${visitId}/orders/${order.id}/history`);
+      setStatusHistory(response.items);
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Không thể tải lịch sử trạng thái");
+    } finally {
+      setLoadingHistory(false);
+    }
+  }
+
+  function printOrder(order: ParaclinicalOrder) {
+    const diagnosis = order.diagnosis_id ? diagnoses.find((item) => item.id === order.diagnosis_id) : undefined;
+    const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character] as string);
+    const printWindow = window.open("", "_blank", "noopener,noreferrer");
+    if (!printWindow) {
+      toast.error("Trình duyệt đã chặn cửa sổ in");
+      return;
+    }
+    const rows = [
+      ["Họ tên bệnh nhân", patient?.name ?? patientId],
+      ["Ngày sinh", patient?.date_of_birth ?? "—"],
+      ["Giới tính", patient?.gender === "M" ? "Nam" : patient?.gender === "F" ? "Nữ" : "—"],
+      ["Loại chỉ định", order.order_type === "other" ? order.custom_type_name ?? "Khác" : getOrderTypeLabel(order.order_type)],
+      ...(order.body_site ? [["Vị trí / Răng", order.body_site]] : []),
+      ["Lý do chỉ định", order.clinical_reason],
+      ...(diagnosis ? [["Chẩn đoán liên kết", `${diagnosis.concept_display_vi_snapshot}${diagnosis.icd10_code_snapshot ? ` (${diagnosis.icd10_code_snapshot})` : ""}`]] : []),
+      ...(order.notes ? [["Ghi chú", order.notes]] : []),
+    ];
+    printWindow.document.write(`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Phiếu chỉ định cận lâm sàng</title><style>body{font-family:Arial,sans-serif;color:#111;margin:32px;font-size:14px}h1{text-align:center;font-size:20px;margin:0 0 8px}.meta{text-align:center;color:#555;margin-bottom:24px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #555;padding:10px;text-align:left;vertical-align:top}th{width:31%;background:#f3f4f6}.signature{margin-top:52px;text-align:right;padding-right:48px}.signature p{margin:4px 0}@media print{body{margin:18mm}}</style></head><body><h1>PHIẾU CHỈ ĐỊNH CẬN LÂM SÀNG</h1><p class="meta">Thời gian chỉ định: ${escapeHtml(formatDateTime(order.ordered_at))}</p><table>${rows.map(([label, value]) => `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`).join("")}</table><div class="signature"><p>Người chỉ định</p><p><em>(Ký, ghi rõ họ tên)</em></p></div><script>window.onload=function(){window.print();}</script></body></html>`);
+    printWindow.document.close();
+  }
+
   const grouped = ORDER_GROUPS.map((group) => ({
     group,
     label: ORDER_GROUP_LABELS[group],
@@ -194,9 +235,11 @@ export function ParaclinicalOrdersCard({ visitId, patientId, readOnly = false }:
                           {order.notes && <p className="mt-1 text-xs text-muted-foreground">{order.notes}</p>}
                           {order.cancel_reason && <p className="mt-1 text-xs text-destructive">Lý do hủy: {order.cancel_reason}</p>}
                         </div>
-                        {!readOnly && (
-                          <Button variant="outline" size="sm" onClick={() => openUpdateDialog(order)}>Cập nhật</Button>
-                        )}
+                        <div className="flex shrink-0 flex-wrap gap-2">
+                          <Button variant="outline" size="sm" onClick={() => printOrder(order)}>In phiếu</Button>
+                          <Button variant="outline" size="sm" onClick={() => void openHistoryDialog(order)}>Theo dõi</Button>
+                          {!readOnly && <Button variant="outline" size="sm" onClick={() => openUpdateDialog(order)}>Cập nhật</Button>}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -262,6 +305,28 @@ export function ParaclinicalOrdersCard({ visitId, patientId, readOnly = false }:
           <Button variant="outline" onClick={() => setOpenCreate(false)}>Hủy</Button>
           <Button onClick={() => void saveCreate()} disabled={saving}>{saving ? "Đang lưu..." : "Tạo chỉ định"}</Button>
         </DialogFooter>
+      </Dialog>
+
+      <Dialog open={Boolean(historyOrder)} onOpenChange={(open) => !open && setHistoryOrder(null)} size="md">
+        <DialogHeader><DialogTitle>Theo dõi trạng thái chỉ định</DialogTitle></DialogHeader>
+        <DialogBody className="space-y-4">
+          {historyOrder && <p className="font-medium">{historyOrder.order_type === "other" ? historyOrder.custom_type_name : getOrderTypeLabel(historyOrder.order_type)}</p>}
+          {loadingHistory ? (
+            <p className="text-sm text-muted-foreground">Đang tải lịch sử...</p>
+          ) : statusHistory.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Chưa có lịch sử trạng thái.</p>
+          ) : (
+            <ol className="space-y-3 border-l border-border pl-4">
+              {statusHistory.map((entry) => (
+                <li key={entry.id} className="relative text-sm before:absolute before:-left-[21px] before:top-1.5 before:h-2 before:w-2 before:rounded-full before:bg-primary">
+                  <p className="font-medium">{entry.from_status ? `${ORDER_STATUS_LABELS[entry.from_status]} → ` : "Tạo chỉ định → "}{ORDER_STATUS_LABELS[entry.to_status]}</p>
+                  <time className="text-xs text-muted-foreground" dateTime={entry.changed_at}>{formatDateTime(entry.changed_at)}</time>
+                </li>
+              ))}
+            </ol>
+          )}
+        </DialogBody>
+        <DialogFooter><Button variant="outline" onClick={() => setHistoryOrder(null)}>Đóng</Button></DialogFooter>
       </Dialog>
 
       {/* Update dialog */}

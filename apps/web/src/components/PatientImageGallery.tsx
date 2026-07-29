@@ -20,6 +20,13 @@ import { apiBlob, apiDelete, apiGet, apiPost, apiUpload, ApiError } from "@/lib/
 import { toast } from "@/lib/toast";
 import type { ClinicalDiagnosis, ClinicalDiagnosisImageEvidence, ClinicalFinding, ImageAnnotation, ImageAnnotationGeometry, ImageAnnotationShapeType, PatientImage, PatientImagePurpose, PatientImageType, AnalyzeImageResult, Visit } from "@shared/types";
 import { PATIENT_IMAGE_PURPOSE_LABELS, PATIENT_IMAGE_TYPE_LABELS } from "@shared/types";
+import { getAnatomicalSiteLabel } from "@shared/constants/clinical-findings";
+
+type DiagnosisOption = ClinicalDiagnosis & {
+  visit_date: string;
+  source_tooth_number?: number;
+  source_anatomical_site?: ClinicalFinding["anatomical_site"];
+};
 
 interface PatientImageGalleryProps {
   patientId: string;
@@ -74,7 +81,7 @@ export function PatientImageGallery({
   const [analysisResult, setAnalysisResult] = useState<AnalyzeImageResult | null>(null);
   const [annotations, setAnnotations] = useState<ImageAnnotation[]>([]);
   const [imageEvidence, setImageEvidence] = useState<ClinicalDiagnosisImageEvidence[]>([]);
-  const [diagnosisOptions, setDiagnosisOptions] = useState<Array<ClinicalDiagnosis & { visit_date: string }>>([]);
+  const [diagnosisOptions, setDiagnosisOptions] = useState<DiagnosisOption[]>([]);
   const [annotationShape, setAnnotationShape] = useState<ImageAnnotationShapeType>("pin");
   const [annotationGeometry, setAnnotationGeometry] = useState<ImageAnnotationGeometry | null>(null);
   const [annotationNote, setAnnotationNote] = useState("");
@@ -178,7 +185,7 @@ export function PatientImageGallery({
     void Promise.all([
       apiGet<{ items: ImageAnnotation[] }>(`/api/patient-images/${selected.id}/annotations`),
       apiGet<{ items: ClinicalDiagnosisImageEvidence[] }>(`/api/patient-images/${selected.id}/evidence`),
-      apiGet<{ items: Array<ClinicalDiagnosis & { visit_date: string }> }>(`/api/patient-images/${selected.id}/diagnosis-options`),
+      apiGet<{ items: DiagnosisOption[] }>(`/api/patient-images/${selected.id}/diagnosis-options`),
     ]).then(([annotationResponse, evidenceResponse, diagnosisResponse]) => {
       setAnnotations(annotationResponse.items);
       setImageEvidence(evidenceResponse.items);
@@ -214,6 +221,15 @@ export function PatientImageGallery({
       .map((evidence) => diagnosisOptions.find((diagnosis) => diagnosis.id === evidence.diagnosis_id)?.concept_display_vi_snapshot)
       .filter((name): name is string => Boolean(name));
     return diagnosisNames.length ? diagnosisNames.join(", ") : "Chưa liên kết";
+  }
+
+  function diagnosisOptionLabel(diagnosis: DiagnosisOption) {
+    const location = diagnosis.source_tooth_number != null
+      ? `Răng #${diagnosis.source_tooth_number}`
+      : diagnosis.source_anatomical_site
+        ? getAnatomicalSiteLabel(diagnosis.source_anatomical_site)
+        : "Chưa xác định vùng";
+    return `${diagnosis.concept_display_vi_snapshot} - ${location} - ${new Date(diagnosis.visit_date).toLocaleDateString("vi-VN")}`;
   }
 
   function isAnnotationLinked(annotationVersionId: string) {
@@ -703,7 +719,7 @@ export function PatientImageGallery({
           {canAnnotate && viewUrl && selected && !isDicomType(selected) && <section className="mb-4 rounded-xl border border-border p-3">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-semibold">Ghi chú trên ảnh</p><p className="text-xs text-muted-foreground">Mũi tên: bấm lên vị trí cần chỉ. Vẽ tự do: nhấn giữ và kéo trên ảnh.</p></div><div className="flex gap-1"><Button size="sm" variant={annotationShape === "pin" ? "default" : "outline"} onClick={() => { setAnnotationShape("pin"); setAnnotationGeometry(null); setAnnotationNote(""); drawingFreehandRef.current = false; freehandPointsRef.current = []; }}>Mũi tên</Button><Button size="sm" variant={annotationShape === "freehand" ? "default" : "outline"} onClick={() => { setAnnotationShape("freehand"); setAnnotationGeometry(null); setAnnotationNote(""); drawingFreehandRef.current = false; freehandPointsRef.current = []; }}>Vẽ tự do</Button></div></div>
             {annotationGeometry ? <div className="flex items-start gap-2"><textarea autoFocus value={annotationNote} onChange={(event) => setAnnotationNote(event.target.value)} rows={2} placeholder="Nhập tên hoặc nội dung ghi chú" className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" /><Button size="sm" onClick={() => void saveAnnotation()} disabled={!annotationNote.trim() || savingAnnotation}>{savingAnnotation ? "Đang lưu..." : "Lưu ghi chú"}</Button></div> : <p className="text-xs text-muted-foreground">Chọn một vị trí hoặc vẽ trên ảnh để nhập ghi chú.</p>}
-            {annotations.length > 0 && <div className="mt-3 overflow-x-auto border-t pt-3"><table className="w-full min-w-[720px] text-left text-xs"><thead className="text-muted-foreground"><tr className="border-b"><th className="px-2 py-2 font-medium">Tên ghi chú</th><th className="px-2 py-2 font-medium">Loại</th><th className="px-2 py-2 font-medium">Chẩn đoán</th></tr></thead><tbody>{annotations.map((annotation) => { const annotationVersionId = annotation.current_version.id; const relation = annotationEvidenceRelations[annotationVersionId] ?? "supports"; const linked = isAnnotationLinked(annotationVersionId); const editingLink = editingLinkAnnotationVersionId === annotationVersionId; return <tr key={annotation.id} onClick={() => setSelectedAnnotationVersionId(annotationVersionId)} className={`border-b last:border-0 ${selectedAnnotationVersionId === annotationVersionId ? "bg-primary/10 text-primary" : "hover:bg-muted/60"}`}><td className="cursor-pointer px-2 py-2 font-medium">{annotation.current_version.note}</td><td className="px-2 py-2"><select value={relation} onClick={(event) => event.stopPropagation()} onChange={(event) => setAnnotationEvidenceRelations((current) => ({ ...current, [annotationVersionId]: event.target.value as "supports" | "contradicts" | "incidental" }))} className="h-8 min-w-40 rounded-md border border-input bg-background px-2 text-xs"><option value="supports">Ủng hộ chẩn đoán</option><option value="contradicts">Mâu thuẫn</option><option value="incidental">Phát hiện kèm theo</option></select></td><td className="px-2 py-2">{linked && !editingLink ? <div className="flex items-center gap-2"><span className="inline-flex h-8 min-w-52 flex-1 items-center rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 font-medium text-emerald-700 dark:text-emerald-300">Đã liên kết: {annotationDiagnosisLabel(annotationVersionId)}</span><Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); setEditingLinkAnnotationVersionId(annotationVersionId); }}>Sửa liên kết</Button></div> : <div className="flex items-center gap-2"><select value={annotationDiagnosisIds[annotationVersionId] ?? ""} onClick={(event) => event.stopPropagation()} onChange={(event) => setAnnotationDiagnosisIds((current) => ({ ...current, [annotationVersionId]: event.target.value }))} className="h-8 min-w-52 flex-1 rounded-md border border-input bg-background px-2 text-xs"><option value="">Chọn chẩn đoán</option>{diagnosisOptions.map((diagnosis) => <option key={diagnosis.id} value={diagnosis.id}>{diagnosis.concept_display_vi_snapshot}</option>)}</select><Button size="sm" onClick={(event) => { event.stopPropagation(); void linkAnnotationEvidence(annotationVersionId); }} disabled={!annotationDiagnosisIds[annotationVersionId] || linkingAnnotationVersionId === annotationVersionId}>{linkingAnnotationVersionId === annotationVersionId ? "Đang liên kết..." : linked ? "Lưu liên kết mới" : "Liên kết"}</Button>{editingLink && <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); setEditingLinkAnnotationVersionId(null); }}>Hủy</Button>}</div>}</td></tr>; })}</tbody></table></div>}
+            {annotations.length > 0 && <div className="mt-3 overflow-x-auto border-t pt-3"><table className="w-full min-w-[720px] text-left text-xs"><thead className="text-muted-foreground"><tr className="border-b"><th className="px-2 py-2 font-medium">Tên ghi chú</th><th className="px-2 py-2 font-medium">Loại</th><th className="px-2 py-2 font-medium">Chẩn đoán</th></tr></thead><tbody>{annotations.map((annotation) => { const annotationVersionId = annotation.current_version.id; const relation = annotationEvidenceRelations[annotationVersionId] ?? "supports"; const linked = isAnnotationLinked(annotationVersionId); const editingLink = editingLinkAnnotationVersionId === annotationVersionId; return <tr key={annotation.id} onClick={() => setSelectedAnnotationVersionId(annotationVersionId)} className={`border-b last:border-0 ${selectedAnnotationVersionId === annotationVersionId ? "bg-primary/10 text-primary" : "hover:bg-muted/60"}`}><td className="cursor-pointer px-2 py-2 font-medium">{annotation.current_version.note}</td><td className="px-2 py-2"><select value={relation} onClick={(event) => event.stopPropagation()} onChange={(event) => setAnnotationEvidenceRelations((current) => ({ ...current, [annotationVersionId]: event.target.value as "supports" | "contradicts" | "incidental" }))} className="h-8 min-w-40 rounded-md border border-input bg-background px-2 text-xs"><option value="supports">Ủng hộ chẩn đoán</option><option value="contradicts">Mâu thuẫn</option><option value="incidental">Phát hiện kèm theo</option></select></td><td className="px-2 py-2">{linked && !editingLink ? <div className="flex items-center gap-2"><span className="inline-flex h-8 min-w-52 flex-1 items-center rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 font-medium text-emerald-700 dark:text-emerald-300">Đã liên kết: {annotationDiagnosisLabel(annotationVersionId)}</span><Button size="sm" variant="outline" onClick={(event) => { event.stopPropagation(); setEditingLinkAnnotationVersionId(annotationVersionId); }}>Sửa liên kết</Button></div> : <div className="flex items-center gap-2"><select value={annotationDiagnosisIds[annotationVersionId] ?? ""} onClick={(event) => event.stopPropagation()} onChange={(event) => setAnnotationDiagnosisIds((current) => ({ ...current, [annotationVersionId]: event.target.value }))} className="h-8 min-w-52 flex-1 rounded-md border border-input bg-background px-2 text-xs"><option value="">Chọn chẩn đoán</option>{diagnosisOptions.map((diagnosis) => <option key={diagnosis.id} value={diagnosis.id}>{diagnosisOptionLabel(diagnosis)}</option>)}</select><Button size="sm" onClick={(event) => { event.stopPropagation(); void linkAnnotationEvidence(annotationVersionId); }} disabled={!annotationDiagnosisIds[annotationVersionId] || linkingAnnotationVersionId === annotationVersionId}>{linkingAnnotationVersionId === annotationVersionId ? "Đang liên kết..." : linked ? "Lưu liên kết mới" : "Liên kết"}</Button>{editingLink && <Button size="sm" variant="ghost" onClick={(event) => { event.stopPropagation(); setEditingLinkAnnotationVersionId(null); }}>Hủy</Button>}</div>}</td></tr>; })}</tbody></table></div>}
           </section>}
 
 {/* AI Analysis Result */}

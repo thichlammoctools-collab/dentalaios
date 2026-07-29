@@ -1,5 +1,5 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import type { ClinicalDiagnosis, ClinicalDiagnosisImageEvidence, ImageAnnotation, ImageAnnotationVersion } from "@shared/types";
+import type { AnatomicalSite, ClinicalDiagnosis, ClinicalDiagnosisImageEvidence, ImageAnnotation, ImageAnnotationVersion } from "@shared/types";
 import type { DiagnosisImageEvidenceCreateInput, ImageAnnotationCreateInput, ImageAnnotationVersionCreateInput } from "@shared/validation";
 import { ConflictError, NotFoundError, ValidationError } from "../lib/errors";
 import { filesService } from "./files.service";
@@ -72,11 +72,13 @@ export const imageAnnotationsService = {
     if (!await createImageAnnotationsRepository(db).deleteEvidence(tenantId, evidenceId, diagnosisId)) throw new NotFoundError("Không tìm thấy liên kết bằng chứng hình ảnh");
   },
 
-  async listDiagnosisOptions(db: D1Database, tenantId: string, imageId: string): Promise<Array<ClinicalDiagnosis & { visit_date: string }>> {
+  async listDiagnosisOptions(db: D1Database, tenantId: string, imageId: string): Promise<Array<ClinicalDiagnosis & { visit_date: string; source_tooth_number?: number; source_anatomical_site?: AnatomicalSite }>> {
     const image = await requireImage(db, tenantId, imageId);
-    const result = await db.prepare(`SELECT d.*, v.date AS visit_date
+    const result = await db.prepare(`SELECT d.*, v.date AS visit_date,
+        f.tooth_number AS source_tooth_number, f.anatomical_site AS source_anatomical_site
       FROM clinical_diagnoses d
       JOIN visits v ON v.id = d.visit_id AND v.tenant_id = d.tenant_id
+      LEFT JOIN clinical_findings f ON f.id = d.source_finding_id AND f.tenant_id = d.tenant_id
       WHERE d.tenant_id = ? AND d.patient_id = ?
       ORDER BY v.date DESC, d.created_at DESC LIMIT 200`).bind(tenantId, image.patient_id).all<Record<string, unknown>>();
     return result.results.map((row) => ({
@@ -88,7 +90,9 @@ export const imageAnnotationsService = {
        mapping_id: text(row.mapping_id), mapping_role: text(row.mapping_role) as ClinicalDiagnosis["mapping_role"], source: row.source as ClinicalDiagnosis["source"], source_text: text(row.source_text),
        confirmed_by: text(row.confirmed_by), confirmed_at: text(row.confirmed_at), ruled_out_at: text(row.ruled_out_at), resolved_at: text(row.resolved_at), notes: text(row.notes),
        entered_by: text(row.entered_by), entry_source: (text(row.entry_source) ?? "doctor") as ClinicalDiagnosis["entry_source"], clinical_effective_at: text(row.clinical_effective_at),
-       created_by: row.created_by as string, created_at: row.created_at as string, updated_at: row.updated_at as string, current_revision: Number(row.current_revision), visit_date: row.visit_date as string,
+        created_by: row.created_by as string, created_at: row.created_at as string, updated_at: row.updated_at as string, current_revision: Number(row.current_revision), visit_date: row.visit_date as string,
+        source_tooth_number: typeof row.source_tooth_number === "number" ? row.source_tooth_number : undefined,
+        source_anatomical_site: text(row.source_anatomical_site) as AnatomicalSite | undefined,
     }));
   },
 
