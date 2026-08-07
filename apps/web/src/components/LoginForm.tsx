@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/lib/auth-context";
 import { ROUTES } from "@shared/constants";
@@ -12,6 +12,12 @@ export function LoginForm() {
   const [email, setEmail] = useState(() => demoRequested ? "doctor@demo.clinic" : "");
   const [password, setPassword] = useState(() => demoRequested ? "password123" : "");
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    if (!demoRequested) return;
+    setEmail("doctor@demo.clinic");
+    setPassword("password123");
+  }, [demoRequested]);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
