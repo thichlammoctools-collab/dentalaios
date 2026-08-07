@@ -193,6 +193,69 @@ html[data-theme="dark"] .marketing-site .bg-\[\#cadbcd\] { background-color: #4b
 html[data-theme="dark"] .marketing-site .bg-\[\#75c4a0\] { background-color: #8ee0ae; }
 html[data-theme="dark"] .marketing-site .bg-\[\#87d0a7\] { background-color: #9ee6b8; }
 
+/* Public-site visual language: dental scan grid, tooth positions, and a gentle AI pulse. */
+.marketing-hero { isolation: isolate; }
+
+.marketing-dental-grid {
+  z-index: -1;
+  opacity: .55;
+  background-image:
+    linear-gradient(rgb(54 116 97 / 8%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(54 116 97 / 8%) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(90deg, transparent, black 22%, black 78%, transparent);
+}
+
+.marketing-scan-orbit { animation: dental-scan 12s ease-in-out infinite; }
+
+.marketing-tooth-mark {
+  display: grid;
+  grid-template-columns: repeat(3, 14px);
+  gap: 8px;
+  transform: rotate(18deg);
+}
+
+.marketing-tooth-mark span {
+  display: block;
+  height: 34px;
+  border: 1px solid rgb(54 116 97 / 26%);
+  border-radius: 45% 45% 38% 38% / 38% 38% 58% 58%;
+  background: linear-gradient(145deg, rgb(255 255 255 / 65%), rgb(220 238 224 / 28%));
+  box-shadow: 0 0 0 5px rgb(54 116 97 / 4%);
+  animation: tooth-pulse 3.4s ease-in-out infinite;
+}
+
+.marketing-tooth-mark span:nth-child(2) { animation-delay: .45s; transform: translateY(-7px); }
+.marketing-tooth-mark span:nth-child(3) { animation-delay: .9s; }
+
+@keyframes dental-scan {
+  0%, 100% { transform: translateX(-50%) scale(.96); opacity: .62; }
+  50% { transform: translateX(-50%) scale(1.05); opacity: .88; }
+}
+
+@keyframes tooth-pulse {
+  0%, 100% { border-color: rgb(54 116 97 / 26%); box-shadow: 0 0 0 5px rgb(54 116 97 / 4%); }
+  50% { border-color: rgb(54 116 97 / 58%); box-shadow: 0 0 0 9px rgb(54 116 97 / 8%), 0 0 20px rgb(73 151 118 / 20%); }
+}
+
+html[data-theme="dark"] .marketing-dental-grid {
+  opacity: .36;
+  background-image:
+    linear-gradient(rgb(117 214 160 / 11%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(117 214 160 / 11%) 1px, transparent 1px);
+}
+
+html[data-theme="dark"] .marketing-tooth-mark span {
+  border-color: rgb(142 224 174 / 35%);
+  background: linear-gradient(145deg, rgb(68 119 93 / 42%), rgb(21 46 37 / 20%));
+  box-shadow: 0 0 0 5px rgb(142 224 174 / 4%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-scan-orbit,
+  .marketing-tooth-mark span { animation: none; }
+}
+
 /* The referrer portal has its own shell but shares the workspace width. */
 main.min-h-svh.bg-muted\/20 > header > .mx-auto,
 main.min-h-svh.bg-muted\/20 > .mx-auto {
