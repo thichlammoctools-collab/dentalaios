@@ -51,6 +51,15 @@ export function createPlatformConfigRepository(db: D1Database) {
         .first<{ present: number }>();
       return Boolean(row?.present);
     },
+    async isTenantFlagEnabled(tenantId: string, key: string): Promise<boolean> {
+      const row = await db
+        .prepare(
+          "SELECT COALESCE(o.enabled, f.default_enabled) AS enabled FROM platform_feature_flags f LEFT JOIN platform_tenant_feature_overrides o ON o.flag_key = f.key AND o.tenant_id = ? WHERE f.key = ? LIMIT 1",
+        )
+        .bind(tenantId, key)
+        .first<{ enabled: number }>();
+      return row?.enabled === 1;
+    },
     async tenantFlags(
       tenantId: string,
     ): Promise<

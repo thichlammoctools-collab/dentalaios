@@ -38,6 +38,7 @@ export const ROLES = {
   DOCTOR: "doctor",
   ASSISTANT: "assistant",
   RECEPTIONIST: "receptionist",
+  MANAGER: "manager",
 } as const;
 
 export type RoleName = (typeof ROLES)[keyof typeof ROLES];
@@ -51,7 +52,7 @@ export const SYSTEM_ROLES = [
   { key: ROLES.DOCTOR, name: "Bác sĩ", permissions: ["read_patients", "write_findings", "write_plans", "approve_plans", "review_clinical_drafts", "sign_clinical_records", "manage_consents"] },
   { key: ROLES.ASSISTANT, name: "Phụ tá", permissions: ["read_patients", "write_visits", "write_pre_exam_drafts"] },
   { key: ROLES.RECEPTIONIST, name: "Lễ tân", permissions: ["read_patients", "write_patients", "write_payments", "write_appointments"] },
-  { key: "manager", name: "Quản lý", permissions: ["all"] },
+  { key: ROLES.MANAGER, name: "Quản lý", permissions: ["read_patients", "write_patients", "write_appointments", "manage_schedule", "manage_users", "manage_roles", "view_management_dashboard", "view_finance"] },
   { key: "accountant", name: "Kế toán", permissions: ["read_patients", "write_payments", "view_finance", "manage_finance"] },
   { key: "hr", name: "Nhân sự", permissions: ["manage_users", "read_patients"] },
   { key: "marketing", name: "Marketing", permissions: ["read_patients"] },
@@ -66,6 +67,7 @@ export const ROLE_LABELS: Record<RoleName, string> = {
   [ROLES.DOCTOR]: "Bác sĩ",
   [ROLES.ASSISTANT]: "Phụ tá",
   [ROLES.RECEPTIONIST]: "Lễ tân",
+  [ROLES.MANAGER]: "Quản lý",
 };
 
 export function getRoleLabel(name: string): string {
@@ -128,6 +130,46 @@ export const PERMISSIONS = {
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+
+export const FEATURE_FLAGS = {
+  CLINICAL_COPILOT_ENDODONTIC_PAIN_V1: "clinical_copilot.endodontic_pain_v1",
+} as const;
+
+export type FeatureFlagKey = (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS];
+
+export const PERMISSION_CATALOG = [
+  { key: PERMISSIONS.ALL, label: "Toàn quyền", module: undefined, risk: "critical", supported_scopes: ["tenant"] },
+  { key: PERMISSIONS.READ_PATIENTS, label: "Xem bệnh nhân", module: undefined, risk: "high", supported_scopes: ["tenant", "branch", "assignment", "ownership"] },
+  { key: PERMISSIONS.WRITE_PATIENTS, label: "Quản lý bệnh nhân", module: undefined, risk: "high", supported_scopes: ["tenant", "branch"] },
+  { key: PERMISSIONS.WRITE_VISITS, label: "Cập nhật lượt khám", module: undefined, risk: "high", supported_scopes: ["tenant", "branch", "assignment"] },
+  { key: PERMISSIONS.WRITE_FINDINGS, label: "Ghi nhận phát hiện lâm sàng", module: undefined, risk: "high", supported_scopes: ["tenant", "branch", "assignment"] },
+  { key: PERMISSIONS.VIEW_CLINICAL_REPORTS, label: "Xem báo cáo lâm sàng", module: undefined, risk: "high", supported_scopes: ["tenant", "branch"] },
+  { key: PERMISSIONS.WRITE_PLANS, label: "Soạn kế hoạch điều trị", module: undefined, risk: "high", supported_scopes: ["tenant", "branch", "assignment"] },
+  { key: PERMISSIONS.APPROVE_PLANS, label: "Duyệt kế hoạch điều trị", module: undefined, risk: "critical", supported_scopes: ["tenant", "branch", "assignment"] },
+  { key: PERMISSIONS.WRITE_PAYMENTS, label: "Ghi thanh toán", module: undefined, risk: "critical", supported_scopes: ["tenant", "branch"] },
+  { key: PERMISSIONS.WRITE_APPOINTMENTS, label: "Quản lý lịch hẹn", module: undefined, risk: "medium", supported_scopes: ["tenant", "branch"] },
+  { key: PERMISSIONS.MANAGE_USERS, label: "Quản lý người dùng", module: undefined, risk: "critical", supported_scopes: ["tenant"] },
+  { key: PERMISSIONS.MANAGE_ROLES, label: "Quản lý nhãn role", module: undefined, risk: "critical", supported_scopes: ["tenant"] },
+  { key: PERMISSIONS.MANAGE_PATIENTS, label: "Quản trị bệnh nhân", module: undefined, risk: "high", supported_scopes: ["tenant", "branch"] },
+  { key: PERMISSIONS.MANAGE_SCHEDULE, label: "Quản lý lịch làm việc", module: undefined, risk: "medium", supported_scopes: ["tenant", "branch"] },
+  { key: PERMISSIONS.VIEW_MANAGEMENT_DASHBOARD, label: "Xem dashboard quản lý", module: undefined, risk: "medium", supported_scopes: ["tenant", "branch"] },
+  { key: PERMISSIONS.VIEW_FINANCE, label: "Xem tài chính", module: undefined, risk: "high", supported_scopes: ["tenant", "branch"] },
+  { key: PERMISSIONS.MANAGE_FINANCE, label: "Quản trị tài chính", module: undefined, risk: "critical", supported_scopes: ["tenant"] },
+  { key: PERMISSIONS.READ_CHAIRS, label: "Xem ghế điều trị", module: undefined, risk: "low", supported_scopes: ["tenant", "branch"] },
+  { key: PERMISSIONS.WRITE_CHAIRS, label: "Quản lý ghế điều trị", module: undefined, risk: "medium", supported_scopes: ["tenant", "branch"] },
+  { key: PERMISSIONS.MANAGE_REFERRAL_PROGRAMS, label: "Quản lý chương trình giới thiệu", module: undefined, risk: "high", supported_scopes: ["tenant"] },
+  { key: PERMISSIONS.MANAGE_REFERRERS, label: "Quản lý người giới thiệu", module: undefined, risk: "high", supported_scopes: ["tenant"] },
+  { key: PERMISSIONS.READ_REFERRALS, label: "Xem giới thiệu", module: undefined, risk: "medium", supported_scopes: ["tenant"] },
+  { key: PERMISSIONS.REVIEW_REFERRAL_REWARDS, label: "Duyệt thưởng giới thiệu", module: undefined, risk: "critical", supported_scopes: ["tenant"] },
+  { key: PERMISSIONS.PAY_REFERRAL_REWARDS, label: "Chi thưởng giới thiệu", module: undefined, risk: "critical", supported_scopes: ["tenant"] },
+  { key: PERMISSIONS.VIEW_REFERRAL_REPORTS, label: "Xem báo cáo giới thiệu", module: undefined, risk: "medium", supported_scopes: ["tenant"] },
+  { key: PERMISSIONS.WRITE_PRE_EXAM_DRAFTS, label: "Soạn nháp tiền khám", module: undefined, risk: "medium", supported_scopes: ["tenant", "branch", "assignment"] },
+  { key: PERMISSIONS.REVIEW_CLINICAL_DRAFTS, label: "Duyệt nháp lâm sàng", module: undefined, risk: "critical", supported_scopes: ["tenant", "branch", "assignment"] },
+  { key: PERMISSIONS.SIGN_CLINICAL_RECORDS, label: "Ký hồ sơ lâm sàng", module: undefined, risk: "critical", supported_scopes: ["tenant", "branch", "assignment"] },
+  { key: PERMISSIONS.MANAGE_CONSENTS, label: "Quản lý đồng thuận", module: undefined, risk: "critical", supported_scopes: ["tenant", "branch"] },
+  { key: PERMISSIONS.WRITE_PATHWAYS, label: "Cập nhật clinical pathway", module: FEATURE_FLAGS.CLINICAL_COPILOT_ENDODONTIC_PAIN_V1, risk: "high", supported_scopes: ["tenant", "branch", "assignment"] },
+  { key: PERMISSIONS.REVIEW_PATHWAYS, label: "Duyệt clinical pathway", module: FEATURE_FLAGS.CLINICAL_COPILOT_ENDODONTIC_PAIN_V1, risk: "critical", supported_scopes: ["tenant", "branch", "assignment"] },
+] as const;
 
 /** API base path — mounted under this in the Worker. */
 export const API_PREFIX = "/api";

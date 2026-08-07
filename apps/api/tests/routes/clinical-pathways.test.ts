@@ -17,12 +17,7 @@ const visitRow = (overrides: Record<string, unknown> = {}) => ({
 });
 
 const flagRow = {
-  key: "clinical_copilot.endodontic_pain_v1",
-  description: "desc",
-  default_enabled: 0,
-  created_at: "2026-01-01T10:00:00Z",
-  updated_at: "2026-01-01T10:00:00Z",
-  override_enabled: 1,
+  enabled: 1,
 };
 
 describe("GET /api/visits/:visitId/clinical-pathways/endodontic-pain", () => {
@@ -32,9 +27,8 @@ describe("GET /api/visits/:visitId/clinical-pathways/endodontic-pain", () => {
       ["FROM visits", [visitRow()]],
       ["FROM platform_feature_flags", []], // no flags enabled
     ]));
-    expect(res.status).toBe(200);
-    const body = await res.json() as { feature_enabled: boolean };
-    expect(body.feature_enabled).toBe(false);
+    expect(res.status).toBe(404);
+    expect((await res.json()) as { code: string }).toMatchObject({ code: "not_found" });
   });
 
   it("returns assessments when feature flag is enabled", async () => {
@@ -45,7 +39,7 @@ describe("GET /api/visits/:visitId/clinical-pathways/endodontic-pain", () => {
       ["FROM clinical_pathway_assessments", [{ id: "assessment-1", tenant_id: "test-tenant", visit_id: "visit-1", tooth_number: 36, pathway_key: "endodontic_pain", pathway_version: "v1", status: "active", assessment_json: "{}", entry_source: "doctor", entered_by: "test-user", current_revision: 0, created_at: "2026-01-01", updated_at: "2026-01-01" }]],
       ["FROM clinical_pathway_assessment_items", []],
     ]));
-    expect(res.status).toBe(200);
+    expect(res.status, await res.clone().text()).toBe(200);
     const body = await res.json() as { feature_enabled: boolean; assessments: unknown[] };
     expect(body.feature_enabled).toBe(true);
     expect(body.assessments).toHaveLength(1);
@@ -63,7 +57,7 @@ describe("POST sign-off blocker", () => {
       ["FROM clinical_review_events", []],
       ["FROM visit_initial_assessments", [{ id: "ia-1" }]],
     ]), { permissions: ["sign_clinical_records"] });
-    expect(res.status).toBe(422);
+    expect(res.status, await res.clone().text()).toBe(422);
     const body = await res.json() as { error: string };
     expect(body.error).toContain("Còn pathway assessment đang đánh giá chưa đóng");
   });

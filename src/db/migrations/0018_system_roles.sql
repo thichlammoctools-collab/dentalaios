@@ -21,11 +21,11 @@ END;
 UPDATE roles
 SET permissions = CASE system_key
   WHEN 'admin' THEN '["all"]'
-  WHEN 'doctor' THEN '["read_patients","write_findings","write_plans","approve_plans"]'
-  WHEN 'assistant' THEN '["read_patients","write_visits"]'
+  WHEN 'doctor' THEN '["read_patients","write_findings","write_plans","approve_plans","review_clinical_drafts","sign_clinical_records","manage_consents"]'
+  WHEN 'assistant' THEN '["read_patients","write_visits","write_pre_exam_drafts"]'
   WHEN 'receptionist' THEN '["read_patients","write_patients","write_payments","write_appointments"]'
-  WHEN 'manager' THEN '["all"]'
-  WHEN 'accountant' THEN '["read_patients","write_payments"]'
+  WHEN 'manager' THEN '["read_patients","write_patients","write_appointments","manage_schedule","manage_users","manage_roles","view_management_dashboard","view_finance"]'
+  WHEN 'accountant' THEN '["read_patients","write_payments","view_finance","manage_finance"]'
   WHEN 'hr' THEN '["manage_users","read_patients"]'
   WHEN 'marketing' THEN '["read_patients"]'
   WHEN 'security' THEN '[]'
@@ -36,11 +36,11 @@ WHERE system_key IS NOT NULL;
 WITH catalog(system_key, name, permissions) AS (
   VALUES
     ('admin', 'Quản trị viên', '["all"]'),
-    ('doctor', 'Bác sĩ', '["read_patients","write_findings","write_plans","approve_plans"]'),
-    ('assistant', 'Phụ tá', '["read_patients","write_visits"]'),
+    ('doctor', 'Bác sĩ', '["read_patients","write_findings","write_plans","approve_plans","review_clinical_drafts","sign_clinical_records","manage_consents"]'),
+    ('assistant', 'Phụ tá', '["read_patients","write_visits","write_pre_exam_drafts"]'),
     ('receptionist', 'Lễ tân', '["read_patients","write_patients","write_payments","write_appointments"]'),
-    ('manager', 'Quản lý', '["all"]'),
-    ('accountant', 'Kế toán', '["read_patients","write_payments"]'),
+    ('manager', 'Quản lý', '["read_patients","write_patients","write_appointments","manage_schedule","manage_users","manage_roles","view_management_dashboard","view_finance"]'),
+    ('accountant', 'Kế toán', '["read_patients","write_payments","view_finance","manage_finance"]'),
     ('hr', 'Nhân sự', '["manage_users","read_patients"]'),
     ('marketing', 'Marketing', '["read_patients"]'),
     ('security', 'Bảo vệ', '[]')

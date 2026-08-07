@@ -11,6 +11,7 @@
  */
 
 import type { D1Database } from "@cloudflare/workers-types";
+import { FEATURE_FLAGS } from "@shared/constants";
 import type { ClinicalPathwayAssessment, ClinicalPathwayAssessmentItem, EndodonticPainAssessmentPayload, PathwayPattern } from "@shared/types";
 import type { PathwayAssessmentCreateInput, PathwayAssessmentUpdateInput, PathwayAssessmentCloseInput, PathwayItemUpdateInput } from "@shared/validation";
 import { ConflictError, NotFoundError, ValidationError } from "../lib/errors";
@@ -28,7 +29,7 @@ import {
   evaluatePatterns,
 } from "./clinical-pathway-content";
 
-const FLAG_KEY = "clinical_copilot.endodontic_pain_v1";
+const FLAG_KEY = FEATURE_FLAGS.CLINICAL_COPILOT_ENDODONTIC_PAIN_V1;
 
 export interface PathwayAssessmentResponse {
   assessment: ClinicalPathwayAssessment;
@@ -46,9 +47,7 @@ export interface PathwayVisitResponse {
 export const clinicalPathwayService = {
   /** Check if the pathway feature flag is enabled for this tenant. */
   async isFeatureEnabled(db: D1Database, tenantId: string): Promise<boolean> {
-    const flags = await createPlatformConfigRepository(db).tenantFlags(tenantId);
-    const flag = flags.find((f) => f.key === FLAG_KEY);
-    return flag?.enabled ?? false;
+    return createPlatformConfigRepository(db).isTenantFlagEnabled(tenantId, FLAG_KEY);
   },
 
   /** GET — fetch all pathway data for a visit. */
@@ -350,7 +349,6 @@ export const clinicalPathwayService = {
     reviewerId: string,
   ): Promise<ClinicalPathwayAssessment> {
     await assertFeatureEnabled(db, tenantId);
-    await assertFeatureEnabled(db, tenantId);
     const visit = await requireVisit(db, tenantId, visitId);
     if (visit.locked_at) throw new ConflictError("Lượt khám đã khóa");
 
@@ -405,6 +403,7 @@ export const clinicalPathwayService = {
     tenantId: string,
     visitId: string,
   ): Promise<PathwayAssessmentResponse[]> {
+    await assertFeatureEnabled(db, tenantId);
     const repo = createClinicalPathwayAssessmentsRepository(db);
     const pending = await repo.listPendingReviewByVisit(tenantId, visitId);
     return Promise.all(pending.map((a) => enrichAssessment(db, tenantId, a)));
@@ -412,6 +411,7 @@ export const clinicalPathwayService = {
 
   /** Get metrics for a tenant (aggregate, no PII). */
   async getMetrics(db: D1Database, tenantId: string) {
+    await assertFeatureEnabled(db, tenantId);
     // Use direct D1 query for aggregate metrics
     const row = await db.prepare(
       `SELECT

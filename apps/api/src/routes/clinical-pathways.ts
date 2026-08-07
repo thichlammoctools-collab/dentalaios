@@ -12,7 +12,7 @@
 
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { PERMISSIONS } from "@shared/constants";
+import { FEATURE_FLAGS, PERMISSIONS } from "@shared/constants";
 import {
   pathwayAssessmentCreateSchema,
   pathwayAssessmentUpdateSchema,
@@ -22,6 +22,7 @@ import {
 import type { Env } from "../index";
 import { requireAuth, getJwt } from "../middleware/auth";
 import { requirePermission } from "../middleware/rbac";
+import { requireFeatureEnabled } from "../middleware/feature-flags";
 import { auditLog } from "../middleware/audit";
 import type { AuthContext } from "../middleware/auth";
 import { clinicalPathwayService } from "../services/clinical-pathway.service";
@@ -34,6 +35,7 @@ router.use("*", requireAuth());
 // GET /api/visits/:visitId/clinical-pathways/endodontic-pain
 router.get(
   "/:visitId/clinical-pathways/endodontic-pain",
+  requireFeatureEnabled(FEATURE_FLAGS.CLINICAL_COPILOT_ENDODONTIC_PAIN_V1),
   requirePermission(PERMISSIONS.READ_PATIENTS),
   async (c) => {
     const jwt = getJwt(c);
@@ -49,6 +51,7 @@ router.get(
 // GET pending review (assistant drafts)
 router.get(
   "/:visitId/clinical-pathways/endodontic-pain/review",
+  requireFeatureEnabled(FEATURE_FLAGS.CLINICAL_COPILOT_ENDODONTIC_PAIN_V1),
   requirePermission(PERMISSIONS.REVIEW_PATHWAYS),
   async (c) => {
     const jwt = getJwt(c);
@@ -64,6 +67,7 @@ router.get(
 // POST — create assessment
 router.post(
   "/:visitId/clinical-pathways/endodontic-pain/assessments",
+  requireFeatureEnabled(FEATURE_FLAGS.CLINICAL_COPILOT_ENDODONTIC_PAIN_V1),
   requirePermission(PERMISSIONS.WRITE_PATHWAYS),
   auditLog("pathway_assessment_created", "clinical_pathway_assessment"),
   zValidator("json", pathwayAssessmentCreateSchema),
@@ -85,6 +89,7 @@ router.post(
 // PATCH — update assessment payload
 router.patch(
   "/:visitId/clinical-pathways/endodontic-pain/assessments/:assessmentId",
+  requireFeatureEnabled(FEATURE_FLAGS.CLINICAL_COPILOT_ENDODONTIC_PAIN_V1),
   requirePermission(PERMISSIONS.WRITE_PATHWAYS),
   auditLog("pathway_assessment_updated", "clinical_pathway_assessment"),
   zValidator("json", pathwayAssessmentUpdateSchema),
@@ -107,6 +112,7 @@ router.patch(
 // POST — close assessment
 router.post(
   "/:visitId/clinical-pathways/endodontic-pain/assessments/:assessmentId/close",
+  requireFeatureEnabled(FEATURE_FLAGS.CLINICAL_COPILOT_ENDODONTIC_PAIN_V1),
   requirePermission(PERMISSIONS.WRITE_PATHWAYS),
   auditLog("pathway_assessment_closed", "clinical_pathway_assessment"),
   zValidator("json", pathwayAssessmentCloseSchema),
@@ -129,6 +135,7 @@ router.post(
 // PATCH — update a single checklist item
 router.patch(
   "/:visitId/clinical-pathways/endodontic-pain/assessments/:assessmentId/items/:itemKey",
+  requireFeatureEnabled(FEATURE_FLAGS.CLINICAL_COPILOT_ENDODONTIC_PAIN_V1),
   requirePermission(PERMISSIONS.WRITE_PATHWAYS),
   auditLog("pathway_item_updated", "clinical_pathway_assessment_item", {
     entityIdFrom: (body) => {
@@ -157,6 +164,7 @@ router.patch(
 // POST — accept draft assessment (doctor review)
 router.post(
   "/:visitId/clinical-pathways/endodontic-pain/assessments/:assessmentId/accept",
+  requireFeatureEnabled(FEATURE_FLAGS.CLINICAL_COPILOT_ENDODONTIC_PAIN_V1),
   requirePermission(PERMISSIONS.REVIEW_PATHWAYS),
   auditLog("pathway_assessment_accepted", "clinical_pathway_assessment"),
   async (c) => {
@@ -176,6 +184,7 @@ router.post(
 // POST — reject draft assessment
 router.post(
   "/:visitId/clinical-pathways/endodontic-pain/assessments/:assessmentId/reject",
+  requireFeatureEnabled(FEATURE_FLAGS.CLINICAL_COPILOT_ENDODONTIC_PAIN_V1),
   requirePermission(PERMISSIONS.REVIEW_PATHWAYS),
   auditLog("pathway_assessment_rejected", "clinical_pathway_assessment"),
   zValidator("json", pathwayAssessmentCloseSchema),
@@ -203,6 +212,7 @@ clinicalCopilotMetricsRouter.use("*", requireAuth());
 // GET /api/clinical-copilot/metrics/endodontic-pain
 clinicalCopilotMetricsRouter.get(
   "/endodontic-pain",
+  requireFeatureEnabled(FEATURE_FLAGS.CLINICAL_COPILOT_ENDODONTIC_PAIN_V1),
   requirePermission(PERMISSIONS.VIEW_CLINICAL_REPORTS),
   async (c) => {
     const jwt = getJwt(c);

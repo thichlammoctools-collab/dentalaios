@@ -19,10 +19,10 @@ INSERT OR IGNORE INTO branches (id, tenant_id, name, address) VALUES
 -- ───���──────────── Roles (RBAC baseline) ────────────────
 INSERT OR IGNORE INTO roles (id, tenant_id, name, permissions) VALUES
   ('role-admin',        'tenant-demo', 'admin',        '["all"]'),
-  ('role-doctor',       'tenant-demo', 'doctor',       '["read_patients","write_findings","write_plans","approve_plans"]'),
-  ('role-assistant',    'tenant-demo', 'assistant',    '["read_patients","write_visits"]'),
+  ('role-doctor',       'tenant-demo', 'doctor',       '["read_patients","write_findings","write_plans","approve_plans","review_clinical_drafts","sign_clinical_records","manage_consents"]'),
+  ('role-assistant',    'tenant-demo', 'assistant',    '["read_patients","write_visits","write_pre_exam_drafts"]'),
   ('role-receptionist', 'tenant-demo', 'receptionist', '["read_patients","write_patients","write_payments","write_appointments"]'),
-  ('role-quan-ly',      'tenant-demo', 'Quản lý',     '["all"]'),
+  ('role-quan-ly',      'tenant-demo', 'Quản lý',     '["read_patients","write_patients","write_appointments","manage_schedule","manage_users","manage_roles","view_management_dashboard","view_finance"]'),
   ('role-ke-toan',      'tenant-demo', 'Kế toán',     '["read_patients","write_payments","view_finance","manage_finance"]'),
   ('role-nhan-su',      'tenant-demo', 'Nhân sự',     '["manage_users","read_patients"]'),
   ('role-marketing',    'tenant-demo', 'Marketing',   '["read_patients"]'),

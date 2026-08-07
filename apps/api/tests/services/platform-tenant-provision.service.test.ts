@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { verifyPassword } from "../../src/lib/password";
 import { platformTenantProvisionService } from "../../src/services/platform-tenant-provision.service";
 import { createMockD1 } from "../helpers/mock-db";
+import { PERMISSIONS, ROLES, SYSTEM_ROLES } from "@shared/constants";
 
 describe("platformTenantProvisionService", () => {
   it("creates a tenant administrator with a hashed password", async () => {
@@ -29,5 +30,33 @@ describe("platformTenantProvisionService", () => {
     expect(userInsert[0].binds[1]).toBe(tenantInsert[0].binds[0]);
     expect(userInsert[0].binds[2]).toBe(branchInsert[0].binds[0]);
     expect(userInsert[0].binds[3]).toBe(roleInserts[0].binds[0]);
+  });
+
+  it("serializes the least-privilege Manager catalog for new tenants", async () => {
+    const db = createMockD1();
+
+    await platformTenantProvisionService.provision(db as never, {
+      name: "Nha khoa ABC",
+      admin_email: "owner@abc.vn",
+      admin_password: "A-secure-initial-password",
+    });
+
+    const manager = SYSTEM_ROLES.find((role) => role.key === ROLES.MANAGER);
+    const roleInsert = db.__sqlContaining("INSERT INTO roles").find(
+      (call) => call.binds[2] === ROLES.MANAGER,
+    );
+
+    expect(manager?.permissions).toEqual([
+      PERMISSIONS.READ_PATIENTS,
+      PERMISSIONS.WRITE_PATIENTS,
+      PERMISSIONS.WRITE_APPOINTMENTS,
+      PERMISSIONS.MANAGE_SCHEDULE,
+      PERMISSIONS.MANAGE_USERS,
+      PERMISSIONS.MANAGE_ROLES,
+      PERMISSIONS.VIEW_MANAGEMENT_DASHBOARD,
+      PERMISSIONS.VIEW_FINANCE,
+    ]);
+    expect(manager?.permissions).not.toContain(PERMISSIONS.ALL);
+    expect(roleInsert?.binds[4]).toBe(JSON.stringify(manager?.permissions));
   });
 });
