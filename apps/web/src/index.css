@@ -125,7 +125,8 @@ html[data-theme="dark"] .marketing-site .bg-\[\#e5f0e7\],
 html[data-theme="dark"] .marketing-site .bg-\[\#e6f1e8\],
 html[data-theme="dark"] .marketing-site .bg-\[\#e7eee8\],
 html[data-theme="dark"] .marketing-site .bg-\[\#e7f2e9\],
-html[data-theme="dark"] .marketing-site .bg-\[\#e3f2e6\] { background-color: #213a31; }
+html[data-theme="dark"] .marketing-site .bg-\[\#e3f2e6\],
+html[data-theme="dark"] .marketing-site .bg-\[\#e4f2e8\] { background-color: #213a31; }
 
 html[data-theme="dark"] .marketing-site .bg-\[\#dceee0\] { background-color: #1d382e; }
 html[data-theme="dark"] .marketing-site .bg-\[\#dcecdf\] { background-color: #244638; }
@@ -137,6 +138,9 @@ html[data-theme="dark"] .marketing-site .border-\[\#d1ded4\],
 html[data-theme="dark"] .marketing-site .border-\[\#cfddd2\],
 html[data-theme="dark"] .marketing-site .border-\[\#e4ece5\],
 html[data-theme="dark"] .marketing-site .border-\[\#dbe7dd\] { border-color: #365348; }
+
+html[data-theme="dark"] .marketing-site .border-\[\#b9d6c4\],
+html[data-theme="dark"] .marketing-site .border-\[\#7da58c\] { border-color: #75b48e; }
 
 html[data-theme="dark"] .marketing-site .text-\[\#123c31\],
 html[data-theme="dark"] .marketing-site .text-\[\#13251f\],
@@ -165,9 +169,29 @@ html[data-theme="dark"] .marketing-site .text-\[\#799287\],
 html[data-theme="dark"] .marketing-site .text-\[\#80a192\],
 html[data-theme="dark"] .marketing-site .text-\[\#8a9c94\] { color: #adc5b8; }
 
+html[data-theme="dark"] .marketing-site .text-\[\#196149\],
+html[data-theme="dark"] .marketing-site .text-\[\#277057\],
+html[data-theme="dark"] .marketing-site .text-\[\#287154\],
+html[data-theme="dark"] .marketing-site .text-\[\#2d7258\],
+html[data-theme="dark"] .marketing-site .text-\[\#337257\],
+html[data-theme="dark"] .marketing-site .text-\[\#367461\],
+html[data-theme="dark"] .marketing-site .text-\[\#3d956e\],
+html[data-theme="dark"] .marketing-site .text-\[\#24664d\] { color: #8ee0ae; }
+
 html[data-theme="dark"] .marketing-site .hover\:bg-\[\#edf2ed\]:hover { background-color: #284539; }
 html[data-theme="dark"] .marketing-site .bg-\[\#123c31\] { background-color: #245b48; }
 html[data-theme="dark"] .marketing-site .hover\:bg-\[\#0c3026\]:hover { background-color: #30725a; }
+html[data-theme="dark"] .marketing-site .marketing-metric-value { color: #75d6a0; }
+
+/* Preserve dark text on light-accent badges; global marketing text overrides are
+   intentionally light for dark surfaces, but these accents need the inverse. */
+html[data-theme="dark"] .marketing-site .bg-\[\#8ed6aa\] { background-color: #9ee6b8; }
+html[data-theme="dark"] .marketing-site .bg-\[\#8ed6aa\].text-\[\#123c31\],
+html[data-theme="dark"] .marketing-site .bg-\[\#e4f2e8\].text-\[\#287154\] { color: #102d23; }
+
+html[data-theme="dark"] .marketing-site .bg-\[\#cadbcd\] { background-color: #4b6b5d; }
+html[data-theme="dark"] .marketing-site .bg-\[\#75c4a0\] { background-color: #8ee0ae; }
+html[data-theme="dark"] .marketing-site .bg-\[\#87d0a7\] { background-color: #9ee6b8; }
 
 /* The referrer portal has its own shell but shares the workspace width. */
 main.min-h-svh.bg-muted\/20 > header > .mx-auto,
