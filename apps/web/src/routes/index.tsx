@@ -39,6 +39,7 @@ import { PlatformShell } from "@/components/platform/PlatformShell";
 import { PlatformLoginPage } from "@/pages/platform/PlatformLoginPage";
 import { PlatformClinicalTerminologyPage } from "@/pages/platform/PlatformClinicalTerminologyPage";
 import { PlatformTreatmentServiceTemplatesPage } from "@/pages/platform/PlatformTreatmentServiceTemplatesPage";
+import { MarketingSite } from "@/pages/MarketingSite";
 import {
   PlatformAdminsPage,
   PlatformAuditLogsPage,
@@ -73,7 +74,11 @@ export function AppRoutes() {
   return (
     <Routes>
       {/* Public */}
-      <Route path="/" element={<Navigate to={ROUTES.LOGIN} replace />} />
+      <Route path="/" element={<Navigate to="/vi" replace />} />
+      <Route path="/vi" element={<MarketingSite />} />
+      <Route path="/vi/:page" element={<MarketingSite />} />
+      <Route path="/en" element={<MarketingSite />} />
+      <Route path="/en/:page" element={<MarketingSite />} />
       <Route path={ROUTES.LOGIN} element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
