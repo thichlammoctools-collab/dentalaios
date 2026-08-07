@@ -106,10 +106,10 @@ html[data-theme="dark"] {
 .platform-control .text-emerald-800 { color: #86efac; }
 .platform-control .text-cyan-700 { color: #67e8f9; }
 
-/* The public marketing site has its own calm, clinical dark palette. */
+/* The public marketing site shares the clinic's calm deep-sea dark palette. */
 html[data-theme="dark"] .marketing-site {
-  background: #101917;
-  color: #edf5ef;
+  background: #091725;
+  color: #e7f4fb;
 }
 
 html[data-theme="dark"] .marketing-site .bg-\[\#f7f8f5\],
@@ -119,7 +119,7 @@ html[data-theme="dark"] .marketing-site .bg-white\/55,
 html[data-theme="dark"] .marketing-site .bg-white\/60,
 html[data-theme="dark"] .marketing-site .bg-white\/70,
 html[data-theme="dark"] .marketing-site .bg-\[\#fdfefd\],
-html[data-theme="dark"] .marketing-site .bg-\[\#fbfdfb\] { background-color: #16221f; }
+html[data-theme="dark"] .marketing-site .bg-\[\#fbfdfb\] { background-color: #0e2234; }
 
 html[data-theme="dark"] .marketing-site .bg-\[\#eff5ef\],
 html[data-theme="dark"] .marketing-site .bg-\[\#e5f0e7\],
@@ -127,10 +127,10 @@ html[data-theme="dark"] .marketing-site .bg-\[\#e6f1e8\],
 html[data-theme="dark"] .marketing-site .bg-\[\#e7eee8\],
 html[data-theme="dark"] .marketing-site .bg-\[\#e7f2e9\],
 html[data-theme="dark"] .marketing-site .bg-\[\#e3f2e6\],
-html[data-theme="dark"] .marketing-site .bg-\[\#e4f2e8\] { background-color: #213a31; }
+html[data-theme="dark"] .marketing-site .bg-\[\#e4f2e8\] { background-color: #123047; }
 
-html[data-theme="dark"] .marketing-site .bg-\[\#dceee0\] { background-color: #1d382e; }
-html[data-theme="dark"] .marketing-site .bg-\[\#dcecdf\] { background-color: #244638; }
+html[data-theme="dark"] .marketing-site .bg-\[\#dceee0\] { background-color: #102b40; }
+html[data-theme="dark"] .marketing-site .bg-\[\#dcecdf\] { background-color: #163954; }
 html[data-theme="dark"] .marketing-site .border-\[\#dce4de\],
 html[data-theme="dark"] .marketing-site .border-\[\#dce6de\],
 html[data-theme="dark"] .marketing-site .border-\[\#d5e1d7\],
@@ -138,10 +138,10 @@ html[data-theme="dark"] .marketing-site .border-\[\#d4dfd6\],
 html[data-theme="dark"] .marketing-site .border-\[\#d1ded4\],
 html[data-theme="dark"] .marketing-site .border-\[\#cfddd2\],
 html[data-theme="dark"] .marketing-site .border-\[\#e4ece5\],
-html[data-theme="dark"] .marketing-site .border-\[\#dbe7dd\] { border-color: #365348; }
+html[data-theme="dark"] .marketing-site .border-\[\#dbe7dd\] { border-color: #284b67; }
 
 html[data-theme="dark"] .marketing-site .border-\[\#b9d6c4\],
-html[data-theme="dark"] .marketing-site .border-\[\#7da58c\] { border-color: #75b48e; }
+html[data-theme="dark"] .marketing-site .border-\[\#7da58c\] { border-color: #3b6f94; }
 
 html[data-theme="dark"] .marketing-site .text-\[\#123c31\],
 html[data-theme="dark"] .marketing-site .text-\[\#13251f\],
@@ -151,7 +151,7 @@ html[data-theme="dark"] .marketing-site .text-\[\#20473b\],
 html[data-theme="dark"] .marketing-site .text-\[\#21483c\],
 html[data-theme="dark"] .marketing-site .text-\[\#245044\],
 html[data-theme="dark"] .marketing-site .text-\[\#315748\],
-html[data-theme="dark"] .marketing-site .text-\[\#406258\] { color: #edf5ef; }
+html[data-theme="dark"] .marketing-site .text-\[\#406258\] { color: #e7f4fb; }
 
 html[data-theme="dark"] .marketing-site .text-\[\#547268\],
 html[data-theme="dark"] .marketing-site .text-\[\#587068\],
@@ -168,7 +168,7 @@ html[data-theme="dark"] .marketing-site .text-\[\#779087\],
 html[data-theme="dark"] .marketing-site .text-\[\#789087\],
 html[data-theme="dark"] .marketing-site .text-\[\#799287\],
 html[data-theme="dark"] .marketing-site .text-\[\#80a192\],
-html[data-theme="dark"] .marketing-site .text-\[\#8a9c94\] { color: #adc5b8; }
+html[data-theme="dark"] .marketing-site .text-\[\#8a9c94\] { color: #afc8d7; }
 
 html[data-theme="dark"] .marketing-site .text-\[\#196149\],
 html[data-theme="dark"] .marketing-site .text-\[\#277057\],
@@ -177,22 +177,22 @@ html[data-theme="dark"] .marketing-site .text-\[\#2d7258\],
 html[data-theme="dark"] .marketing-site .text-\[\#337257\],
 html[data-theme="dark"] .marketing-site .text-\[\#367461\],
 html[data-theme="dark"] .marketing-site .text-\[\#3d956e\],
-html[data-theme="dark"] .marketing-site .text-\[\#24664d\] { color: #8ee0ae; }
+html[data-theme="dark"] .marketing-site .text-\[\#24664d\] { color: #78d0f4; }
 
-html[data-theme="dark"] .marketing-site .hover\:bg-\[\#edf2ed\]:hover { background-color: #284539; }
-html[data-theme="dark"] .marketing-site .bg-\[\#123c31\] { background-color: #245b48; }
-html[data-theme="dark"] .marketing-site .hover\:bg-\[\#0c3026\]:hover { background-color: #30725a; }
-html[data-theme="dark"] .marketing-site .marketing-metric-value { color: #75d6a0; }
+html[data-theme="dark"] .marketing-site .hover\:bg-\[\#edf2ed\]:hover { background-color: #173a55; }
+html[data-theme="dark"] .marketing-site .bg-\[\#123c31\] { background-color: #1b5a7a; }
+html[data-theme="dark"] .marketing-site .hover\:bg-\[\#0c3026\]:hover { background-color: #267aa3; }
+html[data-theme="dark"] .marketing-site .marketing-metric-value { color: #4db6e8; }
 
 /* Preserve dark text on light-accent badges; global marketing text overrides are
    intentionally light for dark surfaces, but these accents need the inverse. */
-html[data-theme="dark"] .marketing-site .bg-\[\#8ed6aa\] { background-color: #9ee6b8; }
+html[data-theme="dark"] .marketing-site .bg-\[\#8ed6aa\] { background-color: #85d5f4; }
 html[data-theme="dark"] .marketing-site .bg-\[\#8ed6aa\].text-\[\#123c31\],
-html[data-theme="dark"] .marketing-site .bg-\[\#e4f2e8\].text-\[\#287154\] { color: #102d23; }
+html[data-theme="dark"] .marketing-site .bg-\[\#e4f2e8\].text-\[\#287154\] { color: #082133; }
 
-html[data-theme="dark"] .marketing-site .bg-\[\#cadbcd\] { background-color: #4b6b5d; }
-html[data-theme="dark"] .marketing-site .bg-\[\#75c4a0\] { background-color: #8ee0ae; }
-html[data-theme="dark"] .marketing-site .bg-\[\#87d0a7\] { background-color: #9ee6b8; }
+html[data-theme="dark"] .marketing-site .bg-\[\#cadbcd\] { background-color: #436b83; }
+html[data-theme="dark"] .marketing-site .bg-\[\#75c4a0\] { background-color: #4db6e8; }
+html[data-theme="dark"] .marketing-site .bg-\[\#87d0a7\] { background-color: #85d5f4; }
 
 :root { --motion-highlight-color: rgb(54 116 97 / 26%); --motion-success-color: rgb(61 149 110 / 28%); }
 html[data-theme="dark"] { --motion-highlight-color: rgb(77 182 232 / 30%); --motion-success-color: rgb(77 182 232 / 32%); }
@@ -285,14 +285,14 @@ html[data-theme="dark"] { --motion-highlight-color: rgb(77 182 232 / 30%); --mot
 html[data-theme="dark"] .marketing-dental-grid {
   opacity: .36;
   background-image:
-    linear-gradient(rgb(117 214 160 / 11%) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(117 214 160 / 11%) 1px, transparent 1px);
+    linear-gradient(rgb(77 182 232 / 13%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(77 182 232 / 13%) 1px, transparent 1px);
 }
 
 html[data-theme="dark"] .marketing-tooth-mark span {
-  border-color: rgb(142 224 174 / 35%);
-  background: linear-gradient(145deg, rgb(68 119 93 / 42%), rgb(21 46 37 / 20%));
-  box-shadow: 0 0 0 5px rgb(142 224 174 / 4%);
+  border-color: rgb(120 208 244 / 35%);
+  background: linear-gradient(145deg, rgb(38 122 163 / 42%), rgb(8 33 51 / 20%));
+  box-shadow: 0 0 0 5px rgb(120 208 244 / 4%);
 }
 
 @media (prefers-reduced-motion: reduce) {
