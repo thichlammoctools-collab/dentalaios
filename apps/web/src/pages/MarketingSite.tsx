@@ -7,21 +7,28 @@ import {
   Check,
   CircleHelp,
   Clock3,
+  FileText,
   Globe2,
   HeartPulse,
+  LockKeyhole,
   Mail,
   Menu,
   MessagesSquare,
   Moon,
+  Mic,
+  Network,
+  Shield,
   ShieldCheck,
   Sparkles,
   Sun,
+  TimerReset,
   X,
 } from "lucide-react";
 import { useTheme } from "@/lib/theme";
 
 type Locale = "vi" | "en";
 type Page = "home" | "features" | "pricing" | "guides" | "contact";
+type FeatureSlug = "ai-copilot" | "ghe-va-lich-hen" | "benh-an-theo-rang" | "referral-va-bao-mat";
 
 const content = {
   vi: {
@@ -46,9 +53,9 @@ const content = {
     featureTitle: "Một hệ điều hành lâm sàng nhẹ nhàng cho bác sĩ chủ phòng khám.",
     featureBody: "Giao diện tối giản, các quyết định cần thiết luôn ở đúng chỗ và dữ liệu luôn thuộc quyền kiểm soát của phòng khám.",
     featureCards: [
-      { title: "AI Copilot lâm sàng", body: "Hỗ trợ khám, chẩn đoán và lập kế hoạch; ghi nhận nhanh bằng giọng nói để bác sĩ không phải gõ." },
-      { title: "Ghế và lịch hẹn thông minh", body: "Điều phối ghế, bác sĩ và lịch hẹn trực quan để cả phòng khám luôn chủ động." },
-      { title: "Bệnh án theo từng răng", body: "Theo dõi bệnh án điện tử và toàn bộ lịch sử điều trị trên từng răng, không mất ngữ cảnh." },
+      { slug: "ai-copilot", title: "AI Copilot lâm sàng", body: "Hỗ trợ khám, chẩn đoán và lập kế hoạch; ghi nhận nhanh bằng giọng nói để bác sĩ không phải gõ." },
+      { slug: "ghe-va-lich-hen", title: "Ghế và lịch hẹn thông minh", body: "Điều phối ghế, bác sĩ và lịch hẹn trực quan để cả phòng khám luôn chủ động." },
+      { slug: "benh-an-theo-rang", title: "Bệnh án theo từng răng", body: "Theo dõi bệnh án điện tử và toàn bộ lịch sử điều trị trên từng răng, không mất ngữ cảnh." },
     ],
     seeFeatures: "Khám phá tính năng",
     ctaTitle: "Triển khai hệ điều hành đúng cho phòng khám RHM của bạn.",
@@ -61,10 +68,10 @@ const content = {
     featuresTitle: "Làm sâu việc lâm sàng. Làm nhẹ việc điều hành.",
     featuresBody: "DentalAI OS được xây dựng bởi bác sĩ RHM cho bác sĩ RHM: đúng những gì cần trong phòng khám, không lặp lại những gì LarkSuite đã đáp ứng.",
     featureDetails: [
-      { title: "AI Copilot và ghi nhận giọng nói", body: "AI đồng hành trong khám, chẩn đoán và lên kế hoạch điều trị; bác sĩ nói, hệ thống ghi nhận có cấu trúc.", points: ["Không cần gõ ghi chú lâm sàng", "Gợi ý chẩn đoán và kế hoạch", "Giữ bác sĩ tập trung vào người bệnh"] },
-      { title: "Ghế thông minh, lịch hẹn tiện dụng", body: "Một giao diện trực quan để điều phối ghế điều trị, bác sĩ và bệnh nhân theo nhịp làm việc thực tế.", points: ["Nhìn nhanh công suất từng ghế", "Hạn chế trùng lịch và thời gian chờ", "Lịch hẹn rõ ràng cho lễ tân và bác sĩ"] },
-      { title: "Bệnh án điện tử theo từng răng", body: "Toàn bộ lần khám, chẩn đoán, hình ảnh và điều trị được kết nối đúng vị trí trên hàm răng.", points: ["Lịch sử điều trị từng răng", "Kế hoạch điều trị dễ theo dõi", "Hồ sơ lâm sàng không mất ngữ cảnh"] },
-      { title: "Referral, LarkSuite và bảo mật riêng", body: "Xây dựng chính sách referral cho bác sĩ, nhân viên, khách hàng; đồng bộ công việc với LarkSuite và giữ dữ liệu trên server riêng.", points: ["Chính sách referral linh hoạt", "Phân công, phân quyền rõ ràng", "Phòng khám sở hữu 100% dữ liệu"] },
+      { slug: "ai-copilot", title: "AI Copilot và ghi nhận giọng nói", body: "AI đồng hành trong khám, chẩn đoán và lên kế hoạch điều trị; bác sĩ nói, hệ thống ghi nhận có cấu trúc.", points: ["Không cần gõ ghi chú lâm sàng", "Gợi ý chẩn đoán và kế hoạch", "Giữ bác sĩ tập trung vào người bệnh"] },
+      { slug: "ghe-va-lich-hen", title: "Ghế thông minh, lịch hẹn tiện dụng", body: "Một giao diện trực quan để điều phối ghế điều trị, bác sĩ và bệnh nhân theo nhịp làm việc thực tế.", points: ["Nhìn nhanh công suất từng ghế", "Hạn chế trùng lịch và thời gian chờ", "Lịch hẹn rõ ràng cho lễ tân và bác sĩ"] },
+      { slug: "benh-an-theo-rang", title: "Bệnh án điện tử theo từng răng", body: "Toàn bộ lần khám, chẩn đoán, hình ảnh và điều trị được kết nối đúng vị trí trên hàm răng.", points: ["Lịch sử điều trị từng răng", "Kế hoạch điều trị dễ theo dõi", "Hồ sơ lâm sàng không mất ngữ cảnh"] },
+      { slug: "referral-va-bao-mat", title: "Referral, LarkSuite và bảo mật riêng", body: "Xây dựng chính sách referral cho bác sĩ, nhân viên, khách hàng; đồng bộ công việc với LarkSuite và giữ dữ liệu trên server riêng.", points: ["Chính sách referral linh hoạt", "Phân công, phân quyền rõ ràng", "Phòng khám sở hữu 100% dữ liệu"] },
     ],
     pricingEyebrow: "Gói triển khai giới hạn",
     pricingTitle: "Một gói duy nhất. Cấu hình đúng cho phòng khám của bạn.",
@@ -120,17 +127,17 @@ const content = {
     workflows: ["Examination with voice capture", "AI Copilot-assisted diagnosis", "Per-tooth treatment planning", "Chair, appointment, and team coordination"],
     featureEyebrow: "Built differently for dentists", featureTitle: "A focused clinical operating system for clinic owners.", featureBody: "A calm, simple interface keeps essential decisions in reach while the clinic keeps full control of its own data.",
     featureCards: [
-      { title: "Clinical AI Copilot", body: "Support examination, diagnosis, and planning with voice-first capture, so dentists do not need to type." },
-      { title: "Smart chairs and appointments", body: "Coordinate chairs, clinicians, and appointments in a clear view that keeps the clinic ahead." },
-      { title: "Records by tooth", body: "Follow electronic records and complete treatment history for every tooth without losing clinical context." },
+      { slug: "ai-copilot", title: "Clinical AI Copilot", body: "Support examination, diagnosis, and planning with voice-first capture, so dentists do not need to type." },
+      { slug: "ghe-va-lich-hen", title: "Smart chairs and appointments", body: "Coordinate chairs, clinicians, and appointments in a clear view that keeps the clinic ahead." },
+      { slug: "benh-an-theo-rang", title: "Records by tooth", body: "Follow electronic records and complete treatment history for every tooth without losing clinical context." },
     ],
     seeFeatures: "Explore features", ctaTitle: "Implement the right operating system for your dental clinic.", ctaBody: "A private-server configuration and installation package for the first five clinics through December 31, 2026.", footerTagline: "AI Copilot and clinical operating system for dental clinics.", footerProduct: "Product", footerCompany: "Company", legal: "Privacy & terms",
     featuresEyebrow: "Core differences", featuresTitle: "Go deep on clinical care. Keep operations light.", featuresBody: "DentalAI OS is built by dentists for dentists: what the clinic needs, without duplicating the work LarkSuite already covers.",
     featureDetails: [
-      { title: "AI Copilot and voice capture", body: "AI supports examination, diagnosis, and treatment planning while dentists speak and the system captures structured records.", points: ["No typing for clinical notes", "Diagnosis and planning suggestions", "Stay focused on the patient"] },
-      { title: "Smart chairs and practical appointments", body: "A visual workspace coordinates treatment chairs, clinicians, and patients around the clinic's real operating rhythm.", points: ["See chair capacity at a glance", "Reduce schedule conflicts and waits", "Clear appointments for front desk and clinicians"] },
-      { title: "Electronic records by tooth", body: "Every visit, diagnosis, image, and treatment connects to the right position in the dental chart.", points: ["Treatment history for each tooth", "Easy-to-follow treatment plans", "Clinical records that preserve context"] },
-      { title: "Referral, LarkSuite, and private security", body: "Create referral policies for dentists, staff, and patients; sync work with LarkSuite while keeping data on your private server.", points: ["Flexible referral policies", "Clear assignments and permissions", "Your clinic owns 100% of its data"] },
+      { slug: "ai-copilot", title: "AI Copilot and voice capture", body: "AI supports examination, diagnosis, and treatment planning while dentists speak and the system captures structured records.", points: ["No typing for clinical notes", "Diagnosis and planning suggestions", "Stay focused on the patient"] },
+      { slug: "ghe-va-lich-hen", title: "Smart chairs and practical appointments", body: "A visual workspace coordinates treatment chairs, clinicians, and patients around the clinic's real operating rhythm.", points: ["See chair capacity at a glance", "Reduce schedule conflicts and waits", "Clear appointments for front desk and clinicians"] },
+      { slug: "benh-an-theo-rang", title: "Electronic records by tooth", body: "Every visit, diagnosis, image, and treatment connects to the right position in the dental chart.", points: ["Treatment history for each tooth", "Easy-to-follow treatment plans", "Clinical records that preserve context"] },
+      { slug: "referral-va-bao-mat", title: "Referral, LarkSuite, and private security", body: "Create referral policies for dentists, staff, and patients; sync work with LarkSuite while keeping data on your private server.", points: ["Flexible referral policies", "Clear assignments and permissions", "Your clinic owns 100% of its data"] },
     ],
     pricingEyebrow: "Limited implementation package", pricingTitle: "One package. Configured for your clinic.", pricingBody: "Available to the first five customers through December 31, 2026.", monthly: "", annually: "", save: "", perMonth: "", popular: "First five customers offer", choose: "Book implementation", talk: "Book a consultation",
     plans: [
@@ -158,6 +165,13 @@ function getPage(pathname: string): Page {
   return "home";
 }
 
+function getFeatureSlug(pathname: string): FeatureSlug | null {
+  const slug = pathname.split("/").filter(Boolean).at(-1);
+  return ["ai-copilot", "ghe-va-lich-hen", "benh-an-theo-rang", "referral-va-bao-mat"].includes(slug ?? "")
+    ? slug as FeatureSlug
+    : null;
+}
+
 function getLocale(pathname: string): Locale {
   return pathname.startsWith("/en") ? "en" : "vi";
 }
@@ -166,6 +180,7 @@ export function MarketingSite() {
   const location = useLocation();
   const locale = getLocale(location.pathname);
   const page = getPage(location.pathname);
+  const featureSlug = getFeatureSlug(location.pathname);
   const t = content[locale];
   const [menuOpen, setMenuOpen] = useState(false);
   const [sent, setSent] = useState(false);
@@ -197,7 +212,7 @@ export function MarketingSite() {
       </header>
 
       {page === "home" && <Home t={t} href={href} />}
-      {page === "features" && <Features t={t} href={href} />}
+       {page === "features" && featureSlug ? <FeatureDetail t={t} href={href} slug={featureSlug} /> : page === "features" && <Features t={t} href={href} />}
       {page === "pricing" && <Pricing t={t} href={href} />}
       {page === "guides" && <Guides t={t} />}
       {page === "contact" && <Contact t={t} sent={sent} onSend={() => setSent(true)} />}
@@ -215,7 +230,7 @@ function Home({ t, href }: { t: SiteContent; href: Href }) {
     <section className="marketing-hero relative overflow-hidden"><div className="marketing-dental-grid absolute inset-0" aria-hidden="true" /><div className="marketing-scan-orbit absolute left-1/2 top-0 -z-0 size-[760px] -translate-x-1/2 rounded-full bg-[#dcecdf] blur-3xl" aria-hidden="true" /><div className="marketing-tooth-mark absolute right-[6%] top-18 hidden lg:block" aria-hidden="true"><span /><span /><span /></div><div className="relative z-10 mx-auto max-w-7xl px-5 pb-20 pt-18 lg:px-8 lg:pb-28 lg:pt-28"><div className="grid items-center gap-14 lg:grid-cols-[1.05fr_.95fr]"><div><p className="motion-enter motion-enter-stagger mb-5 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-[#367461]" style={{ "--motion-delay": "0ms" } as React.CSSProperties}><Sparkles size={15} />{t.heroEyebrow}</p><h1 className="motion-enter motion-enter-stagger max-w-3xl text-4xl font-semibold leading-[1.08] tracking-[-0.045em] text-[#123c31] sm:text-5xl lg:text-6xl" style={{ "--motion-delay": "60ms" } as React.CSSProperties}>{t.heroTitle}</h1><p className="motion-enter motion-enter-stagger mt-6 max-w-xl text-lg leading-8 text-[#587068]" style={{ "--motion-delay": "120ms" } as React.CSSProperties}>{t.heroBody}</p><div className="motion-enter motion-enter-stagger mt-9 flex flex-wrap gap-3" style={{ "--motion-delay": "180ms" } as React.CSSProperties}><Link to={href("contact")} className="inline-flex items-center gap-2 rounded-xl bg-[#123c31] px-5 py-3.5 font-semibold text-white shadow-lg shadow-[#123c31]/15">{t.start}<ArrowRight size={17} /></Link><Link to={href("features")} className="inline-flex items-center gap-2 rounded-xl border border-[#cfddd2] bg-white/70 px-5 py-3.5 font-semibold text-[#245044]">{t.seeFeatures}</Link></div></div><div className="motion-enter motion-enter-stagger" style={{ "--motion-delay": "240ms" } as React.CSSProperties}><ClinicPreview t={t} /></div></div></div></section>
     <section className="border-y border-[#dce4de] bg-white/60"><div className="mx-auto max-w-7xl px-5 py-8 lg:px-8"><p className="mb-5 text-center text-xs font-bold uppercase tracking-[0.14em] text-[#789087]">{t.trusted}</p><div className="grid grid-cols-3 divide-x divide-[#dce4de]"><Metric value="40%" text={t.metric1} /><Metric value="360°" text={t.metric2} /><Metric value="100%" text={t.metric3} /></div></div></section>
     <section className="mx-auto grid max-w-7xl gap-12 px-5 py-20 lg:grid-cols-[.8fr_1.2fr] lg:px-8 lg:py-28"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#367461]">{t.workflowEyebrow}</p><h2 className="mt-4 text-3xl font-semibold leading-tight tracking-[-0.035em] text-[#123c31] sm:text-4xl">{t.workflowTitle}</h2><p className="mt-5 max-w-md leading-7 text-[#587068]">{t.workflowBody}</p></div><div className="grid gap-3">{t.workflows.map((item, index) => <div key={item} className="flex items-center gap-5 rounded-2xl border border-[#dce6de] bg-white p-5 shadow-sm"><span className="grid size-10 shrink-0 place-items-center rounded-full bg-[#e5f0e7] text-sm font-bold text-[#196149]">0{index + 1}</span><span className="font-semibold text-[#20473b]">{item}</span><ArrowRight className="ml-auto text-[#80a192]" size={19} /></div>)}</div></section>
-    <section className="bg-[#123c31] py-20 text-white"><div className="mx-auto max-w-7xl px-5 lg:px-8"><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9fd2b7]">{t.featureEyebrow}</p><div className="mt-4 flex flex-col justify-between gap-5 md:flex-row"><h2 className="max-w-xl text-3xl font-semibold leading-tight tracking-[-0.035em] sm:text-4xl">{t.featureTitle}</h2><p className="max-w-md leading-7 text-[#c5ded1]">{t.featureBody}</p></div><div className="mt-12 grid gap-4 md:grid-cols-3">{t.featureCards.map((feature, index) => <div key={feature.title} className="rounded-2xl border border-white/15 bg-white/5 p-6"><span className="mb-12 grid size-10 place-items-center rounded-xl bg-[#75c4a0] text-[#123c31]">{index === 0 ? <BookOpen size={20} /> : index === 1 ? <CalendarCheck size={20} /> : <Sparkles size={20} />}</span><h3 className="text-lg font-semibold">{feature.title}</h3><p className="mt-3 leading-7 text-[#c5ded1]">{feature.body}</p></div>)}</div></div></section>
+     <section className="bg-[#123c31] py-20 text-white"><div className="mx-auto max-w-7xl px-5 lg:px-8"><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9fd2b7]">{t.featureEyebrow}</p><div className="mt-4 flex flex-col justify-between gap-5 md:flex-row"><h2 className="max-w-xl text-3xl font-semibold leading-tight tracking-[-0.035em] sm:text-4xl">{t.featureTitle}</h2><p className="max-w-md leading-7 text-[#c5ded1]">{t.featureBody}</p></div><div className="mt-12 grid gap-4 md:grid-cols-3">{t.featureCards.map((feature, index) => <Link to={`${href("features")}/${feature.slug}`} key={feature.title} className="group rounded-2xl border border-white/15 bg-white/5 p-6 transition hover:-translate-y-1 hover:bg-white/10"><span className="mb-12 grid size-10 place-items-center rounded-xl bg-[#75c4a0] text-[#123c31]">{index === 0 ? <BookOpen size={20} /> : index === 1 ? <CalendarCheck size={20} /> : <Sparkles size={20} />}</span><h3 className="text-lg font-semibold">{feature.title}</h3><p className="mt-3 leading-7 text-[#c5ded1]">{feature.body}</p><span className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-[#a8e0bd]">{t.seeFeatures}<ArrowRight size={15} className="transition group-hover:translate-x-1" /></span></Link>)}</div></div></section>
     <Cta t={t} href={href} />
   </>;
 }
@@ -223,7 +238,60 @@ function Home({ t, href }: { t: SiteContent; href: Href }) {
 function ClinicPreview({ t }: { t: SiteContent }) { return <div className="relative mx-auto w-full max-w-lg"><div className="absolute -inset-4 rounded-[2rem] bg-[#87c5a0]/25 blur-2xl" /><div className="relative overflow-hidden rounded-[1.5rem] border border-white/80 bg-[#fdfefd] p-4 shadow-2xl shadow-[#123c31]/15"><div className="flex items-center justify-between border-b border-[#e4ece5] pb-4"><div className="flex gap-2"><i className="size-2.5 rounded-full bg-[#e89578]" /><i className="size-2.5 rounded-full bg-[#e7c56d]" /><i className="size-2.5 rounded-full bg-[#76bd9a]" /></div><span className="text-xs font-semibold text-[#779087]">DentalAI OS</span></div><div className="mt-4 grid grid-cols-[88px_1fr] gap-4"><aside className="rounded-xl bg-[#eff5ef] p-3"><HeartPulse size={18} className="text-[#2d7258]" /><div className="mt-5 space-y-3">{[1, 2, 3, 4].map((x) => <span key={x} className={`block h-2 rounded-full ${x === 1 ? "bg-[#378367]" : "bg-[#cadbcd]"}`} />)}</div></aside><div><div className="flex items-center justify-between"><div><p className="text-xs text-[#6c877c]">{t.workflows[0]}</p><p className="text-lg font-bold text-[#173e32]">09:30</p></div><span className="rounded-full bg-[#e3f2e6] px-2.5 py-1 text-[10px] font-bold text-[#287154]">TODAY</span></div><div className="mt-4 rounded-xl bg-[#123c31] p-4 text-white"><p className="text-xs text-[#b7d5c1]">Nguyen Minh Anh</p><p className="mt-1 text-sm font-semibold">Treatment consultation</p><div className="mt-4 h-1.5 rounded-full bg-white/15"><div className="h-full w-2/3 rounded-full bg-[#87d0a7]" /></div></div><div className="mt-3 grid grid-cols-2 gap-3"><div className="rounded-xl border border-[#dbe7dd] p-3"><p className="text-[10px] text-[#799287]">Chair 02</p><p className="mt-1 text-sm font-bold text-[#21483c]">Available</p></div><div className="rounded-xl border border-[#dbe7dd] p-3"><p className="text-[10px] text-[#799287]">Patients</p><p className="mt-1 text-sm font-bold text-[#21483c]">12 today</p></div></div></div></div></div></div> }
 function Metric({ value, text }: { value: string; text: string }) { return <div className="px-3 text-center sm:px-8"><strong className="marketing-metric-value block text-2xl tracking-tight text-[#1c4d3e] sm:text-3xl">{value}</strong><span className="mt-1 block text-xs leading-4 text-[#6b8379] sm:text-sm">{text}</span></div>; }
 
-function Features({ t, href }: { t: SiteContent; href: Href }) { return <><PageIntro eyebrow={t.featuresEyebrow} title={t.featuresTitle} body={t.featuresBody} /><section className="mx-auto max-w-7xl px-5 pb-20 lg:px-8 lg:pb-28"><div className="grid gap-5 md:grid-cols-2">{t.featureDetails.map((feature, index) => <article key={feature.title} className="rounded-3xl border border-[#dce6de] bg-white p-7 sm:p-9"><span className="grid size-11 place-items-center rounded-xl bg-[#e6f1e8] text-[#277057]">{index === 0 ? <CalendarCheck /> : index === 1 ? <HeartPulse /> : index === 2 ? <Sparkles /> : <ShieldCheck />}</span><h2 className="mt-7 text-2xl font-semibold tracking-[-0.03em] text-[#163e32]">{feature.title}</h2><p className="mt-3 max-w-md leading-7 text-[#5d756c]">{feature.body}</p><ul className="mt-7 space-y-3">{feature.points.map((point) => <li key={point} className="flex gap-3 text-sm font-medium text-[#315748]"><Check size={17} className="shrink-0 text-[#3d956e]" />{point}</li>)}</ul></article>)}</div></section><Cta t={t} href={href} /></>; }
+function Features({ t, href }: { t: SiteContent; href: Href }) { return <><PageIntro eyebrow={t.featuresEyebrow} title={t.featuresTitle} body={t.featuresBody} /><section className="mx-auto max-w-7xl px-5 pb-20 lg:px-8 lg:pb-28"><div className="grid gap-5 md:grid-cols-2">{t.featureDetails.map((feature, index) => <Link to={`${href("features")}/${feature.slug}`} key={feature.title} className="group rounded-3xl border border-[#dce6de] bg-white p-7 transition hover:-translate-y-1 hover:border-[#9fcbb0] hover:shadow-lg hover:shadow-[#123c31]/5 sm:p-9"><span className="grid size-11 place-items-center rounded-xl bg-[#e6f1e8] text-[#277057]">{index === 0 ? <CalendarCheck /> : index === 1 ? <HeartPulse /> : index === 2 ? <Sparkles /> : <ShieldCheck />}</span><h2 className="mt-7 text-2xl font-semibold tracking-[-0.03em] text-[#163e32]">{feature.title}</h2><p className="mt-3 max-w-md leading-7 text-[#5d756c]">{feature.body}</p><ul className="mt-7 space-y-3">{feature.points.map((point) => <li key={point} className="flex gap-3 text-sm font-medium text-[#315748]"><Check size={17} className="shrink-0 text-[#3d956e]" />{point}</li>)}</ul><span className="mt-8 inline-flex items-center gap-2 text-sm font-bold text-[#24664d]">{t.seeFeatures}<ArrowRight size={16} className="transition group-hover:translate-x-1" /></span></Link>)}</div></section><Cta t={t} href={href} /></>; }
+
+function FeatureDetail({ t, href, slug }: { t: SiteContent; href: Href; slug: FeatureSlug }) {
+  const feature = t.featureDetails.find((item) => item.slug === slug) ?? t.featureDetails[0];
+  const vi = t.language === "Tiếng Việt";
+  const detail = {
+    "ai-copilot": {
+      eyebrow: vi ? "Lâm sàng có trợ lực" : "Clinical assistance",
+      headline: vi ? "Bác sĩ nói. DentalAI OS ghi nhận." : "Dentists speak. DentalAI OS captures.",
+      body: vi ? "Biến cuộc trao đổi trong phòng khám thành ghi nhận lâm sàng có cấu trúc, để bác sĩ giữ trọn sự tập trung vào người bệnh." : "Turn the clinical conversation into structured records, keeping the dentist focused on the patient.",
+      steps: vi ? ["Bác sĩ nói nhận định trong lúc khám", "Hệ thống chuẩn hóa triệu chứng và ghi chú", "Bác sĩ duyệt trước khi lưu vào bệnh án"] : ["Dentist speaks during the examination", "The system structures findings and notes", "Dentist reviews before saving the record"],
+      icon: <Mic size={22} />,
+    },
+    "ghe-va-lich-hen": {
+      eyebrow: vi ? "Vận hành theo nhịp thật" : "Operations in real time",
+      headline: vi ? "Mỗi ghế, một nhịp làm việc rõ ràng." : "Every chair, one clear operating rhythm.",
+      body: vi ? "Một bảng điều phối giúp lễ tân và bác sĩ nhìn thấy lịch hẹn, trạng thái ghế và các khoảng trống cần xử lý trong vài giây." : "One workspace lets front desk and clinicians see appointments, chair status, and gaps that need attention in seconds.",
+      steps: vi ? ["Nhìn lịch theo ghế và bác sĩ", "Chọn khung giờ phù hợp với dịch vụ", "Giảm trùng lịch và thời gian chờ"] : ["See the day by chair and clinician", "Choose a slot that fits the service", "Reduce conflicts and waiting time"],
+      icon: <CalendarCheck size={22} />,
+    },
+    "benh-an-theo-rang": {
+      eyebrow: vi ? "Hồ sơ không mất ngữ cảnh" : "Context that stays",
+      headline: vi ? "Điều trị bắt đầu từ đúng chiếc răng." : "Treatment starts with the right tooth.",
+      body: vi ? "Kết nối khám, hình ảnh, chẩn đoán và kế hoạch vào từng vị trí trên sơ đồ răng để lần tái khám luôn có đủ bối cảnh." : "Connect visits, images, diagnoses, and plans to each tooth so every follow-up has the context it needs.",
+      steps: vi ? ["Chọn răng hoặc vùng cần khám", "Gắn nhận định và hình ảnh bằng chứng", "Theo dõi kế hoạch qua từng lần tái khám"] : ["Select the tooth or area being examined", "Attach findings and image evidence", "Follow the plan across every follow-up"],
+      icon: <FileText size={22} />,
+    },
+    "referral-va-bao-mat": {
+      eyebrow: vi ? "Tăng trưởng có kiểm soát" : "Controlled growth",
+      headline: vi ? "Dữ liệu phòng khám ở đúng nơi thuộc về nó." : "Clinic data stays where it belongs.",
+      body: vi ? "Quản lý referral, quyền truy cập và công việc liên phòng ban trong một nền tảng riêng, đồng bộ với LarkSuite khi cần." : "Manage referrals, access, and cross-team work in a private platform that syncs with LarkSuite when needed.",
+      steps: vi ? ["Thiết lập chính sách và vai trò", "Theo dõi referral theo trạng thái", "Duyệt và truy vết mọi thay đổi"] : ["Set policies and roles", "Track referrals by status", "Review and audit every change"],
+      icon: <Shield size={22} />,
+    },
+  }[slug];
+
+  return <>
+    <section className="relative overflow-hidden bg-[#123c31] text-white">
+      <div className="marketing-dental-grid absolute inset-0 opacity-30" aria-hidden="true" />
+      <div className="relative mx-auto grid max-w-7xl gap-12 px-5 py-16 lg:grid-cols-[.9fr_1.1fr] lg:px-8 lg:py-24">
+        <div className="flex flex-col justify-center"><Link to={href("features")} className="mb-8 inline-flex w-fit items-center gap-2 text-sm font-semibold text-[#a8e0bd]"><ArrowRight className="rotate-180" size={16} />{vi ? "Tất cả tính năng" : "All features"}</Link><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#9fd2b7]">{detail.eyebrow}</p><h1 className="mt-5 max-w-2xl text-4xl font-semibold leading-[1.08] tracking-[-0.045em] sm:text-5xl lg:text-6xl">{detail.headline}</h1><p className="mt-6 max-w-xl text-lg leading-8 text-[#c5ded1]">{detail.body}</p><Link to={href("contact")} className="mt-8 inline-flex w-fit items-center gap-2 rounded-xl bg-[#8ed6aa] px-5 py-3.5 font-bold text-[#123c31]">{t.start}<ArrowRight size={17} /></Link></div>
+        <FeatureMockup slug={slug} vi={vi} />
+      </div>
+    </section>
+    <section className="mx-auto grid max-w-7xl gap-12 px-5 py-20 lg:grid-cols-[.75fr_1.25fr] lg:px-8 lg:py-28"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#367461]">{feature.title}</p><h2 className="mt-4 text-3xl font-semibold leading-tight tracking-[-0.035em] text-[#123c31] sm:text-4xl">{vi ? "Một quy trình rõ ràng cho cả đội ngũ." : "A clear workflow for the whole team."}</h2><p className="mt-5 max-w-md leading-7 text-[#587068]">{feature.body}</p></div><div className="grid gap-3">{detail.steps.map((step, index) => <div key={step} className="flex items-center gap-5 rounded-2xl border border-[#dce6de] bg-white p-5 shadow-sm"><span className="grid size-10 shrink-0 place-items-center rounded-full bg-[#e5f0e7] text-sm font-bold text-[#196149]">0{index + 1}</span><span className="font-semibold text-[#20473b]">{step}</span><Check className="ml-auto text-[#3d956e]" size={18} /></div>)}</div></section>
+    <section className="bg-[#eff5ef] py-16"><div className="mx-auto flex max-w-5xl flex-col items-center gap-5 px-5 text-center sm:px-8"><span className="grid size-12 place-items-center rounded-xl bg-[#123c31] text-[#9fe0ba]">{detail.icon}</span><h2 className="max-w-2xl text-3xl font-semibold tracking-[-0.035em] text-[#123c31] sm:text-4xl">{vi ? "Được thiết kế để dùng ngay trong phòng khám." : "Designed for the clinic you run every day."}</h2><p className="max-w-xl leading-7 text-[#547268]">{vi ? "Không thay thế quyết định chuyên môn của bác sĩ. Hệ thống giúp thông tin đúng người, đúng lúc và đúng ngữ cảnh." : "It does not replace clinical judgment. It puts the right information in the right hands at the right time."}</p></div></section>
+    <Cta t={t} href={href} />
+  </>;
+}
+
+function FeatureMockup({ slug, vi }: { slug: FeatureSlug; vi: boolean }) {
+  const labels = vi ? { ai: "Ghi nhận giọng nói", schedule: "Lịch theo ghế", tooth: "Sơ đồ răng", referral: "Referral & quyền truy cập" } : { ai: "Voice capture", schedule: "Chair schedule", tooth: "Dental chart", referral: "Referral & access" };
+  return <div className="relative mx-auto w-full max-w-xl"><div className="absolute -inset-5 rounded-[2rem] bg-[#6ac79b]/20 blur-3xl" /><div className="relative overflow-hidden rounded-[1.25rem] border border-white/15 bg-[#f9fcfa] p-3 shadow-2xl shadow-black/20"><div className="flex items-center justify-between border-b border-[#dce6de] px-2 pb-3"><div className="flex gap-1.5"><i className="size-2.5 rounded-full bg-[#e89578]" /><i className="size-2.5 rounded-full bg-[#e7c56d]" /><i className="size-2.5 rounded-full bg-[#76bd9a]" /></div><span className="text-[11px] font-bold text-[#5c756b]">DentalAI OS / demo</span></div><div className="grid min-h-72 gap-3 p-3 sm:grid-cols-[150px_1fr]"> <aside className="rounded-lg bg-[#eaf3ec] p-3"><div className="flex items-center gap-2 text-xs font-bold text-[#123c31]"><HeartPulse size={16} />DentalAI</div><div className="mt-6 space-y-3">{[0, 1, 2, 3, 4].map((item) => <div key={item} className={`h-2 rounded-full ${item === 1 ? "w-4/5 bg-[#4f9d79]" : "w-3/5 bg-[#bed5c5]"}`} />)}</div></aside><div className="rounded-lg border border-[#dce6de] bg-white p-4"><div className="flex items-center justify-between"><div><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#789087]">{slug === "ai-copilot" ? labels.ai : slug === "ghe-va-lich-hen" ? labels.schedule : slug === "benh-an-theo-rang" ? labels.tooth : labels.referral}</p><p className="mt-1 text-lg font-bold text-[#173e32]">{slug === "ghe-va-lich-hen" ? "Thứ Tư, 07/08" : slug === "benh-an-theo-rang" ? "Răng 16 · Lần khám 04" : "09:30 · Đang xử lý"}</p></div><span className="grid size-8 place-items-center rounded-lg bg-[#e4f2e8] text-[#287154]">{slug === "ai-copilot" ? <Mic size={16} /> : slug === "ghe-va-lich-hen" ? <TimerReset size={16} /> : slug === "benh-an-theo-rang" ? <FileText size={16} /> : <LockKeyhole size={16} />}</span></div><div className="mt-5 grid gap-2">{[0, 1, 2].map((item) => <div key={item} className="flex items-center gap-3 rounded-lg border border-[#e4ece5] p-3"><span className={`size-2 rounded-full ${item === 0 ? "bg-[#4f9d79]" : "bg-[#cadbcd]"}`} /><span className="h-2 flex-1 rounded-full bg-[#dce9df]" /><span className="h-2 w-12 rounded-full bg-[#edf4ee]" /></div>)}</div><div className="mt-4 rounded-lg bg-[#123c31] p-3 text-white"><div className="flex items-center gap-2 text-xs font-semibold">{slug === "referral-va-bao-mat" ? <Network size={15} /> : <Sparkles size={15} />}{vi ? "Đề xuất tiếp theo" : "Next suggestion"}</div><div className="mt-2 h-2 w-3/4 rounded-full bg-white/30" /><div className="mt-2 h-2 w-1/2 rounded-full bg-white/15" /></div></div></div></div></div>;
+}
 function Pricing({ t, href }: { t: SiteContent; href: Href }) { const plan = t.plans[0]; return <><PageIntro eyebrow={t.pricingEyebrow} title={t.pricingTitle} body={t.pricingBody} /><section className="mx-auto max-w-5xl px-5 pb-20 lg:px-8 lg:pb-28"><article className="relative overflow-hidden rounded-[2rem] border border-[#b9d6c4] bg-white shadow-xl shadow-[#123c31]/10"><div className="absolute right-0 top-0 h-48 w-48 translate-x-1/3 -translate-y-1/3 rounded-full bg-[#dceee0]" /><div className="relative grid lg:grid-cols-[.9fr_1.1fr]"><div className="bg-[#123c31] p-7 text-white sm:p-10"><span className="inline-flex rounded-full bg-[#8ed6aa] px-3 py-1 text-xs font-bold text-[#123c31]">{t.popular}</span><p className="mt-8 text-sm font-semibold uppercase tracking-[0.14em] text-[#a8d8ba]">{plan.name}</p><p className="mt-3 text-4xl font-semibold tracking-[-0.05em] sm:text-5xl">{plan.price}</p><p className="mt-3 max-w-sm text-sm leading-6 text-[#c4dfcf]">{plan.description}</p><div className="mt-8 border-t border-white/15 pt-6"><p className="text-sm font-medium text-[#dcefe2]">Thanh toán một lần cho triển khai ban đầu</p><p className="mt-2 text-xs leading-5 text-[#a9cdb5]">Cấu hình riêng theo quy trình vận hành cốt lõi của phòng khám.</p></div></div><div className="p-7 sm:p-10"><p className="text-xs font-bold uppercase tracking-[0.15em] text-[#367461]">Phạm vi triển khai</p><h2 className="mt-3 text-2xl font-semibold tracking-[-0.035em] text-[#173e32]">Sẵn sàng cho bác sĩ và đội ngũ sử dụng.</h2><ul className="mt-7 space-y-4">{plan.features.map((item) => <li key={item} className="flex gap-3 text-sm leading-6 text-[#426357]"><span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-[#e4f2e8] text-[#287154]"><Check size={13} strokeWidth={3} /></span>{item}</li>)}</ul><Link to={href("contact")} className="mt-9 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#123c31] px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-[#0c3026]">{t.choose}<ArrowRight size={16} /></Link></div></div></article><p className="mx-auto mt-6 max-w-3xl text-center text-sm leading-6 text-[#71877e]">{t.pricingNote}</p></section></>; }
 function Guides({ t }: { t: SiteContent }) { const [query, setQuery] = useState(""); const guides = t.guideItems.filter((item) => `${item.title} ${item.category}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())); return <><PageIntro eyebrow={t.guidesEyebrow} title={t.guidesTitle} body={t.guidesBody} /><section className="mx-auto max-w-7xl px-5 pb-20 lg:px-8 lg:pb-28"><label className="mx-auto flex max-w-xl items-center gap-3 rounded-xl border border-[#d5e1d7] bg-white px-4 py-3 shadow-sm"><CircleHelp size={18} className="text-[#6d897d]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t.search} className="w-full bg-transparent text-sm outline-none placeholder:text-[#8a9c94]" /></label><div className="mt-10 grid gap-4 md:grid-cols-2 lg:grid-cols-3">{guides.map((guide) => <article key={guide.title} className="flex min-h-66 flex-col rounded-2xl border border-[#dce6de] bg-white p-6"><div className="flex items-center justify-between"><span className="rounded-full bg-[#e7f2e9] px-3 py-1 text-xs font-bold text-[#337257]">{guide.category}</span><span className="flex items-center gap-1 text-xs text-[#748b81]"><Clock3 size={13} />{guide.time}</span></div><h2 className="mt-6 text-lg font-semibold leading-6 text-[#173e32]">{guide.title}</h2><p className="mt-3 text-sm leading-6 text-[#61786e]">{guide.body}</p><button className="mt-auto flex items-center gap-2 pt-6 text-sm font-bold text-[#24664d]">{t.readGuide}<ArrowRight size={16} /></button></article>)}</div></section></>; }
 function Contact({ t, sent, onSend }: { t: SiteContent; sent: boolean; onSend: () => void }) { return <><PageIntro eyebrow={t.contactEyebrow} title={t.contactTitle} body={t.contactBody} /><section className="mx-auto grid max-w-6xl gap-8 px-5 pb-20 lg:grid-cols-[.8fr_1.2fr] lg:px-8 lg:pb-28"><aside className="rounded-3xl bg-[#123c31] p-8 text-white"><MessagesSquare className="text-[#93d3aa]" size={28} /><p className="mt-8 text-2xl font-semibold leading-8 tracking-[-0.03em]">{t.contactAside}</p><div className="mt-12 space-y-5 border-t border-white/15 pt-6"><a href={`mailto:${t.contactEmail}`} className="flex items-center gap-3 text-sm text-[#d2e6d9]"><Mail size={17} />{t.contactEmail}</a><p className="flex items-center gap-3 text-sm text-[#d2e6d9]"><Clock3 size={17} />{t.response}</p></div></aside><form onSubmit={(event) => { event.preventDefault(); onSend(); }} className="rounded-3xl border border-[#dce6de] bg-white p-6 sm:p-8"><div className="grid gap-5 sm:grid-cols-2"><Field label={t.name} /><Field label={t.email} type="email" /><Field label={t.phone} type="tel" /></div><label className="mt-5 block text-sm font-semibold text-[#315748]">{t.message}<textarea required rows={5} className="mt-2 w-full resize-none rounded-xl border border-[#d1ded4] bg-[#fbfdfb] px-3 py-3 text-sm outline-none transition focus:border-[#4c9874] focus:ring-2 focus:ring-[#cfe8d7]" /></label>{sent && <p className="mt-5 rounded-xl bg-[#e7f4eb] p-3 text-sm font-medium text-[#267052]">{t.sent}</p>}<button className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#123c31] px-5 py-3 text-sm font-semibold text-white">{t.send}<ArrowRight size={16} /></button></form></section></>; }

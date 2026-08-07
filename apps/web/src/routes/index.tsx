@@ -78,8 +78,10 @@ export function AppRoutes() {
       <Route path="/" element={<Navigate to="/vi" replace />} />
       <Route path="/vi" element={<MarketingSite />} />
       <Route path="/vi/:page" element={<MarketingSite />} />
+      <Route path="/vi/features/:feature" element={<MarketingSite />} />
       <Route path="/en" element={<MarketingSite />} />
       <Route path="/en/:page" element={<MarketingSite />} />
+      <Route path="/en/features/:feature" element={<MarketingSite />} />
       <Route path={ROUTES.LOGIN} element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
