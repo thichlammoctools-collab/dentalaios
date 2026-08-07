@@ -6,6 +6,7 @@ const navigation = [
   { label: "Tổng quan", href: "/platform/dashboard", icon: "grid" },
   { label: "Phòng khám", href: "/platform/tenants", icon: "building" },
   { label: "Nội dung", href: "/platform/content", icon: "document" },
+  { label: "Website marketing", href: "/platform/website", icon: "globe" },
   { label: "Cấu hình", href: "/platform/configuration", icon: "sliders" },
   { label: "Thủ thuật", href: "/platform/procedures", icon: "stethoscope" },
   { label: "Dịch vụ mẫu", href: "/platform/treatment-service-templates", icon: "tag" },
@@ -19,6 +20,7 @@ function Icon({ name }: { name: (typeof navigation)[number]["icon"] }) {
     grid: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
     building: <><path d="M3 21h18M6 21V5h12v16M9 9h1m4 0h1M9 13h1m4 0h1M10 21v-4h4v4" /></>,
     document: <><path d="M6 3h9l3 3v15H6z" /><path d="M14 3v4h4M9 12h6M9 16h6" /></>,
+    globe: <><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18" /></>,
     sliders: <><path d="M4 7h16M4 17h16M9 4v6M15 14v6" /></>,
     stethoscope: <><path d="M6 3v6a6 6 0 0012 0V3M6 3h3M15 3h3M12 15v3a3 3 0 003 3h3" /><circle cx="18" cy="21" r="1" /></>,
     tag: <><path d="M20.59 13.41L13.4 20.6a2 2 0 01-2.82 0L3 13V4h9l7.59 7.59a2 2 0 010 2.82z" /><circle cx="8" cy="8" r="1.6" /></>,
@@ -37,6 +39,7 @@ export function PlatformShell() {
     if (item.href.endsWith("/admins")) return hasPermission("platform_admins.read");
     if (item.href.endsWith("/audit-logs")) return hasPermission("platform_audit.read");
     if (item.href.endsWith("/content")) return hasPermission("platform_content.read");
+    if (item.href.endsWith("/website")) return hasPermission("platform_content.read");
     if (item.href.endsWith("/configuration")) return hasPermission("platform_config.read");
     if (item.href.endsWith("/procedures")) return hasPermission("platform_procedures.read");
     if (item.href.endsWith("/treatment-service-templates")) return hasPermission("platform_config.read");

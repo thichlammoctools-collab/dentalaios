@@ -40,6 +40,7 @@ import { PlatformLoginPage } from "@/pages/platform/PlatformLoginPage";
 import { PlatformClinicalTerminologyPage } from "@/pages/platform/PlatformClinicalTerminologyPage";
 import { PlatformTreatmentServiceTemplatesPage } from "@/pages/platform/PlatformTreatmentServiceTemplatesPage";
 import { MarketingSite } from "@/pages/MarketingSite";
+import { PlatformWebsitePage } from "@/pages/platform/PlatformWebsitePage";
 import {
   PlatformAdminsPage,
   PlatformAuditLogsPage,
@@ -93,6 +94,7 @@ export function AppRoutes() {
         <Route path="/platform/tenants" element={<PlatformTenantsPage />} />
         <Route path="/platform/tenants/:id" element={<PlatformTenantDetailPage />} />
         <Route path="/platform/content" element={<PlatformContentPage />} />
+        <Route path="/platform/website" element={<PlatformWebsitePage />} />
         <Route path="/platform/configuration" element={<PlatformConfigurationPage />} />
         <Route path="/platform/procedures" element={<PlatformProceduresPage />} />
         <Route path="/platform/treatment-service-templates" element={<PlatformTreatmentServiceTemplatesPage />} />
