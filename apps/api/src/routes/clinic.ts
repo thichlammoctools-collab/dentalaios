@@ -83,6 +83,7 @@ router.get("/logo", async (c) => {
 router.delete(
   "/logo",
   requirePermission(PERMISSIONS.MANAGE_USERS),
+  blockDemoAction("Xóa logo phòng khám"),
   auditLog("delete", "tenant_logo"),
   async (c) => c.json(await clinicService.removeLogo(c.env.DB, c.env, getJwt(c).tenant_id)),
 );
