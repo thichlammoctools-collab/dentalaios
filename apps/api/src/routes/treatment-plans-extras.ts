@@ -13,6 +13,7 @@ import { buildProposalPdf } from "../services/pdf.service";
 import { larkService } from "../services/lark.service";
 import { authService } from "../services/auth.service";
 import { ValidationError } from "../lib/errors";
+import { blockDemoAction } from "../middleware/demo-safety";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -91,6 +92,7 @@ const larkHandoverSchema = z.object({
 router.post(
   "/:id/lark-handover",
   requirePermission(PERMISSIONS.WRITE_PLANS),
+  blockDemoAction("Đồng bộ công việc sang LarkSuite"),
   auditLog("lark_handover", "treatment_plan"),
   zValidator("json", larkHandoverSchema),
   async (c) => {

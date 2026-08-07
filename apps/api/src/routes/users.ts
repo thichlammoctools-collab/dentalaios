@@ -10,6 +10,7 @@ import type { AuthContext } from "../middleware/auth";
 import { usersService } from "../services/users.service";
 import { createUsersRepository } from "../repositories/users.repo";
 import { ForbiddenError } from "../lib/errors";
+import { blockDemoAction } from "../middleware/demo-safety";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -89,6 +90,7 @@ router.put(
 router.delete(
   "/:id",
   requirePermission(PERMISSIONS.MANAGE_USERS),
+  blockDemoAction("Xóa người dùng"),
   auditLog("delete", "user"),
   async (c) => {
     const jwt = getJwt(c);

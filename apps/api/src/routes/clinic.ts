@@ -25,6 +25,7 @@ import { paymentService } from "../services/payment.service";
 import { treatmentServicesService } from "../services/treatment-service-prices.service";
 import { createProcedureCatalogRepository } from "../repositories/procedure-catalog.repo";
 import { treatmentServiceTemplateService } from "../services/treatment-service-template.service";
+import { blockDemoAction, DEMO_TENANT_ID } from "../middleware/demo-safety";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 
@@ -99,7 +100,7 @@ router.post(
 
     // Enqueue async Lark notification (Task + optional Calendar event).
     // Skip silently if JOBS binding is missing (e.g. local dev without queue).
-    if (c.env.JOBS) {
+    if (c.env.JOBS && jwt.tenant_id !== DEMO_TENANT_ID) {
       try {
         const me = await authService.getMe(
           { db: c.env.DB, jwtSecret: c.env.JWT_SECRET },
@@ -140,6 +141,7 @@ router.patch(
 router.delete(
   "/branches/:id",
   requirePermission(PERMISSIONS.MANAGE_USERS),
+  blockDemoAction("Xóa chi nhánh"),
   auditLog("delete", "branch"),
   async (c) => {
     const jwt = getJwt(c);

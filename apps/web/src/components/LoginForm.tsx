@@ -8,8 +8,8 @@ export function LoginForm() {
   const { login, loading, error } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const demoRequested = searchParams.get("demo") === "doctor";
-  const [email, setEmail] = useState(() => demoRequested ? "doctor@demo.clinic" : "");
+  const demoRequested = searchParams.get("demo") === "owner";
+  const [email, setEmail] = useState(() => demoRequested ? "admin@demo.clinic" : "");
   const [password, setPassword] = useState(() => demoRequested ? "password123" : "");
   const [showPassword, setShowPassword] = useState(false);
   const [highlightDemo, setHighlightDemo] = useState(false);
@@ -17,7 +17,7 @@ export function LoginForm() {
 
   useEffect(() => {
     if (!demoRequested) { setHighlightDemo(false); return; }
-    setEmail("doctor@demo.clinic");
+    setEmail("admin@demo.clinic");
     setPassword("password123");
     setHighlightDemo(true);
     const timeout = window.setTimeout(() => setHighlightDemo(false), 600);
@@ -43,10 +43,10 @@ export function LoginForm() {
     >
       <h1 className="text-2xl font-semibold tracking-tight">Đăng nhập</h1>
       <p className="text-sm text-muted-foreground">
-        {demoRequested ? "Tài khoản bác sĩ demo đã được điền sẵn. Bạn có thể bắt đầu trải nghiệm ngay." : "Đăng nhập bằng email và mật khẩu được cấp."}
+        {demoRequested ? "Tài khoản chủ phòng khám demo đã được điền sẵn. Bạn có thể trải nghiệm toàn bộ luồng vận hành." : "Đăng nhập bằng email và mật khẩu được cấp."}
       </p>
 
-      {demoRequested && <p className="motion-enter rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">Bạn đang truy cập môi trường demo với dữ liệu mô phỏng.</p>}
+       {demoRequested && <p className="motion-enter rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">Bạn đang truy cập môi trường demo với dữ liệu mô phỏng. Có toàn quyền vận hành, nhưng không thể gửi email, đồng bộ LarkSuite hoặc xóa dữ liệu dùng chung.</p>}
 
       <div className="space-y-1.5">
         <label htmlFor="email" className="text-sm font-medium">
@@ -119,7 +119,7 @@ export function LoginForm() {
         {loading ? "Đang đăng nhập..." : "Đăng nhập"}
       </button>
 
-      {!demoRequested && <Link to="/login?demo=doctor" className="block rounded-md border border-primary/30 px-3 py-2 text-center text-sm font-medium text-primary transition-colors hover:bg-primary/10">Trải nghiệm demo với vai trò Bác sĩ</Link>}
+       {!demoRequested && <Link to="/login?demo=owner" className="block rounded-md border border-primary/30 px-3 py-2 text-center text-sm font-medium text-primary transition-colors hover:bg-primary/10">Trải nghiệm demo với vai trò Chủ phòng khám</Link>}
 
       <p className="text-center text-sm text-muted-foreground">
         Chưa có tài khoản?{" "}

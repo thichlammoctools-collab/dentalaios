@@ -10,6 +10,7 @@ import { referralService } from "../services/referral.service";
 import { referrerPortalService } from "../services/referrer-portal.service";
 import { sendReferrerPortalLink } from "../services/referrer-email.service";
 import { createReferralsRepository } from "../repositories/referrals.repo";
+import { blockDemoAction } from "../middleware/demo-safety";
 
 const router = new Hono<{ Bindings: Env; Variables: AuthContext }>();
 router.use("*", requireAuth());
@@ -51,7 +52,7 @@ router.patch("/:id", requirePermission(PERMISSIONS.MANAGE_REFERRERS), auditLog("
   const jwt = getJwt(c);
   return c.json(await referralService.updateReferrer(c.env.DB, jwt.tenant_id, jwt.sub, c.req.param("id"), c.req.valid("json")));
 });
-router.delete("/:id", requirePermission(PERMISSIONS.MANAGE_REFERRERS), auditLog("delete", "referrer"), async (c) => {
+router.delete("/:id", requirePermission(PERMISSIONS.MANAGE_REFERRERS), blockDemoAction("Xóa người giới thiệu"), auditLog("delete", "referrer"), async (c) => {
   const jwt = getJwt(c);
   await referralService.deleteReferrer(c.env.DB, jwt.tenant_id, jwt.sub, c.req.param("id"));
   return c.body(null, 204);
@@ -60,14 +61,14 @@ router.post("/:id/regenerate-code", requirePermission(PERMISSIONS.MANAGE_REFERRE
   const jwt = getJwt(c);
   return c.json(await referralService.regenerateCode(c.env.DB, jwt.tenant_id, jwt.sub, c.req.param("id")));
 });
-router.post("/:id/account", requirePermission(PERMISSIONS.MANAGE_REFERRERS), auditLog("create_portal_account", "referrer"), zValidator("json", referrerAccountCreateSchema), async (c) => {
+router.post("/:id/account", requirePermission(PERMISSIONS.MANAGE_REFERRERS), blockDemoAction("Gửi email kích hoạt portal"), auditLog("create_portal_account", "referrer"), zValidator("json", referrerAccountCreateSchema), async (c) => {
   const jwt = getJwt(c);
   const baseUrl = c.env.FRONTEND_ORIGIN || new URL(c.req.url).origin;
   const account = await referrerPortalService.createAccount(c.env.DB, jwt.tenant_id, c.req.param("id"), c.req.valid("json").email, jwt.sub, baseUrl);
   const emailed = await sendReferrerPortalLink(c.env, account.email, account.activation_link, "activate");
   return c.json({ ...account, emailed }, 201);
 });
-router.post("/:id/account/reset-password", requirePermission(PERMISSIONS.MANAGE_REFERRERS), auditLog("reset_portal_password", "referrer"), async (c) => {
+router.post("/:id/account/reset-password", requirePermission(PERMISSIONS.MANAGE_REFERRERS), blockDemoAction("Gửi email đặt lại mật khẩu portal"), auditLog("reset_portal_password", "referrer"), async (c) => {
   const jwt = getJwt(c);
   const account = await c.env.DB.prepare("SELECT id FROM referrer_accounts WHERE tenant_id = ? AND referrer_id = ?").bind(jwt.tenant_id, c.req.param("id")).first<{ id: string }>();
   if (!account) return c.json({ error: "Tài khoản portal không tồn tại", code: "not_found" }, 404);
