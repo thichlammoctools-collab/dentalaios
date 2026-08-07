@@ -28,6 +28,9 @@ interface AppointmentTimelineProps {
   onModeChange: (mode: ResourceMode) => void;
   onAppointmentClick: (appointment: Appointment) => void;
   onEmptySlotClick: (input: { time: string; clinicianId?: string; chairId?: string }) => void;
+  settlingAppointmentId?: string | null;
+  revealingAppointmentId?: string | null;
+  conflictAdjustedAppointmentId?: string | null;
 }
 
 export function AppointmentTimeline({
@@ -42,6 +45,9 @@ export function AppointmentTimeline({
   onModeChange,
   onAppointmentClick,
   onEmptySlotClick,
+  settlingAppointmentId,
+  revealingAppointmentId,
+  conflictAdjustedAppointmentId,
 }: AppointmentTimelineProps) {
   const bounds = useMemo(() => getTimelineBounds(date, schedules, appointments), [date, schedules, appointments]);
   const rows = useMemo(() => buildTimelineRows(bounds), [bounds]);
@@ -93,9 +99,13 @@ export function AppointmentTimeline({
                   {resourceAppointments.map((appointment) => {
                     const offset = resourceOffsets.get(appointment.id) ?? 0;
                     const outsideHours = isOutsideOperatingHours(appointment, bounds);
-                    return <button key={appointment.id} type="button" onClick={(event) => { event.stopPropagation(); onAppointmentClick(appointment); }} className={`absolute z-10 overflow-hidden rounded-md border-l-4 px-2 py-1 text-left text-xs shadow-sm transition-shadow hover:z-20 hover:shadow-md ${statusClass(appointment.status)} ${outsideHours ? "ring-1 ring-destructive" : ""}`} style={{ top: timelineTop(timeToMinutes(isoToTime(appointment.scheduled_at)), bounds) + 2, height: timelineHeight(appointment.duration_min) - 4, left: `${4 + offset * 12}px`, right: `${4 + offset * 12}px` }}>
+                    const isSettling = settlingAppointmentId === appointment.id;
+                    const isRevealing = revealingAppointmentId === appointment.id;
+                    const isConflictAdjusted = conflictAdjustedAppointmentId === appointment.id;
+                    return <button key={appointment.id} type="button" onClick={(event) => { event.stopPropagation(); onAppointmentClick(appointment); }} className={`absolute z-10 overflow-hidden rounded-md border-l-4 px-2 py-1 text-left text-xs shadow-sm transition-shadow hover:z-20 hover:shadow-md ${statusClass(appointment.status)} ${isSettling ? "motion-settle ring-2 ring-emerald-500/70" : ""} ${isRevealing ? "motion-enter" : ""} ${outsideHours ? "ring-1 ring-destructive" : ""}`} style={{ top: timelineTop(timeToMinutes(isoToTime(appointment.scheduled_at)), bounds) + 2, height: timelineHeight(appointment.duration_min) - 4, left: `${4 + offset * 12}px`, right: `${4 + offset * 12}px` }}>
                       <span className="block truncate font-semibold">{patientsById.get(appointment.patient_id)?.name ?? appointment.patient_id.slice(0, 8)}</span>
                       <span className="block truncate text-[10px] opacity-80">{formatTime(appointment.scheduled_at)} · {appointment.duration_min}p{appointment.procedure ? ` · ${appointment.procedure}` : ""}</span>
+                      {isConflictAdjusted && <span className="block truncate text-[10px] font-medium text-emerald-700 dark:text-emerald-300">Đã điều chỉnh để tránh trùng lịch</span>}
                       {outsideHours && <span className="block text-[10px] font-medium text-destructive">Ngoài giờ</span>}
                     </button>;
                   })}

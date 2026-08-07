@@ -16,6 +16,7 @@ export function TreatmentPlanAiPage() {
   const [plan, setPlan] = useState<TreatmentPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
+  const [applyConfirmed, setApplyConfirmed] = useState(false);
 
   async function load() {
     if (!id) return;
@@ -66,7 +67,8 @@ export function TreatmentPlanAiPage() {
           estimated_duration_min: item.estimated_duration_min,
         })),
       });
-      // Redirect back to plan detail
+      setApplyConfirmed(true);
+      // Redirect back to plan detail after the API confirms the items were added.
       navigate(`/treatment-plans/${plan.id}`);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Lỗi thêm hạng mục");
@@ -151,7 +153,12 @@ export function TreatmentPlanAiPage() {
         </Card>
       )}
 
-      <AiTreatmentPlanSuggest visitId={plan.visit_id} onApply={onApply} />
+      <AiTreatmentPlanSuggest
+        visitId={plan.visit_id}
+        onApply={onApply}
+        applying={applying}
+        applyConfirmed={applyConfirmed}
+      />
 
       <Card>
         <CardContent className="p-4">

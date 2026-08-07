@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/lib/auth-context";
 import { ROUTES } from "@shared/constants";
@@ -12,11 +12,17 @@ export function LoginForm() {
   const [email, setEmail] = useState(() => demoRequested ? "doctor@demo.clinic" : "");
   const [password, setPassword] = useState(() => demoRequested ? "password123" : "");
   const [showPassword, setShowPassword] = useState(false);
+  const [highlightDemo, setHighlightDemo] = useState(false);
+  const emailRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!demoRequested) return;
+    if (!demoRequested) { setHighlightDemo(false); return; }
     setEmail("doctor@demo.clinic");
     setPassword("password123");
+    setHighlightDemo(true);
+    const timeout = window.setTimeout(() => setHighlightDemo(false), 600);
+    const focus = window.setTimeout(() => emailRef.current?.focus(), 0);
+    return () => { window.clearTimeout(timeout); window.clearTimeout(focus); };
   }, [demoRequested]);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
@@ -40,7 +46,7 @@ export function LoginForm() {
         {demoRequested ? "Tài khoản bác sĩ demo đã được điền sẵn. Bạn có thể bắt đầu trải nghiệm ngay." : "Đăng nhập bằng email và mật khẩu được cấp."}
       </p>
 
-      {demoRequested && <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">Bạn đang truy cập môi trường demo với dữ liệu mô phỏng.</p>}
+      {demoRequested && <p className="motion-enter rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">Bạn đang truy cập môi trường demo với dữ liệu mô phỏng.</p>}
 
       <div className="space-y-1.5">
         <label htmlFor="email" className="text-sm font-medium">
@@ -48,12 +54,13 @@ export function LoginForm() {
         </label>
         <input
           id="email"
+          ref={emailRef}
           type="email"
           autoComplete="username"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/40"
+          className={`w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/40${highlightDemo ? " motion-highlight" : ""}`}
           placeholder="admin@demo.clinic"
         />
       </div>
@@ -70,7 +77,7 @@ export function LoginForm() {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 pr-10 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/40"
+            className={`w-full rounded-md border border-input bg-background px-3 py-2 pr-10 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/40${highlightDemo ? " motion-highlight" : ""}`}
           />
           <button
             type="button"

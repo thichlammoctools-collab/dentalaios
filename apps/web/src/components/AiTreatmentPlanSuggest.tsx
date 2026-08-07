@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -27,17 +27,48 @@ export interface GeneratePlanResult {
 interface AiTreatmentPlanSuggestProps {
   visitId: string;
   onApply: (items: TreatmentPlanItemDraft[]) => void;
+  applying?: boolean;
+  applyConfirmed?: boolean;
 }
 
-export function AiTreatmentPlanSuggest({ visitId, onApply }: AiTreatmentPlanSuggestProps) {
+export function AiTreatmentPlanSuggest({ visitId, onApply, applying = false, applyConfirmed = false }: AiTreatmentPlanSuggestProps) {
   const [generating, setGenerating] = useState(false);
+  const [generationStage, setGenerationStage] = useState(0);
   const [result, setResult] = useState<GeneratePlanResult | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
+  const [revealedItemCount, setRevealedItemCount] = useState(0);
+
+  useEffect(() => {
+    if (!generating) return;
+
+    const secondStage = window.setTimeout(() => setGenerationStage(1), 400);
+    const thirdStage = window.setTimeout(() => setGenerationStage(2), 800);
+    return () => {
+      window.clearTimeout(secondStage);
+      window.clearTimeout(thirdStage);
+    };
+  }, [generating]);
+
+  useEffect(() => {
+    if (!result) return;
+
+    const cascadeCount = Math.min(result.items.length, 6);
+    setRevealedItemCount(0);
+    if (cascadeCount === 0) return;
+
+    const timers = Array.from({ length: cascadeCount }, (_, index) => window.setTimeout(
+      () => setRevealedItemCount(index + 1),
+      (index + 1) * 50,
+    ));
+    return () => timers.forEach(window.clearTimeout);
+  }, [result]);
 
   async function generate() {
     setGenerating(true);
+    setGenerationStage(0);
     setResult(null);
     setSelectedItems(new Set());
+    setRevealedItemCount(0);
     try {
       const res = await apiPost<GeneratePlanResult>("/api/ai/generate-plan", {
         visit_id: visitId,
@@ -110,23 +141,44 @@ export function AiTreatmentPlanSuggest({ visitId, onApply }: AiTreatmentPlanSugg
       </CardHeader>
       <CardContent className="space-y-3">
         {!result ? (
-          <Button
-            type="button"
-            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-            disabled={generating}
-            onClick={generate}
-          >
-            {generating ? (
-              <>
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />
-                Đang phân tích...
-              </>
-            ) : (
-              "✨ Tạo gợi ý từ AI"
-            )}
-          </Button>
+          generating ? (
+            <div className="rounded-md border border-purple-200 bg-card p-4 dark:border-purple-900" aria-live="polite">
+              <p className="mb-3 text-sm font-medium">AI đang tổng hợp dữ liệu lâm sàng</p>
+              <ol className="space-y-2 text-sm">
+                {[
+                  "Đọc phát hiện lâm sàng",
+                  "Đối chiếu dịch vụ và thời lượng",
+                  "Tạo đề xuất để bác sĩ duyệt",
+                ].map((stage, index) => (
+                  <li key={stage} className="flex items-center gap-2">
+                    <span
+                      aria-hidden="true"
+                      className={index <= generationStage
+                        ? "h-2 w-2 rounded-full bg-purple-600"
+                        : "h-2 w-2 rounded-full bg-muted"}
+                    />
+                    <span className={index === generationStage ? "font-medium" : "text-muted-foreground"}>
+                      {stage}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+              onClick={generate}
+            >
+              ✨ Tạo gợi ý từ AI
+            </Button>
+          )
         ) : (
           <>
+            <p className="rounded-md border border-purple-200 bg-card p-3 text-sm font-medium text-purple-900 dark:border-purple-900 dark:text-purple-300">
+              Đề xuất cần bác sĩ rà soát trước khi áp dụng.
+            </p>
+
             {/* AI Notes */}
             {result.notes && (
               <div className="rounded-md border border-purple-200 bg-card p-3 text-sm dark:border-purple-900">
@@ -152,7 +204,7 @@ export function AiTreatmentPlanSuggest({ visitId, onApply }: AiTreatmentPlanSugg
                   {result.items.map((item, idx) => (
                     <TableRow
                       key={idx}
-                      className={selectedItems.has(idx) ? "bg-purple-50 dark:bg-purple-950/40" : ""}
+                      className={`${selectedItems.has(idx) ? "bg-purple-50 dark:bg-purple-950/40" : ""}${idx < 6 ? idx < revealedItemCount ? " motion-enter" : " invisible" : ""}`}
                     >
                       <TableCell>
                         <input
@@ -227,9 +279,9 @@ export function AiTreatmentPlanSuggest({ visitId, onApply }: AiTreatmentPlanSugg
               <Button
                 className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600"
                 onClick={apply}
-                disabled={selectedItems.size === 0}
+                disabled={selectedItems.size === 0 || applying || applyConfirmed}
               >
-                Áp dụng ({selectedItems.size})
+                {applyConfirmed ? "✓ Đã áp dụng" : applying ? "Đang áp dụng..." : `Áp dụng (${selectedItems.size})`}
               </Button>
             </div>
           </>

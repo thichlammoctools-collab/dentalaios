@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -75,12 +75,20 @@ export function FdiToothChart({ visitId, findings, readOnly = false, onCreated, 
   const [editingOther, setEditingOther] = useState<ClinicalFinding | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
+  const [savedTooth, setSavedTooth] = useState<number | null>(null);
+  const savedToothTimer = useRef<number | null>(null);
   const [concepts, setConcepts] = useState<ClinicalConcept[]>([]);
 
   useEffect(() => {
     void apiGet<{ items: ClinicalConcept[] }>("/api/clinical-terminology/concepts")
       .then((response) => setConcepts(response.items))
       .catch(() => undefined);
+  }, []);
+
+  useEffect(() => () => {
+    if (savedToothTimer.current !== null) {
+      window.clearTimeout(savedToothTimer.current);
+    }
   }, []);
 
   const toothDefinition = getFindingCategory(toothTab);
@@ -179,7 +187,9 @@ export function FdiToothChart({ visitId, findings, readOnly = false, onCreated, 
   }
 
   function renderTooth(tooth: number) {
-    return <button key={tooth} type="button" onClick={() => openTooth(tooth)} disabled={readOnly} aria-label={`${readOnly ? "Xem" : "Ghi nhận"} răng ${tooth}`} className={cn("flex h-9 w-9 items-center justify-center rounded border font-mono text-xs font-semibold transition-colors sm:h-10 sm:w-10", selectedTooth === tooth && "ring-2 ring-primary ring-offset-2 ring-offset-card", readOnly && "cursor-default", toothStatus(tooth))}>{tooth}</button>;
+    const isSelected = selectedTooth === tooth;
+    const isSaved = savedTooth === tooth || findings.some((finding) => finding.tooth_number === tooth);
+    return <button key={tooth} type="button" onClick={() => openTooth(tooth)} disabled={readOnly} aria-label={`${readOnly ? "Xem" : "Ghi nhận"} răng ${tooth}${isSaved ? ", đã có ghi nhận" : ""}`} className={cn("relative flex h-9 w-9 items-center justify-center rounded border font-mono text-xs font-semibold transition-colors sm:h-10 sm:w-10", isSelected && "motion-highlight ring-2 ring-primary ring-offset-2 ring-offset-card", savedTooth === tooth && "motion-success", readOnly && "cursor-default", toothStatus(tooth))}>{tooth}{isSaved && <span aria-hidden="true" className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-600 font-sans text-[9px] leading-none text-white">✓</span>}</button>;
   }
 
   function renderJaw(right: number[], left: number[]) {
@@ -231,6 +241,11 @@ export function FdiToothChart({ visitId, findings, readOnly = false, onCreated, 
       });
       onCreated(created);
       const message = `Đã lưu ghi nhận răng #${selectedTooth}`;
+      setSavedTooth(selectedTooth);
+      if (savedToothTimer.current !== null) {
+        window.clearTimeout(savedToothTimer.current);
+      }
+      savedToothTimer.current = window.setTimeout(() => setSavedTooth(null), 300);
       setSavedMessage(message);
       toast.success(message);
       resetToothForm(toothTab);

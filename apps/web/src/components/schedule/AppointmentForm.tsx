@@ -24,7 +24,7 @@ interface AppointmentFormProps {
   branchId?: string;
   initialClinicianId?: string;
   initialChairId?: string;
-  onCreated?: () => void;
+  onCreated?: (appointment: Appointment) => void;
   milestone?: {
     planId: string;
     milestoneId: string;
@@ -291,6 +291,7 @@ export function AppointmentForm({
         : selectedPatientMilestones[0]
           ? { planId: selectedPatientMilestones[0].treatment_plan_id, milestoneId: selectedPatientMilestones[0].milestone_id }
           : undefined;
+      let createdAppointment: Appointment | undefined;
       if (milestoneContext) {
         await apiPost(`/api/treatment-plans/${milestoneContext.planId}/case/milestones/${milestoneContext.milestoneId}/appointments`, {
           milestone_ids: selectedMilestoneIds,
@@ -302,10 +303,10 @@ export function AppointmentForm({
           notes: notes || undefined,
         });
       } else {
-        await apiPost<Appointment>("/api/appointments", { patient_id: patientId, ...appointmentPayload });
+        createdAppointment = await apiPost<Appointment>("/api/appointments", { patient_id: patientId, ...appointmentPayload });
       }
       toast.success("Đã tạo lịch hẹn");
-      onCreated?.();
+      if (createdAppointment) onCreated?.(createdAppointment);
       onOpenChange(false);
       resetForm();
     } catch (err) {

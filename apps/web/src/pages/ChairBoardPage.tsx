@@ -78,6 +78,8 @@ export function ChairBoardPage() {
   const [transferAppointment, setTransferAppointment] = useState<Appointment | null>(null);
   const [transferChairId, setTransferChairId] = useState("");
   const [transferring, setTransferring] = useState(false);
+  const [settlingChairId, setSettlingChairId] = useState<string | null>(null);
+  const [transferFeedback, setTransferFeedback] = useState<{ sourceChairId: string; destinationChairId: string } | null>(null);
   const [now, setNow] = useState(() => new Date());
   const canManage = Boolean(
     session?.role.permissions.includes(PERMISSIONS.ALL) || session?.role.permissions.includes(PERMISSIONS.MANAGE_USERS),
@@ -126,6 +128,15 @@ export function ChairBoardPage() {
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    if (!settlingChairId && !transferFeedback) return;
+    const timer = window.setTimeout(() => {
+      setSettlingChairId(null);
+      setTransferFeedback(null);
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [settlingChairId, transferFeedback]);
+
   const patientsById = useMemo(() => new Map(patients.map((patient) => [patient.id, patient])), [patients]);
   const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
 
@@ -142,8 +153,9 @@ export function ChairBoardPage() {
         chairs: current.chairs.map((item) => item.chair.id === chair.id
           ? { ...item, chair, current_status: operationalStatus }
           : item),
-      });
-      toast.success("Đã cập nhật trạng thái ghế");
+       });
+       setSettlingChairId(chair.id);
+       toast.success("Đã cập nhật trạng thái ghế");
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Không thể cập nhật trạng thái ghế");
     }
@@ -177,6 +189,7 @@ export function ChairBoardPage() {
     setTransferring(true);
     try {
       await apiPatch<Appointment>(`/api/appointments/${transferAppointment.id}`, { chair_id: transferChairId });
+      setTransferFeedback({ sourceChairId: transferAppointment.chair_id ?? "", destinationChairId: transferChairId });
       toast.success("Đã chuyển ghế cho lịch hẹn");
       setTransferAppointment(null);
       setRefreshKey((value) => value + 1);
@@ -231,11 +244,11 @@ export function ChairBoardPage() {
           {board.chairs.map((item) => {
             const { chair } = item;
             return (
-              <Card key={chair.id} onClick={() => setSelectedChair(item)} className="cursor-pointer overflow-hidden transition-colors hover:bg-muted/20">
+              <Card key={chair.id} onClick={() => setSelectedChair(item)} className={`cursor-pointer overflow-hidden transition-colors hover:bg-muted/20 ${settlingChairId === chair.id || transferFeedback?.destinationChairId === chair.id ? "motion-settle ring-2 ring-emerald-500/70" : ""} ${transferFeedback?.sourceChairId === chair.id ? "opacity-70" : ""}`}>
                 <CardHeader className="border-b bg-muted/20 pb-3">
                     <CardTitle className="flex items-start justify-between gap-3 text-base">
                       <span>{chair.name}<span className="ml-2 font-mono text-xs font-normal text-muted-foreground">{chair.code}</span></span>
-                      <span className={`rounded-full px-2 py-1 text-[11px] font-medium ${STATUS_STYLE[item.current_status]}`}>{STATUS_LABEL[item.current_status]}</span>
+                       <span className={`rounded-full px-2 py-1 text-[11px] font-medium transition-colors duration-200 ${STATUS_STYLE[item.current_status]} ${settlingChairId === chair.id ? "motion-success" : ""}`}>{STATUS_LABEL[item.current_status]}</span>
                     </CardTitle>
                     <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
                       <span>{chair.room_name ?? "Chưa gán phòng"}</span>

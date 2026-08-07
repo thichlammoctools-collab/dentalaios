@@ -3,11 +3,48 @@ import worker from "../src/index";
 
 const env = {
   ENVIRONMENT: "production",
-  FRONTEND_ORIGIN: "https://dentalaios-web.pages.dev",
-  CORS_ORIGINS: "https://dentalaios-web.pages.dev,https://*.dentalaios-web.pages.dev,https://dentalaios.pages.dev",
+  FRONTEND_ORIGIN: "https://ai.dentalempireos.com",
+  CORS_ORIGINS:
+    "https://ai.dentalempireos.com,https://dentalaios-web.pages.dev,https://*.dentalaios-web.pages.dev,https://dentalaios.pages.dev",
 } as any;
 
 describe("CORS", () => {
+  it("allows the custom production domain", async () => {
+    const response = await worker.fetch(
+      new Request("https://api.example.test/api/health", {
+        headers: { Origin: "https://ai.dentalempireos.com" },
+      }),
+      env,
+      {} as ExecutionContext,
+    );
+
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(
+      "https://ai.dentalempireos.com",
+    );
+  });
+
+  it("allows login preflight from the custom production domain", async () => {
+    const response = await worker.fetch(
+      new Request("https://api.example.test/api/auth/login", {
+        method: "OPTIONS",
+        headers: {
+          Origin: "https://ai.dentalempireos.com",
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers": "content-type",
+        },
+      }),
+      env,
+      {} as ExecutionContext,
+    );
+
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(
+      "https://ai.dentalempireos.com",
+    );
+    expect(response.headers.get("Access-Control-Allow-Credentials")).toBe("true");
+    expect(response.headers.get("Access-Control-Allow-Methods")).toContain("POST");
+    expect(response.headers.get("Access-Control-Allow-Headers")).toContain("Content-Type");
+  });
+
   it("allows the production Pages domain", async () => {
     const response = await worker.fetch(
       new Request("https://api.example.test/api/health", {

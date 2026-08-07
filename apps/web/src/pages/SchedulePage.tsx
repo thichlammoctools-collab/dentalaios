@@ -51,6 +51,9 @@ export function SchedulePage() {
   const [expandedWeekDay, setExpandedWeekDay] = useState<string | null>(null);
   const [timelineMode, setTimelineMode] = useState<"doctor" | "chair">("doctor");
   const [timelinePrefill, setTimelinePrefill] = useState<{ time?: string; clinicianId?: string; chairId?: string }>({});
+  const [settlingAppointmentId, setSettlingAppointmentId] = useState<string | null>(null);
+  const [revealingAppointmentId, setRevealingAppointmentId] = useState<string | null>(null);
+  const [conflictAdjustedAppointmentId, setConflictAdjustedAppointmentId] = useState<string | null>(null);
 
   // Filters apply to both schedule views.
   const [filterStatuses, setFilterStatuses] = useState<Set<string>>(() => new Set(requestedStatuses));
@@ -65,6 +68,16 @@ export function SchedulePage() {
     const timer = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!settlingAppointmentId && !revealingAppointmentId && !conflictAdjustedAppointmentId) return;
+    const timer = window.setTimeout(() => {
+      setSettlingAppointmentId(null);
+      setRevealingAppointmentId(null);
+      setConflictAdjustedAppointmentId(null);
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [settlingAppointmentId, revealingAppointmentId, conflictAdjustedAppointmentId]);
 
   // Compute week range from selectedDate
   const weekDays = useMemo(() => getWeekDays(selectedDate), [selectedDate]);
@@ -208,6 +221,7 @@ export function SchedulePage() {
     try {
       const updated = await apiPatch<Appointment>(`/api/appointments/${appointment.id}`, { status });
       setAppointments((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setSettlingAppointmentId(updated.id);
       toast.success(`Đã cập nhật trạng thái thành ${statusLabelVi(updated.status)}`);
     } catch (err) {
       setAppointments((current) => current.map((item) => item.id === previous.id ? previous : item));
@@ -266,7 +280,9 @@ export function SchedulePage() {
         scheduled_at: scheduledAt.toISOString(),
       });
       setAppointments((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setSettlingAppointmentId(updated.id);
       if (scheduledAt.getTime() !== requestedAt.getTime()) {
+        setConflictAdjustedAppointmentId(updated.id);
         toast.success(`Đã đổi lịch sang ${formatDate(scheduledAt.toISOString())} ${formatTime(scheduledAt.toISOString())} để tránh trùng lịch`);
       } else {
         toast.success("Đã đổi lịch hẹn");
@@ -291,6 +307,7 @@ export function SchedulePage() {
         notes: appointment.notes,
       });
       setAppointments((current) => [...current, created]);
+      setRevealingAppointmentId(created.id);
       toast.success("Đã nhân bản lịch hẹn");
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Không thể nhân bản lịch hẹn");
@@ -441,11 +458,14 @@ export function SchedulePage() {
                   mode={timelineMode}
                   onModeChange={setTimelineMode}
                   onAppointmentClick={(appointment) => navigate(`/appointments/${appointment.id}`)}
-                  onEmptySlotClick={({ time, clinicianId, chairId }) => {
-                    setTimelinePrefill({ time, clinicianId, chairId });
-                    setCreateOpen(true);
-                  }}
-                />
+                   onEmptySlotClick={({ time, clinicianId, chairId }) => {
+                     setTimelinePrefill({ time, clinicianId, chairId });
+                     setCreateOpen(true);
+                   }}
+                   settlingAppointmentId={settlingAppointmentId}
+                   revealingAppointmentId={revealingAppointmentId}
+                   conflictAdjustedAppointmentId={conflictAdjustedAppointmentId}
+                 />
               )}
             </CardContent>
           </Card>
@@ -684,8 +704,12 @@ export function SchedulePage() {
         initialTime={timelinePrefill.time}
         initialClinicianId={timelinePrefill.clinicianId}
         initialChairId={timelinePrefill.chairId}
-        branchId={boardBranchId || undefined}
-      />
+         branchId={boardBranchId || undefined}
+         onCreated={(created) => {
+           setAppointments((current) => [...current, created]);
+           setRevealingAppointmentId(created.id);
+         }}
+       />
 
       {editing && (
         <EditAppointmentDialog

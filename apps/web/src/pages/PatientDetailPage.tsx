@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -78,11 +78,19 @@ export function PatientDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [showPastAppointments, setShowPastAppointments] = useState(false);
   const [startingAppointmentId, setStartingAppointmentId] = useState<string | null>(null);
+  const [startedAppointmentId, setStartedAppointmentId] = useState<string | null>(null);
+  const startVisitNavigationTimer = useRef<number | null>(null);
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => () => {
+    if (startVisitNavigationTimer.current !== null) {
+      window.clearTimeout(startVisitNavigationTimer.current);
+    }
   }, []);
 
   async function load() {
@@ -164,8 +172,11 @@ export function PatientDetailPage() {
         clinician_id: session.user.id,
         source_appointment_id: appointment.id,
       });
+      setStartedAppointmentId(appointment.id);
       toast.success("Đã bắt đầu lượt khám");
-      navigate(withPatientReturnContext(`/visits/${visit.id}#findings`, patient.id, "appointments"));
+      startVisitNavigationTimer.current = window.setTimeout(() => {
+        navigate(withPatientReturnContext(`/visits/${visit.id}#findings`, patient.id, "appointments"));
+      }, 250);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Không thể bắt đầu lượt khám");
     } finally {
@@ -660,9 +671,14 @@ export function PatientDetailPage() {
                           <Button
                             size="sm"
                             onClick={() => void startVisit(apt)}
-                            disabled={startingAppointmentId === apt.id}
+                            disabled={startingAppointmentId === apt.id || startedAppointmentId === apt.id}
+                            className={startedAppointmentId === apt.id ? "motion-success" : undefined}
                           >
-                            {startingAppointmentId === apt.id ? "Đang bắt đầu…" : "Bắt đầu khám"}
+                            {startingAppointmentId === apt.id
+                              ? "Đang bắt đầu…"
+                              : startedAppointmentId === apt.id
+                                ? "✓ Đã tạo lượt khám"
+                                : "Bắt đầu khám"}
                           </Button>
                         </div>
                       )}
