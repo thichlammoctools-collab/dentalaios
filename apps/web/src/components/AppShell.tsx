@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { MobileBottomNav } from "./MobileBottomNav";
+import { DemoBanner } from "./DemoBanner";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "sidebar:collapsed";
@@ -53,6 +54,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <DemoBanner />
         <Topbar onMenuClick={() => setMobileOpen(true)} />
         <main id="app-content" className="min-h-0 flex-1 overflow-y-auto pb-20 lg:pb-0">{children}</main>
       </div>

@@ -105,6 +105,70 @@ html[data-theme="dark"] {
 .platform-control .text-emerald-800 { color: #86efac; }
 .platform-control .text-cyan-700 { color: #67e8f9; }
 
+/* The public marketing site has its own calm, clinical dark palette. */
+html[data-theme="dark"] .marketing-site {
+  background: #101917;
+  color: #edf5ef;
+}
+
+html[data-theme="dark"] .marketing-site .bg-\[\#f7f8f5\],
+html[data-theme="dark"] .marketing-site .bg-\[\#f7f8f5\]\/90,
+html[data-theme="dark"] .marketing-site .bg-white,
+html[data-theme="dark"] .marketing-site .bg-white\/55,
+html[data-theme="dark"] .marketing-site .bg-white\/60,
+html[data-theme="dark"] .marketing-site .bg-white\/70,
+html[data-theme="dark"] .marketing-site .bg-\[\#fdfefd\],
+html[data-theme="dark"] .marketing-site .bg-\[\#fbfdfb\] { background-color: #16221f; }
+
+html[data-theme="dark"] .marketing-site .bg-\[\#eff5ef\],
+html[data-theme="dark"] .marketing-site .bg-\[\#e5f0e7\],
+html[data-theme="dark"] .marketing-site .bg-\[\#e6f1e8\],
+html[data-theme="dark"] .marketing-site .bg-\[\#e7eee8\],
+html[data-theme="dark"] .marketing-site .bg-\[\#e7f2e9\],
+html[data-theme="dark"] .marketing-site .bg-\[\#e3f2e6\] { background-color: #213a31; }
+
+html[data-theme="dark"] .marketing-site .bg-\[\#dceee0\] { background-color: #1d382e; }
+html[data-theme="dark"] .marketing-site .bg-\[\#dcecdf\] { background-color: #244638; }
+html[data-theme="dark"] .marketing-site .border-\[\#dce4de\],
+html[data-theme="dark"] .marketing-site .border-\[\#dce6de\],
+html[data-theme="dark"] .marketing-site .border-\[\#d5e1d7\],
+html[data-theme="dark"] .marketing-site .border-\[\#d4dfd6\],
+html[data-theme="dark"] .marketing-site .border-\[\#d1ded4\],
+html[data-theme="dark"] .marketing-site .border-\[\#cfddd2\],
+html[data-theme="dark"] .marketing-site .border-\[\#e4ece5\],
+html[data-theme="dark"] .marketing-site .border-\[\#dbe7dd\] { border-color: #365348; }
+
+html[data-theme="dark"] .marketing-site .text-\[\#123c31\],
+html[data-theme="dark"] .marketing-site .text-\[\#13251f\],
+html[data-theme="dark"] .marketing-site .text-\[\#163e32\],
+html[data-theme="dark"] .marketing-site .text-\[\#173e32\],
+html[data-theme="dark"] .marketing-site .text-\[\#20473b\],
+html[data-theme="dark"] .marketing-site .text-\[\#21483c\],
+html[data-theme="dark"] .marketing-site .text-\[\#245044\],
+html[data-theme="dark"] .marketing-site .text-\[\#315748\],
+html[data-theme="dark"] .marketing-site .text-\[\#406258\] { color: #edf5ef; }
+
+html[data-theme="dark"] .marketing-site .text-\[\#547268\],
+html[data-theme="dark"] .marketing-site .text-\[\#587068\],
+html[data-theme="dark"] .marketing-site .text-\[\#5c756b\],
+html[data-theme="dark"] .marketing-site .text-\[\#5d756c\],
+html[data-theme="dark"] .marketing-site .text-\[\#60776e\],
+html[data-theme="dark"] .marketing-site .text-\[\#61786e\],
+html[data-theme="dark"] .marketing-site .text-\[\#627a70\],
+html[data-theme="dark"] .marketing-site .text-\[\#6b8379\],
+html[data-theme="dark"] .marketing-site .text-\[\#6d8178\],
+html[data-theme="dark"] .marketing-site .text-\[\#6f8079\],
+html[data-theme="dark"] .marketing-site .text-\[\#748b81\],
+html[data-theme="dark"] .marketing-site .text-\[\#779087\],
+html[data-theme="dark"] .marketing-site .text-\[\#789087\],
+html[data-theme="dark"] .marketing-site .text-\[\#799287\],
+html[data-theme="dark"] .marketing-site .text-\[\#80a192\],
+html[data-theme="dark"] .marketing-site .text-\[\#8a9c94\] { color: #adc5b8; }
+
+html[data-theme="dark"] .marketing-site .hover\:bg-\[\#edf2ed\]:hover { background-color: #284539; }
+html[data-theme="dark"] .marketing-site .bg-\[\#123c31\] { background-color: #245b48; }
+html[data-theme="dark"] .marketing-site .hover\:bg-\[\#0c3026\]:hover { background-color: #30725a; }
+
 /* The referrer portal has its own shell but shares the workspace width. */
 main.min-h-svh.bg-muted\/20 > header > .mx-auto,
 main.min-h-svh.bg-muted\/20 > .mx-auto {

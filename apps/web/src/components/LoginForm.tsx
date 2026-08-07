@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/lib/auth-context";
 import { ROUTES } from "@shared/constants";
 import { ApiError } from "@/lib/api";
@@ -7,8 +7,10 @@ import { ApiError } from "@/lib/api";
 export function LoginForm() {
   const { login, loading, error } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [searchParams] = useSearchParams();
+  const demoRequested = searchParams.get("demo") === "doctor";
+  const [email, setEmail] = useState(() => demoRequested ? "doctor@demo.clinic" : "");
+  const [password, setPassword] = useState(() => demoRequested ? "password123" : "");
   const [showPassword, setShowPassword] = useState(false);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
@@ -29,8 +31,10 @@ export function LoginForm() {
     >
       <h1 className="text-2xl font-semibold tracking-tight">Đăng nhập</h1>
       <p className="text-sm text-muted-foreground">
-        Đăng nhập bằng email và mật khẩu được cấp.
+        {demoRequested ? "Tài khoản bác sĩ demo đã được điền sẵn. Bạn có thể bắt đầu trải nghiệm ngay." : "Đăng nhập bằng email và mật khẩu được cấp."}
       </p>
+
+      {demoRequested && <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">Bạn đang truy cập môi trường demo với dữ liệu mô phỏng.</p>}
 
       <div className="space-y-1.5">
         <label htmlFor="email" className="text-sm font-medium">
@@ -101,6 +105,8 @@ export function LoginForm() {
       >
         {loading ? "Đang đăng nhập..." : "Đăng nhập"}
       </button>
+
+      {!demoRequested && <Link to="/login?demo=doctor" className="block rounded-md border border-primary/30 px-3 py-2 text-center text-sm font-medium text-primary transition-colors hover:bg-primary/10">Trải nghiệm demo với vai trò Bác sĩ</Link>}
 
       <p className="text-center text-sm text-muted-foreground">
         Chưa có tài khoản?{" "}

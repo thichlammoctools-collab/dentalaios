@@ -135,6 +135,19 @@ npx wrangler d1 migrations apply dentalaios-db --remote
 npx wrangler d1 execute dentalaios-db --remote --file=../../src/db/seeds/0001_roles.sql
 ```
 
+### Môi trường demo
+
+Triển khai demo trên Worker, D1 và R2 riêng; tuyệt đối không dùng chung database hoặc tệp với production. Sau khi tạo database demo, apply migrations rồi seed dữ liệu mô phỏng:
+
+```bash
+cd apps/api
+npx wrangler d1 migrations apply dentalaios-demo-db --remote
+npx wrangler d1 execute dentalaios-demo-db --remote --file=../../src/db/seeds/0001_roles.sql
+npx wrangler d1 execute dentalaios-demo-db --remote --file=../../src/db/seeds/0002_demo_data.sql
+```
+
+Tài khoản trải nghiệm mặc định: `doctor@demo.clinic` / `password123`. Khi đăng nhập bằng tài khoản `@demo.clinic`, ứng dụng hiển thị banner cảnh báo dữ liệu mô phỏng. Không cấu hình credential Lark, email, SMS hoặc webhook thật trong môi trường demo.
+
 ---
 
 ## Scripts tiện ích
